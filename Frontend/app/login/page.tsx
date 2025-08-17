@@ -1,5 +1,6 @@
 'use client'
 import { useState } from 'react'
+import Link from 'next/link'
 import { Eye, EyeOff, Mail, Lock, User, Calendar, Camera, Edit3, ArrowRight, Sparkles, Upload, Chrome, Apple as AppleIcon, GithubIcon } from 'lucide-react'
 
 export default function LoginPage() {
@@ -186,9 +187,12 @@ export default function LoginPage() {
 
               {/* Create Account */}
               <div className="mt-8">
-                <button className="w-full flex justify-center items-center py-4 px-6 border border-white/30 rounded-2xl text-lg font-semibold text-white hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-white/50 focus:ring-offset-2 focus:ring-offset-transparent transition-all duration-300 backdrop-blur-sm hover:border-white/50">
-                  Create New Account
-                </button>
+                <Link
+    href="/register"
+    className="w-full flex justify-center items-center py-4 px-6 border border-white/30 rounded-2xl text-lg font-semibold text-white hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-white/50 focus:ring-offset-2 focus:ring-offset-transparent transition-all duration-300 backdrop-blur-sm hover:border-white/50"
+  >
+    Create New Account
+  </Link>
               </div>
             </div>
           </div>

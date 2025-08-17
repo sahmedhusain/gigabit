@@ -1,5 +1,7 @@
 'use client'
 import { useState } from 'react'
+import Link from 'next/link'
+
 import { Eye, EyeOff, Mail, Lock, User, Calendar, Camera, Edit3, ArrowRight, Sparkles, Upload, Chrome, Apple as AppleIcon, GithubIcon } from 'lucide-react'
 
 export default function RegisterPage() {
@@ -322,9 +324,12 @@ export default function RegisterPage() {
               <div className="mt-8 text-center">
                 <p className="text-white/70">
                   Already have an account?{' '}
-                  <button className="text-emerald-300 hover:text-emerald-200 hover:underline transition-colors font-medium">
+                    <Link
+                   href="/login"
+                  className="text-emerald-300 hover:text-emerald-200 hover:underline transition-colors font-medium">
                     Sign In
-                  </button>
+                  
+                  </Link>
                 </p>
               </div>
             </div>

@@ -1,20 +1,26 @@
 package handlers
 
 import (
+	"database/sql"
 	"net/http"
 	"social/models"
+	"social/services"
 	"social/utils"
+	"time"
 
 	"github.com/gin-gonic/gin"
-	"gorm.io/gorm"
 )
 
 type AuthHandler struct {
-	DB *gorm.DB
+	userService    *services.UserService
+	sessionService *services.SessionService
 }
 
-func NewAuthHandler(db *gorm.DB) *AuthHandler {
-	return &AuthHandler{DB: db}
+func NewAuthHandler(db *sql.DB) *AuthHandler {
+	return &AuthHandler{
+		userService:    services.NewUserService(db),
+		sessionService: services.NewSessionService(db),
+	}
 }
 
 func (h *AuthHandler) Register(c *gin.Context) {
@@ -25,9 +31,9 @@ func (h *AuthHandler) Register(c *gin.Context) {
 	}
 
 	// Check if user already exists
-	var existingUser models.User
-	if err := h.DB.Where("email = ? OR username = ?", req.Email, req.Username).First(&existingUser).Error; err == nil {
-		c.JSON(http.StatusConflict, gin.H{"error": "User with this email or username already exists"})
+	existingUser, err := h.userService.GetUserByEmail(req.Email)
+	if err == nil && existingUser != nil {
+		c.JSON(http.StatusConflict, gin.H{"error": "User with this email already exists"})
 		return
 	}
 
@@ -39,28 +45,64 @@ func (h *AuthHandler) Register(c *gin.Context) {
 	}
 
 	// Create user
-	user := models.User{
-		Username:  req.Username,
-		Email:     req.Email,
-		Password:  hashedPassword,
-		FirstName: req.FirstName,
-		LastName:  req.LastName,
+	user := &models.User{
+		Email:       req.Email,
+		Password:    hashedPassword,
+		FirstName:   req.FirstName,
+		LastName:    req.LastName,
+		DateOfBirth: req.DateOfBirth,
 	}
 
-	if err := h.DB.Create(&user).Error; err != nil {
+	// Handle optional fields
+	if req.Nickname != "" {
+		user.Nickname = &req.Nickname
+	}
+	if req.AboutMe != "" {
+		user.AboutMe = &req.AboutMe
+	}
+
+	if err := h.userService.CreateUser(user); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create user"})
 		return
 	}
 
-	// Generate token
-	token, err := utils.GenerateToken(user.ID, user.Email)
+	// Create session with temporary ID to generate token
+	tempSession := &models.Session{
+		UserID:    user.ID,
+		ExpiresAt: time.Now().Add(30 * time.Minute),
+	}
+
+	// Generate token - we'll use 0 as temporary session ID, then update
+	token, err := utils.GenerateToken(user.ID, user.Email, 0)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate token"})
 		return
 	}
 
+	// Set token in session before creating
+	tempSession.Token = token
+
+	if err := h.sessionService.CreateSession(tempSession); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create session"})
+		return
+	}
+
+	// Now generate the final token with correct session ID
+	finalToken, err := utils.GenerateToken(user.ID, user.Email, tempSession.ID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate final token"})
+		return
+	}
+
+	// Update session with final token
+	tempSession.Token = finalToken
+	if err := h.sessionService.UpdateSessionToken(tempSession); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save session"})
+		return
+	}
+
 	response := models.AuthResponse{
-		Token: token,
+		Token: finalToken,
 		User:  user.ToResponse(),
 	}
 
@@ -75,8 +117,8 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	}
 
 	// Find user by email
-	var user models.User
-	if err := h.DB.Where("email = ?", req.Email).First(&user).Error; err != nil {
+	user, err := h.userService.GetUserByEmail(req.Email)
+	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid credentials"})
 		return
 	}
@@ -87,15 +129,45 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		return
 	}
 
-	// Generate token
-	token, err := utils.GenerateToken(user.ID, user.Email)
+	// Invalidate existing sessions for this user
+	h.sessionService.DeleteUserSessions(user.ID)
+
+	// Create new session with temporary token
+	tempSession := &models.Session{
+		UserID:    user.ID,
+		ExpiresAt: time.Now().Add(30 * time.Minute),
+	}
+
+	// Generate temporary token
+	tempToken, err := utils.GenerateToken(user.ID, user.Email, 0)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate token"})
 		return
 	}
 
+	tempSession.Token = tempToken
+
+	if err := h.sessionService.CreateSession(tempSession); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create session"})
+		return
+	}
+
+	// Generate final token with correct session ID
+	finalToken, err := utils.GenerateToken(user.ID, user.Email, tempSession.ID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate final token"})
+		return
+	}
+
+	// Update session with final token
+	tempSession.Token = finalToken
+	if err := h.sessionService.UpdateSessionToken(tempSession); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save session"})
+		return
+	}
+
 	response := models.AuthResponse{
-		Token: token,
+		Token: finalToken,
 		User:  user.ToResponse(),
 	}
 
@@ -109,11 +181,27 @@ func (h *AuthHandler) GetMe(c *gin.Context) {
 		return
 	}
 
-	var user models.User
-	if err := h.DB.First(&user, userID).Error; err != nil {
+	user, err := h.userService.GetUserByID(userID.(uint))
+	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
 		return
 	}
 
 	c.JSON(http.StatusOK, user.ToResponse())
+}
+
+func (h *AuthHandler) Logout(c *gin.Context) {
+	sessionID, exists := c.Get("session_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "No active session"})
+		return
+	}
+
+	// Delete the session
+	if err := h.sessionService.DeleteSession(sessionID.(uint)); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to logout"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Successfully logged out"})
 }

@@ -1,31 +1,50 @@
 'use client'
 import { useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import { useAuth } from '@/context/AuthContext'
 import { Eye, EyeOff, Mail, Lock, User, Calendar, Camera, Edit3, ArrowRight, Sparkles, Upload, Chrome, Apple as AppleIcon, GithubIcon } from 'lucide-react'
 
 export default function LoginPage() {
+  const router = useRouter()
+  const { login } = useAuth()
+  
   const [formData, setFormData] = useState({
     email: '',
     password: ''
   })
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({
       ...formData,
-      [e.target.name]: e.target.value
+      [e.target.name]: e.target.value.trim()
     })
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
-    // Simulate loading
-    setTimeout(() => {
+    setError(null)
+    
+    try {
+      // Validate required fields
+      if (!formData.email || !formData.password) {
+        throw new Error('Please fill in all fields')
+      }
+
+      // Call login function from auth context
+      await login(formData.email, formData.password)
+
+      // Redirect to dashboard on success
+      router.push('/dashboard')
+    } catch (err: any) {
+      setError(err.message || 'Login failed. Please try again.')
+    } finally {
       setIsLoading(false)
-      console.log('Login attempt:', formData)
-    }, 2000)
+    }
   }
 
   return (
@@ -78,6 +97,13 @@ export default function LoginPage() {
             
             <div className="relative p-6 sm:p-8">
               <div className="space-y-6">
+                {/* Error Message */}
+                {error && (
+                  <div className="bg-red-500/20 border border-red-500/30 rounded-2xl p-4 mb-4">
+                    <p className="text-red-300 text-sm text-center">{error}</p>
+                  </div>
+                )}
+
                 {/* Email Input */}
                 <div className="relative group">
                   <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none z-10">

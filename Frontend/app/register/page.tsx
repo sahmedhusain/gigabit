@@ -1,10 +1,15 @@
 'use client'
 import { useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import { useAuth } from '@/context/AuthContext'
 
 import { Eye, EyeOff, Mail, Lock, User, Calendar, Camera, Edit3, ArrowRight, Sparkles, Upload, Chrome, Apple as AppleIcon, GithubIcon } from 'lucide-react'
 
 export default function RegisterPage() {
+  const router = useRouter()
+  const { register } = useAuth()
+  
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -18,11 +23,12 @@ export default function RegisterPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     setFormData({
       ...formData,
-      [e.target.name]: e.target.value
+      [e.target.name]: e.target.value.trim()
     })
   }
 
@@ -40,11 +46,43 @@ export default function RegisterPage() {
 
   const handleSubmit = async () => {
     setIsLoading(true)
-    // Simulate loading
-    setTimeout(() => {
+    setError(null)
+    
+    try {
+      // Validate required fields
+      if (!formData.email || !formData.password || !formData.firstName || !formData.lastName || !formData.dateOfBirth) {
+        throw new Error('Please fill in all required fields')
+      }
+
+      // Validate email format
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+      if (!emailRegex.test(formData.email)) {
+        throw new Error('Please enter a valid email address')
+      }
+
+      // Validate password length
+      if (formData.password.length < 6) {
+        throw new Error('Password must be at least 6 characters long')
+      }
+
+      // Call register function from auth context
+      await register({
+        email: formData.email,
+        password: formData.password,
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        dateOfBirth: formData.dateOfBirth,
+        nickname: formData.nickname,
+        aboutMe: formData.aboutMe,
+      })
+
+      // Redirect to dashboard on success
+      router.push('/dashboard')
+    } catch (err: any) {
+      setError(err.message || 'Registration failed. Please try again.')
+    } finally {
       setIsLoading(false)
-      console.log('Register attempt:', formData)
-    }, 2500)
+    }
   }
 
   return (
@@ -120,6 +158,13 @@ export default function RegisterPage() {
                     />
                   </div>
                 </div>
+
+                {/* Error Message */}
+                {error && (
+                  <div className="bg-red-500/20 border border-red-500/30 rounded-2xl p-4 mb-4">
+                    <p className="text-red-300 text-sm text-center">{error}</p>
+                  </div>
+                )}
 
                 {/* Name Fields Row */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

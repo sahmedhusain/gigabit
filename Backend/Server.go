@@ -3,101 +3,74 @@ package main
 import (
 	"social/handlers"
 	"social/middleware"
+	customsqlite "social/pkg/db/sqlite"
+	"time"
 
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 )
 
-func SetupRoutes() *gin.Engine {
+type Server struct {
+	Router *gin.Engine
+	DB     *customsqlite.DB
+}
+
+func NewServer() *Server {
 	r := gin.New()
 
 	// Add middleware
-	r.Use(middleware.Logger())
-	r.Use(middleware.ErrorHandler())
+	r.Use(gin.Logger())
+	r.Use(gin.Recovery())
+	r.Use(middleware.ErrorHandler()) // Add error handling middleware
 
-	// CORS middleware
+	server := &Server{
+		Router: r,
+		DB:     DB,
+	}
+
+	server.Routes()
+	return server
+}
+
+func (s *Server) Routes() {
+	r := s.Router
+
+	// Setup CORS
+	r.Use(cors.New(cors.Config{
+		AllowOrigins:     []string{"http://localhost:3000", "http://localhost:3001"},
+		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization"},
+		ExposeHeaders:    []string{"Content-Length"},
+		AllowCredentials: true,
+		MaxAge:           12 * time.Hour,
+	}))
+
+	// Database middleware
 	r.Use(func(c *gin.Context) {
-		c.Header("Access-Control-Allow-Origin", "*")
-		c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-		c.Header("Access-Control-Allow-Headers", "Origin, Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization")
-
-		if c.Request.Method == "OPTIONS" {
-			c.AbortWithStatus(204)
-			return
-		}
-
+		c.Set("db", s.DB.GetDB())
 		c.Next()
 	})
 
 	// Initialize handlers
-	authHandler := handlers.NewAuthHandler(DB)
-	userHandler := handlers.NewUserHandler(DB)
-	friendshipHandler := handlers.NewFriendshipHandler(DB)
-	postHandler := handlers.NewPostHandler(DB)
-	commentHandler := handlers.NewCommentHandler(DB)
-	feedHandler := handlers.NewFeedHandler(DB)
+	authHandler := handlers.NewAuthHandler(s.DB.GetDB())
 
 	// Health check
 	r.GET("/health", func(c *gin.Context) {
 		c.JSON(200, gin.H{"status": "ok"})
 	})
 
-	// API v1 routes
-	v1 := r.Group("/api/v1")
-
-	// Authentication routes (public)
-	auth := v1.Group("/auth")
+	// Public routes
+	public := r.Group("/api")
 	{
-		auth.POST("/register", authHandler.Register)
-		auth.POST("/login", authHandler.Login)
-		auth.GET("/me", middleware.AuthMiddleware(), authHandler.GetMe)
+		public.POST("/register", authHandler.Register)
+		public.POST("/login", authHandler.Login)
 	}
 
-	// User routes
-	users := v1.Group("/users")
+	// Protected routes
+	protected := r.Group("/api")
+	protected.Use(middleware.AuthMiddleware(s.DB.GetDB()))
 	{
-		users.GET("/search", middleware.AuthMiddleware(), userHandler.SearchUsers)
-		users.GET("/:id", userHandler.GetProfile)
-		users.PUT("/profile", middleware.AuthMiddleware(), userHandler.UpdateProfile)
+		protected.GET("/me", authHandler.GetMe)
+		protected.POST("/logout", authHandler.Logout)
 	}
-
-	// Friendship routes (protected)
-	friends := v1.Group("/friends")
-	friends.Use(middleware.AuthMiddleware())
-	{
-		friends.POST("/request", friendshipHandler.SendFriendRequest)
-		friends.PUT("/:id/accept", friendshipHandler.AcceptFriendRequest)
-		friends.DELETE("/:id/reject", friendshipHandler.RejectFriendRequest)
-		friends.GET("/", friendshipHandler.GetFriends)
-		friends.GET("/requests", friendshipHandler.GetPendingRequests)
-	}
-
-	// Post routes
-	posts := v1.Group("/posts")
-	{
-		posts.POST("/", middleware.AuthMiddleware(), postHandler.CreatePost)
-		posts.GET("/:id", postHandler.GetPost)
-		posts.PUT("/:id", middleware.AuthMiddleware(), postHandler.UpdatePost)
-		posts.DELETE("/:id", middleware.AuthMiddleware(), postHandler.DeletePost)
-		posts.POST("/:id/like", middleware.AuthMiddleware(), postHandler.LikePost)
-		posts.GET("/:id/comments", commentHandler.GetPostComments)
-		posts.POST("/:id/comments", middleware.AuthMiddleware(), commentHandler.CreateComment)
-	}
-
-	// Comment routes (protected)
-	comments := v1.Group("/comments")
-	comments.Use(middleware.AuthMiddleware())
-	{
-		comments.PUT("/:id", commentHandler.UpdateComment)
-		comments.DELETE("/:id", commentHandler.DeleteComment)
-	}
-
-	// Feed routes (protected)
-	feed := v1.Group("/feed")
-	feed.Use(middleware.AuthMiddleware())
-	{
-		feed.GET("/", feedHandler.GetNewsFeed)
-		feed.GET("/user/:userId", feedHandler.GetUserPosts)
-	}
-
-	return r
 }

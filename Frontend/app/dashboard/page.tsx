@@ -1,6 +1,8 @@
 'use client'
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import ProtectedRoute from '@/components/ProtectedRoute'
+import { useAuth } from '@/context/AuthContext'
 import { 
   Home,
   User,
@@ -36,7 +38,8 @@ import {
   Activity
 } from 'lucide-react'
 
-export default function DashboardPage() {
+function DashboardPage() {
+  const { user, logout, checkAuth } = useAuth()
   const [activeTab, setActiveTab] = useState('home')
   const [showCreatePost, setShowCreatePost] = useState(false)
   const [showNotifications, setShowNotifications] = useState(false)
@@ -45,10 +48,29 @@ export default function DashboardPage() {
   const [newPostContent, setNewPostContent] = useState('')
   const [postPrivacy, setPostPrivacy] = useState('public')
   const [selectedUsers, setSelectedUsers] = useState([])
+
+  // Test function to manually check token
+  const testTokenExpiration = async () => {
+    console.log('Testing token expiration...')
+    try {
+      await checkAuth()
+      console.log('Token still valid')
+    } catch (error) {
+      console.log('Token expired or invalid')
+    }
+  }
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
 
-  // Mock data
-  const currentUser = {
+  // Use actual user data or fallback
+  const currentUser = user ? {
+    id: user.id,
+    name: `${user.first_name} ${user.last_name}`,
+    username: user.email.split('@')[0], // Use email prefix as username
+    avatar: user.avatar,
+    isPrivate: user.is_private,
+    followers: 0, // These would come from API calls
+    following: 0
+  } : {
     id: 1,
     name: 'John Doe',
     username: 'johndoe',
@@ -892,6 +914,12 @@ export default function DashboardPage() {
           <div className="bg-white/5 rounded-xl lg:rounded-2xl p-4 lg:p-6">
             <h3 className="text-base lg:text-lg font-semibold text-white mb-3 lg:mb-4">Account</h3>
             <div className="space-y-2 lg:space-y-3">
+              <button 
+                onClick={testTokenExpiration}
+                className="w-full text-left px-3 lg:px-4 py-2 lg:py-3 text-yellow-400 hover:bg-yellow-500/10 rounded-lg lg:rounded-xl transition-all duration-200 text-sm lg:text-base"
+              >
+                🔍 Test Token Expiration (Check Console)
+              </button>
               <button className="w-full text-left px-3 lg:px-4 py-2 lg:py-3 text-white hover:bg-white/10 rounded-lg lg:rounded-xl transition-all duration-200 text-sm lg:text-base">
                 Change Password
               </button>
@@ -962,3 +990,14 @@ export default function DashboardPage() {
     </div>
   )
 }
+
+// Wrap the entire component with ProtectedRoute
+function ProtectedDashboard() {
+  return (
+    <ProtectedRoute>
+      <DashboardPage />
+    </ProtectedRoute>
+  )
+}
+
+export default ProtectedDashboard

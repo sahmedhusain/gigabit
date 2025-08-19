@@ -1,21 +1,24 @@
 package handlers
 
 import (
+	"database/sql"
 	"net/http"
 	"social/middleware"
 	"social/models"
+	"social/services"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
-	"gorm.io/gorm"
 )
 
 type UserHandler struct {
-	DB *gorm.DB
+	userService *services.UserService
 }
 
-func NewUserHandler(db *gorm.DB) *UserHandler {
-	return &UserHandler{DB: db}
+func NewUserHandler(db *sql.DB) *UserHandler {
+	return &UserHandler{
+		userService: services.NewUserService(db),
+	}
 }
 
 func (h *UserHandler) GetProfile(c *gin.Context) {
@@ -26,8 +29,8 @@ func (h *UserHandler) GetProfile(c *gin.Context) {
 		return
 	}
 
-	var user models.User
-	if err := h.DB.First(&user, uint(userID)).Error; err != nil {
+	user, err := h.userService.GetUserByID(uint(userID))
+	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
 		return
 	}
@@ -48,8 +51,8 @@ func (h *UserHandler) UpdateProfile(c *gin.Context) {
 		return
 	}
 
-	var user models.User
-	if err := h.DB.First(&user, userID).Error; err != nil {
+	user, err := h.userService.GetUserByID(userID)
+	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
 		return
 	}
@@ -62,13 +65,13 @@ func (h *UserHandler) UpdateProfile(c *gin.Context) {
 		user.LastName = req.LastName
 	}
 	if req.Bio != "" {
-		user.Bio = req.Bio
+		user.AboutMe = &req.Bio
 	}
 	if req.AvatarURL != "" {
-		user.AvatarURL = req.AvatarURL
+		user.Avatar = &req.AvatarURL
 	}
 
-	if err := h.DB.Save(&user).Error; err != nil {
+	if err := h.userService.UpdateUser(user); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update profile"})
 		return
 	}
@@ -83,12 +86,8 @@ func (h *UserHandler) SearchUsers(c *gin.Context) {
 		return
 	}
 
-	var users []models.User
-	searchPattern := "%" + query + "%"
-	
-	if err := h.DB.Where("username LIKE ? OR first_name LIKE ? OR last_name LIKE ?", 
-		searchPattern, searchPattern, searchPattern).
-		Limit(20).Find(&users).Error; err != nil {
+	users, err := h.userService.SearchUsers(query, 20)
+	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to search users"})
 		return
 	}

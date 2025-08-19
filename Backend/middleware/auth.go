@@ -1,14 +1,19 @@
 package middleware
 
 import (
+	"database/sql"
 	"net/http"
-	"strings"
+	"social/services"
 	"social/utils"
+	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 )
 
-func AuthMiddleware() gin.HandlerFunc {
+func AuthMiddleware(db *sql.DB) gin.HandlerFunc {
+	sessionService := services.NewSessionService(db)
+
 	return func(c *gin.Context) {
 		authHeader := c.GetHeader("Authorization")
 		if authHeader == "" {
@@ -26,11 +31,32 @@ func AuthMiddleware() gin.HandlerFunc {
 
 		// Extract the token
 		tokenString := strings.TrimPrefix(authHeader, "Bearer ")
-		
+
 		// Validate the token
 		claims, err := utils.ValidateToken(tokenString)
 		if err != nil {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token"})
+			if err.Error() == "token expired" {
+				c.JSON(http.StatusUnauthorized, gin.H{"error": "Token expired", "code": "TOKEN_EXPIRED"})
+			} else {
+				c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token", "code": "INVALID_TOKEN"})
+			}
+			c.Abort()
+			return
+		}
+
+		// Verify session exists and is valid
+		session, err := sessionService.GetSessionByIDAndToken(claims.SessionID, tokenString)
+		if err != nil {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid session"})
+			c.Abort()
+			return
+		}
+
+		// Check if session is expired
+		if session.ExpiresAt.Before(time.Now()) {
+			// Delete expired session
+			sessionService.DeleteSession(session.ID)
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Session expired", "code": "SESSION_EXPIRED"})
 			c.Abort()
 			return
 		}
@@ -38,7 +64,8 @@ func AuthMiddleware() gin.HandlerFunc {
 		// Set user information in context
 		c.Set("user_id", claims.UserID)
 		c.Set("user_email", claims.Email)
-		
+		c.Set("session_id", claims.SessionID)
+
 		c.Next()
 	}
 }
@@ -48,7 +75,7 @@ func GetUserID(c *gin.Context) (uint, bool) {
 	if !exists {
 		return 0, false
 	}
-	
+
 	id, ok := userID.(uint)
 	return id, ok
 }

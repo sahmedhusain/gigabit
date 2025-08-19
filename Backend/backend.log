@@ -1,0 +1,43 @@
+2025/08/19 20:20:05 Database migrations applied successfully
+2025/08/19 20:20:05 Database initialized successfully with migrations
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+[GIN-debug] GET    /health                   --> main.(*Server).Routes.func2 (6 handlers)
+[GIN-debug] POST   /api/register             --> social/handlers.(*AuthHandler).Register-fm (6 handlers)
+[GIN-debug] POST   /api/login                --> social/handlers.(*AuthHandler).Login-fm (6 handlers)
+[GIN-debug] GET    /api/me                   --> social/handlers.(*AuthHandler).GetMe-fm (7 handlers)
+[GIN-debug] POST   /api/logout               --> social/handlers.(*AuthHandler).Logout-fm (7 handlers)
+2025/08/19 20:20:05 Starting server on :8080
+[GIN-debug] [WARNING] You trusted all proxies, this is NOT safe. We recommend you to set a value.
+Please check https://pkg.go.dev/github.com/gin-gonic/gin#readme-don-t-trust-all-proxies for details.
+[GIN-debug] Listening and serving HTTP on :8080
+[GIN] 2025/08/19 - 20:20:14 | 200 |     238.417µs |             ::1 | GET      "/health"
+[GIN] 2025/08/19 - 20:20:18 | 401 |     805.375µs |             ::1 | POST     "/api/login"
+[GIN] 2025/08/19 - 20:20:19 | 401 |       623.5µs |             ::1 | POST     "/api/login"
+[GIN] 2025/08/19 - 20:20:20 | 401 |     268.125µs |             ::1 | POST     "/api/login"
+[GIN] 2025/08/19 - 20:20:21 | 401 |     507.459µs |             ::1 | POST     "/api/login"
+[GIN] 2025/08/19 - 20:20:51 | 401 |     152.875µs |             ::1 | POST     "/api/login"
+[GIN] 2025/08/19 - 20:22:37 | 401 |       255.5µs |             ::1 | POST     "/api/login"
+[GIN] 2025/08/19 - 20:22:38 | 401 |     154.792µs |             ::1 | POST     "/api/login"
+[GIN] 2025/08/19 - 20:22:38 | 401 |     733.459µs |             ::1 | POST     "/api/login"
+[GIN] 2025/08/19 - 20:23:37 | 401 |     284.167µs |             ::1 | POST     "/api/login"
+[GIN] 2025/08/19 - 20:23:45 | 401 |     344.708µs |             ::1 | GET      "/api/me"
+[GIN] 2025/08/19 - 20:24:05 | 204 |      13.708µs |             ::1 | OPTIONS  "/api/login"
+[GIN] 2025/08/19 - 20:24:05 | 401 |     305.834µs |             ::1 | POST     "/api/login"
+[GIN] 2025/08/19 - 20:24:50 | 401 |    1.594708ms |             ::1 | POST     "/api/login"
+[GIN] 2025/08/19 - 20:25:25 | 200 |       22.25µs |             ::1 | GET      "/health"
+[GIN] 2025/08/19 - 20:25:32 | 201 |   68.309083ms |             ::1 | POST     "/api/register"
+[GIN] 2025/08/19 - 20:25:38 | 200 |   66.022375ms |             ::1 | POST     "/api/login"
+[GIN] 2025/08/19 - 20:26:18 | 204 |      76.625µs |             ::1 | OPTIONS  "/api/login"
+[GIN] 2025/08/19 - 20:26:18 | 401 |   81.617209ms |             ::1 | POST     "/api/login"
+[GIN] 2025/08/19 - 20:26:33 | 401 |     153.125µs |       127.0.0.1 | GET      "/api/me"
+[GIN] 2025/08/19 - 20:26:48 | 401 |      70.625ms |       127.0.0.1 | POST     "/api/login"
+[GIN] 2025/08/19 - 20:27:16 | 204 |      16.125µs |       127.0.0.1 | OPTIONS  "/api/register"
+[GIN] 2025/08/19 - 20:27:17 | 201 |   72.839958ms |       127.0.0.1 | POST     "/api/register"
+[GIN] 2025/08/19 - 20:27:49 | 200 |     254.167µs |       127.0.0.1 | GET      "/api/me"
+[GIN] 2025/08/19 - 20:28:07 | 200 |     73.1045ms |       127.0.0.1 | POST     "/api/login"
+[GIN] 2025/08/19 - 20:28:53 | 401 |   70.667958ms |             ::1 | POST     "/api/login"
+[GIN] 2025/08/19 - 20:29:12 | 200 |   77.900334ms |             ::1 | POST     "/api/login"
+signal: terminated

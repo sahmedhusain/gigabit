@@ -10,17 +10,19 @@ import (
 var jwtSecret = []byte("your-secret-key-change-this-in-production")
 
 type Claims struct {
-	UserID uint   `json:"user_id"`
-	Email  string `json:"email"`
+	UserID    uint   `json:"user_id"`
+	Email     string `json:"email"`
+	SessionID uint   `json:"session_id"`
 	jwt.RegisteredClaims
 }
 
-func GenerateToken(userID uint, email string) (string, error) {
+func GenerateToken(userID uint, email string, sessionID uint) (string, error) {
 	claims := &Claims{
-		UserID: userID,
-		Email:  email,
+		UserID:    userID,
+		Email:     email,
+		SessionID: sessionID,
 		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(24 * time.Hour)),
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(60 * time.Minute)), 
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
 		},
 	}
@@ -35,6 +37,10 @@ func ValidateToken(tokenString string) (*Claims, error) {
 	})
 
 	if err != nil {
+		// Check if it's specifically an expiration error
+		if errors.Is(err, jwt.ErrTokenExpired) {
+			return nil, errors.New("token expired")
+		}
 		return nil, err
 	}
 

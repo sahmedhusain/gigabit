@@ -58,20 +58,28 @@ export default function LoginPage() {
       
       {/* Floating Particles */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        {[...Array(20)].map((_, i) => (
-          <div
-            key={i}
-            className="absolute animate-bounce"
-            style={{
-              left: `${Math.random() * 100}%`,
-              top: `${Math.random() * 100}%`,
-              animationDelay: `${Math.random() * 3}s`,
-              animationDuration: `${3 + Math.random() * 2}s`
-            }}
-          >
-            <Sparkles className="w-2 h-2 text-white/30" />
-          </div>
-        ))}
+        {[...Array(20)].map((_, i) => {
+          // Use deterministic values based on index to ensure consistency between SSR and client
+          const left = (i * 23 + 17) % 100;
+          const top = (i * 31 + 41) % 100;
+          const delay = (i * 0.3) % 3;
+          const duration = 3 + (i * 0.2) % 2;
+          
+          return (
+            <div
+              key={i}
+              className="absolute animate-bounce"
+              style={{
+                left: `${left}%`,
+                top: `${top}%`,
+                animationDelay: `${delay}s`,
+                animationDuration: `${duration}s`
+              }}
+            >
+              <Sparkles className="w-2 h-2 text-white/30" />
+            </div>
+          );
+        })}
       </div>
 
       <div className="relative min-h-screen flex flex-col justify-center py-6 px-4 sm:py-12 sm:px-6 lg:px-8">
@@ -96,7 +104,7 @@ export default function LoginPage() {
             <div className="absolute inset-0 bg-gradient-to-b from-white/5 to-transparent rounded-3xl"></div>
             
             <div className="relative p-6 sm:p-8">
-              <div className="space-y-6">
+              <form onSubmit={handleSubmit} className="space-y-6">
                 {/* Error Message */}
                 {error && (
                   <div className="bg-red-500/20 border border-red-500/30 rounded-2xl p-4 mb-4">
@@ -156,9 +164,8 @@ export default function LoginPage() {
                 {/* Login Button */}
                 <div className="pt-2">
                   <button
-                    type="button"
+                    type="submit"
                     disabled={isLoading}
-                    onClick={handleSubmit}
                     className="group relative w-full flex justify-center items-center py-4 px-6 border-0 text-lg font-semibold rounded-2xl text-white bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 hover:from-emerald-600 hover:via-teal-600 hover:to-cyan-600 focus:outline-none focus:ring-2 focus:ring-teal-400/50 focus:ring-offset-2 focus:ring-offset-transparent transition-all duration-300 transform hover:scale-[1.02] hover:shadow-2xl hover:shadow-teal-500/25 disabled:opacity-70 disabled:cursor-not-allowed disabled:transform-none"
                   >
                     <div className="absolute inset-0 bg-gradient-to-r from-emerald-400 to-teal-600 rounded-2xl blur opacity-30 group-hover:opacity-50 transition-opacity"></div>
@@ -180,11 +187,11 @@ export default function LoginPage() {
 
                 {/* Forgot Password */}
                 <div className="text-center">
-                  <button className="text-sm text-white/70 hover:text-white hover:underline transition-colors font-medium">
+                  <button type="button" className="text-sm text-white/70 hover:text-white hover:underline transition-colors font-medium">
                     Forgot your password?
                   </button>
                 </div>
-              </div>
+              </form>
 
               {/* Divider */}
               <div className="mt-8">

@@ -40,7 +40,7 @@ func (s *Server) Routes() {
 
 	// Setup CORS
 	r.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{"http://localhost:3000", "http://localhost:3001"},
+		AllowOrigins:     []string{"http://localhost:3000"},
 		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE"},
 		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization"},
 		ExposeHeaders:    []string{"Content-Length"},
@@ -58,6 +58,7 @@ func (s *Server) Routes() {
 	authHandler := handlers.NewAuthHandler(s.DB.GetDB())
 	uploadHandler := handlers.NewUploadHandler()
 	profileHandler := handlers.NewProfileHandler(s.DB.GetDB())
+	userHandler := handlers.NewUserHandler(s.DB.GetDB())
 	followHandler := handlers.NewFollowHandler(s.DB.GetDB())
 	postHandler := handlers.NewPostHandler(s.DB.GetDB(), s.Hub)
 	categoryHandler := handlers.NewCategoryHandler(s.DB.GetDB(), s.Hub)
@@ -97,6 +98,9 @@ func (s *Server) Routes() {
 		protected.PUT("/profile/image", profileHandler.UpdateProfileImage)
 		protected.PUT("/profile/privacy", profileHandler.TogglePrivacy)
 		protected.GET("/users/search", profileHandler.SearchUsers)
+		
+		// User routes
+		protected.GET("/users", userHandler.GetAllUsers)
 
 		// Follow routes
 		protected.POST("/users/:id/follow", followHandler.SendFollowRequest)
@@ -107,6 +111,7 @@ func (s *Server) Routes() {
 		protected.GET("/follow-requests", followHandler.GetFollowRequests)
 
 		// Post routes
+		protected.GET("/posts", postHandler.GetPosts)
 		protected.POST("/posts", postHandler.CreatePost)
 		protected.GET("/posts/:id", postHandler.GetPost)
 		protected.PUT("/posts/:id", postHandler.UpdatePost)

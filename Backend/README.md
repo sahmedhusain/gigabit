@@ -106,7 +106,7 @@ http://localhost:8080/api/v1
 {
   "username": "johndoe",
   "email": "john@example.com",
-  "password": "password123",
+  "password": "Aa123456",
   "first_name": "John",
   "last_name": "Doe"
 }
@@ -118,7 +118,7 @@ http://localhost:8080/api/v1
 ```json
 {
   "email": "john@example.com",
-  "password": "password123"
+  "password": "Aa123456"
 }
 ```
 

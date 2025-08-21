@@ -53,11 +53,13 @@ function DashboardPage() {
   const [showCreatePost, setShowCreatePost] = useState(false)
   const [showNotifications, setShowNotifications] = useState(false)
   const [showChat, setShowChat] = useState(false)
-  const [selectedChat, setSelectedChat] = useState<any>(null)
+  const [selectedChat, setSelectedChat] = useState<Chat | null>(null)
   const [newPostContent, setNewPostContent] = useState('')
   const [postPrivacy, setPostPrivacy] = useState('public')
-  const [selectedUsers, setSelectedUsers] = useState([])
+  const [selectedUsers, setSelectedUsers] = useState<number[]>([])
   const [selectedPostCategory, setSelectedPostCategory] = useState<number>(1) // Default to General category
+  const [availableUsers, setAvailableUsers] = useState<{ id: number; email: string; first_name: string; last_name: string; avatar?: string; nickname?: string; display_name?: string; }[]>([])
+  const [loadingUsers, setLoadingUsers] = useState(false)
 
   // Test function to manually check token
   const testTokenExpiration = async () => {
@@ -103,15 +105,15 @@ function DashboardPage() {
   const [categorySearchQuery, setCategorySearchQuery] = useState('')
   const [categorySearchResults, setCategorySearchResults] = useState<CategoryResponse[]>([])
   const [isSearching, setIsSearching] = useState(false)
-  const [trendingCategories, setTrendingCategories] = useState<any[]>([])
+  const [trendingCategories, setTrendingCategories] = useState<CategoryResponse[]>([])
   const [isLoadingTrending, setIsLoadingTrending] = useState(false)
   const [openChatWindow, setOpenChatWindow] = useState<{
     conversationId: number
     type: 'private' | 'group'
     name: string
   } | null>(null)
-  const [followers, setFollowers] = useState<any[]>([])
-  const [following, setFollowing] = useState<any[]>([])
+  const [followers, setFollowers] = useState<{ id: number; email: string; first_name: string; last_name: string; avatar?: string; nickname?: string; }[]>([])
+  const [following, setFollowing] = useState<{ id: number; email: string; first_name: string; last_name: string; avatar?: string; nickname?: string; }[]>([])
   const [isLoadingFollowers, setIsLoadingFollowers] = useState(false)
 
   // Fetch data when component loads
@@ -120,6 +122,7 @@ function DashboardPage() {
       fetchFeedPosts()
       fetchCategories()
       fetchTrendingCategories()
+      fetchUsers() // Add fetching users for private post selection
     }
   }, [user])
 
@@ -246,7 +249,7 @@ function DashboardPage() {
   const fetchFeedPosts = async () => {
     try {
       setIsLoadingPosts(true)
-      const response: any = await api.getFeed(20, 0)
+      const response = await api.getFeed(20, 0)
       console.log('Feed API response:', response)
       const postsArr = Array.isArray(response.posts) ? response.posts : Array.isArray(response.data) ? response.data : [];
       if (!postsArr.length) {
@@ -312,13 +315,15 @@ function DashboardPage() {
     try {
       setIsLoadingGroups(true)
       const data = await api.getUserGroups(user?.id || 0)
-      setGroups(data.data.map(group => ({
+      const dataAny: any = data
+      const groupsArr = Array.isArray(dataAny?.groups) ? dataAny.groups : Array.isArray(dataAny?.data) ? dataAny.data : []
+      setGroups(groupsArr.map((group: any) => ({
         id: group.id,
-        name: group.title,
-        description: group.description,
-        members: group.member_count,
-        isJoined: group.is_member,
-        lastActivity: formatTimeAgo(group.updated_at)
+        name: group.title ?? group.name ?? '',
+        description: group.description ?? '',
+        members: group.member_count ?? 0,
+        isJoined: !!group.is_member,
+        lastActivity: formatTimeAgo(group.updated_at ?? group.updatedAt ?? new Date().toISOString())
       })))
     } catch (err) {
       console.error('Error fetching groups:', err)
@@ -336,18 +341,23 @@ function DashboardPage() {
     try {
       setIsLoadingEvents(true)
       const data = await api.getUserEvents()
-      setEvents(data.data.map(event => ({
-        id: event.id,
-        title: event.title,
-        description: event.description,
-        date: new Date(event.event_time).toLocaleDateString(),
-        time: new Date(event.event_time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
-        location: 'Location not specified', // Could be added to backend
-        group: event.group.title,
-        going: event.going_count,
-        notGoing: event.not_going_count,
-        userResponse: event.user_response || 'not_responded'
-      })))
+      const dataAny: any = data
+      const eventsArr = Array.isArray(dataAny?.events) ? dataAny.events : Array.isArray(dataAny?.data) ? dataAny.data : []
+      setEvents(eventsArr.map((event: any) => {
+        const eventDateStr = event.event_time ?? event.event_date ?? event.eventTime ?? new Date().toISOString()
+        return {
+          id: event.id,
+          title: event.title ?? '',
+          description: event.description ?? '',
+          date: new Date(eventDateStr).toLocaleDateString(),
+          time: new Date(eventDateStr).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
+          location: event.location ?? 'Location not specified',
+          group: (event.group && (event.group.title ?? event.group.name)) || 'Unknown Group',
+          going: event.going_count ?? event.goingCount ?? 0,
+          notGoing: event.not_going_count ?? event.notGoingCount ?? 0,
+          userResponse: event.user_response ?? event.userResponse ?? 'not_responded'
+        }
+      }))
     } catch (err) {
       console.error('Error fetching events:', err)
       if (err instanceof NetworkError) {
@@ -400,6 +410,23 @@ function DashboardPage() {
     return date.toLocaleDateString()
   }
 
+  const fetchUsers = async () => {
+    try {
+      setLoadingUsers(true)
+      const data = await api.getUsers()
+      setAvailableUsers(data.users || [])
+    } catch (err) {
+      console.error('Error fetching users:', err)
+      if (err instanceof NetworkError) {
+        error('Failed to load users.')
+      } else {
+        error('Unable to load users right now.')
+      }
+    } finally {
+      setLoadingUsers(false)
+    }
+  }
+
   const handleCreatePost = async () => {
     // Validate input
     const validation = ApiClient.validatePostContent(newPostContent)
@@ -409,12 +436,20 @@ function DashboardPage() {
     }
 
     try {
-      await api.createPost({
+      const postData: CreatePostRequest = {
         content: newPostContent,
         privacy: postPrivacy === 'followers' ? 'almost_private' : postPrivacy,
         category_id: selectedPostCategory
-      })
+      }
+      
+      // Add specific user IDs for private posts
+      if (postPrivacy === 'private' && selectedUsers.length > 0) {
+        postData.specific_user_ids = selectedUsers
+      }
+      
+      await api.createPost(postData)
       setNewPostContent('')
+      setSelectedUsers([])
       setShowCreatePost(false)
       success('Post created successfully!')
       // Refresh the feed
@@ -725,13 +760,53 @@ function DashboardPage() {
               
               {postPrivacy === 'private' && (
                 <div className="bg-white/5 rounded-xl lg:rounded-2xl p-3 lg:p-4">
-                  <label className="text-white font-medium mb-2 block text-sm lg:text-base">Select Followers:</label>
+                  <label className="text-white font-medium mb-2 block text-sm lg:text-base">Select Users:</label>
                   <div className="space-y-2 max-h-24 lg:max-h-32 overflow-y-auto">
-                    <div className="text-white/60 text-sm text-center py-4">
-                      Loading followers...
-                    </div>
-                    {/* This would be populated with real followers from API call to /api/users/{id}/followers */}
+                    {loadingUsers ? (
+                      <div className="text-white/60 text-sm text-center py-4">
+                        Loading users...
+                      </div>
+                    ) : availableUsers.length === 0 ? (
+                      <div className="text-white/60 text-sm text-center py-4">
+                        No users available
+                      </div>
+                    ) : (
+                      availableUsers.map((user) => (
+                        <label key={user.id} className="flex items-center space-x-3 cursor-pointer hover:bg-white/5 rounded-lg p-2 transition-colors">
+                          <input
+                            type="checkbox"
+                            checked={selectedUsers.includes(user.id)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedUsers([...selectedUsers, user.id])
+                              } else {
+                                setSelectedUsers(selectedUsers.filter(id => id !== user.id))
+                              }
+                            }}
+                            className="rounded border-white/30 text-emerald-600 focus:ring-emerald-500"
+                          />
+                          <div className="w-6 h-6 bg-gradient-to-r from-emerald-500 to-teal-600 rounded-full flex items-center justify-center flex-shrink-0">
+                            <User className="w-3 h-3 text-white" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-white text-sm font-medium truncate">
+                              {user.display_name || `${user.first_name} ${user.last_name}`}
+                            </p>
+                            <p className="text-white/60 text-xs truncate">
+                              @{user.nickname || user.email.split('@')[0]}
+                            </p>
+                          </div>
+                        </label>
+                      ))
+                    )}
                   </div>
+                  {selectedUsers.length > 0 && (
+                    <div className="mt-3 p-2 bg-emerald-500/10 rounded-lg border border-emerald-400/20">
+                      <p className="text-emerald-300 text-sm">
+                        {selectedUsers.length} user{selectedUsers.length !== 1 ? 's' : ''} selected
+                      </p>
+                    </div>
+                  )}
                 </div>
               )}
               

@@ -13,11 +13,13 @@ import (
 
 type UserHandler struct {
 	userService *services.UserService
+	db          *sql.DB
 }
 
 func NewUserHandler(db *sql.DB) *UserHandler {
 	return &UserHandler{
 		userService: services.NewUserService(db),
+		db:          db,
 	}
 }
 
@@ -98,4 +100,62 @@ func (h *UserHandler) SearchUsers(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"users": responses})
+}
+
+func (h *UserHandler) GetAllUsers(c *gin.Context) {
+	userID, exists := middleware.GetUserID(c)
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		return
+	}
+
+	// Get all users except the current user
+	query := `
+		SELECT id, email, first_name, last_name, avatar, nickname
+		FROM users 
+		WHERE id != ? 
+		ORDER BY first_name, last_name
+		LIMIT 50
+	`
+
+	rows, err := h.db.Query(query, userID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get users"})
+		return
+	}
+	defer rows.Close()
+
+	var users []gin.H
+	for rows.Next() {
+		var user struct {
+			ID        uint    `json:"id"`
+			Email     string  `json:"email"`
+			FirstName string  `json:"first_name"`
+			LastName  string  `json:"last_name"`
+			Avatar    *string `json:"avatar"`
+			Nickname  *string `json:"nickname"`
+		}
+
+		err := rows.Scan(&user.ID, &user.Email, &user.FirstName, &user.LastName, &user.Avatar, &user.Nickname)
+		if err != nil {
+			continue
+		}
+
+		displayName := user.FirstName + " " + user.LastName
+		if user.Nickname != nil && *user.Nickname != "" {
+			displayName = *user.Nickname + " (" + displayName + ")"
+		}
+
+		users = append(users, gin.H{
+			"id":           user.ID,
+			"first_name":   user.FirstName,
+			"last_name":    user.LastName,
+			"email":        user.Email,
+			"avatar":       user.Avatar,
+			"nickname":     user.Nickname,
+			"display_name": displayName,
+		})
+	}
+
+	c.JSON(http.StatusOK, gin.H{"users": users})
 }

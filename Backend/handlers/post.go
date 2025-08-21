@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"database/sql"
+	"log"
 	"net/http"
 	"social/models"
 	"social/services"
@@ -34,7 +35,8 @@ func (h *PostHandler) CreatePost(c *gin.Context) {
 
 	var req models.CreatePostRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		log.Printf("Invalid request data for CreatePost: %v", err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request data", "details": err.Error()})
 		return
 	}
 
@@ -42,6 +44,23 @@ func (h *PostHandler) CreatePost(c *gin.Context) {
 	if req.Privacy == "" {
 		req.Privacy = "public"
 	}
+
+	// Validate privacy value
+	validPrivacy := []string{"public", "followers", "private"}
+	isValid := false
+	for _, v := range validPrivacy {
+		if req.Privacy == v {
+			isValid = true
+			break
+		}
+	}
+
+	if !isValid {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid privacy setting. Must be 'public', 'followers', or 'private'"})
+		return
+	}
+
+	log.Printf("Creating post with privacy: %s for user: %v", req.Privacy, userID)
 
 	post := &models.Post{
 		UserID:     userID.(uint),
@@ -56,6 +75,7 @@ func (h *PostHandler) CreatePost(c *gin.Context) {
 	}
 
 	if err := h.postService.CreatePost(post); err != nil {
+		log.Printf("Failed to create post: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create post"})
 		return
 	}
@@ -63,11 +83,14 @@ func (h *PostHandler) CreatePost(c *gin.Context) {
 	// Add specific users for private posts
 	if req.Privacy == "private" && len(req.SpecificUserIDs) > 0 {
 		if err := h.postService.AddPostPrivacyUsers(post.ID, req.SpecificUserIDs); err != nil {
+			log.Printf("Failed to add privacy users for post %d: %v", post.ID, err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to set post privacy"})
 			return
 		}
+		log.Printf("Added %d users to private post %d", len(req.SpecificUserIDs), post.ID)
 	}
 
+	log.Printf("Post created successfully with ID: %d", post.ID)
 	c.JSON(http.StatusCreated, gin.H{
 		"message": "Post created successfully",
 		"post":    post,
@@ -95,6 +118,42 @@ func (h *PostHandler) GetPost(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, post)
+}
+
+func (h *PostHandler) GetPosts(c *gin.Context) {
+	currentUserID, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		return
+	}
+
+	// Get pagination parameters
+	limitStr := c.DefaultQuery("limit", "50")
+	offsetStr := c.DefaultQuery("offset", "0")
+
+	limit, err := strconv.Atoi(limitStr)
+	if err != nil || limit > 50 {
+		limit = 50
+	}
+
+	offset, err := strconv.Atoi(offsetStr)
+	if err != nil || offset < 0 {
+		offset = 0
+	}
+
+	// Use the service layer to get posts with proper privacy filtering
+	posts, err := h.postService.GetFeedPosts(currentUserID.(uint), limit, offset)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get posts"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"posts":  posts,
+		"count":  len(posts),
+		"limit":  limit,
+		"offset": offset,
+	})
 }
 
 func (h *PostHandler) GetUserPosts(c *gin.Context) {
@@ -247,10 +306,12 @@ func (h *PostHandler) LikePost(c *gin.Context) {
 	}
 
 	if err := h.likeService.LikePost(uint(postID), userID.(uint)); err != nil {
+		log.Printf("Failed to like post %d for user %v: %v", postID, userID, err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to like post"})
 		return
 	}
 
+	log.Printf("Post %d liked successfully by user %v", postID, userID)
 	c.JSON(http.StatusOK, gin.H{"message": "Post liked successfully"})
 }
 
@@ -269,10 +330,12 @@ func (h *PostHandler) UnlikePost(c *gin.Context) {
 	}
 
 	if err := h.likeService.UnlikePost(uint(postID), userID.(uint)); err != nil {
+		log.Printf("Failed to unlike post %d for user %v: %v", postID, userID, err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to unlike post"})
 		return
 	}
 
+	log.Printf("Post %d unliked successfully by user %v", postID, userID)
 	c.JSON(http.StatusOK, gin.H{"message": "Post unliked successfully"})
 }
 

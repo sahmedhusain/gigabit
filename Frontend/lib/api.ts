@@ -60,6 +60,30 @@ export interface Post {
   isLiked: boolean;
 }
 
+// Backend API Post interface
+export interface APIPost {
+  id: number;
+  user_id: number;
+  content: string;
+  image_url?: string;
+  created_at: string;
+  updated_at: string;
+  user: User;
+  like_count: number;
+  is_liked: boolean;
+  comments?: Comment[];
+}
+
+export interface Comment {
+  id: number;
+  user_id: number;
+  post_id: number;
+  content: string;
+  created_at: string;
+  updated_at: string;
+  user: User;
+}
+
 export interface Notification {
   id: number;
   type: string;
@@ -162,9 +186,19 @@ export interface ConversationResponse {
 
 export interface CreatePostRequest {
   content: string;
-  privacy: string;
+  privacy?: string;
   image_url?: string;
-  category_id: number;
+  category_id?: number;
+  specific_user_ids?: number[];
+}
+
+export interface UpdatePostRequest {
+  content: string;
+  image_url?: string;
+}
+
+export interface PostsResponse {
+  posts: APIPost[];
 }
 
 export interface Category {
@@ -396,6 +430,31 @@ export class ApiClient {
     });
   }
 
+  async getPosts(): Promise<PostsResponse> {
+    return this.request<PostsResponse>('/api/posts', {
+      method: 'GET',
+    });
+  }
+
+  async getPost(id: number): Promise<{ post: APIPost }> {
+    return this.request<{ post: APIPost }>(`/api/posts/${id}`, {
+      method: 'GET',
+    });
+  }
+
+  async updatePost(id: number, data: UpdatePostRequest): Promise<{ message: string }> {
+    return this.request<{ message: string }>(`/api/posts/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deletePost(id: number): Promise<{ message: string }> {
+    return this.request<{ message: string }>(`/api/posts/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
   async createPost(data: CreatePostRequest): Promise<PostResponse> {
     return this.request<PostResponse>('/api/posts', {
       method: 'POST',
@@ -412,6 +471,13 @@ export class ApiClient {
   async unlikePost(postId: number): Promise<{ success: boolean }> {
     return this.request<{ success: boolean }>(`/api/posts/${postId}/like`, {
       method: 'DELETE',
+    });
+  }
+
+  // Alternative like endpoint that returns detailed info
+  async toggleLike(id: number): Promise<{ message: string; is_liked: boolean }> {
+    return this.request<{ message: string; is_liked: boolean }>(`/api/posts/${id}/like`, {
+      method: 'POST',
     });
   }
 
@@ -452,6 +518,12 @@ export class ApiClient {
 
   async getFollowing(userId: number): Promise<{ data: User[] }> {
     return this.request<{ data: User[] }>(`/api/users/${userId}/following`, {
+      method: 'GET',
+    });
+  }
+
+  async getUsers(): Promise<{ users: any[] }> {
+    return this.request<{ users: any[] }>('/api/users', {
       method: 'GET',
     });
   }

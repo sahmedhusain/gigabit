@@ -97,16 +97,17 @@ func (s *UserService) UpdateUser(user *models.User) error {
 	return nil
 }
 
-func (s *UserService) SearchUsers(query string, limit int) ([]*models.User, error) {
+func (s *UserService) SearchUsers(query string, currentUserID uint) ([]*models.User, error) {
 	sqlQuery := `
 		SELECT id, email, password, first_name, last_name, date_of_birth, avatar, nickname, about_me, is_private, created_at, updated_at
 		FROM users 
-		WHERE (first_name LIKE ? OR last_name LIKE ? OR email LIKE ?)
-		LIMIT ?
+		WHERE (first_name LIKE ? OR last_name LIKE ? OR email LIKE ? OR nickname LIKE ?) 
+		AND id != ?
+		LIMIT 20
 	`
 
 	searchPattern := "%" + query + "%"
-	rows, err := s.db.Query(sqlQuery, searchPattern, searchPattern, searchPattern, limit)
+	rows, err := s.db.Query(sqlQuery, searchPattern, searchPattern, searchPattern, searchPattern, currentUserID)
 	if err != nil {
 		return nil, err
 	}
@@ -125,4 +126,37 @@ func (s *UserService) SearchUsers(query string, limit int) ([]*models.User, erro
 	}
 
 	return users, nil
+}
+
+func (s *UserService) CanViewProfile(currentUserID, targetUserID uint) (bool, error) {
+	if currentUserID == targetUserID {
+		return true, nil
+	}
+
+	targetUser, err := s.GetUserByID(targetUserID)
+	if err != nil {
+		return false, err
+	}
+
+	if !targetUser.IsPrivate {
+		return true, nil
+	}
+
+	return s.AreUsersConnected(currentUserID, targetUserID)
+}
+
+func (s *UserService) AreUsersConnected(userID1, userID2 uint) (bool, error) {
+	query := `
+		SELECT COUNT(*) FROM follows 
+		WHERE (follower_id = ? AND following_id = ? AND status = 'accepted')
+		OR (follower_id = ? AND following_id = ? AND status = 'accepted')
+	`
+
+	var count int
+	err := s.db.QueryRow(query, userID1, userID2, userID2, userID1).Scan(&count)
+	if err != nil {
+		return false, err
+	}
+
+	return count > 0, nil
 }

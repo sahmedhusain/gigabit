@@ -9,6 +9,7 @@ interface ErrorPageProps {
   message?: string;
   showBackButton?: boolean;
   showHomeButton?: boolean;
+  onRetry?: () => void;
 }
 
 const ERROR_DETAILS = {
@@ -54,7 +55,8 @@ export default function ErrorPage({
   title,
   message,
   showBackButton = true,
-  showHomeButton = true
+  showHomeButton = true,
+  onRetry
 }: ErrorPageProps) {
   const router = useRouter();
   const errorInfo = ERROR_DETAILS[errorCode as keyof typeof ERROR_DETAILS] || ERROR_DETAILS[500];
@@ -73,6 +75,15 @@ export default function ErrorPage({
         </div>
         
         <div className="space-y-4">
+          {onRetry && (
+            <button
+              onClick={onRetry}
+              className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 transition duration-150 ease-in-out"
+            >
+              Try Again
+            </button>
+          )}
+          
           {showBackButton && (
             <button
               onClick={() => router.back()}

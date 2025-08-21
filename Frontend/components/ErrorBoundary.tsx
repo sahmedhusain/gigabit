@@ -25,6 +25,11 @@ export default class ErrorBoundary extends Component<Props, State> {
 
   componentDidCatch(error: Error, errorInfo: any) {
     console.error('ErrorBoundary caught an error:', error, errorInfo);
+    this.setState({ error });
+  }
+
+  retry = () => {
+    this.setState({ hasError: false, error: undefined });
   }
 
   render() {
@@ -40,6 +45,7 @@ export default class ErrorBoundary extends Component<Props, State> {
           message="Something went wrong in the application. Please refresh the page or try again later."
           showBackButton={false}
           showHomeButton={true}
+          onRetry={this.retry}
         />
       );
     }

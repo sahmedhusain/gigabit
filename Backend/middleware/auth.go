@@ -16,21 +16,18 @@ func AuthMiddleware(db *sql.DB) gin.HandlerFunc {
 
 	return func(c *gin.Context) {
 		authHeader := c.GetHeader("Authorization")
-		if authHeader == "" {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Authorization header required"})
-			c.Abort()
-			return
+		var tokenString string
+		if authHeader != "" && strings.HasPrefix(authHeader, "Bearer ") {
+			tokenString = strings.TrimPrefix(authHeader, "Bearer ")
+		} else {
+			// Try to get token from query param (for WebSocket)
+			tokenString = c.Query("token")
+			if tokenString == "" {
+				c.JSON(http.StatusUnauthorized, gin.H{"error": "Authorization token required"})
+				c.Abort()
+				return
+			}
 		}
-
-		// Check if the header starts with "Bearer "
-		if !strings.HasPrefix(authHeader, "Bearer ") {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid authorization header format"})
-			c.Abort()
-			return
-		}
-
-		// Extract the token
-		tokenString := strings.TrimPrefix(authHeader, "Bearer ")
 
 		// Validate the token
 		claims, err := utils.ValidateToken(tokenString)

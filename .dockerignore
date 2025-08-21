@@ -1,0 +1,33 @@
+# Common
+.git
+.gitignore
+README.md
+*.md
+.env
+.env.local
+.env.production
+.env.staging
+
+# Backend specific
+Backend/social_network.db*
+Backend/backend.log
+Backend/.air.toml
+
+# Frontend specific
+Frontend/node_modules
+Frontend/.next
+Frontend/out
+Frontend/.env*
+Frontend/npm-debug.log*
+Frontend/yarn-debug.log*
+Frontend/yarn-error.log*
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db

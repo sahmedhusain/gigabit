@@ -55,25 +55,30 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
   const messageListeners = useRef<((message: WebSocketMessage) => void)[]>([])
   const reconnectAttempts = useRef(0)
   const maxReconnectAttempts = 5
-  const reconnectTimeout = useRef<NodeJS.Timeout>()
-  const pingInterval = useRef<NodeJS.Timeout>()
-  const pongTimeout = useRef<NodeJS.Timeout>()
+  const reconnectTimeout = useRef<NodeJS.Timeout | null>(null)
+  const pingInterval = useRef<NodeJS.Timeout | null>(null)
+  const pongTimeout = useRef<NodeJS.Timeout | null>(null)
 
   const connect = useCallback(() => {
     if (!isAuthenticated || !user || socket?.readyState === WebSocket.CONNECTING) {
+      console.log('WebSocket connection skipped:', { isAuthenticated, user: !!user, socketState: socket?.readyState })
       return
     }
 
     const token = localStorage.getItem('token')
     if (!token) {
+      console.log('No token found in localStorage')
       return
     }
 
+    console.log('Attempting WebSocket connection...', { userId: user.id, tokenLength: token.length })
     const wsUrl = `ws://localhost:8080/api/ws?token=${encodeURIComponent(token)}`
+    console.log('WebSocket URL:', wsUrl.replace(/token=[^&]+/, 'token=***'))
+    
     const newSocket = new WebSocket(wsUrl)
 
     newSocket.onopen = () => {
-      console.log('WebSocket connected')
+      console.log('WebSocket connected successfully')
       setIsConnected(true)
       reconnectAttempts.current = 0
       
@@ -85,7 +90,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
         type: 'user_status',
         data: { action: 'get_online_users' }
       }
-      newSocket.send(JSON.stringify(message))
+      newSocket.send(JSON.stringify({ ...message, timestamp: Date.now() }))
     }
 
     newSocket.onmessage = (event) => {
@@ -126,6 +131,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
             // Clear pong timeout - connection is alive
             if (pongTimeout.current) {
               clearTimeout(pongTimeout.current)
+              pongTimeout.current = null
             }
             break
             
@@ -156,7 +162,11 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
     }
 
     newSocket.onclose = (event) => {
-      console.log('WebSocket disconnected:', event.code, event.reason)
+      console.log('WebSocket disconnected:', {
+        code: event.code,
+        reason: event.reason,
+        wasClean: event.wasClean
+      })
       setIsConnected(false)
       setSocket(null)
       stopPingInterval()
@@ -167,6 +177,9 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
         const delay = Math.min(1000 * Math.pow(2, reconnectAttempts.current), 30000)
         console.log(`Attempting to reconnect in ${delay}ms (attempt ${reconnectAttempts.current}/${maxReconnectAttempts})`)
         
+        if (reconnectTimeout.current) {
+          clearTimeout(reconnectTimeout.current)
+        }
         reconnectTimeout.current = setTimeout(() => {
           connect()
         }, delay)
@@ -175,6 +188,8 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 
     newSocket.onerror = (error) => {
       console.error('WebSocket error:', error)
+      console.log('WebSocket state:', newSocket.readyState)
+      console.log('WebSocket URL:', wsUrl)
     }
 
     setSocket(newSocket)
@@ -184,9 +199,11 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
     // Clear existing intervals
     if (pingInterval.current) {
       clearInterval(pingInterval.current)
+      pingInterval.current = null
     }
     if (pongTimeout.current) {
       clearTimeout(pongTimeout.current)
+      pongTimeout.current = null
     }
 
     // Send ping every 30 seconds
@@ -198,6 +215,9 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
         }))
 
         // Set timeout for pong response (10 seconds)
+        if (pongTimeout.current) {
+          clearTimeout(pongTimeout.current)
+        }
         pongTimeout.current = setTimeout(() => {
           console.log('No pong received, closing connection')
           ws.close()
@@ -209,15 +229,18 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
   const stopPingInterval = () => {
     if (pingInterval.current) {
       clearInterval(pingInterval.current)
+      pingInterval.current = null
     }
     if (pongTimeout.current) {
       clearTimeout(pongTimeout.current)
+      pongTimeout.current = null
     }
   }
 
   const disconnect = useCallback(() => {
     if (reconnectTimeout.current) {
       clearTimeout(reconnectTimeout.current)
+      reconnectTimeout.current = null
     }
     stopPingInterval()
     if (socket) {
@@ -233,7 +256,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
     if (socket && socket.readyState === WebSocket.OPEN) {
       const fullMessage: WebSocketMessage = {
         ...message,
-        timestamp: new Date().toISOString()
+        timestamp: Date.now()
       }
       socket.send(JSON.stringify(fullMessage))
     } else {
@@ -268,6 +291,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
     return () => {
       if (reconnectTimeout.current) {
         clearTimeout(reconnectTimeout.current)
+        reconnectTimeout.current = null
       }
     }
   }, [])

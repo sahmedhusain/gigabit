@@ -425,9 +425,11 @@ export class ApiClient {
 
   // Posts endpoints
   async getFeed(limit: number = 20, offset: number = 0): Promise<{ data: PostResponse[] }> {
-    return this.request<{ data: PostResponse[] }>(`/api/feed?limit=${limit}&offset=${offset}`, {
+    const response = await this.request<{ count: number; limit: number; offset: number; posts: PostResponse[] }>(`/api/feed?limit=${limit}&offset=${offset}`, {
       method: 'GET',
     });
+    // Transform the response to match the expected format
+    return { data: response.posts };
   }
 
   async getPosts(): Promise<PostsResponse> {

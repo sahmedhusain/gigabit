@@ -41,8 +41,8 @@ func (s *Server) Routes() {
 	// Setup CORS
 	r.Use(cors.New(cors.Config{
 		AllowOrigins:     []string{"http://localhost:3000"},
-		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE"},
-		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization"},
+		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization", "Upgrade", "Connection", "Sec-WebSocket-Key", "Sec-WebSocket-Version", "Sec-WebSocket-Protocol"},
 		ExposeHeaders:    []string{"Content-Length"},
 		AllowCredentials: true,
 		MaxAge:           12 * time.Hour,
@@ -98,7 +98,7 @@ func (s *Server) Routes() {
 		protected.PUT("/profile/image", profileHandler.UpdateProfileImage)
 		protected.PUT("/profile/privacy", profileHandler.TogglePrivacy)
 		protected.GET("/users/search", profileHandler.SearchUsers)
-		
+
 		// User routes
 		protected.GET("/users", userHandler.GetAllUsers)
 

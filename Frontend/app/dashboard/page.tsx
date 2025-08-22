@@ -7,7 +7,7 @@ import { useAuth } from '@/context/AuthContext'
 import { useWebSocket } from '@/context/WebSocketContext'
 import { useToast } from '@/context/ToastContext'
 import { useOffline } from '@/hooks/useOffline'
-import { api, ApiClient, Post, type Notification as NotificationType, Group, Event, Chat, NetworkError, ValidationError, AuthenticationError, CategoryResponse } from '@/lib/api'
+import { api, ApiClient, Post, type Notification as NotificationType, Group, Event, Chat, NetworkError, ValidationError, AuthenticationError, CategoryResponse, CreatePostRequest } from '@/lib/api'
 import CategoryBadge from '@/components/ui/CategoryBadge'
 import { 
   Home,
@@ -165,6 +165,26 @@ function DashboardPage() {
           }
           break
 
+        case 'user_status':
+          console.log('User status update received:', message.data)
+          // Handle user status updates - these are handled in WebSocketContext
+          break
+
+        case 'ping':
+          console.log('Ping received from server')
+          // Ping/pong is handled in WebSocketContext
+          break
+
+        case 'pong':
+          console.log('Pong received from server')
+          // Ping/pong is handled in WebSocketContext
+          break
+
+        case 'error':
+          console.error('WebSocket error message:', message.data)
+          error('Server error: ' + (message.data?.message || 'Unknown error'))
+          break
+
         default:
           console.log('Received WebSocket message:', message)
       }
@@ -249,15 +269,17 @@ function DashboardPage() {
   const fetchFeedPosts = async () => {
     try {
       setIsLoadingPosts(true)
+      console.log('Fetching feed posts...')
       const response = await api.getFeed(20, 0)
       console.log('Feed API response:', response)
-      const postsArr = Array.isArray(response.posts) ? response.posts : Array.isArray(response.data) ? response.data : [];
+      const postsArr = Array.isArray(response.data) ? response.data : [];
+      console.log('Posts array:', postsArr)
       if (!postsArr.length) {
         setPosts([])
-        error('No posts found or failed to load posts.')
+        console.log('No posts found in response')
         return
       }
-      setPosts(postsArr.map((post: any) => ({
+      const mappedPosts = postsArr.map((post: any) => ({
         id: post.id,
         user: { 
           name: `${post.user.first_name} ${post.user.last_name}`, 
@@ -272,7 +294,9 @@ function DashboardPage() {
         timeAgo: formatTimeAgo(post.created_at),
         privacy: post.privacy,
         isLiked: post.is_liked
-      })))
+      }))
+      console.log('Mapped posts:', mappedPosts)
+      setPosts(mappedPosts)
     } catch (err) {
       console.error('Error fetching posts:', err)
       if (err instanceof NetworkError) {

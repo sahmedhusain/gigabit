@@ -2,12 +2,12 @@ package handlers
 
 import (
 	"database/sql"
+	"encoding/json"
 	"net/http"
 	"social/models"
 	"social/services"
 	"strconv"
-
-	"github.com/gin-gonic/gin"
+	"strings"
 )
 
 type FollowHandler struct {
@@ -22,50 +22,52 @@ func NewFollowHandler(db *sql.DB) *FollowHandler {
 	}
 }
 
-func (h *FollowHandler) SendFollowRequest(c *gin.Context) {
-	currentUserID, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+func (h *FollowHandler) SendFollowRequest(w http.ResponseWriter, r *http.Request) {
+	currentUserID, ok := r.Context().Value("user_id").(uint)
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "User not authenticated")
 		return
 	}
 
-	targetUserIDParam := c.Param("id")
+	// Extract target user ID from URL path
+	path := strings.TrimPrefix(r.URL.Path, "/api/follow/")
+	targetUserIDParam := strings.Split(path, "/")[0]
 	targetUserID, err := strconv.ParseUint(targetUserIDParam, 10, 32)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user ID"})
+		writeError(w, http.StatusBadRequest, "Invalid user ID")
 		return
 	}
 
 	// Check if trying to follow themselves
-	if currentUserID.(uint) == uint(targetUserID) {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Cannot follow yourself"})
+	if currentUserID == uint(targetUserID) {
+		writeError(w, http.StatusBadRequest, "Cannot follow yourself")
 		return
 	}
 
 	// Check if target user exists
 	targetUser, err := h.userService.GetUserByID(uint(targetUserID))
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+		writeError(w, http.StatusNotFound, "User not found")
 		return
 	}
 
 	// Check if already following or request exists
-	existingFollow, err := h.followService.GetFollowRelation(currentUserID.(uint), uint(targetUserID))
+	existingFollow, err := h.followService.GetFollowRelation(currentUserID, uint(targetUserID))
 	if err == nil && existingFollow != nil {
 		switch existingFollow.Status {
 		case "accepted":
-			c.JSON(http.StatusConflict, gin.H{"error": "Already following this user"})
+			writeError(w, http.StatusConflict, "Already following this user")
 		case "pending":
-			c.JSON(http.StatusConflict, gin.H{"error": "Follow request already sent"})
+			writeError(w, http.StatusConflict, "Follow request already sent")
 		default:
-			c.JSON(http.StatusConflict, gin.H{"error": "Follow request exists"})
+			writeError(w, http.StatusConflict, "Follow request exists")
 		}
 		return
 	}
 
 	// Create follow request
 	followRequest := &models.Follow{
-		FollowerID:  currentUserID.(uint),
+		FollowerID:  currentUserID,
 		FollowingID: uint(targetUserID),
 		Status:      "pending",
 	}
@@ -76,7 +78,7 @@ func (h *FollowHandler) SendFollowRequest(c *gin.Context) {
 	}
 
 	if err := h.followService.CreateFollowRequest(followRequest); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to send follow request"})
+		writeError(w, http.StatusInternalServerError, "Failed to send follow request")
 		return
 	}
 
@@ -85,43 +87,50 @@ func (h *FollowHandler) SendFollowRequest(c *gin.Context) {
 		message = "Now following user"
 	}
 
-	c.JSON(http.StatusCreated, gin.H{
+	writeJSON(w, http.StatusCreated, map[string]interface{}{
 		"message": message,
 		"status":  followRequest.Status,
 	})
 }
 
-func (h *FollowHandler) RespondToFollowRequest(c *gin.Context) {
-	currentUserID, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+func (h *FollowHandler) RespondToFollowRequest(w http.ResponseWriter, r *http.Request) {
+	currentUserID, ok := r.Context().Value("user_id").(uint)
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "User not authenticated")
 		return
 	}
 
-	followerIDParam := c.Param("id")
+	// Extract follower ID from URL path
+	path := strings.TrimPrefix(r.URL.Path, "/api/follow/requests/")
+	followerIDParam := strings.Split(path, "/")[0]
 	followerID, err := strconv.ParseUint(followerIDParam, 10, 32)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user ID"})
+		writeError(w, http.StatusBadRequest, "Invalid user ID")
 		return
 	}
 
 	var req struct {
-		Action string `json:"action" binding:"required,oneof=accept decline"`
+		Action string `json:"action"`
 	}
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "Invalid request body")
+		return
+	}
+
+	if req.Action != "accept" && req.Action != "decline" {
+		writeError(w, http.StatusBadRequest, "Action must be 'accept' or 'decline'")
 		return
 	}
 
 	// Get the follow request
-	followRequest, err := h.followService.GetFollowRelation(uint(followerID), currentUserID.(uint))
+	followRequest, err := h.followService.GetFollowRelation(uint(followerID), currentUserID)
 	if err != nil || followRequest == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Follow request not found"})
+		writeError(w, http.StatusNotFound, "Follow request not found")
 		return
 	}
 
 	if followRequest.Status != "pending" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Follow request not pending"})
+		writeError(w, http.StatusBadRequest, "Follow request not pending")
 		return
 	}
 
@@ -133,136 +142,152 @@ func (h *FollowHandler) RespondToFollowRequest(c *gin.Context) {
 	}
 
 	if err := h.followService.UpdateFollowRequest(followRequest); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update follow request"})
+		writeError(w, http.StatusInternalServerError, "Failed to update follow request")
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
+	writeJSON(w, http.StatusOK, map[string]interface{}{
 		"message": "Follow request " + req.Action + "ed",
 		"status":  followRequest.Status,
 	})
 }
 
-func (h *FollowHandler) Unfollow(c *gin.Context) {
-	currentUserID, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+func (h *FollowHandler) Unfollow(w http.ResponseWriter, r *http.Request) {
+	currentUserID, ok := r.Context().Value("user_id").(uint)
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "User not authenticated")
 		return
 	}
 
-	targetUserIDParam := c.Param("id")
+	// Extract target user ID from URL path
+	path := strings.TrimPrefix(r.URL.Path, "/api/unfollow/")
+	targetUserIDParam := strings.Split(path, "/")[0]
 	targetUserID, err := strconv.ParseUint(targetUserIDParam, 10, 32)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user ID"})
+		writeError(w, http.StatusBadRequest, "Invalid user ID")
 		return
 	}
 
 	// Get the follow relation
-	followRequest, err := h.followService.GetFollowRelation(currentUserID.(uint), uint(targetUserID))
+	followRequest, err := h.followService.GetFollowRelation(currentUserID, uint(targetUserID))
 	if err != nil || followRequest == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Not following this user"})
+		writeError(w, http.StatusNotFound, "Not following this user")
 		return
 	}
 
 	// Delete the follow relation
 	if err := h.followService.DeleteFollowRequest(followRequest.ID); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to unfollow user"})
+		writeError(w, http.StatusInternalServerError, "Failed to unfollow user")
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "Successfully unfollowed user"})
+	writeJSON(w, http.StatusOK, map[string]interface{}{"message": "Successfully unfollowed user"})
 }
 
-func (h *FollowHandler) GetFollowers(c *gin.Context) {
-	userIDParam := c.Param("id")
+func (h *FollowHandler) GetFollowers(w http.ResponseWriter, r *http.Request) {
+	// Extract user ID from URL path
+	path := strings.TrimPrefix(r.URL.Path, "/api/users/")
+	pathParts := strings.Split(path, "/")
+	if len(pathParts) < 2 {
+		writeError(w, http.StatusBadRequest, "Invalid URL format")
+		return
+	}
+	userIDParam := pathParts[0]
 	userID, err := strconv.ParseUint(userIDParam, 10, 32)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user ID"})
+		writeError(w, http.StatusBadRequest, "Invalid user ID")
 		return
 	}
 
-	currentUserID, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+	currentUserID, ok := r.Context().Value("user_id").(uint)
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "User not authenticated")
 		return
 	}
 
 	// Check if current user can view this profile
-	canView, err := h.userService.CanViewProfile(currentUserID.(uint), uint(userID))
+	canView, err := h.userService.CanViewProfile(currentUserID, uint(userID))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check permissions"})
+		writeError(w, http.StatusInternalServerError, "Failed to check permissions")
 		return
 	}
 
 	if !canView {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Cannot view this user's followers"})
+		writeError(w, http.StatusForbidden, "Cannot view this user's followers")
 		return
 	}
 
 	followers, err := h.followService.GetFollowers(uint(userID))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get followers"})
+		writeError(w, http.StatusInternalServerError, "Failed to get followers")
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
+	writeJSON(w, http.StatusOK, map[string]interface{}{
 		"followers": followers,
 		"count":     len(followers),
 	})
 }
 
-func (h *FollowHandler) GetFollowing(c *gin.Context) {
-	userIDParam := c.Param("id")
+func (h *FollowHandler) GetFollowing(w http.ResponseWriter, r *http.Request) {
+	// Extract user ID from URL path
+	path := strings.TrimPrefix(r.URL.Path, "/api/users/")
+	pathParts := strings.Split(path, "/")
+	if len(pathParts) < 2 {
+		writeError(w, http.StatusBadRequest, "Invalid URL format")
+		return
+	}
+	userIDParam := pathParts[0]
 	userID, err := strconv.ParseUint(userIDParam, 10, 32)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user ID"})
+		writeError(w, http.StatusBadRequest, "Invalid user ID")
 		return
 	}
 
-	currentUserID, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+	currentUserID, ok := r.Context().Value("user_id").(uint)
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "User not authenticated")
 		return
 	}
 
 	// Check if current user can view this profile
-	canView, err := h.userService.CanViewProfile(currentUserID.(uint), uint(userID))
+	canView, err := h.userService.CanViewProfile(currentUserID, uint(userID))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check permissions"})
+		writeError(w, http.StatusInternalServerError, "Failed to check permissions")
 		return
 	}
 
 	if !canView {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Cannot view this user's following list"})
+		writeError(w, http.StatusForbidden, "Cannot view this user's following list")
 		return
 	}
 
 	following, err := h.followService.GetFollowing(uint(userID))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get following list"})
+		writeError(w, http.StatusInternalServerError, "Failed to get following list")
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
+	writeJSON(w, http.StatusOK, map[string]interface{}{
 		"following": following,
 		"count":     len(following),
 	})
 }
 
-func (h *FollowHandler) GetFollowRequests(c *gin.Context) {
-	currentUserID, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+func (h *FollowHandler) GetFollowRequests(w http.ResponseWriter, r *http.Request) {
+	currentUserID, ok := r.Context().Value("user_id").(uint)
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "User not authenticated")
 		return
 	}
 
-	requests, err := h.followService.GetPendingFollowRequests(currentUserID.(uint))
+	requests, err := h.followService.GetPendingFollowRequests(currentUserID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get follow requests"})
+		writeError(w, http.StatusInternalServerError, "Failed to get follow requests")
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
+	writeJSON(w, http.StatusOK, map[string]interface{}{
 		"requests": requests,
 		"count":    len(requests),
 	})

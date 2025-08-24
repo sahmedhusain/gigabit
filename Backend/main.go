@@ -38,11 +38,11 @@ func main() {
 	hub := websocket.NewHub()
 	go hub.Run()
 
-	// Create and start server
-	server := NewServer(hub)
+// Create and start server
+server := NewServer(hub)
 
-	log.Println("Starting server on :8080")
-	if err := server.Router.Run(":8080"); err != nil {
-		log.Fatal("Failed to start server:", err)
-	}
+log.Println("Starting server on :8080")
+if err := server.Run(":8080"); err != nil {
+log.Fatal("Failed to start server:", err)
+}
 }

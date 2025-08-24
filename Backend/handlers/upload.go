@@ -3,9 +3,9 @@ package handlers
 import (
 	"net/http"
 	"os"
+	"path/filepath"
 	"social/utils"
-
-	"github.com/gin-gonic/gin"
+	"strings"
 )
 
 type UploadHandler struct{}
@@ -14,81 +14,73 @@ func NewUploadHandler() *UploadHandler {
 	return &UploadHandler{}
 }
 
-func (h *UploadHandler) UploadImage(c *gin.Context) {
-	// Parse multipart form with max memory 32MB
-	if err := c.Request.ParseMultipartForm(32 << 20); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "Failed to parse multipart form",
-		})
-		return
-	}
-
-	// Get file from form
-	file, header, err := c.Request.FormFile("image")
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "No image file provided",
-		})
-		return
-	}
-	defer file.Close()
-
-	// Save the image
-	result, err := utils.SaveImageFile(file, header)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": err.Error(),
-		})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"message":   "Image uploaded successfully",
-		"filename":  result.Filename,
-		"size":      result.Size,
-		"mime_type": result.MimeType,
-	})
+func (h *UploadHandler) UploadImage(w http.ResponseWriter, r *http.Request) {
+// Parse multipart form with max memory 32MB
+if err := r.ParseMultipartForm(32 << 20); err != nil {
+writeError(w, http.StatusBadRequest, "Failed to parse multipart form")
+return
 }
 
-func (h *UploadHandler) ServeImage(c *gin.Context) {
-	filename := c.Param("filename")
-	if filename == "" {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "Filename required",
-		})
-		return
-	}
+// Get file from form
+file, header, err := r.FormFile("image")
+if err != nil {
+writeError(w, http.StatusBadRequest, "No image file provided")
+return
+}
+defer file.Close()
 
-	imagePath := utils.GetImagePath(filename)
-	
-	// Check if file exists
-	if _, err := os.Stat(imagePath); os.IsNotExist(err) {
-		c.JSON(http.StatusNotFound, gin.H{
-			"error": "Image not found",
-		})
-		return
-	}
-
-	c.File(imagePath)
+// Save the image
+result, err := utils.SaveImageFile(file, header)
+if err != nil {
+writeError(w, http.StatusBadRequest, err.Error())
+return
 }
 
-func (h *UploadHandler) DeleteImage(c *gin.Context) {
-	filename := c.Param("filename")
-	if filename == "" {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "Filename required",
-		})
-		return
-	}
+writeJSON(w, http.StatusOK, map[string]interface{}{
+"message":   "Image uploaded successfully",
+"filename":  result.Filename,
+"size":      result.Size,
+"mime_type": result.MimeType,
+})
+}
 
-	if err := utils.DeleteImageFile(filename); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": "Failed to delete image",
-		})
-		return
-	}
+func (h *UploadHandler) ServeImage(w http.ResponseWriter, r *http.Request) {
+// Extract filename from URL path
+path := strings.TrimPrefix(r.URL.Path, "/uploads/")
+filename := filepath.Base(path)
 
-	c.JSON(http.StatusOK, gin.H{
-		"message": "Image deleted successfully",
-	})
+if filename == "" || filename == "." {
+writeError(w, http.StatusBadRequest, "Filename required")
+return
+}
+
+imagePath := utils.GetImagePath(filename)
+
+// Check if file exists
+if _, err := os.Stat(imagePath); os.IsNotExist(err) {
+writeError(w, http.StatusNotFound, "Image not found")
+return
+}
+
+http.ServeFile(w, r, imagePath)
+}
+
+func (h *UploadHandler) DeleteImage(w http.ResponseWriter, r *http.Request) {
+// Extract filename from URL path
+path := strings.TrimPrefix(r.URL.Path, "/uploads/")
+filename := filepath.Base(path)
+
+if filename == "" || filename == "." {
+writeError(w, http.StatusBadRequest, "Filename required")
+return
+}
+
+if err := utils.DeleteImageFile(filename); err != nil {
+writeError(w, http.StatusInternalServerError, "Failed to delete image")
+return
+}
+
+writeJSON(w, http.StatusOK, map[string]interface{}{
+"message": "Image deleted successfully",
+})
 }

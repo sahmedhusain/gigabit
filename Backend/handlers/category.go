@@ -1,187 +1,183 @@
 package handlers
 
 import (
-	"database/sql"
-	"net/http"
-	"social/models"
-	"social/services"
-	"social/websocket"
-	"strconv"
-
-	"github.com/gin-gonic/gin"
+"database/sql"
+"encoding/json"
+"net/http"
+"social/models"
+"social/services"
+"social/websocket"
+"strconv"
 )
 
 type CategoryHandler struct {
-	categoryService *services.CategoryService
+categoryService *services.CategoryService
 }
 
 func NewCategoryHandler(db *sql.DB, hub *websocket.Hub) *CategoryHandler {
-	return &CategoryHandler{
-		categoryService: services.NewCategoryService(db, hub),
-	}
+return &CategoryHandler{
+categoryService: services.NewCategoryService(db, hub),
+}
 }
 
 // GetAllCategories retrieves all active categories
-func (h *CategoryHandler) GetAllCategories(c *gin.Context) {
-	categories, err := h.categoryService.GetAllCategories()
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get categories"})
-		return
-	}
+func (h *CategoryHandler) GetAllCategories(w http.ResponseWriter, r *http.Request) {
+categories, err := h.categoryService.GetAllCategories()
+if err != nil {
+writeError(w, http.StatusInternalServerError, "Failed to get categories")
+return
+}
 
-	c.JSON(http.StatusOK, gin.H{
-		"categories": categories,
-		"count":      len(categories),
-	})
+writeJSON(w, http.StatusOK, map[string]interface{}{
+"categories": categories,
+"count":      len(categories),
+})
 }
 
 // GetCategory retrieves a specific category
-func (h *CategoryHandler) GetCategory(c *gin.Context) {
-	categoryIDStr := c.Param("id")
-	categoryID, err := strconv.ParseUint(categoryIDStr, 10, 32)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid category ID"})
-		return
-	}
+func (h *CategoryHandler) GetCategory(w http.ResponseWriter, r *http.Request, categoryIDStr string) {
+categoryID, err := strconv.ParseUint(categoryIDStr, 10, 32)
+if err != nil {
+writeError(w, http.StatusBadRequest, "Invalid category ID")
+return
+}
 
-	category, err := h.categoryService.GetCategoryByID(uint(categoryID))
-	if err != nil {
-		if err == sql.ErrNoRows {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Category not found"})
-		} else {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get category"})
-		}
-		return
-	}
+category, err := h.categoryService.GetCategoryByID(uint(categoryID))
+if err != nil {
+if err == sql.ErrNoRows {
+writeError(w, http.StatusNotFound, "Category not found")
+} else {
+writeError(w, http.StatusInternalServerError, "Failed to get category")
+}
+return
+}
 
-	c.JSON(http.StatusOK, category)
+writeJSON(w, http.StatusOK, category)
 }
 
 // CreateCategory creates a new category (admin only)
-func (h *CategoryHandler) CreateCategory(c *gin.Context) {
-	var req models.CreateCategoryRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
+func (h *CategoryHandler) CreateCategory(w http.ResponseWriter, r *http.Request) {
+var req models.CreateCategoryRequest
+if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+writeError(w, http.StatusBadRequest, "Invalid request body")
+return
+}
 
-	// Set default values if not provided
-	if req.Color == "" {
-		req.Color = "#10B981" // Default emerald color
-	}
-	if req.Icon == "" {
-		req.Icon = "folder" // Default icon
-	}
+// Set default values if not provided
+if req.Color == "" {
+req.Color = "#10B981" // Default emerald color
+}
+if req.Icon == "" {
+req.Icon = "folder" // Default icon
+}
 
-	category := &models.Category{
-		Name:        req.Name,
-		Description: req.Description,
-		Color:       req.Color,
-		Icon:        req.Icon,
-		IsActive:    true,
-		PostCount:   0,
-	}
+category := &models.Category{
+Name:        req.Name,
+Description: req.Description,
+Color:       req.Color,
+Icon:        req.Icon,
+IsActive:    true,
+PostCount:   0,
+}
 
-	if err := h.categoryService.CreateCategory(category); err != nil {
-		if err.Error() == "category name already exists" {
-			c.JSON(http.StatusConflict, gin.H{"error": "Category name already exists"})
-		} else {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create category"})
-		}
-		return
-	}
+if err := h.categoryService.CreateCategory(category); err != nil {
+if err.Error() == "category name already exists" {
+writeError(w, http.StatusConflict, "Category name already exists")
+} else {
+writeError(w, http.StatusInternalServerError, "Failed to create category")
+}
+return
+}
 
-	c.JSON(http.StatusCreated, gin.H{
-		"message":  "Category created successfully",
-		"category": category,
-	})
+writeJSON(w, http.StatusCreated, map[string]interface{}{
+"message":  "Category created successfully",
+"category": category,
+})
 }
 
 // UpdateCategory updates an existing category (admin only)
-func (h *CategoryHandler) UpdateCategory(c *gin.Context) {
-	categoryIDStr := c.Param("id")
-	categoryID, err := strconv.ParseUint(categoryIDStr, 10, 32)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid category ID"})
-		return
-	}
+func (h *CategoryHandler) UpdateCategory(w http.ResponseWriter, r *http.Request, categoryIDStr string) {
+categoryID, err := strconv.ParseUint(categoryIDStr, 10, 32)
+if err != nil {
+writeError(w, http.StatusBadRequest, "Invalid category ID")
+return
+}
 
-	var req models.UpdateCategoryRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
+var req models.UpdateCategoryRequest
+if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+writeError(w, http.StatusBadRequest, "Invalid request body")
+return
+}
 
-	if err := h.categoryService.UpdateCategory(uint(categoryID), &req); err != nil {
-		if err == sql.ErrNoRows {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Category not found"})
-		} else if err.Error() == "category name already exists" {
-			c.JSON(http.StatusConflict, gin.H{"error": "Category name already exists"})
-		} else if err.Error() == "no fields to update" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "No fields to update"})
-		} else {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update category"})
-		}
-		return
-	}
+if err := h.categoryService.UpdateCategory(uint(categoryID), &req); err != nil {
+if err == sql.ErrNoRows {
+writeError(w, http.StatusNotFound, "Category not found")
+} else if err.Error() == "category name already exists" {
+writeError(w, http.StatusConflict, "Category name already exists")
+} else if err.Error() == "no fields to update" {
+writeError(w, http.StatusBadRequest, "No fields to update")
+} else {
+writeError(w, http.StatusInternalServerError, "Failed to update category")
+}
+return
+}
 
-	c.JSON(http.StatusOK, gin.H{"message": "Category updated successfully"})
+writeJSON(w, http.StatusOK, map[string]interface{}{"message": "Category updated successfully"})
 }
 
 // DeleteCategory soft deletes a category (admin only)
-func (h *CategoryHandler) DeleteCategory(c *gin.Context) {
-	categoryIDStr := c.Param("id")
-	categoryID, err := strconv.ParseUint(categoryIDStr, 10, 32)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid category ID"})
-		return
-	}
+func (h *CategoryHandler) DeleteCategory(w http.ResponseWriter, r *http.Request, categoryIDStr string) {
+categoryID, err := strconv.ParseUint(categoryIDStr, 10, 32)
+if err != nil {
+writeError(w, http.StatusBadRequest, "Invalid category ID")
+return
+}
 
-	if err := h.categoryService.DeleteCategory(uint(categoryID)); err != nil {
-		if err == sql.ErrNoRows {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Category not found"})
-		} else if err.Error() == "cannot delete the default General category" {
-			c.JSON(http.StatusForbidden, gin.H{"error": "Cannot delete the default General category"})
-		} else {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete category"})
-		}
-		return
-	}
+if err := h.categoryService.DeleteCategory(uint(categoryID)); err != nil {
+if err == sql.ErrNoRows {
+writeError(w, http.StatusNotFound, "Category not found")
+} else if err.Error() == "cannot delete the default General category" {
+writeError(w, http.StatusForbidden, "Cannot delete the default General category")
+} else {
+writeError(w, http.StatusInternalServerError, "Failed to delete category")
+}
+return
+}
 
-	c.JSON(http.StatusOK, gin.H{"message": "Category deleted successfully"})
+writeJSON(w, http.StatusOK, map[string]interface{}{"message": "Category deleted successfully"})
 }
 
 // GetCategoryStats retrieves category statistics
-func (h *CategoryHandler) GetCategoryStats(c *gin.Context) {
-	stats, err := h.categoryService.GetCategoryStats()
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get category stats"})
-		return
-	}
+func (h *CategoryHandler) GetCategoryStats(w http.ResponseWriter, r *http.Request) {
+stats, err := h.categoryService.GetCategoryStats()
+if err != nil {
+writeError(w, http.StatusInternalServerError, "Failed to get category stats")
+return
+}
 
-	c.JSON(http.StatusOK, gin.H{
-		"stats": stats,
-		"count": len(stats),
-	})
+writeJSON(w, http.StatusOK, map[string]interface{}{
+"stats": stats,
+"count": len(stats),
+})
 }
 
 // SearchCategories searches categories by name
-func (h *CategoryHandler) SearchCategories(c *gin.Context) {
-	searchTerm := c.Query("q")
-	if searchTerm == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Search query required"})
-		return
-	}
+func (h *CategoryHandler) SearchCategories(w http.ResponseWriter, r *http.Request) {
+searchTerm := r.URL.Query().Get("q")
+if searchTerm == "" {
+writeError(w, http.StatusBadRequest, "Search query required")
+return
+}
 
-	categories, err := h.categoryService.SearchCategories(searchTerm)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to search categories"})
-		return
-	}
+categories, err := h.categoryService.SearchCategories(searchTerm)
+if err != nil {
+writeError(w, http.StatusInternalServerError, "Failed to search categories")
+return
+}
 
-	c.JSON(http.StatusOK, gin.H{
-		"categories": categories,
-		"count":      len(categories),
-		"search":     searchTerm,
-	})
+writeJSON(w, http.StatusOK, map[string]interface{}{
+"categories": categories,
+"count":      len(categories),
+"search":     searchTerm,
+})
 }

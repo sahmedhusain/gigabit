@@ -1,80 +1,92 @@
 package handlers
 
 import (
-	"fmt"
-	"net/http"
-	"social/websocket"
-
-	"github.com/gin-gonic/gin"
+"net/http"
+"social/websocket"
+"strconv"
 )
 
 type WebSocketHandler struct {
-	hub *websocket.Hub
+hub *websocket.Hub
 }
 
 func NewWebSocketHandler(hub *websocket.Hub) *WebSocketHandler {
-	return &WebSocketHandler{
-		hub: hub,
-	}
+return &WebSocketHandler{
+hub: hub,
+}
 }
 
-func (h *WebSocketHandler) HandleWebSocket(c *gin.Context) {
-	// Get user ID from auth middleware
-	userID, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
-		return
-	}
-
-	// Upgrade HTTP connection to WebSocket
-	h.hub.ServeWS(c.Writer, c.Request, userID.(uint))
+func (h *WebSocketHandler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
+if r.Method != http.MethodGet {
+writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
+return
 }
 
-func (h *WebSocketHandler) GetOnlineUsers(c *gin.Context) {
-	// Get user ID from auth middleware
-	_, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
-		return
-	}
-
-	onlineUsers := h.hub.GetOnlineUsers()
-	c.JSON(http.StatusOK, gin.H{
-		"online_users": onlineUsers,
-		"count":        len(onlineUsers),
-	})
+// Get user ID from auth middleware
+userID := r.Context().Value("user_id")
+if userID == nil {
+writeError(w, http.StatusUnauthorized, "User not authenticated")
+return
 }
 
-func (h *WebSocketHandler) CheckUserStatus(c *gin.Context) {
-	// Get user ID from auth middleware
-	_, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
-		return
-	}
+// Upgrade HTTP connection to WebSocket
+h.hub.ServeWS(w, r, userID.(uint))
+}
 
-	targetUserID := c.Param("user_id")
-	if targetUserID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "User ID required"})
-		return
-	}
+func (h *WebSocketHandler) GetOnlineUsers(w http.ResponseWriter, r *http.Request) {
+if r.Method != http.MethodGet {
+writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
+return
+}
 
-	// Convert string to uint
-	var userIDUint uint
-	if _, err := fmt.Sscanf(targetUserID, "%d", &userIDUint); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user ID"})
-		return
-	}
+// Get user ID from auth middleware
+userID := r.Context().Value("user_id")
+if userID == nil {
+writeError(w, http.StatusUnauthorized, "User not authenticated")
+return
+}
 
-	isOnline := h.hub.IsUserOnline(userIDUint)
-	status := "offline"
-	if isOnline {
-		status = "online"
-	}
+onlineUsers := h.hub.GetOnlineUsers()
+writeJSON(w, http.StatusOK, map[string]interface{}{
+"online_users": onlineUsers,
+"count":        len(onlineUsers),
+})
+}
 
-	c.JSON(http.StatusOK, gin.H{
-		"user_id": userIDUint,
-		"status":  status,
-		"online":  isOnline,
-	})
+func (h *WebSocketHandler) CheckUserStatus(w http.ResponseWriter, r *http.Request, targetUserIDStr string) {
+if r.Method != http.MethodGet {
+writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
+return
+}
+
+// Get user ID from auth middleware
+userID := r.Context().Value("user_id")
+if userID == nil {
+writeError(w, http.StatusUnauthorized, "User not authenticated")
+return
+}
+
+if targetUserIDStr == "" {
+writeError(w, http.StatusBadRequest, "User ID required")
+return
+}
+
+// Convert string to uint
+userIDUint, err := strconv.ParseUint(targetUserIDStr, 10, 32)
+if err != nil {
+writeError(w, http.StatusBadRequest, "Invalid user ID")
+return
+}
+
+isOnline := h.hub.IsUserOnline(uint(userIDUint))
+status := "offline"
+if isOnline {
+status = "online"
+}
+
+writeJSON(w, http.StatusOK, map[string]interface{}{
+"user_id": uint(userIDUint),
+"status":  status,
+"online":  isOnline,
+})
 }

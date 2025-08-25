@@ -1,43 +1,54 @@
-2025/08/19 20:20:05 Database migrations applied successfully
-2025/08/19 20:20:05 Database initialized successfully with migrations
-[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
- - using env:	export GIN_MODE=release
- - using code:	gin.SetMode(gin.ReleaseMode)
-
-[GIN-debug] GET    /health                   --> main.(*Server).Routes.func2 (6 handlers)
-[GIN-debug] POST   /api/register             --> social/handlers.(*AuthHandler).Register-fm (6 handlers)
-[GIN-debug] POST   /api/login                --> social/handlers.(*AuthHandler).Login-fm (6 handlers)
-[GIN-debug] GET    /api/me                   --> social/handlers.(*AuthHandler).GetMe-fm (7 handlers)
-[GIN-debug] POST   /api/logout               --> social/handlers.(*AuthHandler).Logout-fm (7 handlers)
-2025/08/19 20:20:05 Starting server on :8080
-[GIN-debug] [WARNING] You trusted all proxies, this is NOT safe. We recommend you to set a value.
-Please check https://pkg.go.dev/github.com/gin-gonic/gin#readme-don-t-trust-all-proxies for details.
-[GIN-debug] Listening and serving HTTP on :8080
-[GIN] 2025/08/19 - 20:20:14 | 200 |     238.417µs |             ::1 | GET      "/health"
-[GIN] 2025/08/19 - 20:20:18 | 401 |     805.375µs |             ::1 | POST     "/api/login"
-[GIN] 2025/08/19 - 20:20:19 | 401 |       623.5µs |             ::1 | POST     "/api/login"
-[GIN] 2025/08/19 - 20:20:20 | 401 |     268.125µs |             ::1 | POST     "/api/login"
-[GIN] 2025/08/19 - 20:20:21 | 401 |     507.459µs |             ::1 | POST     "/api/login"
-[GIN] 2025/08/19 - 20:20:51 | 401 |     152.875µs |             ::1 | POST     "/api/login"
-[GIN] 2025/08/19 - 20:22:37 | 401 |       255.5µs |             ::1 | POST     "/api/login"
-[GIN] 2025/08/19 - 20:22:38 | 401 |     154.792µs |             ::1 | POST     "/api/login"
-[GIN] 2025/08/19 - 20:22:38 | 401 |     733.459µs |             ::1 | POST     "/api/login"
-[GIN] 2025/08/19 - 20:23:37 | 401 |     284.167µs |             ::1 | POST     "/api/login"
-[GIN] 2025/08/19 - 20:23:45 | 401 |     344.708µs |             ::1 | GET      "/api/me"
-[GIN] 2025/08/19 - 20:24:05 | 204 |      13.708µs |             ::1 | OPTIONS  "/api/login"
-[GIN] 2025/08/19 - 20:24:05 | 401 |     305.834µs |             ::1 | POST     "/api/login"
-[GIN] 2025/08/19 - 20:24:50 | 401 |    1.594708ms |             ::1 | POST     "/api/login"
-[GIN] 2025/08/19 - 20:25:25 | 200 |       22.25µs |             ::1 | GET      "/health"
-[GIN] 2025/08/19 - 20:25:32 | 201 |   68.309083ms |             ::1 | POST     "/api/register"
-[GIN] 2025/08/19 - 20:25:38 | 200 |   66.022375ms |             ::1 | POST     "/api/login"
-[GIN] 2025/08/19 - 20:26:18 | 204 |      76.625µs |             ::1 | OPTIONS  "/api/login"
-[GIN] 2025/08/19 - 20:26:18 | 401 |   81.617209ms |             ::1 | POST     "/api/login"
-[GIN] 2025/08/19 - 20:26:33 | 401 |     153.125µs |       127.0.0.1 | GET      "/api/me"
-[GIN] 2025/08/19 - 20:26:48 | 401 |      70.625ms |       127.0.0.1 | POST     "/api/login"
-[GIN] 2025/08/19 - 20:27:16 | 204 |      16.125µs |       127.0.0.1 | OPTIONS  "/api/register"
-[GIN] 2025/08/19 - 20:27:17 | 201 |   72.839958ms |       127.0.0.1 | POST     "/api/register"
-[GIN] 2025/08/19 - 20:27:49 | 200 |     254.167µs |       127.0.0.1 | GET      "/api/me"
-[GIN] 2025/08/19 - 20:28:07 | 200 |     73.1045ms |       127.0.0.1 | POST     "/api/login"
-[GIN] 2025/08/19 - 20:28:53 | 401 |   70.667958ms |             ::1 | POST     "/api/login"
-[GIN] 2025/08/19 - 20:29:12 | 200 |   77.900334ms |             ::1 | POST     "/api/login"
-signal: terminated
+2025/08/25 17:43:34 Database migrations applied successfully
+2025/08/25 17:43:34 Database initialized successfully with migrations
+2025/08/25 17:43:34 Using existing database (use -mock flag to load mock data)
+2025/08/25 17:43:34 Starting server on :8080
+2025/08/25 17:43:34 Server starting on :8080
+2025/08/25 17:43:45 GET /health 48.06µs
+2025/08/25 17:44:07 GET /health 63.208µs
+2025/08/25 17:44:46 GET /health 31.559µs
+2025/08/25 17:45:07 GET /health 24.546µs
+2025/08/25 17:45:08 POST /api/login 54.427333ms
+2025/08/25 17:45:08 GET /api/ws 527.524µs
+2025/08/25 17:45:08 Client 1 connected
+2025/08/25 17:45:08 Unknown message type: user_status
+2025/08/25 17:45:08 GET /api/feed 2.237696ms
+2025/08/25 17:45:08 GET /api/categories 640.757µs
+2025/08/25 17:45:08 GET /api/categories/stats 313.12µs
+2025/08/25 17:45:08 GET /api/users 807.731µs
+2025/08/25 17:45:08 GET /api/categories 1.233263ms
+2025/08/25 17:45:08 GET /api/feed 4.054309ms
+2025/08/25 17:45:08 GET /api/categories/stats 3.239581ms
+2025/08/25 17:45:08 GET /api/users 710.389µs
+2025/08/25 17:45:38 GET /health 52.858µs
+2025/08/25 17:45:47 GET /health 69.319µs
+2025/08/25 17:46:07 GET /health 19.517µs
+2025/08/25 17:46:08 GET /health 74.389µs
+2025/08/25 17:46:38 GET /health 37.961µs
+2025/08/25 17:46:48 GET /health 117.69µs
+2025/08/25 17:47:07 GET /health 16.301µs
+2025/08/25 17:47:08 GET /health 75.262µs
+2025/08/25 17:47:38 GET /health 85.88µs
+2025/08/25 17:47:49 GET /health 50.414µs
+2025/08/25 17:48:07 GET /health 51.186µs
+2025/08/25 17:48:08 GET /health 44.232µs
+2025/08/25 17:48:38 GET /health 28.784µs
+2025/08/25 17:48:50 GET /health 37.35µs
+2025/08/25 17:49:07 GET /health 34.244µs
+2025/08/25 17:49:08 GET /health 37.961µs
+2025/08/25 17:49:38 GET /health 29.315µs
+2025/08/25 17:49:51 GET /health 46.136µs
+2025/08/25 17:50:07 GET /health 18.374µs
+2025/08/25 17:50:08 GET /health 40.696µs
+2025/08/25 17:50:38 GET /health 22.813µs
+2025/08/25 17:50:52 GET /health 33.192µs
+2025/08/25 17:51:07 GET /health 19.847µs
+2025/08/25 17:51:08 GET /health 19.116µs
+2025/08/25 17:51:38 GET /health 14.718µs
+2025/08/25 17:51:53 GET /health 45.655µs
+2025/08/25 17:52:07 GET /health 28.634µs
+2025/08/25 17:52:08 GET /health 17.973µs
+2025/08/25 17:52:38 GET /health 19.206µs
+2025/08/25 17:52:54 GET /health 67.957µs
+2025/08/25 17:53:07 GET /health 17.754µs
+2025/08/25 17:53:08 GET /health 16.12µs
+2025/08/25 17:53:25 GET /health 23.133µs

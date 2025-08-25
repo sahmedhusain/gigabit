@@ -29,6 +29,7 @@ const (
 	MessageTypePostUpdate     = "post_update"
 	MessageTypeCommentUpdate  = "comment_update"
 	MessageTypeLikeUpdate     = "like_update"
+	MessageTypeLike           = "like"
 	MessageTypeFollowUpdate   = "follow_update"
 	MessageTypeGroupUpdate    = "group_update"
 	MessageTypeEventUpdate    = "event_update"
@@ -143,6 +144,8 @@ func (h *Hub) handleMessage(message Message) {
 		h.handleCommentUpdate(message)
 	case MessageTypeLikeUpdate:
 		h.handleLikeUpdate(message)
+	case MessageTypeLike:
+		h.handleLike(message)
 	case MessageTypeFollowUpdate:
 		h.handleFollowUpdate(message)
 	case MessageTypeGroupUpdate:
@@ -495,6 +498,25 @@ func (h *Hub) handleLikeUpdate(message Message) {
 				default:
 					log.Printf("Failed to send like update to user %d", userID)
 				}
+			}
+		}
+	}
+}
+
+func (h *Hub) handleLike(message Message) {
+	// Broadcast like updates to all connected clients except sender
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+
+	log.Printf("Broadcasting like update for post %d by user %d", message.PostID, message.From)
+	
+	for userID, client := range h.clients {
+		if userID != message.From { // Don't send back to sender
+			select {
+			case client.Send <- message:
+				log.Printf("Successfully sent like update to user %d", userID)
+			default:
+				log.Printf("Failed to send like update to user %d", userID)
 			}
 		}
 	}

@@ -448,3 +448,98 @@ writeJSON(w, http.StatusOK, map[string]interface{}{
 "category_id": categoryID,
 })
 }
+
+// CreateComment handles creating a new comment on a post
+func (h *PostHandler) CreateComment(w http.ResponseWriter, r *http.Request, postIDStr string) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
+
+	postID, err := strconv.ParseUint(postIDStr, 10, 32)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "Invalid post ID")
+		return
+	}
+
+	userID := r.Context().Value("user_id")
+	if userID == nil {
+		writeError(w, http.StatusUnauthorized, "User not authenticated")
+		return
+	}
+
+	var req models.CreateCommentRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "Invalid request data: "+err.Error())
+		return
+	}
+
+	comment := &models.Comment{
+		PostID:  uint(postID),
+		UserID:  userID.(uint),
+		Content: req.Content,
+	}
+
+	if req.ImageURL != "" {
+		comment.ImageURL = &req.ImageURL
+	}
+
+	if err := h.commentService.CreateComment(comment); err != nil {
+		log.Printf("Failed to create comment: %v", err)
+		writeError(w, http.StatusInternalServerError, "Failed to create comment")
+		return
+	}
+
+	writeJSON(w, http.StatusCreated, map[string]interface{}{
+		"message": "Comment created successfully",
+		"comment": comment,
+	})
+}
+
+// GetPostComments handles getting comments for a specific post
+func (h *PostHandler) GetPostComments(w http.ResponseWriter, r *http.Request, postIDStr string) {
+	if r.Method != http.MethodGet {
+		writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
+
+	postID, err := strconv.ParseUint(postIDStr, 10, 32)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "Invalid post ID")
+		return
+	}
+
+	// Get pagination parameters
+	limitStr := r.URL.Query().Get("limit")
+	if limitStr == "" {
+		limitStr = "20"
+	}
+	offsetStr := r.URL.Query().Get("offset")
+	if offsetStr == "" {
+		offsetStr = "0"
+	}
+
+	limit, err := strconv.Atoi(limitStr)
+	if err != nil || limit > 100 {
+		limit = 20
+	}
+
+	offset, err := strconv.Atoi(offsetStr)
+	if err != nil || offset < 0 {
+		offset = 0
+	}
+
+	comments, err := h.commentService.GetPostComments(uint(postID), limit, offset)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "Failed to get comments")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"comments": comments,
+		"count":    len(comments),
+		"limit":    limit,
+		"offset":   offset,
+		"post_id":  postID,
+	})
+}

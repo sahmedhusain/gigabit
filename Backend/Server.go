@@ -329,6 +329,19 @@ func (s *Server) handlePostRoute(handler *handlers.PostHandler) http.HandlerFunc
 				default:
 					writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
 				}
+			case "comments":
+				switch r.Method {
+				case http.MethodGet:
+					authMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+						handler.GetPostComments(w, r, postID)
+					})).ServeHTTP(w, r)
+				case http.MethodPost:
+					authMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+						handler.CreateComment(w, r, postID)
+					})).ServeHTTP(w, r)
+				default:
+					writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
+				}
 			default:
 				writeError(w, http.StatusNotFound, "Route not found")
 			}
@@ -381,6 +394,28 @@ func (s *Server) handleCategoryRoute(handler *handlers.CategoryHandler) http.Han
 			return
 		}
 
+		// Handle special endpoints first
+		if parts[0] == "stats" {
+			if r.Method != http.MethodGet {
+				writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
+				return
+			}
+			authMiddleware := middleware.AuthMiddleware(s.DB.GetDB())
+			authMiddleware(http.HandlerFunc(handler.GetCategoryStats)).ServeHTTP(w, r)
+			return
+		}
+
+		if parts[0] == "search" {
+			if r.Method != http.MethodGet {
+				writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
+				return
+			}
+			authMiddleware := middleware.AuthMiddleware(s.DB.GetDB())
+			authMiddleware(http.HandlerFunc(handler.SearchCategories)).ServeHTTP(w, r)
+			return
+		}
+
+		// Handle category ID routes
 		categoryID := parts[0]
 		authMiddleware := middleware.AuthMiddleware(s.DB.GetDB())
 
@@ -402,23 +437,8 @@ func (s *Server) handleCategoryRoute(handler *handlers.CategoryHandler) http.Han
 				writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
 			}
 		} else if len(parts) == 2 {
-			action := parts[1]
-			switch action {
-			case "stats":
-				if r.Method != http.MethodGet {
-					writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
-					return
-				}
-				authMiddleware(http.HandlerFunc(handler.GetCategoryStats)).ServeHTTP(w, r)
-			case "search":
-				if r.Method != http.MethodGet {
-					writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
-					return
-				}
-				authMiddleware(http.HandlerFunc(handler.SearchCategories)).ServeHTTP(w, r)
-			default:
-				writeError(w, http.StatusNotFound, "Route not found")
-			}
+			// No additional actions needed for individual categories currently
+			writeError(w, http.StatusNotFound, "Route not found")
 		}
 	}
 }

@@ -66,15 +66,18 @@ export default function PostCard({ post, onLike }: PostCardProps) {
         <button
           onClick={handleLikeClick}
           className={`flex items-center space-x-1 lg:space-x-2 px-2 lg:px-4 py-1.5 lg:py-2 rounded-lg lg:rounded-xl transition-all duration-200 text-xs lg:text-sm ${post.isLiked
-              ? 'text-red-400 bg-red-500/10'
-              : 'text-white/70 hover:text-white hover:bg-white/10'
+            ? 'text-red-400 bg-red-500/10'
+            : 'text-white/70 hover:text-white hover:bg-white/10'
             }`}>
           <Heart className={`w-3 h-3 lg:w-4 lg:h-4 ${post.isLiked ? 'fill-current' : ''}`} />
           <span>{post.likes}</span>
         </button>
 
         <button
-          onClick={(e) => e.stopPropagation()}
+          onClick={(e) => {
+            e.stopPropagation()
+            router.push(`/post/${post.id}`)
+          }}
           className="flex items-center space-x-1 lg:space-x-2 px-2 lg:px-4 py-1.5 lg:py-2 text-white/70 hover:text-white hover:bg-white/10 rounded-lg lg:rounded-xl transition-all duration-200 text-xs lg:text-sm">
           <MessageSquare className="w-3 h-3 lg:w-4 lg:h-4" />
           <span>{post.comments}</span>

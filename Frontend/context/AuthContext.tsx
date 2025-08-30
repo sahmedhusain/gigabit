@@ -105,6 +105,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     } finally {
       removeToken();
       setUser(null);
+      // Ensure user is redirected to login after logout
+      if (typeof window !== 'undefined') {
+        window.location.href = '/login'
+      }
     }
   };
 

@@ -11,6 +11,5 @@ export {
   CategoriesSection,
   FollowersSection,
   GroupsSection,
-  EventsSection,
   SettingsSection
 } from './DashboardSections'

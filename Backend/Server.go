@@ -1,16 +1,17 @@
 package main
 
 import (
-"context"
-"encoding/json"
-"log"
-"net/http"
-"social/handlers"
-"social/middleware"
-customsqlite "social/pkg/db/sqlite"
-"social/websocket"
-"strings"
-"time"
+	"context"
+	"encoding/json"
+	"log"
+	"net/http"
+	"os"
+	"social/handlers"
+	"social/middleware"
+	customsqlite "social/pkg/db/sqlite"
+	"social/websocket"
+	"strings"
+	"time"
 )
 
 type Server struct {
@@ -148,6 +149,7 @@ func (s *Server) setupRoutes() {
 	// Category routes
 	s.router.HandleFunc("/api/categories", s.handleCategoriesRoute(categoryHandler))
 	s.router.HandleFunc("/api/categories/", s.handleCategoryRoute(categoryHandler))
+	s.router.HandleFunc("/api/categories/stats", s.handleRoute(categoryHandler.GetCategoryStats, true))
 
 	// Group routes
 	s.router.HandleFunc("/api/groups", s.handleGroupsRoute(groupHandler))
@@ -171,6 +173,47 @@ func (s *Server) setupRoutes() {
 
 	// Upload routes
 	s.router.HandleFunc("/api/upload", s.handleRoute(uploadHandler.UploadImage, true))
+
+	// Dev-only debug routes (enable by setting ENABLE_DEBUG=1 in environment)
+	if os.Getenv("ENABLE_DEBUG") == "1" {
+		s.router.HandleFunc("/api/debug/sessions", func(w http.ResponseWriter, r *http.Request) {
+			if r.Method != http.MethodGet {
+				writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
+				return
+			}
+
+			db := s.DB.GetDB()
+			rows, err := db.Query(`SELECT id, user_id, token, expires_at, created_at, updated_at FROM sessions`)
+			if err != nil {
+				writeError(w, http.StatusInternalServerError, "Failed to query sessions")
+				return
+			}
+			defer rows.Close()
+
+			sessions := []map[string]interface{}{}
+			for rows.Next() {
+				var id int
+				var userID int
+				var token string
+				var expiresAt string
+				var createdAt string
+				var updatedAt string
+				if err := rows.Scan(&id, &userID, &token, &expiresAt, &createdAt, &updatedAt); err != nil {
+					continue
+				}
+				sessions = append(sessions, map[string]interface{}{
+					"id":         id,
+					"user_id":    userID,
+					"token":      token,
+					"expires_at": expiresAt,
+					"created_at": createdAt,
+					"updated_at": updatedAt,
+				})
+			}
+
+			writeJSON(w, http.StatusOK, map[string]interface{}{"sessions": sessions})
+		})
+	}
 }
 
 // Route handler wrapper
@@ -212,7 +255,7 @@ func (s *Server) handleUserRoute(followHandler *handlers.FollowHandler, wsHandle
 	return func(w http.ResponseWriter, r *http.Request) {
 		path := strings.TrimPrefix(r.URL.Path, "/api/users/")
 		parts := strings.Split(path, "/")
-		
+
 		if len(parts) < 2 {
 			writeError(w, http.StatusNotFound, "Invalid route")
 			return
@@ -222,7 +265,7 @@ func (s *Server) handleUserRoute(followHandler *handlers.FollowHandler, wsHandle
 		action := parts[1]
 
 		authMiddleware := middleware.AuthMiddleware(s.DB.GetDB())
-		
+
 		switch action {
 		case "follow":
 			authMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -270,7 +313,7 @@ func (s *Server) handleUserRoute(followHandler *handlers.FollowHandler, wsHandle
 func (s *Server) handlePostsRoute(handler *handlers.PostHandler) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		authMiddleware := middleware.AuthMiddleware(s.DB.GetDB())
-		
+
 		switch r.Method {
 		case http.MethodGet:
 			authMiddleware(http.HandlerFunc(handler.GetPosts)).ServeHTTP(w, r)
@@ -286,7 +329,7 @@ func (s *Server) handlePostRoute(handler *handlers.PostHandler) http.HandlerFunc
 	return func(w http.ResponseWriter, r *http.Request) {
 		path := strings.TrimPrefix(r.URL.Path, "/api/posts/")
 		parts := strings.Split(path, "/")
-		
+
 		if len(parts) == 0 || parts[0] == "" {
 			writeError(w, http.StatusNotFound, "Post ID required")
 			return
@@ -359,7 +402,7 @@ func (s *Server) handlePostRoute(handler *handlers.PostHandler) http.HandlerFunc
 func (s *Server) handleCategoriesRoute(handler *handlers.CategoryHandler) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		authMiddleware := middleware.AuthMiddleware(s.DB.GetDB())
-		
+
 		switch r.Method {
 		case http.MethodGet:
 			authMiddleware(http.HandlerFunc(handler.GetAllCategories)).ServeHTTP(w, r)
@@ -375,7 +418,7 @@ func (s *Server) handleCategoryRoute(handler *handlers.CategoryHandler) http.Han
 	return func(w http.ResponseWriter, r *http.Request) {
 		path := strings.TrimPrefix(r.URL.Path, "/api/categories/")
 		parts := strings.Split(path, "/")
-		
+
 		if len(parts) == 0 || parts[0] == "" {
 			writeError(w, http.StatusNotFound, "Category ID required")
 			return
@@ -426,7 +469,7 @@ func (s *Server) handleCategoryRoute(handler *handlers.CategoryHandler) http.Han
 func (s *Server) handleGroupsRoute(handler *handlers.GroupHandler) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		authMiddleware := middleware.AuthMiddleware(s.DB.GetDB())
-		
+
 		switch r.Method {
 		case http.MethodGet:
 			authMiddleware(http.HandlerFunc(handler.GetAllGroups)).ServeHTTP(w, r)
@@ -442,7 +485,7 @@ func (s *Server) handleGroupRoute(groupHandler *handlers.GroupHandler, eventHand
 	return func(w http.ResponseWriter, r *http.Request) {
 		path := strings.TrimPrefix(r.URL.Path, "/api/groups/")
 		parts := strings.Split(path, "/")
-		
+
 		if len(parts) == 0 || parts[0] == "" {
 			writeError(w, http.StatusNotFound, "Group ID required")
 			return
@@ -569,7 +612,7 @@ func (s *Server) handleEventRoute(handler *handlers.EventHandler) http.HandlerFu
 	return func(w http.ResponseWriter, r *http.Request) {
 		path := strings.TrimPrefix(r.URL.Path, "/api/events/")
 		parts := strings.Split(path, "/")
-		
+
 		if len(parts) == 0 || parts[0] == "" {
 			writeError(w, http.StatusNotFound, "Event ID required")
 			return
@@ -624,7 +667,7 @@ func (s *Server) handleEventRoute(handler *handlers.EventHandler) http.HandlerFu
 func (s *Server) handleMessagesRoute(handler *handlers.MessageHandler) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		authMiddleware := middleware.AuthMiddleware(s.DB.GetDB())
-		
+
 		switch r.Method {
 		case http.MethodPost:
 			authMiddleware(http.HandlerFunc(handler.SendMessage)).ServeHTTP(w, r)
@@ -638,7 +681,7 @@ func (s *Server) handleMessageRoute(handler *handlers.MessageHandler) http.Handl
 	return func(w http.ResponseWriter, r *http.Request) {
 		path := strings.TrimPrefix(r.URL.Path, "/api/messages/")
 		parts := strings.Split(path, "/")
-		
+
 		if len(parts) < 2 {
 			writeError(w, http.StatusNotFound, "Invalid route")
 			return
@@ -686,7 +729,7 @@ func (s *Server) handleMessageRoute(handler *handlers.MessageHandler) http.Handl
 func (s *Server) handleNotificationsRoute(handler *handlers.NotificationHandler) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		authMiddleware := middleware.AuthMiddleware(s.DB.GetDB())
-		
+
 		switch r.Method {
 		case http.MethodGet:
 			authMiddleware(http.HandlerFunc(handler.GetNotifications)).ServeHTTP(w, r)
@@ -702,7 +745,7 @@ func (s *Server) handleNotificationRoute(handler *handlers.NotificationHandler) 
 	return func(w http.ResponseWriter, r *http.Request) {
 		path := strings.TrimPrefix(r.URL.Path, "/api/notifications/")
 		parts := strings.Split(path, "/")
-		
+
 		if len(parts) == 0 || parts[0] == "" {
 			writeError(w, http.StatusNotFound, "Notification route required")
 			return
@@ -746,7 +789,7 @@ func (s *Server) handleNotificationRoute(handler *handlers.NotificationHandler) 
 func (s *Server) Run(addr string) error {
 	// Create HTTP server with middleware chain
 	handler := corsMiddleware(loggingMiddleware(s.dbMiddleware(s.router)))
-	
+
 	s.server = &http.Server{
 		Addr:         addr,
 		Handler:      handler,

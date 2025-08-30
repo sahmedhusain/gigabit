@@ -1,6 +1,7 @@
 package websocket
 
 import (
+	"database/sql"
 	"log"
 	"net/http"
 	"sync"
@@ -29,6 +30,7 @@ const (
 	MessageTypePostUpdate     = "post_update"
 	MessageTypeCommentUpdate  = "comment_update"
 	MessageTypeLikeUpdate     = "like_update"
+	MessageTypeLike           = "like"
 	MessageTypeFollowUpdate   = "follow_update"
 	MessageTypeGroupUpdate    = "group_update"
 	MessageTypeEventUpdate    = "event_update"
@@ -79,6 +81,9 @@ type Hub struct {
 	// Inbound messages from clients
 	broadcast chan Message
 
+	// Database connection for WebSocket operations
+	db *sql.DB
+
 	// Mutex for thread-safe operations
 	mu sync.RWMutex
 }
@@ -91,6 +96,11 @@ func NewHub() *Hub {
 		unregister: make(chan *Client),
 		broadcast:  make(chan Message),
 	}
+}
+
+// SetDB sets the database connection for the hub
+func (h *Hub) SetDB(db *sql.DB) {
+	h.db = db
 }
 
 // Run starts the hub and handles client registration, unregistration, and message broadcasting
@@ -140,9 +150,15 @@ func (h *Hub) handleMessage(message Message) {
 	case MessageTypePostUpdate:
 		h.handlePostUpdate(message)
 	case MessageTypeCommentUpdate:
-		h.handleCommentUpdate(message)
+		if message.Action == "create" {
+			h.handleCommentCreate(message)
+		} else {
+			h.handleCommentUpdate(message)
+		}
 	case MessageTypeLikeUpdate:
 		h.handleLikeUpdate(message)
+	case MessageTypeLike:
+		h.handleLike(message)
 	case MessageTypeFollowUpdate:
 		h.handleFollowUpdate(message)
 	case MessageTypeGroupUpdate:
@@ -461,6 +477,104 @@ func (h *Hub) handlePostUpdate(message Message) {
 	}
 }
 
+// handleCommentCreate processes comment creation via WebSocket
+func (h *Hub) handleCommentCreate(message Message) {
+	if h.db == nil {
+		log.Printf("Database not available")
+		return
+	}
+
+	// Extract comment data from the message
+	if commentData, ok := message.Data.(map[string]interface{}); ok {
+		postID := message.PostID
+		userID := message.From
+		
+		content, contentOk := commentData["content"].(string)
+		if !contentOk || content == "" {
+			log.Printf("Invalid comment content from user %d", userID)
+			// Send error back to client
+			errorMsg := Message{
+				Type:      MessageTypeError,
+				From:      0, // System message
+				To:        userID,
+				Content:   "Invalid comment content",
+				Timestamp: time.Now().Unix(),
+			}
+			h.SendToUser(userID, errorMsg)
+			return
+		}
+		
+		// Create the comment directly in the database
+		query := `
+			INSERT INTO comments (post_id, user_id, content, image_url, created_at, updated_at)
+			VALUES (?, ?, ?, ?, ?, ?)
+		`
+		
+		var imageURL *string
+		if imgURL, ok := commentData["image_url"].(string); ok && imgURL != "" {
+			imageURL = &imgURL
+		}
+		
+		now := time.Now()
+		result, err := h.db.Exec(query, postID, userID, content, imageURL, now, now)
+		if err != nil {
+			log.Printf("Failed to create comment via WebSocket: %v", err)
+			// Send error back to client
+			errorMsg := Message{
+				Type:      MessageTypeError,
+				From:      0,
+				To:        userID,
+				Content:   "Failed to create comment",
+				Timestamp: time.Now().Unix(),
+			}
+			h.SendToUser(userID, errorMsg)
+			return
+		}
+		
+		commentID, err := result.LastInsertId()
+		if err != nil {
+			log.Printf("Failed to get comment ID: %v", err)
+			return
+		}
+		
+		// Get user information for the response
+		userQuery := `SELECT first_name, last_name, avatar, nickname FROM users WHERE id = ?`
+		var firstName, lastName string
+		var avatar, nickname *string
+		
+		err = h.db.QueryRow(userQuery, userID).Scan(&firstName, &lastName, &avatar, &nickname)
+		if err != nil {
+			log.Printf("Failed to get user info: %v", err)
+			return
+		}
+		
+		// Create response data with complete comment information
+		responseData := map[string]interface{}{
+			"id":         uint(commentID),
+			"post_id":    postID,
+			"user_id":    userID,
+			"content":    content,
+			"image_url":  imageURL,
+			"created_at": now.Format("2006-01-02T15:04:05Z"),
+			"updated_at": now.Format("2006-01-02T15:04:05Z"),
+			"user": map[string]interface{}{
+				"id":         userID,
+				"first_name": firstName,
+				"last_name":  lastName,
+				"avatar":     avatar,
+				"nickname":   nickname,
+			},
+		}
+		
+		// Broadcast the new comment to all clients
+		h.BroadcastCommentUpdate(postID, uint(commentID), userID, "create", responseData)
+		
+		log.Printf("Comment created via WebSocket: postID=%d, userID=%d, commentID=%d", postID, userID, commentID)
+	} else {
+		log.Printf("Invalid comment data format from user %d", message.From)
+	}
+}
+
 // handleCommentUpdate broadcasts comment updates to post author and commenters
 func (h *Hub) handleCommentUpdate(message Message) {
 	h.mu.RLock()
@@ -495,6 +609,25 @@ func (h *Hub) handleLikeUpdate(message Message) {
 				default:
 					log.Printf("Failed to send like update to user %d", userID)
 				}
+			}
+		}
+	}
+}
+
+func (h *Hub) handleLike(message Message) {
+	// Broadcast like updates to all connected clients except sender
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+
+	log.Printf("Broadcasting like update for post %d by user %d", message.PostID, message.From)
+	
+	for userID, client := range h.clients {
+		if userID != message.From { // Don't send back to sender
+			select {
+			case client.Send <- message:
+				log.Printf("Successfully sent like update to user %d", userID)
+			default:
+				log.Printf("Failed to send like update to user %d", userID)
 			}
 		}
 	}

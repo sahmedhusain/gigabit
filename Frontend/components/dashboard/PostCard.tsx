@@ -1,5 +1,6 @@
 'use client'
 import { User, Heart, MessageSquare, Share, MoreHorizontal, Bookmark, Image as ImageIcon } from 'lucide-react'
+import { useRouter } from 'next/navigation'
 import CategoryBadge from '@/components/ui/CategoryBadge'
 import { Post } from '@/lib/api'
 
@@ -9,8 +10,26 @@ interface PostCardProps {
 }
 
 export default function PostCard({ post, onLike }: PostCardProps) {
+  const router = useRouter()
+
+  const handlePostClick = (e: React.MouseEvent) => {
+    // Don't navigate if clicking on interactive elements
+    if ((e.target as HTMLElement).closest('button')) {
+      return
+    }
+    router.push(`/post/${post.id}`)
+  }
+
+  const handleLikeClick = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    onLike(post.id)
+  }
+
   return (
-    <div className="bg-gradient-to-r from-white/10 to-white/5 backdrop-blur-xl rounded-2xl lg:rounded-3xl border border-white/20 p-4 lg:p-6">
+    <div
+      className="bg-gradient-to-r from-white/10 to-white/5 backdrop-blur-xl rounded-2xl lg:rounded-3xl border border-white/20 p-4 lg:p-6 cursor-pointer hover:bg-white/15 transition-all duration-200"
+      onClick={handlePostClick}
+    >
       {/* Post Header */}
       <div className="flex items-center justify-between mb-3 lg:mb-4">
         <div className="flex items-center space-x-3 flex-1 min-w-0">
@@ -44,28 +63,36 @@ export default function PostCard({ post, onLike }: PostCardProps) {
 
       {/* Post Actions */}
       <div className="flex items-center justify-between pt-3 lg:pt-4 border-t border-white/10">
-        <button 
-          onClick={() => onLike(post.id)}
-          className={`flex items-center space-x-1 lg:space-x-2 px-2 lg:px-4 py-1.5 lg:py-2 rounded-lg lg:rounded-xl transition-all duration-200 text-xs lg:text-sm ${
-            post.isLiked 
-              ? 'text-red-400 bg-red-500/10' 
-              : 'text-white/70 hover:text-white hover:bg-white/10'
-          }`}>
+        <button
+          onClick={handleLikeClick}
+          className={`flex items-center space-x-1 lg:space-x-2 px-2 lg:px-4 py-1.5 lg:py-2 rounded-lg lg:rounded-xl transition-all duration-200 text-xs lg:text-sm ${post.isLiked
+            ? 'text-red-400 bg-red-500/10'
+            : 'text-white/70 hover:text-white hover:bg-white/10'
+            }`}>
           <Heart className={`w-3 h-3 lg:w-4 lg:h-4 ${post.isLiked ? 'fill-current' : ''}`} />
           <span>{post.likes}</span>
         </button>
-        
-        <button className="flex items-center space-x-1 lg:space-x-2 px-2 lg:px-4 py-1.5 lg:py-2 text-white/70 hover:text-white hover:bg-white/10 rounded-lg lg:rounded-xl transition-all duration-200 text-xs lg:text-sm">
+
+        <button
+          onClick={(e) => {
+            e.stopPropagation()
+            router.push(`/post/${post.id}`)
+          }}
+          className="flex items-center space-x-1 lg:space-x-2 px-2 lg:px-4 py-1.5 lg:py-2 text-white/70 hover:text-white hover:bg-white/10 rounded-lg lg:rounded-xl transition-all duration-200 text-xs lg:text-sm">
           <MessageSquare className="w-3 h-3 lg:w-4 lg:h-4" />
           <span>{post.comments}</span>
         </button>
-        
-        <button className="flex items-center space-x-1 lg:space-x-2 px-2 lg:px-4 py-1.5 lg:py-2 text-white/70 hover:text-white hover:bg-white/10 rounded-lg lg:rounded-xl transition-all duration-200 text-xs lg:text-sm">
+
+        <button
+          onClick={(e) => e.stopPropagation()}
+          className="flex items-center space-x-1 lg:space-x-2 px-2 lg:px-4 py-1.5 lg:py-2 text-white/70 hover:text-white hover:bg-white/10 rounded-lg lg:rounded-xl transition-all duration-200 text-xs lg:text-sm">
           <Share className="w-3 h-3 lg:w-4 lg:h-4" />
           <span>{post.shares}</span>
         </button>
-        
-        <button className="p-1.5 lg:p-2 text-white/70 hover:text-white hover:bg-white/10 rounded-lg lg:rounded-xl transition-all duration-200">
+
+        <button
+          onClick={(e) => e.stopPropagation()}
+          className="p-1.5 lg:p-2 text-white/70 hover:text-white hover:bg-white/10 rounded-lg lg:rounded-xl transition-all duration-200">
           <Bookmark className="w-3 h-3 lg:w-4 lg:h-4" />
         </button>
       </div>

@@ -2,6 +2,7 @@ package services
 
 import (
 	"database/sql"
+	"log"
 	"social/models"
 	"social/websocket"
 	"time"
@@ -129,6 +130,17 @@ func (s *PostService) GetPostByID(postID uint, currentUserID uint) (*models.Post
 	canView, err := s.CanViewPost(postID, currentUserID)
 	if err != nil || !canView {
 		return nil, err
+	}
+
+	// Fetch comments for this post
+	commentService := NewCommentService(s.db, s.hub)
+	comments, err := commentService.GetPostComments(postID, 50, 0) // Get up to 50 comments
+	if err != nil {
+		log.Printf("Failed to get comments for post %d: %v", postID, err)
+		// Don't fail the request, just set empty comments
+		post.Comments = []models.CommentResponse{}
+	} else {
+		post.Comments = comments
 	}
 
 	return &post, nil

@@ -66,10 +66,14 @@ export interface APIPost {
   user_id: number;
   content: string;
   image_url?: string;
+  privacy: string;
+  category_id: number;
   created_at: string;
   updated_at: string;
   user: User;
+  category: CategoryResponse;
   like_count: number;
+  comment_count: number;
   is_liked: boolean;
   comments?: Comment[];
 }
@@ -303,13 +307,13 @@ export class ApiClient {
 
     try {
       const response = await fetch(url, config);
-      
+
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({
           error: `HTTP ${response.status}: ${response.statusText}`,
           status: response.status
         }));
-        
+
         // Handle specific error cases
         if (response.status === 401) {
           const code = errorData.code;
@@ -323,11 +327,11 @@ export class ApiClient {
           }
           throw new AuthenticationError(errorData.error || 'Authentication failed');
         }
-        
+
         if (response.status === 400) {
           throw new ValidationError(errorData.error || 'Validation failed', errorData.field);
         }
-        
+
         if (response.status >= 500) {
           // Server errors - retry if possible
           if (retryCount < this.maxRetries && this.shouldRetry(options.method)) {
@@ -337,7 +341,7 @@ export class ApiClient {
           }
           throw new NetworkError(errorData.error || 'Server error', response.status, errorData.code);
         }
-        
+
         throw new NetworkError(errorData.error || `HTTP error! status: ${response.status}`, response.status, errorData.code);
       }
 
@@ -359,12 +363,12 @@ export class ApiClient {
         }
         throw new NetworkError('Network connection failed. Please check your internet connection.');
       }
-      
+
       // Re-throw custom errors
       if (error instanceof AuthenticationError || error instanceof ValidationError || error instanceof NetworkError) {
         throw error;
       }
-      
+
       console.error('API request failed:', error);
       throw new NetworkError(error instanceof Error ? error.message : 'Unknown error occurred');
     }
@@ -438,8 +442,8 @@ export class ApiClient {
     });
   }
 
-  async getPost(id: number): Promise<{ post: APIPost }> {
-    return this.request<{ post: APIPost }>(`/api/posts/${id}`, {
+  async getPost(id: number): Promise<APIPost> {
+    return this.request<APIPost>(`/api/posts/${id}`, {
       method: 'GET',
     });
   }
@@ -480,6 +484,20 @@ export class ApiClient {
   async toggleLike(id: number): Promise<{ message: string; is_liked: boolean }> {
     return this.request<{ message: string; is_liked: boolean }>(`/api/posts/${id}/like`, {
       method: 'POST',
+    });
+  }
+
+  // Comment endpoints
+  async getPostComments(postId: number, limit: number = 20, offset: number = 0): Promise<{ comments: Comment[], count: number, post_id: number }> {
+    return this.request<{ comments: Comment[], count: number, post_id: number }>(`/api/posts/${postId}/comments?limit=${limit}&offset=${offset}`, {
+      method: 'GET',
+    });
+  }
+
+  async createComment(postId: number, data: { content: string; image_url?: string }): Promise<{ message: string; comment: Comment }> {
+    return this.request<{ message: string; comment: Comment }>(`/api/posts/${postId}/comments`, {
+      method: 'POST',
+      body: JSON.stringify(data),
     });
   }
 
@@ -538,7 +556,7 @@ export class ApiClient {
 
   static validatePassword(password: string): { isValid: boolean; errors: string[] } {
     const errors: string[] = [];
-    
+
     if (password.length < 8) {
       errors.push('Password must be at least 8 characters long');
     }
@@ -551,7 +569,7 @@ export class ApiClient {
     if (!/\d/.test(password)) {
       errors.push('Password must contain at least one number');
     }
-    
+
     return {
       isValid: errors.length === 0,
       errors

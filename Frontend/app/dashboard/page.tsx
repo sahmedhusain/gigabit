@@ -6,19 +6,19 @@ import { useAuth } from '@/context/AuthContext'
 import { useWebSocket } from '@/context/WebSocketContext'
 import { useToast } from '@/context/ToastContext'
 import { useOffline } from '@/hooks/useOffline'
-import { 
-  api, 
-  ApiClient, 
-  Post, 
-  type Notification as NotificationType, 
-  Group, 
-  Event, 
-  Chat, 
-  NetworkError, 
-  ValidationError, 
-  AuthenticationError, 
-  CategoryResponse, 
-  CreatePostRequest 
+import {
+  api,
+  ApiClient,
+  Post,
+  type Notification as NotificationType,
+  Group,
+  Event,
+  Chat,
+  NetworkError,
+  ValidationError,
+  AuthenticationError,
+  CategoryResponse,
+  CreatePostRequest
 } from '@/lib/api'
 import { Sparkles } from 'lucide-react'
 
@@ -30,12 +30,12 @@ import NotificationsDropdown from '@/components/dashboard/NotificationsDropdown'
 import ChatDropdown from '@/components/dashboard/ChatDropdown'
 import HomeFeed from '@/components/dashboard/HomeFeed'
 import ProfileSection from '@/components/dashboard/ProfileSection'
-import { 
-  CategoriesSection, 
-  FollowersSection, 
-  GroupsSection, 
-  EventsSection, 
-  SettingsSection 
+import {
+  CategoriesSection,
+  FollowersSection,
+  GroupsSection,
+  EventsSection,
+  SettingsSection
 } from '@/components/dashboard/DashboardSections'
 
 function DashboardPage() {
@@ -43,14 +43,14 @@ function DashboardPage() {
   const { isConnected, onlineUsers, addMessageListener, sendMessage } = useWebSocket()
   const { success, error, warning } = useToast()
   const { isOffline, lastConnectionCheck } = useOffline()
-  
+
   // UI State
   const [activeTab, setActiveTab] = useState('home')
   const [showCreatePost, setShowCreatePost] = useState(false)
   const [showNotifications, setShowNotifications] = useState(false)
   const [showChat, setShowChat] = useState(false)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
-  
+
   // Post Creation State
   const [newPostContent, setNewPostContent] = useState('')
   const [postPrivacy, setPostPrivacy] = useState('public')
@@ -152,6 +152,24 @@ function DashboardPage() {
           console.log('Post update received:', message.data)
           if (activeTab === 'home') {
             fetchFeedPosts()
+          }
+          break
+
+        case 'like':
+          // Update like count in real-time for other users
+          if (message.data?.post_id && message.data?.user_id !== user?.id) {
+            setPosts(prevPosts =>
+              prevPosts.map(post =>
+                post.id === message.data.post_id
+                  ? {
+                    ...post,
+                    likes: message.data.like_count || post.likes
+                  }
+                  : post
+              )
+            )
+          } else {
+            console.log('Not updating - either no post_id or message from current user')
           }
           break
 
@@ -269,10 +287,10 @@ function DashboardPage() {
       }
       const mappedPosts = postsArr.map((post: any) => ({
         id: post.id,
-        user: { 
-          name: `${post.user.first_name} ${post.user.last_name}`, 
-          username: post.user.nickname || post.user.email.split('@')[0], 
-          avatar: post.user.avatar 
+        user: {
+          name: `${post.user.first_name} ${post.user.last_name}`,
+          username: post.user.nickname || post.user.email.split('@')[0],
+          avatar: post.user.avatar
         },
         content: post.content,
         image: post.image_url,
@@ -362,7 +380,7 @@ function DashboardPage() {
           title: event.title ?? '',
           description: event.description ?? '',
           date: new Date(eventDateStr).toLocaleDateString(),
-          time: new Date(eventDateStr).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
+          time: new Date(eventDateStr).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
           location: event.location ?? 'Location not specified',
           group: (event.group && (event.group.title ?? event.group.name)) || 'Unknown Group',
           going: event.going_count ?? event.goingCount ?? 0,
@@ -388,7 +406,7 @@ function DashboardPage() {
       const data = await api.getConversations()
       setChats(data.conversations.map(conversation => ({
         id: conversation.id,
-        name: conversation.type === 'private' 
+        name: conversation.type === 'private'
           ? `${conversation.participant?.first_name || ''} ${conversation.participant?.last_name || ''}`.trim() || 'Unknown User'
           : conversation.group?.title || 'Unknown Group',
         lastMessage: conversation.last_message.content,
@@ -428,14 +446,14 @@ function DashboardPage() {
 
   const fetchFollowers = async () => {
     if (!user) return
-    
+
     try {
       setIsLoadingFollowers(true)
       const [followersData, followingData] = await Promise.all([
         api.getFollowers(user.id),
         api.getFollowing(user.id)
       ])
-      
+
       setFollowers(Array.isArray(followersData?.data) ? followersData.data : [])
       setFollowing(Array.isArray(followingData?.data) ? followingData.data : [])
     } catch (err) {
@@ -457,7 +475,7 @@ function DashboardPage() {
     if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m ago`
     if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h ago`
     if (diffInSeconds < 604800) return `${Math.floor(diffInSeconds / 86400)}d ago`
-    
+
     return date.toLocaleDateString()
   }
 
@@ -474,11 +492,11 @@ function DashboardPage() {
         privacy: postPrivacy === 'followers' ? 'almost_private' : postPrivacy,
         category_id: selectedPostCategory
       }
-      
+
       if (postPrivacy === 'private' && selectedUsers.length > 0) {
         postData.specific_user_ids = selectedUsers
       }
-      
+
       await api.createPost(postData)
       setNewPostContent('')
       setSelectedUsers([])
@@ -500,20 +518,47 @@ function DashboardPage() {
   const handleLikePost = async (postId: number) => {
     try {
       const post = posts.find(p => p.id === postId)
+      const wasLiked = post?.isLiked || false
+
       if (post && post.isLiked) {
         await api.unlikePost(postId)
       } else {
         await api.likePost(postId)
       }
-      setPosts(posts.map(p => 
-        p.id === postId 
+
+      // Send real-time WebSocket update
+      if (isConnected) {
+        console.log('Sending like WebSocket message:', {
+          type: 'like',
+          from: user?.id,
+          post_id: postId,
+          action: wasLiked ? 'unlike' : 'like'
+        })
+        sendMessage({
+          type: 'like',
+          from: user?.id,
+          post_id: postId,
+          action: wasLiked ? 'unlike' : 'like',
+          data: {
+            post_id: postId,
+            user_id: user?.id,
+            action: wasLiked ? 'unlike' : 'like',
+            like_count: wasLiked ? (post?.likes || 0) - 1 : (post?.likes || 0) + 1
+          }
+        })
+      } else {
+        console.log('WebSocket not connected, cannot send like update')
+      }
+
+      setPosts(posts.map(p =>
+        p.id === postId
           ? { ...p, isLiked: !p.isLiked, likes: p.isLiked ? p.likes - 1 : p.likes + 1 }
           : p
       ))
     } catch (err) {
       console.error('Error toggling like:', err)
-      setPosts(posts.map(p => 
-        p.id === postId 
+      setPosts(posts.map(p =>
+        p.id === postId
           ? { ...p, isLiked: !p.isLiked, likes: p.isLiked ? p.likes + 1 : p.likes - 1 }
           : p
       ))
@@ -551,7 +596,7 @@ function DashboardPage() {
 
   const renderContent = () => {
     switch (activeTab) {
-      case 'home': 
+      case 'home':
         return (
           <HomeFeed
             posts={posts}
@@ -561,7 +606,7 @@ function DashboardPage() {
             setActiveTab={setActiveTab}
           />
         )
-      case 'categories': 
+      case 'categories':
         return (
           <CategoriesSection
             categories={categories}
@@ -576,7 +621,7 @@ function DashboardPage() {
             searchCategories={searchCategories}
           />
         )
-      case 'profile': 
+      case 'profile':
         return (
           <ProfileSection
             currentUser={currentUser}
@@ -586,7 +631,7 @@ function DashboardPage() {
             isLoadingFollowers={isLoadingFollowers}
           />
         )
-      case 'followers': 
+      case 'followers':
         return (
           <FollowersSection
             followers={followers}
@@ -594,18 +639,18 @@ function DashboardPage() {
             isLoadingFollowers={isLoadingFollowers}
           />
         )
-      case 'groups': 
+      case 'groups':
         return <GroupsSection groups={groups} />
-      case 'events': 
+      case 'events':
         return <EventsSection events={events} />
-      case 'settings': 
+      case 'settings':
         return (
           <SettingsSection
             currentUser={currentUser}
             testTokenExpiration={testTokenExpiration}
           />
         )
-      default: 
+      default:
         return (
           <HomeFeed
             posts={posts}
@@ -626,7 +671,7 @@ function DashboardPage() {
         <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-teal-500/20 rounded-full blur-3xl animate-pulse delay-1000"></div>
         <div className="absolute top-3/4 left-1/2 w-64 h-64 bg-cyan-500/20 rounded-full blur-3xl animate-pulse delay-2000"></div>
       </div>
-      
+
       {/* Floating Particles */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         {[...Array(20)].map((_, i) => (
@@ -699,7 +744,7 @@ function DashboardPage() {
         onClose={() => setShowChat(false)}
         isUserOnline={isUserOnline}
       />
-      
+
       {/* Chat Window */}
       {openChatWindow && (
         <ChatWindow

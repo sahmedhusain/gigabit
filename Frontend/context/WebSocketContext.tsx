@@ -5,7 +5,7 @@ import { useAuth } from './AuthContext'
 // WebSocket message types
 export interface WebSocketMessage {
   type: 'private_message' | 'group_message' | 'notification' | 'user_status' | 'typing' | 
-        'post_update' | 'comment_update' | 'like_update' | 'follow_update' | 
+        'post_update' | 'comment_update' | 'like_update' | 'like' | 'follow_update' | 
         'group_update' | 'event_update' | 'category_update' | 'ping' | 'pong' | 'error'
   from?: number
   to?: number
@@ -138,6 +138,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
           case 'post_update':
           case 'comment_update':
           case 'like_update':
+          case 'like':
           case 'follow_update':
           case 'group_update':
           case 'event_update':

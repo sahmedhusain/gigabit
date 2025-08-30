@@ -1,12 +1,15 @@
 'use client'
 import { X, Camera, Image as ImageIcon, Globe, Users, Lock, User } from 'lucide-react'
-import { CategoryResponse, CreatePostRequest } from '@/lib/api'
+import { CategoryResponse, CreatePostRequest, api } from '@/lib/api'
+import { ChangeEvent, useRef, useState } from 'react'
 
 interface CreatePostProps {
   show: boolean
   onClose: () => void
   newPostContent: string
   setNewPostContent: (content: string) => void
+  newPostImage: File | null
+  setNewPostImage: (image: File | null) => void
   postPrivacy: string
   setPostPrivacy: (privacy: string) => void
   selectedUsers: number[]
@@ -19,11 +22,15 @@ interface CreatePostProps {
   onCreatePost: () => void
 }
 
+
+
 export default function CreatePost({
   show,
   onClose,
   newPostContent,
   setNewPostContent,
+  newPostImage,
+  setNewPostImage,
   postPrivacy,
   setPostPrivacy,
   selectedUsers,
@@ -35,6 +42,56 @@ export default function CreatePost({
   loadingUsers,
   onCreatePost
 }: CreatePostProps) {
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [uploadError, setUploadError] = useState<string>('')
+
+  const handleImageClick = () => {
+    fileInputRef.current?.click()
+  }
+  
+  // selects image
+  const handleImageSelect = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (file) {
+      setNewPostImage(file)
+      setUploadError('') // Clear any previous error
+    }
+  }
+
+  // remove selected image
+  const removeImage = () => {
+    setNewPostImage(null)
+    setUploadError('')
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ''
+    }
+  }
+
+  const uploadImage = async (file: File): Promise<string | null> => {
+    try {
+      const formData = new FormData()
+      formData.append('image', file)
+
+      const response = await fetch ('/api/uploads', {
+        method: 'POST',
+        body: formData,
+        credentials: 'include'
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || "Failed to upload image")
+      }
+
+      const data = await response.json()
+      return data.filename
+    } catch (error) {
+      console.error("Image upload error:", error)
+      setUploadError(error instanceof Error ? error.message : "Failed to upload image")
+      return null
+    }
+  }
+
   if (!show) return null
 
   return (
@@ -68,17 +125,57 @@ export default function CreatePost({
             </div>
             
             <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-2 sm:space-y-0 sm:space-x-4">
-              <button className="flex items-center px-3 lg:px-4 py-2 bg-white/10 hover:bg-white/20 border border-white/20 rounded-xl text-white transition-all duration-200 text-sm lg:text-base">
-                <ImageIcon className="w-4 h-4 mr-2" />
-                Add Image
-              </button>
-              
-              <button className="flex items-center px-3 lg:px-4 py-2 bg-white/10 hover:bg-white/20 border border-white/20 rounded-xl text-white transition-all duration-200 text-sm lg:text-base">
-                <Camera className="w-4 h-4 mr-2" />
-                Add GIF
+              <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleImageSelect}
+              className="hidden"
+            />
+            <button
+              onClick={handleImageClick}
+              className="flex items-center px-3 lg:px-4 py-2 bg-white/10 hover:bg-white/20 border border-white/20 rounded-xl text-white transition-all duration-200 text-sm lg:text-base"
+            >
+              <ImageIcon className="w-4 h-4 mr-2" />
+                  Add Image or GIF
               </button>
             </div>
-            
+
+            {/* Image Preview */}
+            {newPostImage && (
+              <div className="relative">
+                <div className="bg-white/10 border border-white/20 rounded-xl p-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-white text-sm font-medium">Selected Image:</span>
+                    <button 
+                      onClick={removeImage}
+                      className="p-1 text-white/70 hover:text-white hover:bg-white/10 rounded-lg transition-all duration-200"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                  <div className="flex items-center space-x-3">
+                    <div className="w-12 h-12 bg-white/20 rounded-lg flex items-center justify-center">
+                      <ImageIcon className="w-6 h-6 text-white/70" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-white text-sm truncate">{newPostImage.name}</p>
+                      <p className="text-white/60 text-xs">
+                        {(newPostImage.size / 1024 / 1024).toFixed(2)} MB
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Upload Error Display */}
+            {uploadError && (
+              <div className="bg-red-500/10 border border-red-400/20 rounded-xl p-3">
+                <p className="text-red-400 text-sm">{uploadError}</p>
+              </div>
+            )}
+
             <div className="space-y-3">
               <label className="text-white font-medium text-sm lg:text-base">Category:</label>
               <select

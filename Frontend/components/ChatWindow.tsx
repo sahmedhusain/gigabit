@@ -34,7 +34,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
   const [isLoading, setIsLoading] = useState(true)
   const [isTyping, setIsTyping] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
-  const typingTimeoutRef = useRef<NodeJS.Timeout>()
+  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
   // Scroll to bottom when new messages arrive
   const scrollToBottom = () => {
@@ -109,7 +109,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
     if (!isConnected) return
 
     const removeListener = addMessageListener((wsMessage) => {
-      if (wsMessage.type === 'message' && wsMessage.data.conversation_id === conversationId) {
+      if ((wsMessage.type === 'private_message' || wsMessage.type === 'group_message') && wsMessage.data.conversation_id === conversationId) {
         const newMsg: Message = {
           id: wsMessage.data.id || Date.now(),
           content: wsMessage.data.content,
@@ -134,7 +134,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
     try {
       // Send via WebSocket for real-time delivery
       sendMessage({
-        type: 'message',
+        type: conversationType === 'private' ? 'private_message' : 'group_message',
         data: {
           conversation_id: conversationId,
           content: newMessage,

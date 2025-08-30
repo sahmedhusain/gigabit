@@ -139,7 +139,7 @@ export default function TopBar({
                   )}
                 </button>
 
-                <div id="topbar-user-dropdown" className="hidden absolute right-0 mt-2 w-44 bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl shadow-xl py-2 z-50">
+                <div id="topbar-user-dropdown" className="hidden absolute right-0 mt-2 w-44 bg-white/10 backdrop-blur-xl border border-white/20 rounded-xl shadow-xl py-2 z-50">
                   <button
                     onClick={() => {
                       const el = document.getElementById('topbar-user-dropdown')

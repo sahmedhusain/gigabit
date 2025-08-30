@@ -16,12 +16,11 @@ func NewSessionService(db *sql.DB) *SessionService {
 
 func (s *SessionService) CreateSession(session *models.Session) error {
 	query := `
-		INSERT INTO sessions (user_id, token, expires_at, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?)
-	`
+        INSERT INTO sessions (user_id, token, expires_at)
+        VALUES (?, ?, ?)
+    `
 
-	now := time.Now()
-	result, err := s.db.Exec(query, session.UserID, session.Token, session.ExpiresAt, now, now)
+	result, err := s.db.Exec(query, session.UserID, session.Token, session.ExpiresAt)
 	if err != nil {
 		return err
 	}
@@ -32,18 +31,24 @@ func (s *SessionService) CreateSession(session *models.Session) error {
 	}
 
 	session.ID = uint(id)
-	session.CreatedAt = now
-	session.UpdatedAt = now
+
+	// Fetch the created timestamps from the database
+	query = `SELECT created_at, updated_at FROM sessions WHERE id = ?`
+	row := s.db.QueryRow(query, session.ID)
+	err = row.Scan(&session.CreatedAt, &session.UpdatedAt)
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
 
 func (s *SessionService) GetSessionByTokenAndID(token string, sessionID uint) (*models.Session, error) {
 	query := `
-		SELECT id, user_id, token, expires_at, created_at, updated_at
-		FROM sessions 
-		WHERE id = ? AND token = ?
-	`
+        SELECT id, user_id, token, expires_at, created_at, updated_at
+        FROM sessions 
+        WHERE id = ? AND token = ?
+    `
 
 	session := &models.Session{}
 	row := s.db.QueryRow(query, sessionID, token)
@@ -60,10 +65,10 @@ func (s *SessionService) GetSessionByTokenAndID(token string, sessionID uint) (*
 
 func (s *SessionService) GetSessionByIDAndToken(sessionID uint, token string) (*models.Session, error) {
 	query := `
-		SELECT id, user_id, token, expires_at, created_at, updated_at
-		FROM sessions 
-		WHERE id = ? AND token = ?
-	`
+        SELECT id, user_id, token, expires_at, created_at, updated_at
+        FROM sessions 
+        WHERE id = ? AND token = ?
+    `
 
 	session := &models.Session{}
 	row := s.db.QueryRow(query, sessionID, token)
@@ -80,10 +85,10 @@ func (s *SessionService) GetSessionByIDAndToken(sessionID uint, token string) (*
 
 func (s *SessionService) GetSessionByID(sessionID uint) (*models.Session, error) {
 	query := `
-		SELECT id, user_id, token, expires_at, created_at, updated_at
-		FROM sessions 
-		WHERE id = ?
-	`
+        SELECT id, user_id, token, expires_at, created_at, updated_at
+        FROM sessions 
+        WHERE id = ?
+    `
 
 	session := &models.Session{}
 	row := s.db.QueryRow(query, sessionID)
@@ -100,23 +105,29 @@ func (s *SessionService) GetSessionByID(sessionID uint) (*models.Session, error)
 
 func (s *SessionService) UpdateSessionToken(session *models.Session) error {
 	query := `
-		UPDATE sessions SET token = ?, updated_at = ? WHERE id = ?
-	`
+UPDATE sessions SET token = ? WHERE id = ?
+`
 
-	now := time.Now()
-	_, err := s.db.Exec(query, session.Token, now, session.ID)
+	_, err := s.db.Exec(query, session.Token, session.ID)
 	if err != nil {
 		return err
 	}
 
-	session.UpdatedAt = now
+	// Fetch the updated timestamp from the database (set by trigger)
+	query = `SELECT updated_at FROM sessions WHERE id = ?`
+	row := s.db.QueryRow(query, session.ID)
+	err = row.Scan(&session.UpdatedAt)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
 func (s *SessionService) DeleteSession(sessionID uint) error {
 	query := `
-		DELETE FROM sessions WHERE id = ?
-	`
+        DELETE FROM sessions WHERE id = ?
+    `
 
 	_, err := s.db.Exec(query, sessionID)
 	return err
@@ -124,8 +135,8 @@ func (s *SessionService) DeleteSession(sessionID uint) error {
 
 func (s *SessionService) DeleteUserSessions(userID uint) error {
 	query := `
-		DELETE FROM sessions WHERE user_id = ?
-	`
+        DELETE FROM sessions WHERE user_id = ?
+    `
 
 	_, err := s.db.Exec(query, userID)
 	return err
@@ -133,10 +144,10 @@ func (s *SessionService) DeleteUserSessions(userID uint) error {
 
 func (s *SessionService) CleanupExpiredSessions() error {
 	query := `
-		DELETE FROM sessions WHERE expires_at < ?
-	`
+        DELETE FROM sessions WHERE expires_at < ?
+    `
 
-	now := time.Now()
+	now := time.Now().In(gmt3Location)
 	_, err := s.db.Exec(query, now)
 	return err
 }

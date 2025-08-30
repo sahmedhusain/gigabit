@@ -5,7 +5,7 @@ import { api } from '@/lib/api'
 export const useOffline = () => {
   const [isOffline, setIsOffline] = useState(false)
   const [lastConnectionCheck, setLastConnectionCheck] = useState<Date>(new Date())
-  const checkIntervalRef = useRef<NodeJS.Timeout>()
+  const checkIntervalRef = useRef<NodeJS.Timeout | null>(null)
 
   // Check network connectivity
   const checkNetworkConnection = async (): Promise<boolean> => {

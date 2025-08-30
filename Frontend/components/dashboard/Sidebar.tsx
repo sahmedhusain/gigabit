@@ -1,5 +1,5 @@
 'use client'
-import { Home, User, Users, Calendar, Settings, Filter, X } from 'lucide-react'
+import { Home, Users, Calendar, Filter, X } from 'lucide-react'
 
 interface SidebarProps {
   isMobileMenuOpen: boolean
@@ -29,9 +29,7 @@ export default function Sidebar({
       fetchGroups()
     } else if (itemId === 'events') {
       fetchEvents()
-    } else if (itemId === 'followers' || itemId === 'profile') {
-      fetchFollowers()
-    }
+    } 
   }
 
   return (
@@ -66,11 +64,9 @@ export default function Sidebar({
             {[
               { id: 'home', icon: Home, label: 'Home Feed' },
               { id: 'categories', icon: Filter, label: 'Categories' },
-              { id: 'profile', icon: User, label: 'My Profile' },
               { id: 'followers', icon: Users, label: 'Followers' },
               { id: 'groups', icon: Users, label: 'Groups' },
-              { id: 'events', icon: Calendar, label: 'Events' },
-              { id: 'settings', icon: Settings, label: 'Settings' }
+              { id: 'events', icon: Calendar, label: 'Events' }
             ].map((item) => (
               <button
                 key={item.id}

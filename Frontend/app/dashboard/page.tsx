@@ -53,6 +53,7 @@ function DashboardPage() {
   
   // Post Creation State
   const [newPostContent, setNewPostContent] = useState('')
+  const [newPostImage, setNewPostImage] = useState<File | null>(null)
   const [postPrivacy, setPostPrivacy] = useState('public')
   const [selectedUsers, setSelectedUsers] = useState<number[]>([])
   const [selectedPostCategory, setSelectedPostCategory] = useState<number>(1)
@@ -487,10 +488,32 @@ function DashboardPage() {
     }
 
     try {
+
+      let imageUrl = '';
+      
+      if (newPostImage) {
+        const formData = new FormData();
+        formData.append('image', newPostImage);
+
+        const uploadResponse = await fetch('/api/uploads', {
+          method: 'POST',
+          body: formData,
+          credentials: 'include'
+        })
+
+        if (uploadResponse.ok) {
+          const uploadData = await uploadResponse.json();
+          imageUrl = `/uploads/${uploadData.filename}`;
+        } else {
+          const errorData = await uploadResponse.json();
+          throw new Error(errorData.error || 'Failed to upload image');
+        }
+      }
       const postData: CreatePostRequest = {
         content: newPostContent,
         privacy: postPrivacy === 'followers' ? 'almost_private' : postPrivacy,
-        category_id: selectedPostCategory
+        category_id: selectedPostCategory,
+        image_url: imageUrl
       }
       
       if (postPrivacy === 'private' && selectedUsers.length > 0) {
@@ -499,6 +522,8 @@ function DashboardPage() {
       
       await api.createPost(postData)
       setNewPostContent('')
+      setNewPostImage(null)
+      setPostPrivacy('public')
       setSelectedUsers([])
       setShowCreatePost(false)
       success('Post created successfully!')
@@ -721,6 +746,8 @@ function DashboardPage() {
         onClose={() => setShowCreatePost(false)}
         newPostContent={newPostContent}
         setNewPostContent={setNewPostContent}
+        newPostImage={newPostImage}
+        setNewPostImage={setNewPostImage}
         postPrivacy={postPrivacy}
         setPostPrivacy={setPostPrivacy}
         selectedUsers={selectedUsers}

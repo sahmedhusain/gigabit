@@ -119,7 +119,7 @@ func (s *Server) setupRoutes() {
 	})
 
 	// Static file serving for images
-	s.router.Handle("/uploads/", http.StripPrefix("/uploads/", http.FileServer(http.Dir("./uploads"))))
+	// s.router.Handle("/uploads/", http.StripPrefix("/uploads/", http.FileServer(http.Dir("./uploads"))))
 
 	// Public routes
 	s.router.HandleFunc("/api/register", s.handleRoute(authHandler.Register, false))
@@ -172,7 +172,7 @@ func (s *Server) setupRoutes() {
 	s.router.HandleFunc("/api/users/online", s.handleRoute(wsHandler.GetOnlineUsers, true))
 
 	// Upload routes
-	s.router.HandleFunc("/api/upload", s.handleRoute(uploadHandler.UploadImage, true))
+	s.router.HandleFunc("/api/uploads", s.handleRoute(uploadHandler.UploadImage, true))
 
 	// Dev-only debug routes (enable by setting ENABLE_DEBUG=1 in environment)
 	if os.Getenv("ENABLE_DEBUG") == "1" {

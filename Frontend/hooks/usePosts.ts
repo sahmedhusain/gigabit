@@ -61,7 +61,7 @@ export function usePosts() {
       console.log('Create post response:', response)
       
       // Handle different response formats
-      let newPost = response.post || response
+      let newPost = (response as any).post || response
       
       if (newPost) {
         setPosts(prevPosts => [newPost, ...(prevPosts || [])])

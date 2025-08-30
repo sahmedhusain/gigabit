@@ -307,13 +307,13 @@ export class ApiClient {
 
     try {
       const response = await fetch(url, config);
-
+      
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({
           error: `HTTP ${response.status}: ${response.statusText}`,
           status: response.status
         }));
-
+        
         // Handle specific error cases
         if (response.status === 401) {
           const code = errorData.code;
@@ -327,11 +327,11 @@ export class ApiClient {
           }
           throw new AuthenticationError(errorData.error || 'Authentication failed');
         }
-
+        
         if (response.status === 400) {
           throw new ValidationError(errorData.error || 'Validation failed', errorData.field);
         }
-
+        
         if (response.status >= 500) {
           // Server errors - retry if possible
           if (retryCount < this.maxRetries && this.shouldRetry(options.method)) {
@@ -341,7 +341,7 @@ export class ApiClient {
           }
           throw new NetworkError(errorData.error || 'Server error', response.status, errorData.code);
         }
-
+        
         throw new NetworkError(errorData.error || `HTTP error! status: ${response.status}`, response.status, errorData.code);
       }
 
@@ -363,12 +363,12 @@ export class ApiClient {
         }
         throw new NetworkError('Network connection failed. Please check your internet connection.');
       }
-
+      
       // Re-throw custom errors
       if (error instanceof AuthenticationError || error instanceof ValidationError || error instanceof NetworkError) {
         throw error;
       }
-
+      
       console.error('API request failed:', error);
       throw new NetworkError(error instanceof Error ? error.message : 'Unknown error occurred');
     }
@@ -556,7 +556,7 @@ export class ApiClient {
 
   static validatePassword(password: string): { isValid: boolean; errors: string[] } {
     const errors: string[] = [];
-
+    
     if (password.length < 8) {
       errors.push('Password must be at least 8 characters long');
     }
@@ -569,7 +569,7 @@ export class ApiClient {
     if (!/\d/.test(password)) {
       errors.push('Password must contain at least one number');
     }
-
+    
     return {
       isValid: errors.length === 0,
       errors

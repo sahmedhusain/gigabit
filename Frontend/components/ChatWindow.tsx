@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef } from 'react'
 import { useWebSocket } from '@/context/WebSocketContext'
 import { useAuth } from '@/context/AuthContext'
 import { api, API_BASE_URL } from '@/lib/api'
-import { X, Send, Smile } from 'lucide-react'
+import { X, Send, Smile, Paperclip, Image, Check, CheckCheck, Clock } from 'lucide-react'
 
 interface Message {
   id: number
@@ -12,6 +12,10 @@ interface Message {
   sender_name: string
   created_at: string
   is_own: boolean
+  status?: 'sending' | 'sent' | 'delivered' | 'read'
+  type?: 'text' | 'image' | 'file'
+  file_url?: string
+  file_name?: string
 }
 
 interface ChatWindowProps {
@@ -34,7 +38,11 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
   const [isLoading, setIsLoading] = useState(true)
   const [isTyping, setIsTyping] = useState(false)
   const [typingUser, setTypingUser] = useState('')
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false)
+  const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const [isUploading, setIsUploading] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
   // Scroll to bottom when new messages arrive
@@ -143,33 +151,85 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
   }, [isConnected, addMessageListener, conversationId, user?.id, conversationType])
 
   const handleSendMessage = async () => {
-    if (!newMessage.trim() || !isConnected) return
+    if ((!newMessage.trim() && !selectedFile) || !isConnected) return
 
     try {
-      // Send via WebSocket for real-time delivery
+      let fileUrl = ''
+      let messageContent = newMessage.trim()
+      let messageType: 'text' | 'image' | 'file' = 'text'
+
+      if (selectedFile) {
+        setIsUploading(true)
+        const formData = new FormData()
+        formData.append('file', selectedFile)
+
+        const uploadResponse = await fetch('/api/uploads', {
+          method: 'POST',
+          body: formData,
+          credentials: 'include'
+        })
+
+        if (uploadResponse.ok) {
+          const uploadData = await uploadResponse.json()
+          fileUrl = `/uploads/${uploadData.filename}`
+          messageType = selectedFile.type.startsWith('image/') ? 'image' : 'file'
+          if (!messageContent) {
+            messageContent = selectedFile.name
+          }
+        } else {
+          console.error('Failed to upload file')
+          setIsUploading(false)
+          return
+        }
+        setIsUploading(false)
+      }
+
       sendMessage({
         type: conversationType === 'private' ? 'private_message' : 'group_message',
         data: {
           conversation_id: conversationId,
-          content: newMessage,
-          conversation_type: conversationType
+          content: messageContent,
+          conversation_type: conversationType,
+          type: messageType,
+          file_url: fileUrl,
+          file_name: selectedFile?.name
         }
       })
 
       // Add to local state immediately for better UX
       const tempMessage: Message = {
         id: Date.now(),
-        content: newMessage,
+        content: messageContent,
         sender_id: user?.id || 0,
         sender_name: user ? `${user.first_name} ${user.last_name}` : 'You',
         created_at: new Date().toISOString(),
-        is_own: true
+        is_own: true,
+        status: 'sending',
+        type: messageType,
+        file_url: fileUrl,
+        file_name: selectedFile?.name
       }
       
       setMessages(prev => [...prev, tempMessage])
       setNewMessage('')
+      setSelectedFile(null)
+
+      // Simulate message status updates
+      setTimeout(() => {
+        setMessages(prev => prev.map(msg => 
+          msg.id === tempMessage.id ? { ...msg, status: 'sent' } : msg
+        ))
+      }, 500)
+
+      setTimeout(() => {
+        setMessages(prev => prev.map(msg => 
+          msg.id === tempMessage.id ? { ...msg, status: 'delivered' } : msg
+        ))
+      }, 1000)
+
     } catch (error) {
       console.error('Error sending message:', error)
+      setIsUploading(false)
     }
   }
 
@@ -183,7 +243,6 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
   const handleTyping = () => {
     if (!isConnected) return
 
-    // Send typing indicator
     sendMessage({
       type: 'typing',
       data: {
@@ -192,7 +251,6 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
       }
     })
 
-    // Clear previous timeout and set new one
     if (typingTimeoutRef.current) {
       clearTimeout(typingTimeoutRef.current)
     }
@@ -206,6 +264,84 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
         }
       })
     }, 2000)
+  }
+
+  const handleEmojiClick = (emoji: string) => {
+    setNewMessage(prev => prev + emoji)
+    setShowEmojiPicker(false)
+  }
+
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (file) {
+      // Validate file size (max 10MB)
+      if (file.size > 10 * 1024 * 1024) {
+        alert('File size must be less than 10MB')
+        return
+      }
+      setSelectedFile(file)
+    }
+  }
+
+  const removeSelectedFile = () => {
+    setSelectedFile(null)
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ''
+    }
+  }
+
+  const renderMessageStatus = (status?: string) => {
+    if (!status) return null
+
+    switch (status) {
+      case 'sending':
+        return <Clock className="w-3 h-3 text-white/50" />
+      case 'sent':
+        return <Check className="w-3 h-3 text-white/50" />
+      case 'delivered':
+        return <CheckCheck className="w-3 h-3 text-white/50" />
+      case 'read':
+        return <CheckCheck className="w-3 h-3 text-blue-400" />
+      default:
+        return null
+    }
+  }
+
+  const renderMessageContent = (message: Message) => {
+    if (message.type === 'image' && message.file_url) {
+      return (
+        <div className="space-y-2">
+          <img
+            src={message.file_url}
+            alt={message.file_name || 'Shared image'}
+            className="max-w-full h-auto rounded-lg cursor-pointer hover:opacity-90 transition-opacity"
+            onClick={() => window.open(message.file_url, '_blank')}
+          />
+          {message.content && message.content !== message.file_name && (
+            <div className="text-sm">{message.content}</div>
+          )}
+        </div>
+      )
+    } else if (message.type === 'file' && message.file_url) {
+      return (
+        <div className="space-y-2">
+          <div className="flex items-center space-x-2 p-2 bg-white/10 rounded-lg cursor-pointer hover:bg-white/20 transition-colors"
+               onClick={() => window.open(message.file_url, '_blank')}>
+            <Paperclip className="w-4 h-4 text-white/70" />
+            <div className="flex-1 min-w-0">
+              <div className="text-sm font-medium text-white truncate">
+                {message.file_name || 'Shared file'}
+              </div>
+              <div className="text-xs text-white/60">Click to download</div>
+            </div>
+          </div>
+          {message.content && message.content !== message.file_name && (
+            <div className="text-sm">{message.content}</div>
+          )}
+        </div>
+      )
+    }
+    return <div className="text-sm">{message.content}</div>
   }
 
   const formatTime = (dateString: string) => {
@@ -258,9 +394,12 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
                       {message.sender_name}
                     </div>
                   )}
-                  <div className="text-sm">{message.content}</div>
-                  <div className={`text-xs mt-1 ${message.is_own ? 'text-white/80' : 'text-white/60'}`}>
-                    {formatTime(message.created_at)}
+                  {renderMessageContent(message)}
+                  <div className={`flex items-center justify-between mt-1 ${
+                    message.is_own ? 'text-white/80' : 'text-white/60'
+                  }`}>
+                    <span className="text-xs">{formatTime(message.created_at)}</span>
+                    {message.is_own && renderMessageStatus(message.status)}
                   </div>
                 </div>
               </div>
@@ -290,7 +429,50 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
 
       {/* Input */}
       <div className="p-4 border-t border-white/20">
+        {/* Selected File Display */}
+        {selectedFile && (
+          <div className="mb-3 p-2 bg-white/10 rounded-lg border border-white/20">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                {selectedFile?.type.startsWith('image/') ? (
+                  <Image className="w-4 h-4 text-white/70" />
+                ) : (
+                  <Paperclip className="w-4 h-4 text-white/70" />
+                )}
+                <span className="text-white/80 text-sm truncate">{selectedFile?.name}</span>
+                <span className="text-white/50 text-xs">
+                  ({((selectedFile as File).size / 1024 / 1024).toFixed(1)}MB)
+                </span>
+              </div>
+              <button
+                onClick={removeSelectedFile}
+                className="p-1 text-white/60 hover:text-white transition-colors"
+                title="Remove file"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        )}
+
         <div className="flex items-center space-x-2">
+          {/* File Input */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            onChange={handleFileSelect}
+            accept="image/*,.pdf,.doc,.docx,.txt,.zip,.rar"
+            className="hidden"
+            title="Attach file"
+          />
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            className="p-2 text-white/60 hover:text-white transition-colors"
+            title="Attach file"
+          >
+            <Paperclip className="w-4 h-4" />
+          </button>
+
           <div className="flex-1 relative">
             <input
               type="text"
@@ -301,25 +483,49 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
               }}
               onKeyPress={handleKeyPress}
               placeholder={`Message ${conversationType === 'group' ? `#${participantName}` : participantName}...`}
-              className="w-full bg-white/10 border border-white/20 rounded-xl px-3 py-2 pr-10 text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-emerald-400/50 text-sm"
+              className="w-full bg-white/10 border border-white/20 rounded-xl px-3 py-2 pr-20 text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-emerald-400/50 text-sm"
             />
+            
+            {/* Emoji Picker Button */}
             <button
-              className="absolute right-2 top-1/2 transform -translate-y-1/2 p-1 text-white/60 hover:text-white transition-colors"
+              onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+              className="absolute right-8 top-1/2 transform -translate-y-1/2 p-1 text-white/60 hover:text-white transition-colors"
               title="Add emoji"
             >
               <Smile className="w-4 h-4" />
             </button>
           </div>
+
           <button
             onClick={handleSendMessage}
-            disabled={!newMessage.trim() || !isConnected}
+            disabled={(!newMessage.trim() && !selectedFile) || !isConnected || isUploading}
             className="p-2 bg-gradient-to-r from-emerald-500 to-teal-600 rounded-xl text-white hover:from-emerald-600 hover:to-teal-700 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
             title="Send message"
           >
-            <Send className="w-4 h-4" />
+            {isUploading ? <Clock className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
           </button>
         </div>
-        {newMessage.length > 0 && (
+
+        {/* Emoji Picker */}
+        {showEmojiPicker && (
+          <div className="absolute bottom-full right-0 mb-2 z-50">
+            <div className="bg-white/95 backdrop-blur-xl rounded-xl border border-white/20 shadow-xl p-2">
+              <div className="grid grid-cols-8 gap-1 max-w-xs">
+                {['😀', '😂', '❤️', '👍', '👎', '🔥', '💯', '🎉', '🤔', '😢', '😮', '🙌', '👏', '💪', '🤝', '✨'].map((emoji) => (
+                  <button
+                    key={emoji}
+                    onClick={() => handleEmojiClick(emoji)}
+                    className="w-8 h-8 hover:bg-gray-100 rounded-lg flex items-center justify-center text-lg transition-colors"
+                  >
+                    {emoji}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {(newMessage.length > 0 || selectedFile) && (
           <div className="text-xs text-white/50 mt-1 text-right">
             Press Enter to send
           </div>

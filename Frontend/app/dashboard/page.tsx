@@ -26,6 +26,7 @@ import { Sparkles } from 'lucide-react'
 import TopBar from '@/components/dashboard/TopBar'
 import Sidebar from '@/components/dashboard/Sidebar'
 import CreatePost from '@/components/dashboard/CreatePost'
+import CreateGroup from '@/components/dashboard/CreateGroup'
 import NotificationsDropdown from '@/components/dashboard/NotificationsDropdown'
 import ChatDropdown from '@/components/dashboard/ChatDropdown'
 import HomeFeed from '@/components/dashboard/HomeFeed'
@@ -47,6 +48,7 @@ function DashboardPage() {
   // UI State
   const [activeTab, setActiveTab] = useState('home')
   const [showCreatePost, setShowCreatePost] = useState(false)
+  const [showCreateGroup, setShowCreateGroup] = useState(false)
   const [showNotifications, setShowNotifications] = useState(false)
   const [showChat, setShowChat] = useState(false)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
@@ -374,21 +376,7 @@ function DashboardPage() {
       const data = await api.getUserEvents()
       const dataAny: any = data
       const eventsArr = Array.isArray(dataAny?.events) ? dataAny.events : Array.isArray(dataAny?.data) ? dataAny.data : []
-      setEvents(eventsArr.map((event: any) => {
-        const eventDateStr = event.event_time ?? event.event_date ?? event.eventTime ?? new Date().toISOString()
-        return {
-          id: event.id,
-          title: event.title ?? '',
-          description: event.description ?? '',
-          date: new Date(eventDateStr).toLocaleDateString(),
-          time: new Date(eventDateStr).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
-          location: event.location ?? 'Location not specified',
-          group: (event.group && (event.group.title ?? event.group.name)) || 'Unknown Group',
-          going: event.going_count ?? event.goingCount ?? 0,
-          notGoing: event.not_going_count ?? event.notGoingCount ?? 0,
-          userResponse: event.user_response ?? event.userResponse ?? 'not_responded' as string
-        }
-      }))
+      setEvents(eventsArr)
     } catch (err) {
       console.error('Error fetching events:', err)
       if (err instanceof NetworkError) {
@@ -665,7 +653,7 @@ function DashboardPage() {
           />
         )
       case 'groups': 
-        return <GroupsSection groups={groups} />
+        return <GroupsSection groups={groups} onCreateGroup={() => setShowCreateGroup(true)} />
       case 'events': 
         return <EventsSection events={events} />
       case 'settings': 
@@ -702,7 +690,7 @@ function DashboardPage() {
         {[...Array(20)].map((_, i) => (
           <div
             key={i}
-            className="absolute animate-bounce"
+            className="absolute animate-bounce floating-particle"
             style={{
               left: `${Math.random() * 100}%`,
               top: `${Math.random() * 100}%`,
@@ -758,6 +746,16 @@ function DashboardPage() {
         availableUsers={availableUsers}
         loadingUsers={loadingUsers}
         onCreatePost={handleCreatePost}
+      />
+
+      <CreateGroup
+        show={showCreateGroup}
+        onClose={() => setShowCreateGroup(false)}
+        onGroupCreated={() => {
+          fetchGroups()
+          setShowCreateGroup(false)
+          success('Group created successfully!')
+        }}
       />
 
       <NotificationsDropdown

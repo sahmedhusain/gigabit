@@ -1,7 +1,5 @@
 // API configuration and utilities
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
-
-// Types for API requests and responses
 export interface RegisterRequest {
   email: string;
   password: string;
@@ -107,16 +105,43 @@ export interface Group {
 }
 
 export interface Event {
-  id: number;
-  title: string;
-  description: string;
-  date: string;
-  time: string;
-  location: string;
-  group: string;
-  going: number;
-  notGoing: number;
-  userResponse?: string;
+  id: number
+  group_id: number
+  creator_id: number
+  title: string
+  description: string
+  event_time: string
+  created_at: string
+  updated_at: string
+  creator: {
+    id: number
+    username: string
+    email: string
+    first_name: string
+    last_name: string
+    avatar: string
+  }
+  group: {
+    id: number
+    title: string
+  }
+  going_count: number
+  not_going_count: number
+  user_response: string
+  responses?: Array<{
+    id: number
+    event_id: number
+    user: {
+      id: number
+      username: string
+      email: string
+      first_name: string
+      last_name: string
+      avatar: string
+    }
+    option: string
+    created_at: string
+  }>
 }
 
 export interface Chat {
@@ -164,15 +189,43 @@ export interface GroupResponse {
 }
 
 export interface EventResponse {
-  id: number;
-  title: string;
-  description: string;
-  event_time: string;
-  group: GroupResponse;
-  going_count: number;
-  not_going_count: number;
-  user_response?: string;
-  created_at: string;
+  id: number
+  group_id: number
+  creator_id: number
+  title: string
+  description: string
+  event_time: string
+  created_at: string
+  updated_at: string
+  creator: {
+    id: number
+    username: string
+    email: string
+    first_name: string
+    last_name: string
+    avatar: string
+  }
+  group: {
+    id: number
+    title: string
+  }
+  going_count: number
+  not_going_count: number
+  user_response: string
+  responses?: Array<{
+    id: number
+    event_id: number
+    user: {
+      id: number
+      username: string
+      email: string
+      first_name: string
+      last_name: string
+      avatar: string
+    }
+    option: string
+    created_at: string
+  }>
 }
 
 export interface ConversationResponse {
@@ -199,6 +252,11 @@ export interface CreatePostRequest {
 export interface UpdatePostRequest {
   content: string;
   image_url?: string;
+}
+
+export interface CreateGroupRequest {
+  title: string;
+  description: string;
 }
 
 export interface PostsResponse {
@@ -510,16 +568,26 @@ export class ApiClient {
 
   // Groups endpoints
   async getUserGroups(userId: number): Promise<{ data: GroupResponse[] }> {
-    return this.request<{ data: GroupResponse[] }>(`/api/groups/user/${userId}`, {
+    const response = await this.request<{ groups: GroupResponse[], count: number, limit: number, offset: number }>('/api/groups', {
+      method: 'GET',
+    });
+    // Transform the response to match the expected format
+    return { data: response.groups };
+  }
+
+  async getGroup(groupId: number): Promise<GroupResponse> {
+    return this.request<GroupResponse>(`/api/groups/${groupId}`, {
       method: 'GET',
     });
   }
 
   // Events endpoints
   async getUserEvents(): Promise<{ data: EventResponse[] }> {
-    return this.request<{ data: EventResponse[] }>('/api/events/user/upcoming', {
+    const response = await this.request<{ events: EventResponse[], count: number, limit: number, offset: number }>('/api/events', {
       method: 'GET',
     });
+    // Transform the response to match the expected format
+    return { data: response.events };
   }
 
   // Messages endpoints
@@ -620,6 +688,7 @@ export class ApiClient {
 
 // Create and export API client instance
 export const api = new ApiClient(API_BASE_URL);
+export { API_BASE_URL };
 
 // Auth utilities
 export const isAuthenticated = (): boolean => {

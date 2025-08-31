@@ -581,6 +581,79 @@ export class ApiClient {
     });
   }
 
+  async createGroup(data: CreateGroupRequest): Promise<GroupResponse> {
+    return this.request<GroupResponse>('/api/groups', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async joinGroup(groupId: number): Promise<{ message: string }> {
+    return this.request<{ message: string }>(`/api/groups/${groupId}/join`, {
+      method: 'POST',
+    });
+  }
+
+  async leaveGroup(groupId: number): Promise<{ message: string }> {
+    return this.request<{ message: string }>(`/api/groups/${groupId}/leave`, {
+      method: 'POST',
+    });
+  }
+
+  async inviteUserToGroup(groupId: number, userId: number): Promise<{ message: string }> {
+    return this.request<{ message: string }>(`/api/groups/${groupId}/invite`, {
+      method: 'POST',
+      body: JSON.stringify({ user_id: userId }),
+    });
+  }
+
+  async acceptGroupInvitation(groupId: number): Promise<{ message: string }> {
+    return this.request<{ message: string }>(`/api/groups/${groupId}/invitation`, {
+      method: 'PUT',
+      body: JSON.stringify({ action: 'accept' }),
+    });
+  }
+
+  async declineGroupInvitation(groupId: number): Promise<{ message: string }> {
+    return this.request<{ message: string }>(`/api/groups/${groupId}/invitation`, {
+      method: 'PUT',
+      body: JSON.stringify({ action: 'decline' }),
+    });
+  }
+
+  async getGroupMembers(groupId: number): Promise<{ members: any[], count: number }> {
+    return this.request<{ members: any[], count: number }>(`/api/groups/${groupId}/members`, {
+      method: 'GET',
+    });
+  }
+
+  async getGroupPosts(groupId: number, limit: number = 20, offset: number = 0): Promise<{ posts: PostResponse[], count: number }> {
+    return this.request<{ posts: PostResponse[], count: number }>(`/api/groups/${groupId}/posts?limit=${limit}&offset=${offset}`, {
+      method: 'GET',
+    });
+  }
+
+  async createGroupPost(groupId: number, data: CreatePostRequest): Promise<PostResponse> {
+    return this.request<PostResponse>(`/api/groups/${groupId}/posts`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async createGroupEvent(groupId: number, data: { title: string; description: string; event_time: string }): Promise<EventResponse> {
+    return this.request<EventResponse>(`/api/groups/${groupId}/events`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async respondToEvent(eventId: number, response: 'going' | 'not_going'): Promise<{ message: string }> {
+    return this.request<{ message: string }>(`/api/events/${eventId}/respond`, {
+      method: 'POST',
+      body: JSON.stringify({ response }),
+    });
+  }
+
   // Events endpoints
   async getUserEvents(): Promise<{ data: EventResponse[] }> {
     const response = await this.request<{ events: EventResponse[], count: number, limit: number, offset: number }>('/api/events', {

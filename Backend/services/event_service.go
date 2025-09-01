@@ -15,13 +15,13 @@ func NewEventService(db *sql.DB) *EventService {
 }
 
 func (s *EventService) CreateEvent(event *models.Event) error {
-query := `
+	query := `
 INSERT INTO events (group_id, creator_id, title, description, event_date, created_at, updated_at)
 VALUES (?, ?, ?, ?, ?, ?, ?)
 `
 
 	now := time.Now()
-	result, err := s.db.Exec(query, event.GroupID, event.CreatorID, event.Title, 
+	result, err := s.db.Exec(query, event.GroupID, event.CreatorID, event.Title,
 		event.Description, event.EventTime, now, now)
 	if err != nil {
 		return err
@@ -40,7 +40,7 @@ VALUES (?, ?, ?, ?, ?, ?, ?)
 }
 
 func (s *EventService) GetEventByID(eventID, currentUserID uint) (*models.EventResponse, error) {
-query := `
+	query := `
 SELECT e.id, e.group_id, e.creator_id, e.title, e.description, e.event_date, 
    e.created_at, e.updated_at,
    u.first_name, u.last_name, u.avatar, u.nickname,
@@ -54,11 +54,13 @@ WHERE e.id = ?
 	var event models.EventResponse
 	var creator models.UserResponse
 	var group models.GroupEventResponse
+	var avatar sql.NullString
+	var nickname sql.NullString
 
 	err := s.db.QueryRow(query, eventID).Scan(
 		&event.ID, &event.GroupID, &event.CreatorID, &event.Title, &event.Description,
 		&event.EventTime, &event.CreatedAt, &event.UpdatedAt,
-		&creator.FirstName, &creator.LastName, &creator.Avatar, &creator.Nickname,
+		&creator.FirstName, &creator.LastName, &avatar, &nickname,
 		&group.Title,
 	)
 	if err != nil {
@@ -66,6 +68,14 @@ WHERE e.id = ?
 	}
 
 	creator.ID = event.CreatorID
+	if avatar.Valid {
+		v := avatar.String
+		creator.Avatar = &v
+	}
+	if nickname.Valid {
+		v := nickname.String
+		creator.Nickname = &v
+	}
 	group.ID = event.GroupID
 	event.Creator = creator
 	event.Group = group
@@ -92,7 +102,7 @@ func (s *EventService) GetGroupEvents(groupID, currentUserID uint, limit, offset
 		return nil, sql.ErrNoRows
 	}
 
-query := `
+	query := `
 SELECT e.id, e.group_id, e.creator_id, e.title, e.description, e.event_date,
    e.created_at, e.updated_at,
    u.first_name, u.last_name, u.avatar, u.nickname,
@@ -116,11 +126,13 @@ LIMIT ? OFFSET ?
 		var event models.EventResponse
 		var creator models.UserResponse
 		var group models.GroupEventResponse
+		var avatar sql.NullString
+		var nickname sql.NullString
 
 		err := rows.Scan(
 			&event.ID, &event.GroupID, &event.CreatorID, &event.Title, &event.Description,
 			&event.EventTime, &event.CreatedAt, &event.UpdatedAt,
-			&creator.FirstName, &creator.LastName, &creator.Avatar, &creator.Nickname,
+			&creator.FirstName, &creator.LastName, &avatar, &nickname,
 			&group.Title,
 		)
 		if err != nil {
@@ -128,6 +140,14 @@ LIMIT ? OFFSET ?
 		}
 
 		creator.ID = event.CreatorID
+		if avatar.Valid {
+			v := avatar.String
+			creator.Avatar = &v
+		}
+		if nickname.Valid {
+			v := nickname.String
+			creator.Nickname = &v
+		}
 		group.ID = event.GroupID
 		event.Creator = creator
 		event.Group = group
@@ -164,12 +184,12 @@ func (s *EventService) UpdateEvent(eventID, userID uint, updateReq *models.Updat
 	}
 
 	query := `
-		UPDATE events SET title = ?, description = ?, event_time = ?, updated_at = ?
+		UPDATE events SET title = ?, description = ?, event_date = ?, updated_at = ?
 		WHERE id = ? AND creator_id = ?
 	`
 
 	now := time.Now()
-	_, err = s.db.Exec(query, updateReq.Title, updateReq.Description, updateReq.EventTime, 
+	_, err = s.db.Exec(query, updateReq.Title, updateReq.Description, updateReq.EventTime,
 		now, eventID, userID)
 	return err
 }
@@ -282,7 +302,7 @@ func (s *EventService) GetEventResponses(eventID, currentUserID uint) ([]models.
 
 func (s *EventService) GetUserEvents(userID uint, limit, offset int) ([]models.EventResponse, error) {
 	// Get events from groups the user is a member of
-query := `
+	query := `
 SELECT DISTINCT e.id, e.group_id, e.creator_id, e.title, e.description, e.event_date,
    e.created_at, e.updated_at,
    u.first_name, u.last_name, u.avatar, u.nickname,
@@ -290,13 +310,12 @@ SELECT DISTINCT e.id, e.group_id, e.creator_id, e.title, e.description, e.event_
 FROM events e
 JOIN users u ON e.creator_id = u.id
 JOIN groups g ON e.group_id = g.id
-JOIN group_members gm ON e.group_id = gm.group_id AND gm.user_id = ? AND gm.status = 'member'
-WHERE e.event_date >= ?
+JOIN group_members gm ON e.group_id = gm.group_id AND gm.user_id = ? AND gm.status IN ('member','accepted')
 ORDER BY e.event_date ASC
 LIMIT ? OFFSET ?
 `
 
-	rows, err := s.db.Query(query, userID, time.Now(), limit, offset)
+	rows, err := s.db.Query(query, userID, limit, offset)
 	if err != nil {
 		return nil, err
 	}
@@ -307,11 +326,13 @@ LIMIT ? OFFSET ?
 		var event models.EventResponse
 		var creator models.UserResponse
 		var group models.GroupEventResponse
+		var avatar sql.NullString
+		var nickname sql.NullString
 
 		err := rows.Scan(
 			&event.ID, &event.GroupID, &event.CreatorID, &event.Title, &event.Description,
 			&event.EventTime, &event.CreatedAt, &event.UpdatedAt,
-			&creator.FirstName, &creator.LastName, &creator.Avatar, &creator.Nickname,
+			&creator.FirstName, &creator.LastName, &avatar, &nickname,
 			&group.Title,
 		)
 		if err != nil {
@@ -319,6 +340,14 @@ LIMIT ? OFFSET ?
 		}
 
 		creator.ID = event.CreatorID
+		if avatar.Valid {
+			v := avatar.String
+			creator.Avatar = &v
+		}
+		if nickname.Valid {
+			v := nickname.String
+			creator.Nickname = &v
+		}
 		group.ID = event.GroupID
 		event.Creator = creator
 		event.Group = group
@@ -346,8 +375,8 @@ LIMIT ? OFFSET ?
 func (s *EventService) getEventResponseCounts(eventID uint) (going, notGoing int, err error) {
 	query := `
 		SELECT 
-			SUM(CASE WHEN response_option = 'going' THEN 1 ELSE 0 END) as going_count,
-			SUM(CASE WHEN response_option = 'not_going' THEN 1 ELSE 0 END) as not_going_count
+			COALESCE(SUM(CASE WHEN response_option = 'going' THEN 1 ELSE 0 END), 0) as going_count,
+			COALESCE(SUM(CASE WHEN response_option = 'not_going' THEN 1 ELSE 0 END), 0) as not_going_count
 		FROM event_responses 
 		WHERE event_id = ?
 	`
@@ -358,7 +387,7 @@ func (s *EventService) getEventResponseCounts(eventID uint) (going, notGoing int
 
 func (s *EventService) getUserEventResponse(eventID, userID uint) (string, error) {
 	query := `SELECT response_option FROM event_responses WHERE event_id = ? AND user_id = ?`
-	
+
 	var option string
 	err := s.db.QueryRow(query, eventID, userID).Scan(&option)
 	if err == sql.ErrNoRows {
@@ -374,7 +403,7 @@ func (s *EventService) getUserEventResponse(eventID, userID uint) (string, error
 func (s *EventService) isUserGroupMember(groupID, userID uint) (bool, error) {
 	query := `
 		SELECT COUNT(*) FROM group_members 
-		WHERE group_id = ? AND user_id = ? AND status = 'member'
+		WHERE group_id = ? AND user_id = ? AND status IN ('member','accepted')
 	`
 
 	var count int
@@ -388,7 +417,7 @@ func (s *EventService) isUserGroupMember(groupID, userID uint) (bool, error) {
 
 func (s *EventService) getEventGroupID(eventID uint) (uint, error) {
 	query := `SELECT group_id FROM events WHERE id = ?`
-	
+
 	var groupID uint
 	err := s.db.QueryRow(query, eventID).Scan(&groupID)
 	return groupID, err

@@ -588,11 +588,11 @@ export class ApiClient {
 
   // Groups endpoints
   async getUserGroups(userId: number): Promise<{ data: GroupResponse[] }> {
-    const response = await this.request<{ groups: GroupResponse[], count: number, limit: number, offset: number }>('/api/groups', {
+  const response = await this.request<{ groups: GroupResponse[], count: number, limit: number, offset: number }>(`/api/groups`, {
       method: 'GET',
     });
-    // Transform the response to match the expected format
-    return { data: response.groups };
+    // Return only the groups the user is a member of (defensive filter)
+    return { data: (response.groups || []).filter(g => g.is_member) };
   }
 
   async getGroup(groupId: number): Promise<GroupResponse> {
@@ -667,16 +667,9 @@ export class ApiClient {
     });
   }
 
-  async respondToEvent(eventId: number, response: 'going' | 'not_going'): Promise<{ message: string }> {
-    return this.request<{ message: string }>(`/api/events/${eventId}/respond`, {
-      method: 'POST',
-      body: JSON.stringify({ response }),
-    });
-  }
-
   // Events endpoints
   async getUserEvents(): Promise<{ events: EventResponse[], count: number, limit: number, offset: number }> {
-    return this.request<{ events: EventResponse[], count: number, limit: number, offset: number }>('/api/events/user?limit=20&offset=0', {
+    return this.request<{ events: EventResponse[], count: number, limit: number, offset: number }>('/api/events?limit=20&offset=0', {
       method: 'GET',
     });
   }
@@ -714,7 +707,7 @@ export class ApiClient {
   }
 
   async respondToEvent(eventId: number, option: 'going' | 'not_going'): Promise<{ message: string; response: string }> {
-    return this.request<{ message: string; response: string }>(`/api/events/${eventId}/response`, {
+    return this.request<{ message: string; response: string }>(`/api/events/${eventId}/respond`, {
       method: 'POST',
       body: JSON.stringify({ option }),
     });
@@ -724,8 +717,6 @@ export class ApiClient {
     return this.request<{ responses: { going: EventResponseDetail[], not_going: EventResponseDetail[] }, counts: { going: number, not_going: number, total: number } }>(`/api/events/${eventId}/responses`, {
       method: 'GET',
     });
-    // Transform the response to match the expected format
-    return { data: response.events };
   }
 
   // Messages endpoints

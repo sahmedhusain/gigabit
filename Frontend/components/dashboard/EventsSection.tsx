@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { Calendar, MapPin, Users, Plus, Edit, Trash2, X, Clock, Check } from 'lucide-react';
 import { api, Event, EventResponse, CreateEventRequest, UpdateEventRequest, GroupResponse } from '@/lib/api';
 import { useToast } from '@/context/ToastContext';
+import { useAuth } from '@/context/AuthContext';
 
 interface EventsSectionProps {
   events: Event[];
@@ -51,14 +52,20 @@ const CreateEventModal: React.FC<CreateEventModalProps> = ({ isOpen, onClose, on
 
     setIsLoading(true);
     try {
-      await api.createEvent(selectedGroupId, formData);
+      const payload: CreateEventRequest = {
+        title: formData.title,
+        description: formData.description,
+        event_time: new Date(formData.event_time).toISOString(),
+      };
+      await api.createEvent(selectedGroupId, payload);
       success('Event created successfully!');
       onEventCreated();
       onClose();
       setFormData({ title: '', description: '', event_time: '' });
       setSelectedGroupId(null);
     } catch (err) {
-      error('Failed to create event. Please try again.');
+      const message = err instanceof Error ? err.message : 'Failed to create event. Please try again.';
+      error(message);
     } finally {
       setIsLoading(false);
     }
@@ -77,7 +84,7 @@ const CreateEventModal: React.FC<CreateEventModalProps> = ({ isOpen, onClose, on
       <div className="bg-gradient-to-br from-slate-900 to-slate-800 rounded-2xl p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-6">
           <h3 className="text-xl font-bold text-white">Create New Event</h3>
-          <button onClick={onClose} className="text-gray-400 hover:text-white">
+          <button onClick={onClose} className="text-gray-400 hover:text-white" aria-label="Close modal">
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -102,6 +109,7 @@ const CreateEventModal: React.FC<CreateEventModalProps> = ({ isOpen, onClose, on
               onChange={(e) => setSelectedGroupId(Number(e.target.value))}
               className="w-full p-3 bg-white/10 rounded-lg text-white border border-white/20 focus:border-emerald-500 focus:outline-none"
               required
+              aria-label="Select group"
             >
               <option value="">Select a group</option>
               {groups.map((group) => (
@@ -132,6 +140,7 @@ const CreateEventModal: React.FC<CreateEventModalProps> = ({ isOpen, onClose, on
               min={formatDateTimeLocal(new Date())}
               className="w-full p-3 bg-white/10 rounded-lg text-white border border-white/20 focus:border-emerald-500 focus:outline-none"
               required
+              aria-label="Event date and time"
             />
           </div>
 
@@ -209,7 +218,7 @@ const EditEventModal: React.FC<EditEventModalProps> = ({ isOpen, onClose, event,
       <div className="bg-gradient-to-br from-slate-900 to-slate-800 rounded-2xl p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-6">
           <h3 className="text-xl font-bold text-white">Edit Event</h3>
-          <button onClick={onClose} className="text-gray-400 hover:text-white">
+          <button onClick={onClose} className="text-gray-400 hover:text-white" aria-label="Close modal">
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -245,6 +254,7 @@ const EditEventModal: React.FC<EditEventModalProps> = ({ isOpen, onClose, event,
               onChange={(e) => setFormData({ ...formData, event_time: e.target.value })}
               min={formatDateTimeLocal(new Date())}
               className="w-full p-3 bg-white/10 rounded-lg text-white border border-white/20 focus:border-emerald-500 focus:outline-none"
+              aria-label="Event date and time"
             />
           </div>
 
@@ -346,10 +356,11 @@ const EventDetailsModal: React.FC<EventDetailsModalProps> = ({
               onClick={handleDeleteEvent}
               disabled={isDeletingEvent}
               className="p-2 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg transition-colors"
+              aria-label="Delete event"
             >
               <Trash2 className="w-5 h-5" />
             </button>
-            <button onClick={onClose} className="text-gray-400 hover:text-white">
+            <button onClick={onClose} className="text-gray-400 hover:text-white" aria-label="Close modal">
               <X className="w-5 h-5" />
             </button>
           </div>
@@ -452,16 +463,18 @@ export const EventsSection: React.FC<EventsSectionProps> = ({ events, onEventsUp
   const [selectedEvent, setSelectedEvent] = useState<EventResponse | null>(null);
   const [groups, setGroups] = useState<GroupResponse[]>([]);
   const [isLoadingGroups, setIsLoadingGroups] = useState(false);
+  const { user } = useAuth();
 
   useEffect(() => {
     loadUserGroups();
-  }, []);
+  }, [user]);
 
   const loadUserGroups = async () => {
+    if (!user) return;
     setIsLoadingGroups(true);
     try {
-      const data = await api.getUserGroups();
-      setGroups(data.groups || []);
+      const data = await api.getUserGroups(user.id);
+      setGroups(data.data || []);
     } catch (err) {
       console.error('Failed to load user groups:', err);
       setGroups([]);
@@ -517,45 +530,66 @@ export const EventsSection: React.FC<EventsSectionProps> = ({ events, onEventsUp
                     <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-4 space-y-2 sm:space-y-0 text-xs lg:text-sm text-white/60">
                       <div className="flex items-center">
                         <Calendar className="w-3 h-3 lg:w-4 lg:h-4 mr-1" />
-                        {event.date} at {event.time}
+                        {new Date(event.event_time).toLocaleDateString()} at {new Date(event.event_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       </div>
                       <div className="flex items-center">
                         <Users className="w-3 h-3 lg:w-4 lg:h-4 mr-1" />
-                        {event.group}
+                        {event.group.title}
                       </div>
                     </div>
                   </div>
                   
                   <div className="text-center lg:text-right">
+                    {/* User status and expiry badges */}
+                    <div className="flex flex-wrap items-center justify-center lg:justify-end gap-2 mb-3">
+                      {(() => {
+                        const status = event.user_response === 'going' ? 'Going' : event.user_response === 'not_going' ? 'Not Going' : 'Pending';
+                        const statusClasses =
+                          event.user_response === 'going'
+                            ? 'bg-emerald-600 text-white'
+                            : event.user_response === 'not_going'
+                            ? 'bg-red-600 text-white'
+                            : 'border border-yellow-500 text-yellow-400';
+                        return (
+                          <span className={`px-3 lg:px-4 py-1 rounded-full text-xs lg:text-sm ${statusClasses}`}>
+                            Your status: {status}
+                          </span>
+                        );
+                      })()}
+                      {new Date(event.event_time) < new Date() && (
+                        <span className="px-3 lg:px-4 py-1 rounded-full text-xs lg:text-sm bg-gray-600 text-white">Expired</span>
+                      )}
+                    </div>
                     <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2 mb-3">
                       <div className={`px-3 lg:px-4 py-2 rounded-lg lg:rounded-xl text-xs lg:text-sm ${
-                        event.userResponse === 'going' 
+                        event.user_response === 'going' 
                           ? 'bg-emerald-500 text-white' 
                           : 'border border-emerald-500/50 text-emerald-400'
                       }`}>
-                        Going: {event.going}
+                        Going: {event.going_count}
                       </div>
                       <div className={`px-3 lg:px-4 py-2 rounded-lg lg:rounded-xl text-xs lg:text-sm ${
-                        event.userResponse === 'not_going' 
+                        event.user_response === 'not_going' 
                           ? 'bg-red-500 text-white' 
                           : 'border border-red-500/50 text-red-400'
                       }`}>
-                        Not Going: {event.notGoing}
+                        Not Going: {event.not_going_count}
                       </div>
                     </div>
                     
                     <div className="flex space-x-2">
                       <button
-                        onClick={(e) => {
+                        onClick={async (e) => {
                           e.stopPropagation();
-                          // We need to fetch the full event details first
-                          handleEventClick(event).then(() => {
-                            if (selectedEvent) {
-                              handleEditEvent(selectedEvent);
-                            }
-                          });
+                          try {
+                            const full = await api.getEvent(event.id);
+                            handleEditEvent(full);
+                          } catch (err) {
+                            console.error('Failed to load event for edit:', err);
+                          }
                         }}
                         className="p-2 text-gray-400 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+                        aria-label="Edit event"
                       >
                         <Edit className="w-4 h-4" />
                       </button>

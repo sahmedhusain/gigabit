@@ -98,4 +98,6 @@ $RECYCLE.BIN/
 # Windows shortcuts
 *.lnk
 
-real-time-forum-example/
+Backend/social_network.db-wal
+Backend/social_network.db-shm
+Backend/social_network.db

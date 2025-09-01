@@ -44,7 +44,10 @@ export default function PostCard({ post, onLike }: PostCardProps) {
             <p className="text-white/60 text-xs lg:text-sm">@{post.user.username} • {post.timeAgo}</p>
           </div>
         </div>
-        <button className="p-2 text-white/70 hover:text-white hover:bg-white/10 rounded-lg lg:rounded-xl transition-all duration-200 flex-shrink-0">
+        <button 
+          className="p-2 text-white/70 hover:text-white hover:bg-white/10 rounded-lg lg:rounded-xl transition-all duration-200 flex-shrink-0"
+          title="More options"
+          aria-label="More options">
           <MoreHorizontal className="w-4 h-4 lg:w-5 lg:h-5" />
         </button>
       </div>
@@ -92,7 +95,9 @@ export default function PostCard({ post, onLike }: PostCardProps) {
 
         <button
           onClick={(e) => e.stopPropagation()}
-          className="p-1.5 lg:p-2 text-white/70 hover:text-white hover:bg-white/10 rounded-lg lg:rounded-xl transition-all duration-200">
+          className="p-1.5 lg:p-2 text-white/70 hover:text-white hover:bg-white/10 rounded-lg lg:rounded-xl transition-all duration-200"
+          title="Bookmark post"
+          aria-label="Bookmark post">
           <Bookmark className="w-3 h-3 lg:w-4 lg:h-4" />
         </button>
       </div>

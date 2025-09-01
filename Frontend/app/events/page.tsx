@@ -33,20 +33,21 @@ export default function EventsPage() {
           description: event.description ?? '',
           location: event.location ?? 'Location not specified',
           group: (event.group && (event.group.title ?? event.group.name)) || 'Unknown Group',
-          going: event.going_count ?? event.goingCount ?? 0,
-          notGoing: event.not_going_count ?? event.notGoingCount ?? 0,
-          userResponse: event.user_response ?? event.userResponse ?? 'not_responded',
+          going_count: event.going_count ?? event.goingCount ?? 0,
+          not_going_count: event.not_going_count ?? event.notGoingCount ?? 0,
+          user_response: event.user_response ?? event.userResponse ?? 'not_responded',
           group_id: event.group_id ?? event.groupId ?? '',
           creator_id: event.creator_id ?? event.creatorId ?? '',
+          creator: event.creator ?? null,
           event_time: event.event_time ?? event.eventTime ?? event.event_date ?? new Date().toISOString(),
           created_at: event.created_at ?? event.createdAt ?? new Date().toISOString(),
           updated_at: event.updated_at ?? event.updatedAt ?? new Date().toISOString(),
           date: new Date(eventDateStr).toLocaleDateString(),
           time: new Date(eventDateStr).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        };
+        } as Event;
       });
       
-      setEvents(transformedEvents as Event[]);
+      setEvents(transformedEvents);
     } catch (err) {
       console.error('Error fetching events:', err);
       if (err instanceof NetworkError) {

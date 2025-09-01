@@ -96,7 +96,7 @@ function GroupDetailsPage() {
 
       // Fetch group events
       const eventsData = await api.getUserEvents()
-      const groupEvents = eventsData.data.filter((event: Event) => event.group_id === groupId)
+      const groupEvents = eventsData.events.filter((event: Event) => event.group_id === groupId)
 
       // Fetch group posts
       const postsData = await api.getGroupPosts(groupId)

@@ -108,6 +108,8 @@ export default function NotificationSettingsModal({ show, onClose }: Notificatio
               Notification Settings
             </h2>
             <button
+              type="button"
+              title="Close notification settings"
               onClick={onClose}
               className="text-slate-400 hover:text-white transition-colors"
             >

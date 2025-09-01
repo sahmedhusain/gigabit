@@ -134,6 +134,7 @@ export const ToastProvider: React.FC<ToastProviderProps> = ({ children }) => {
               <button
                 onClick={() => removeToast(toast.id)}
                 className="text-white/70 hover:text-white transition-colors flex-shrink-0"
+                aria-label="Close toast notification"
               >
                 <X className="w-4 h-4" />
               </button>

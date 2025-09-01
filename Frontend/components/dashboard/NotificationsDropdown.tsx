@@ -6,11 +6,10 @@ import { useWebSocket } from '../../context/WebSocketContext'
 import { api, API_BASE_URL, User } from '../../lib/api'
 import NotificationSettingsModal from './NotificationSettingsModal'
 
-import { User } from '../../lib/api';
-
 interface Notification {
   id: number;
   type: string;
+  title: string;
   message: string;
   actor: User;
   is_read: boolean;
@@ -59,8 +58,13 @@ export default function NotificationsDropdown({ show, onClose }: NotificationsDr
 
     try {
       const response = await api.getNotifications(20, 0)
-      setNotifications(response.data || [])
-      setUnreadCount(response.data.filter(n => !n.is_read).length || 0)
+      const mappedNotifications: Notification[] = (response.data || []).map(item => ({
+        ...item,
+        title: item.type || 'Notification',
+        message: item.message || ''
+      }))
+      setNotifications(mappedNotifications)
+      setUnreadCount(mappedNotifications.filter(n => !n.is_read).length || 0)
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred';
       setError('Failed to load notifications')

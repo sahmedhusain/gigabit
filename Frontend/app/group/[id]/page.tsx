@@ -21,6 +21,8 @@ import {
   Heart
 } from 'lucide-react'
 import CreateEvent from '@/components/dashboard/CreateEvent'
+import CreateGroupPost from '@/components/dashboard/CreateGroupPost'
+import GroupFeed from '@/components/dashboard/GroupFeed'
 
 interface GroupDetails {
   id: number
@@ -65,10 +67,6 @@ function GroupDetailsPage() {
   const [inviteEmail, setInviteEmail] = useState('')
   const [isInviting, setIsInviting] = useState(false)
   const [posts, setPosts] = useState<PostResponse[]>([])
-  const [isLoadingPosts, setIsLoadingPosts] = useState(false)
-  const [showCreatePost, setShowCreatePost] = useState(false)
-  const [newPostContent, setNewPostContent] = useState('')
-  const [newPostImage, setNewPostImage] = useState<File | null>(null)
   const [showCreateEvent, setShowCreateEvent] = useState(false)
 
   useEffect(() => {
@@ -189,72 +187,7 @@ function GroupDetailsPage() {
     }
   }
 
-  const handleLikePost = async (postId: number) => {
-    try {
-      const post = posts.find(p => p.id === postId)
-      if (post && post.is_liked) {
-        await api.unlikePost(postId)
-      } else {
-        await api.likePost(postId)
-      }
-      
-      setPosts(posts.map(p =>
-        p.id === postId
-          ? { ...p, is_liked: !p.is_liked, like_count: p.is_liked ? p.like_count - 1 : p.like_count + 1 }
-          : p
-      ))
-    } catch (err) {
-      console.error('Error toggling like:', err)
-      error('Failed to update like.')
-    }
-  }
 
-  const handleCreatePost = async () => {
-    if (!newPostContent.trim()) {
-      error('Post content cannot be empty')
-      return
-    }
-
-    try {
-      setIsLoadingPosts(true)
-      let imageUrl = ''
-      
-      if (newPostImage) {
-        const formData = new FormData()
-        formData.append('image', newPostImage)
-        
-        const uploadResponse = await fetch('/api/uploads', {
-          method: 'POST',
-          body: formData,
-          credentials: 'include'
-        })
-        
-        if (uploadResponse.ok) {
-          const uploadData = await uploadResponse.json()
-          imageUrl = `/uploads/${uploadData.filename}`
-        } else {
-          const errorData = await uploadResponse.json()
-          throw new Error(errorData.error || 'Failed to upload image')
-        }
-      }
-      
-      await api.createGroupPost(group!.id, {
-        content: newPostContent,
-        image_url: imageUrl
-      })
-      
-      setNewPostContent('')
-      setNewPostImage(null)
-      setShowCreatePost(false)
-      success('Post created successfully!')
-      fetchGroupDetails() // Refresh posts
-    } catch (err) {
-      console.error('Error creating post:', err)
-      error('Failed to create post.')
-    } finally {
-      setIsLoadingPosts(false)
-    }
-  }
 
   const isGroupCreator = group && user && group.creator_id === user.id
 
@@ -339,11 +272,10 @@ function GroupDetailsPage() {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center px-4 py-4 border-b-2 transition-all duration-200 ${
-                  activeTab === tab.id
+                className={`flex items-center px-4 py-4 border-b-2 transition-all duration-200 ${activeTab === tab.id
                     ? 'border-emerald-400 text-emerald-400'
                     : 'border-transparent text-white/70 hover:text-white'
-                }`}
+                  }`}
               >
                 <tab.icon className="w-4 h-4 mr-2" />
                 {tab.label}
@@ -421,81 +353,19 @@ function GroupDetailsPage() {
           <div className="space-y-6">
             <div className="flex items-center justify-between">
               <h3 className="text-xl font-semibold text-white">Group Posts</h3>
-              {group.is_member && (
-                <button
-                  onClick={() => setShowCreatePost(true)}
-                  className="flex items-center px-4 py-2 bg-emerald-500 hover:bg-emerald-600 rounded-xl text-white transition-all duration-200"
-                >
-                  <MessageCircle className="w-4 h-4 mr-2" />
-                  Create Post
-                </button>
-              )}
             </div>
 
-            {posts.length === 0 ? (
-              <div className="bg-white/5 backdrop-blur-xl rounded-2xl p-8 border border-white/10 text-center">
-                <MessageCircle className="w-16 h-16 text-white/30 mx-auto mb-4" />
-                <h4 className="text-xl font-semibold text-white mb-2">No posts yet</h4>
-                <p className="text-white/70">Be the first to share something with the group!</p>
-                {group.is_member && (
-                  <button
-                    onClick={() => setShowCreatePost(true)}
-                    className="mt-4 px-4 py-2 bg-emerald-500/20 border border-emerald-400/30 rounded-xl text-emerald-300 hover:bg-emerald-500/30 transition-all duration-200"
-                  >
-                    Create First Post
-                  </button>
-                )}
-              </div>
-            ) : (
-              <div className="space-y-6">
-                {posts.map((post) => (
-                  <div key={post.id} className="bg-white/5 backdrop-blur-xl rounded-2xl p-6 border border-white/10">
-                    <div className="flex items-start space-x-4">
-                      <img
-                        src={post.user.avatar || '/default-avatar.png'}
-                        alt={post.user.first_name}
-                        className="w-12 h-12 rounded-full"
-                      />
-                      <div className="flex-1">
-                        <div className="flex items-center space-x-2 mb-2">
-                          <span className="text-white font-medium">
-                            {post.user.first_name} {post.user.last_name}
-                          </span>
-                          <span className="text-white/50 text-sm">
-                            {new Date(post.created_at).toLocaleDateString()}
-                          </span>
-                        </div>
-                        <p className="text-white/80 mb-4">{post.content}</p>
-                        {post.image_url && (
-                          <img
-                            src={post.image_url}
-                            alt="Post image"
-                            className="rounded-xl max-w-full h-auto mb-4"
-                          />
-                        )}
-                        <div className="flex items-center space-x-4">
-                          <button
-                            onClick={() => handleLikePost(post.id)}
-                            className={`flex items-center space-x-2 px-3 py-1 rounded-lg transition-all duration-200 ${
-                              post.is_liked
-                                ? 'bg-red-500/20 text-red-300'
-                                : 'bg-white/10 text-white/70 hover:bg-white/20'
-                            }`}
-                          >
-                            <Heart className={`w-4 h-4 ${post.is_liked ? 'fill-current' : ''}`} />
-                            <span>{post.like_count}</span>
-                          </button>
-                          <button className="flex items-center space-x-2 px-3 py-1 bg-white/10 text-white/70 hover:bg-white/20 rounded-lg transition-all duration-200">
-                            <MessageCircle className="w-4 h-4" />
-                            <span>{post.comment_count}</span>
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
+            {group.is_member && (
+              <CreateGroupPost
+                groupId={group.id.toString()}
+                onCreated={() => {
+                  // Refresh the feed
+                  fetchGroupDetails()
+                }}
+              />
             )}
+
+            <GroupFeed groupId={group.id.toString()} />
           </div>
         )}
 
@@ -651,70 +521,7 @@ function GroupDetailsPage() {
         </div>
       )}
 
-      {/* Create Post Modal */}
-      {showCreatePost && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="relative w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-            <div className="absolute inset-0 bg-gradient-to-r from-white/10 to-white/5 backdrop-blur-xl rounded-2xl border border-white/20 shadow-2xl"></div>
 
-            <div className="relative p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-white">Create Group Post</h3>
-                <button
-                  onClick={() => setShowCreatePost(false)}
-                  className="p-2 text-white/70 hover:text-white hover:bg-white/10 rounded-xl transition-all duration-200"
-                  title="Close"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <label className="text-white font-medium text-sm">Post Content *</label>
-                  <textarea
-                    value={newPostContent}
-                    onChange={(e) => setNewPostContent(e.target.value)}
-                    placeholder="Share something with the group..."
-                    className="w-full h-32 bg-white/10 border border-white/20 rounded-xl p-3 text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-emerald-400/50 resize-none"
-                    maxLength={5000}
-                  />
-                  <div className="text-xs text-white/50 text-right">
-                    {newPostContent.length}/5000
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-white font-medium text-sm">Image (Optional)</label>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => setNewPostImage(e.target.files?.[0] || null)}
-                    className="w-full bg-white/10 border border-white/20 rounded-xl p-3 text-white file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-emerald-500 file:text-white hover:file:bg-emerald-600"
-                    title="Choose an image file"
-                  />
-                </div>
-
-                <div className="flex justify-end space-x-3 pt-4">
-                  <button
-                    onClick={() => setShowCreatePost(false)}
-                    className="px-4 py-2 border border-white/30 rounded-xl text-white hover:bg-white/10 transition-all duration-200"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={handleCreatePost}
-                    disabled={isLoadingPosts || !newPostContent.trim()}
-                    className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 rounded-xl text-white transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {isLoadingPosts ? 'Creating...' : 'Create Post'}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Create Event Modal */}
       {showCreateEvent && (

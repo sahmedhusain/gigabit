@@ -52,18 +52,19 @@ func (s *NotificationService) CreateNotification(notification *models.Notificati
 
 func (s *NotificationService) GetUserNotifications(userID uint, limit, offset int) ([]models.NotificationResponse, error) {
 	query := `
-		SELECT n.id, n.user_id, n.actor_id, n.type, n.entity_type, n.entity_id,
-			   n.title, n.message, n.is_read, n.created_at, n.updated_at,
-			   u.first_name, u.last_name, u.avatar, u.nickname
-		FROM notifications n
-		JOIN users u ON n.actor_id = u.id
-		WHERE n.user_id = ?
-		ORDER BY n.created_at DESC
-		LIMIT ? OFFSET ?
-	`
+SELECT n.id, n.user_id, n.actor_id, n.type, n.entity_type, n.entity_id,
+   n.title, n.message, n.is_read, n.created_at, n.updated_at,
+   u.first_name, u.last_name, u.avatar, u.nickname
+FROM notifications n
+LEFT JOIN users u ON n.actor_id = u.id
+WHERE n.user_id = ?
+ORDER BY n.created_at DESC
+LIMIT ? OFFSET ?
+`
 
 	rows, err := s.db.Query(query, userID, limit, offset)
 	if err != nil {
+		fmt.Println("GetUserNotifications - query error:", err, "query:", query, "args:", userID, limit, offset)
 		return nil, err
 	}
 	defer rows.Close()
@@ -72,18 +73,64 @@ func (s *NotificationService) GetUserNotifications(userID uint, limit, offset in
 	for rows.Next() {
 		var notification models.NotificationResponse
 		var actor models.UserResponse
+		var actorID sql.NullInt64
+		var entityType sql.NullString
+		var entityID sql.NullInt64
+		var title sql.NullString
+		var avatar sql.NullString
+		var nickname sql.NullString
+		var firstName sql.NullString
+		var lastName sql.NullString
 
 		err := rows.Scan(
-			&notification.ID, &notification.UserID, &notification.ActorID, &notification.Type,
-			&notification.EntityType, &notification.EntityID, &notification.Title, &notification.Message,
+			&notification.ID, &notification.UserID, &actorID, &notification.Type,
+			&entityType, &entityID, &title, &notification.Message,
 			&notification.IsRead, &notification.CreatedAt, &notification.UpdatedAt,
-			&actor.FirstName, &actor.LastName, &actor.Avatar, &actor.Nickname,
+			&firstName, &lastName, &avatar, &nickname,
 		)
 		if err != nil {
+			fmt.Println("GetUserNotifications - scan error:", err)
 			return nil, err
 		}
 
-		actor.ID = notification.ActorID
+		if actorID.Valid {
+			notification.ActorID = uint(actorID.Int64)
+			actor.ID = uint(actorID.Int64)
+		}
+		if entityType.Valid {
+			notification.EntityType = entityType.String
+		}
+		if entityID.Valid {
+			notification.EntityID = uint(entityID.Int64)
+		}
+		if title.Valid {
+			notification.Title = title.String
+		}
+
+		// Map nullable DB fields into actor response
+		if firstName.Valid {
+			actor.FirstName = firstName.String
+		} else {
+			actor.FirstName = ""
+		}
+		if lastName.Valid {
+			actor.LastName = lastName.String
+		} else {
+			actor.LastName = ""
+		}
+		if avatar.Valid {
+			a := avatar.String
+			actor.Avatar = &a
+		} else {
+			actor.Avatar = nil
+		}
+		if nickname.Valid {
+			n := nickname.String
+			actor.Nickname = &n
+		} else {
+			actor.Nickname = nil
+		}
+
 		notification.Actor = actor
 
 		// Add additional data based on notification type
@@ -97,7 +144,7 @@ func (s *NotificationService) GetUserNotifications(userID uint, limit, offset in
 
 func (s *NotificationService) GetUnreadCount(userID uint) (int, error) {
 	query := `SELECT COUNT(*) FROM notifications WHERE user_id = ? AND is_read = false`
-	
+
 	var count int
 	err := s.db.QueryRow(query, userID).Scan(&count)
 	return count, err
@@ -111,7 +158,7 @@ func (s *NotificationService) MarkAsRead(userID uint, notificationIDs []uint) er
 	// Create placeholders for IN clause
 	placeholders := make([]string, len(notificationIDs))
 	args := make([]interface{}, 0, len(notificationIDs)+2)
-	
+
 	for i, id := range notificationIDs {
 		placeholders[i] = "?"
 		args = append(args, id)
@@ -342,11 +389,100 @@ func (s *NotificationService) NotifyPostCommented(commenterID, postOwnerID, post
 	return s.CreateNotification(notification)
 }
 
+func (s *NotificationService) NotifyGroupPostCreated(posterID, groupID, postID uint) error {
+	poster, err := s.getUserInfo(posterID)
+	if err != nil {
+		return err
+	}
+
+	group, err := s.getGroupInfo(groupID)
+	if err != nil {
+		return err
+	}
+
+	// Get all group members except poster
+	memberIDs, err := s.getGroupMemberIDs(groupID, posterID)
+	if err != nil {
+		return err
+	}
+
+	// Create notification for each group member
+	for _, memberID := range memberIDs {
+		notification := &models.Notification{
+			UserID:     memberID,
+			ActorID:    posterID,
+			Type:       models.NotificationGroupPost,
+			EntityType: "group_post",
+			EntityID:   postID,
+			Title:      "New Group Post",
+			Message:    poster.FirstName + " " + poster.LastName + " posted in \"" + group.Title + "\"",
+		}
+
+		if err := s.CreateNotification(notification); err != nil {
+			// Continue with other notifications even if one fails
+			continue
+		}
+	}
+
+	return nil
+}
+
+func (s *NotificationService) NotifyGroupPostLiked(likerID, postOwnerID, groupID, postID uint) error {
+	// Don't notify if user likes their own post
+	if likerID == postOwnerID {
+		return nil
+	}
+
+	liker, err := s.getUserInfo(likerID)
+	if err != nil {
+		return err
+	}
+
+	group, err := s.getGroupInfo(groupID)
+	if err != nil {
+		return err
+	}
+
+	notification := &models.Notification{
+		UserID:     postOwnerID,
+		ActorID:    likerID,
+		Type:       models.NotificationGroupPostLiked,
+		EntityType: "group_post",
+		EntityID:   postID,
+		Title:      "Post Liked",
+		Message:    liker.FirstName + " " + liker.LastName + " liked your post in \"" + group.Title + "\"",
+	}
+
+	return s.CreateNotification(notification)
+}
+
 // Helper methods
 
 func (s *NotificationService) sendRealTimeNotification(notification *models.Notification) {
 	if s.hub == nil {
 		return
+	}
+
+	actor, err := s.getUserInfo(notification.ActorID)
+	if err != nil {
+		// Log the error, but don't block sending the notification
+		fmt.Printf("Error getting actor info for notification: %v", err)
+	}
+
+	notificationResponse := models.NotificationResponse{
+		ID:         notification.ID,
+		UserID:     notification.UserID,
+		ActorID:    notification.ActorID,
+		Type:       notification.Type,
+		EntityType: notification.EntityType,
+		EntityID:   notification.EntityID,
+		Title:      notification.Title,
+		Message:    notification.Message,
+		IsRead:     notification.IsRead,
+		CreatedAt:  notification.CreatedAt,
+		UpdatedAt:  notification.UpdatedAt,
+		Actor:      *actor,
+		Data:       s.getNotificationData(notification.Type, notification.EntityType, notification.EntityID),
 	}
 
 	wsMessage := websocket.Message{
@@ -355,13 +491,7 @@ func (s *NotificationService) sendRealTimeNotification(notification *models.Noti
 		To:        notification.UserID,
 		Content:   notification.Message,
 		Timestamp: notification.CreatedAt.Unix(),
-		Data: map[string]interface{}{
-			"id":          notification.ID,
-			"type":        notification.Type,
-			"entity_type": notification.EntityType,
-			"entity_id":   notification.EntityID,
-			"title":       notification.Title,
-		},
+		Data:      notificationResponse,
 	}
 
 	s.hub.BroadcastMessage(wsMessage)
@@ -369,39 +499,39 @@ func (s *NotificationService) sendRealTimeNotification(notification *models.Noti
 
 func (s *NotificationService) getUserInfo(userID uint) (*models.UserResponse, error) {
 	query := `SELECT first_name, last_name, avatar, nickname FROM users WHERE id = ?`
-	
+
 	var user models.UserResponse
 	err := s.db.QueryRow(query, userID).Scan(&user.FirstName, &user.LastName, &user.Avatar, &user.Nickname)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	user.ID = userID
 	return &user, nil
 }
 
 func (s *NotificationService) getGroupInfo(groupID uint) (*models.GroupResponse, error) {
 	query := `SELECT title, description FROM groups WHERE id = ?`
-	
+
 	var group models.GroupResponse
 	err := s.db.QueryRow(query, groupID).Scan(&group.Title, &group.Description)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	group.ID = groupID
 	return &group, nil
 }
 
 func (s *NotificationService) getEventInfo(eventID uint) (*models.EventResponse, error) {
 	query := `SELECT title, description FROM events WHERE id = ?`
-	
+
 	var event models.EventResponse
 	err := s.db.QueryRow(query, eventID).Scan(&event.Title, &event.Description)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	event.ID = eventID
 	return &event, nil
 }

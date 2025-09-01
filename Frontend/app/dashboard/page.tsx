@@ -34,9 +34,9 @@ import {
   CategoriesSection, 
   FollowersSection, 
   GroupsSection, 
-  EventsSection, 
+  EventsSection,
   SettingsSection 
-} from '@/components/dashboard/DashboardSections'
+} from '@/components/dashboard'
 
 function DashboardPage() {
   const { user, logout, checkAuth } = useAuth()
@@ -667,7 +667,7 @@ function DashboardPage() {
       case 'groups': 
         return <GroupsSection groups={groups} />
       case 'events': 
-        return <EventsSection events={events} />
+        return <EventsSection events={events} onEventsUpdate={fetchEvents} />
       case 'settings': 
         return (
           <SettingsSection

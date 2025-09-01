@@ -1,7 +1,5 @@
 // API configuration and utilities
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
-
-// Types for API requests and responses
 export interface RegisterRequest {
   email: string;
   password: string;
@@ -107,16 +105,43 @@ export interface Group {
 }
 
 export interface Event {
-  id: number;
-  title: string;
-  description: string;
-  date: string;
-  time: string;
-  location: string;
-  group: string;
-  going: number;
-  notGoing: number;
-  userResponse?: string;
+  id: number
+  group_id: number
+  creator_id: number
+  title: string
+  description: string
+  event_time: string
+  created_at: string
+  updated_at: string
+  creator: {
+    id: number
+    username: string
+    email: string
+    first_name: string
+    last_name: string
+    avatar: string
+  }
+  group: {
+    id: number
+    title: string
+  }
+  going_count: number
+  not_going_count: number
+  user_response: string
+  responses?: Array<{
+    id: number
+    event_id: number
+    user: {
+      id: number
+      username: string
+      email: string
+      first_name: string
+      last_name: string
+      avatar: string
+    }
+    option: string
+    created_at: string
+  }>
 }
 
 export interface Chat {
@@ -164,15 +189,43 @@ export interface GroupResponse {
 }
 
 export interface EventResponse {
-  id: number;
-  title: string;
-  description: string;
-  event_time: string;
-  group: GroupResponse;
-  going_count: number;
-  not_going_count: number;
-  user_response?: string;
-  created_at: string;
+  id: number
+  group_id: number
+  creator_id: number
+  title: string
+  description: string
+  event_time: string
+  created_at: string
+  updated_at: string
+  creator: {
+    id: number
+    username: string
+    email: string
+    first_name: string
+    last_name: string
+    avatar: string
+  }
+  group: {
+    id: number
+    title: string
+  }
+  going_count: number
+  not_going_count: number
+  user_response: string
+  responses?: Array<{
+    id: number
+    event_id: number
+    user: {
+      id: number
+      username: string
+      email: string
+      first_name: string
+      last_name: string
+      avatar: string
+    }
+    option: string
+    created_at: string
+  }>
 }
 
 export interface CreateEventRequest {
@@ -219,6 +272,11 @@ export interface CreatePostRequest {
 export interface UpdatePostRequest {
   content: string;
   image_url?: string;
+}
+
+export interface CreateGroupRequest {
+  title: string;
+  description: string;
 }
 
 export interface PostsResponse {
@@ -529,16 +587,90 @@ export class ApiClient {
   }
 
   // Groups endpoints
-  async getUserGroups(userId?: number): Promise<{ groups: GroupResponse[], count: number }> {
-    const endpoint = userId ? `/api/users/${userId}/groups` : '/api/groups/user';
-    return this.request<{ groups: GroupResponse[], count: number }>(endpoint, {
+  async getUserGroups(userId: number): Promise<{ data: GroupResponse[] }> {
+    const response = await this.request<{ groups: GroupResponse[], count: number, limit: number, offset: number }>('/api/groups', {
+      method: 'GET',
+    });
+    // Transform the response to match the expected format
+    return { data: response.groups };
+  }
+
+  async getGroup(groupId: number): Promise<GroupResponse> {
+    return this.request<GroupResponse>(`/api/groups/${groupId}`, {
       method: 'GET',
     });
   }
 
-  async getAllGroups(limit: number = 20, offset: number = 0): Promise<{ groups: GroupResponse[], count: number, limit: number, offset: number }> {
-    return this.request<{ groups: GroupResponse[], count: number, limit: number, offset: number }>(`/api/groups?limit=${limit}&offset=${offset}`, {
+  async createGroup(data: CreateGroupRequest): Promise<GroupResponse> {
+    return this.request<GroupResponse>('/api/groups', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async joinGroup(groupId: number): Promise<{ message: string }> {
+    return this.request<{ message: string }>(`/api/groups/${groupId}/join`, {
+      method: 'POST',
+    });
+  }
+
+  async leaveGroup(groupId: number): Promise<{ message: string }> {
+    return this.request<{ message: string }>(`/api/groups/${groupId}/leave`, {
+      method: 'POST',
+    });
+  }
+
+  async inviteUserToGroup(groupId: number, userId: number): Promise<{ message: string }> {
+    return this.request<{ message: string }>(`/api/groups/${groupId}/invite`, {
+      method: 'POST',
+      body: JSON.stringify({ user_id: userId }),
+    });
+  }
+
+  async acceptGroupInvitation(groupId: number): Promise<{ message: string }> {
+    return this.request<{ message: string }>(`/api/groups/${groupId}/invitation`, {
+      method: 'PUT',
+      body: JSON.stringify({ action: 'accept' }),
+    });
+  }
+
+  async declineGroupInvitation(groupId: number): Promise<{ message: string }> {
+    return this.request<{ message: string }>(`/api/groups/${groupId}/invitation`, {
+      method: 'PUT',
+      body: JSON.stringify({ action: 'decline' }),
+    });
+  }
+
+  async getGroupMembers(groupId: number): Promise<{ members: any[], count: number }> {
+    return this.request<{ members: any[], count: number }>(`/api/groups/${groupId}/members`, {
       method: 'GET',
+    });
+  }
+
+  async getGroupPosts(groupId: number, limit: number = 20, offset: number = 0): Promise<{ posts: PostResponse[], count: number }> {
+    return this.request<{ posts: PostResponse[], count: number }>(`/api/groups/${groupId}/posts?limit=${limit}&offset=${offset}`, {
+      method: 'GET',
+    });
+  }
+
+  async createGroupPost(groupId: number, data: CreatePostRequest): Promise<PostResponse> {
+    return this.request<PostResponse>(`/api/groups/${groupId}/posts`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async createGroupEvent(groupId: number, data: { title: string; description: string; event_time: string }): Promise<EventResponse> {
+    return this.request<EventResponse>(`/api/groups/${groupId}/events`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async respondToEvent(eventId: number, response: 'going' | 'not_going'): Promise<{ message: string }> {
+    return this.request<{ message: string }>(`/api/events/${eventId}/respond`, {
+      method: 'POST',
+      body: JSON.stringify({ response }),
     });
   }
 
@@ -592,6 +724,8 @@ export class ApiClient {
     return this.request<{ responses: { going: EventResponseDetail[], not_going: EventResponseDetail[] }, counts: { going: number, not_going: number, total: number } }>(`/api/events/${eventId}/responses`, {
       method: 'GET',
     });
+    // Transform the response to match the expected format
+    return { data: response.events };
   }
 
   // Messages endpoints
@@ -692,6 +826,7 @@ export class ApiClient {
 
 // Create and export API client instance
 export const api = new ApiClient(API_BASE_URL);
+export { API_BASE_URL };
 
 // Auth utilities
 export const isAuthenticated = (): boolean => {

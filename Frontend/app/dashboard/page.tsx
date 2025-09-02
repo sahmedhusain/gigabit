@@ -6,6 +6,7 @@ import { useAuth } from '@/context/AuthContext'
 import { useWebSocket } from '@/context/WebSocketContext'
 import { useToast } from '@/context/ToastContext'
 import { useOffline } from '@/hooks/useOffline'
+import { useConnectionStatus, useRealTimePosts, useNotifications, useRealTimeGroups, useRealTimeEvents, useConversations } from '@/hooks'
 import {
   api,
   ApiClient,
@@ -44,6 +45,14 @@ function DashboardPage() {
   const { isConnected, onlineUsers, addMessageListener, sendMessage } = useWebSocket()
   const { success, error, warning } = useToast()
   const { isOffline, lastConnectionCheck } = useOffline()
+  
+  // Real-time hooks
+  const { isConnected: connectionStatus } = useConnectionStatus()
+  const { posts: livePosts, isLoading: postsLoading } = useRealTimePosts()
+  const { items: liveNotifications, unread: liveUnreadCount } = useNotifications()
+  const { groups: liveGroups } = useRealTimeGroups()
+  const { events: liveEvents } = useRealTimeEvents()
+  const { conversations: liveConversations } = useConversations()
 
   // UI State
   const [activeTab, setActiveTab] = useState('home')
@@ -62,7 +71,7 @@ function DashboardPage() {
   const [availableUsers, setAvailableUsers] = useState<{ id: number; email: string; first_name: string; last_name: string; avatar?: string; nickname?: string; display_name?: string; }[]>([])
   const [loadingUsers, setLoadingUsers] = useState(false)
 
-  // Data State
+  // Data State - Use real-time data when available
   const [posts, setPosts] = useState<Post[]>([])
   const [isLoadingPosts, setIsLoadingPosts] = useState(true)
   const [notifications, setNotifications] = useState<NotificationType[]>([])
@@ -74,6 +83,14 @@ function DashboardPage() {
   const [events, setEvents] = useState<Event[]>([])
   const [isLoadingEvents, setIsLoadingEvents] = useState(false)
   const [unreadNotifications, setUnreadNotifications] = useState(0)
+
+  // Use live data when available, fallback to local state
+  const displayPosts = livePosts && livePosts.length > 0 ? livePosts : posts
+  const displayNotifications = liveNotifications && liveNotifications.length > 0 ? liveNotifications : notifications
+  const displayGroups = liveGroups && liveGroups.length > 0 ? liveGroups : groups
+  const displayEvents = liveEvents && liveEvents.length > 0 ? liveEvents : events
+  const displayChats = liveConversations && liveConversations.length > 0 ? liveConversations : chats
+  const displayUnreadCount = liveUnreadCount || unreadNotifications
   const [categories, setCategories] = useState<CategoryResponse[]>([])
   const [selectedCategory, setSelectedCategory] = useState<number | null>(null)
   const [isLoadingCategories, setIsLoadingCategories] = useState(false)
@@ -618,9 +635,7 @@ function DashboardPage() {
       case 'home':
         return (
           <HomeFeed
-            posts={posts}
             trendingCategories={trendingCategories}
-            onPostLike={handleLikePost}
             onCategoryClick={handleCategoryClick}
             setActiveTab={setActiveTab}
           />
@@ -672,9 +687,7 @@ function DashboardPage() {
       default:
         return (
           <HomeFeed
-            posts={posts}
             trendingCategories={trendingCategories}
-            onPostLike={handleLikePost}
             onCategoryClick={handleCategoryClick}
             setActiveTab={setActiveTab}
           />
@@ -780,9 +793,9 @@ function DashboardPage() {
       {/* Chat Window */}
       {openChatWindow && (
         <ChatWindow
-          conversationId={openChatWindow.conversationId}
-          conversationType={openChatWindow.type}
-          participantName={openChatWindow.name}
+          conversationId={openChatWindow!.conversationId}
+          conversationType={openChatWindow!.type}
+          participantName={openChatWindow!.name}
           onClose={() => setOpenChatWindow(null)}
         />
       )}

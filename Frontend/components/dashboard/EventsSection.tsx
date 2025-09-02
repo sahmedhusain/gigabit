@@ -1,10 +1,11 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Calendar, MapPin, Users, Plus, Edit, Trash2, X, Clock, Check } from 'lucide-react';
+import { Calendar, MapPin, Users, Plus, Edit, Trash2, X, Clock, Check, Wifi, WifiOff } from 'lucide-react';
 import { api, Event, EventResponse, CreateEventRequest, UpdateEventRequest, GroupResponse } from '@/lib/api';
 import { useToast } from '@/context/ToastContext';
 import { useAuth } from '@/context/AuthContext';
+import { useRealTimeEvents, useConnectionStatus } from '@/hooks';
 
 interface EventsSectionProps {
   events: Event[];
@@ -464,6 +465,23 @@ export const EventsSection: React.FC<EventsSectionProps> = ({ events, onEventsUp
   const [groups, setGroups] = useState<GroupResponse[]>([]);
   const [isLoadingGroups, setIsLoadingGroups] = useState(false);
   const { user } = useAuth();
+  
+  // Real-time events integration
+  const {
+    events: realtimeEvents,
+    loading,
+    error: eventsError,
+    respond: handleEventResponse,
+    getUnreadCount,
+    isConnected: eventsConnected,
+    markEventAsRead
+  } = useRealTimeEvents()
+  
+  // Connection status monitoring
+  const { isConnected, connectionQuality } = useConnectionStatus()
+  
+  // Use real-time events if available, fallback to props
+  const displayEvents = realtimeEvents.length > 0 ? realtimeEvents : events
 
   useEffect(() => {
     loadUserGroups();
@@ -503,101 +521,163 @@ export const EventsSection: React.FC<EventsSectionProps> = ({ events, onEventsUp
     <div className="space-y-4 lg:space-y-6">
       <div className="bg-gradient-to-r from-white/10 to-white/5 backdrop-blur-xl rounded-2xl lg:rounded-3xl border border-white/20 p-4 lg:p-6">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 lg:mb-6 space-y-3 sm:space-y-0">
-          <h2 className="text-xl lg:text-2xl font-bold text-white">My Events</h2>
+          <div className="flex items-center gap-3">
+            <h2 className="text-xl lg:text-2xl font-bold text-white">My Events</h2>
+            {/* Connection status indicator */}
+            <div className={`w-2 h-2 rounded-full ${
+              isConnected ? 'bg-green-400' : 'bg-red-400'
+            }`} title={`WebSocket ${isConnected ? 'Connected' : 'Disconnected'}`} />
+            {getUnreadCount() > 0 && (
+              <span className="bg-blue-500 text-white text-xs px-2 py-1 rounded-full">
+                {getUnreadCount()} updates
+              </span>
+            )}
+          </div>
           <button
             onClick={() => setIsCreateModalOpen(true)}
-            className="flex items-center px-3 lg:px-4 py-2 bg-gradient-to-r from-emerald-500 to-teal-600 rounded-lg lg:rounded-xl text-white hover:from-emerald-600 hover:to-teal-700 transition-all duration-200 text-sm lg:text-base w-full sm:w-auto justify-center"
+            disabled={!isConnected}
+            className="flex items-center px-3 lg:px-4 py-2 bg-gradient-to-r from-emerald-500 to-teal-600 rounded-lg lg:rounded-xl text-white hover:from-emerald-600 hover:to-teal-700 transition-all duration-200 text-sm lg:text-base w-full sm:w-auto justify-center disabled:opacity-50"
+            title={!isConnected ? 'Connection required to create events' : ''}
           >
             <Plus className="w-4 h-4 mr-2" />
             Create Event
           </button>
         </div>
         
+        {/* Connection warnings */}
+        {!isConnected && (
+          <div className="mb-4 flex items-center gap-2 text-orange-400 text-sm bg-orange-400/10 border border-orange-400/20 rounded-lg p-3">
+            <WifiOff className="w-4 h-4 flex-shrink-0" />
+            <span>Connection lost - events may not update in real-time</span>
+          </div>
+        )}
+        
+        {connectionQuality === 'poor' && isConnected && (
+          <div className="mb-4 flex items-center gap-2 text-yellow-400 text-sm bg-yellow-400/10 border border-yellow-400/20 rounded-lg p-3">
+            <Wifi className="w-4 h-4 flex-shrink-0" />
+            <span>Poor connection - real-time updates may be slow</span>
+          </div>
+        )}
         <div className="space-y-3 lg:space-y-4">
-          {events.length === 0 ? (
+          {displayEvents.length === 0 ? (
             <div className="text-center text-white/60 py-8">
               <Calendar className="w-16 h-16 mx-auto mb-4 text-white/30" />
               <p className="text-lg mb-2">No events yet</p>
               <p className="text-sm">Create your first event to get started!</p>
             </div>
           ) : (
-            events.map((event) => (
-              <div key={event.id} className="bg-white/5 rounded-xl lg:rounded-2xl p-4 lg:p-6 hover:bg-white/10 transition-all duration-200 cursor-pointer" onClick={() => handleEventClick(event)}>
-                <div className="flex flex-col lg:flex-row lg:items-center justify-between space-y-4 lg:space-y-0 mb-3 lg:mb-4">
-                  <div className="flex-1">
-                    <h3 className="text-lg lg:text-xl font-semibold text-white mb-2">{event.title}</h3>
-                    <p className="text-white/70 mb-3 text-sm lg:text-base line-clamp-2">{event.description}</p>
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-4 space-y-2 sm:space-y-0 text-xs lg:text-sm text-white/60">
-                      <div className="flex items-center">
-                        <Calendar className="w-3 h-3 lg:w-4 lg:h-4 mr-1" />
-                        {new Date(event.event_time).toLocaleDateString()} at {new Date(event.event_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                      </div>
-                      <div className="flex items-center">
-                        <Users className="w-3 h-3 lg:w-4 lg:h-4 mr-1" />
-                        {event.group.title}
-                      </div>
+            displayEvents.map((event) => {
+              const unreadCount = getUnreadCount(event.id)
+              return (
+                <div 
+                  key={event.id} 
+                  className="bg-white/5 rounded-xl lg:rounded-2xl p-4 lg:p-6 hover:bg-white/10 transition-all duration-200 cursor-pointer relative" 
+                  onClick={() => {
+                    handleEventClick(event)
+                    markEventAsRead(event.id)
+                  }}
+                >
+                  {/* Unread indicator */}
+                  {unreadCount > 0 && (
+                    <div className="absolute -top-2 -right-2 bg-blue-500 text-white text-xs rounded-full min-w-[20px] h-5 flex items-center justify-center px-1">
+                      {unreadCount > 99 ? '99+' : unreadCount}
                     </div>
-                  </div>
+                  )}
                   
-                  <div className="text-center lg:text-right">
-                    {/* User status and expiry badges */}
-                    <div className="flex flex-wrap items-center justify-center lg:justify-end gap-2 mb-3">
-                      {(() => {
-                        const status = event.user_response === 'going' ? 'Going' : event.user_response === 'not_going' ? 'Not Going' : 'Pending';
-                        const statusClasses =
-                          event.user_response === 'going'
-                            ? 'bg-emerald-600 text-white'
-                            : event.user_response === 'not_going'
-                            ? 'bg-red-600 text-white'
-                            : 'border border-yellow-500 text-yellow-400';
-                        return (
-                          <span className={`px-3 lg:px-4 py-1 rounded-full text-xs lg:text-sm ${statusClasses}`}>
-                            Your status: {status}
-                          </span>
-                        );
-                      })()}
-                      {new Date(event.event_time) < new Date() && (
-                        <span className="px-3 lg:px-4 py-1 rounded-full text-xs lg:text-sm bg-gray-600 text-white">Expired</span>
-                      )}
-                    </div>
-                    <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2 mb-3">
-                      <div className={`px-3 lg:px-4 py-2 rounded-lg lg:rounded-xl text-xs lg:text-sm ${
-                        event.user_response === 'going' 
-                          ? 'bg-emerald-500 text-white' 
-                          : 'border border-emerald-500/50 text-emerald-400'
-                      }`}>
-                        Going: {event.going_count}
-                      </div>
-                      <div className={`px-3 lg:px-4 py-2 rounded-lg lg:rounded-xl text-xs lg:text-sm ${
-                        event.user_response === 'not_going' 
-                          ? 'bg-red-500 text-white' 
-                          : 'border border-red-500/50 text-red-400'
-                      }`}>
-                        Not Going: {event.not_going_count}
+                  <div className="flex flex-col lg:flex-row lg:items-center justify-between space-y-4 lg:space-y-0 mb-3 lg:mb-4">
+                    <div className="flex-1">
+                      <h3 className="text-lg lg:text-xl font-semibold text-white mb-2">{event.title}</h3>
+                      <p className="text-white/70 mb-3 text-sm lg:text-base line-clamp-2">{event.description}</p>
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-4 space-y-2 sm:space-y-0 text-xs lg:text-sm text-white/60">
+                        <div className="flex items-center">
+                          <Calendar className="w-3 h-3 lg:w-4 lg:h-4 mr-1" />
+                          {new Date(event.event_time).toLocaleDateString()} at {new Date(event.event_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </div>
+                        <div className="flex items-center">
+                          <Users className="w-3 h-3 lg:w-4 lg:h-4 mr-1" />
+                          {event.group.title}
+                        </div>
                       </div>
                     </div>
                     
-                    <div className="flex space-x-2">
-                      <button
-                        onClick={async (e) => {
-                          e.stopPropagation();
-                          try {
-                            const full = await api.getEvent(event.id);
-                            handleEditEvent(full);
-                          } catch (err) {
-                            console.error('Failed to load event for edit:', err);
-                          }
-                        }}
-                        className="p-2 text-gray-400 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
-                        aria-label="Edit event"
-                      >
-                        <Edit className="w-4 h-4" />
-                      </button>
+                    <div className="text-center lg:text-right">
+                      {/* User status and expiry badges */}
+                      <div className="flex flex-wrap items-center justify-center lg:justify-end gap-2 mb-3">
+                        {(() => {
+                          const status = event.user_response === 'going' ? 'Going' : event.user_response === 'not_going' ? 'Not Going' : 'Pending';
+                          const statusClasses =
+                            event.user_response === 'going'
+                              ? 'bg-emerald-600 text-white'
+                              : event.user_response === 'not_going'
+                              ? 'bg-red-600 text-white'
+                              : 'border border-yellow-500 text-yellow-400';
+                          return (
+                            <span className={`px-3 lg:px-4 py-1 rounded-full text-xs lg:text-sm ${statusClasses}`}>
+                              Your status: {status}
+                            </span>
+                          );
+                        })()}
+                        {new Date(event.event_time) < new Date() && (
+                          <span className="px-3 lg:px-4 py-1 rounded-full text-xs lg:text-sm bg-gray-600 text-white">Expired</span>
+                        )}
+                      </div>
+                      <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2 mb-3">
+                        <button
+                          onClick={async (e) => {
+                            e.stopPropagation()
+                            await handleEventResponse(event.id, 'going')
+                          }}
+                          disabled={!isConnected}
+                          className={`px-3 lg:px-4 py-2 rounded-lg lg:rounded-xl text-xs lg:text-sm transition-colors ${
+                            event.user_response === 'going' 
+                              ? 'bg-emerald-500 text-white' 
+                              : 'border border-emerald-500/50 text-emerald-400 hover:bg-emerald-500 hover:text-white'
+                          } ${!isConnected ? 'opacity-50 cursor-not-allowed' : ''}`}
+                          title={!isConnected ? 'Connection required to respond' : ''}
+                        >
+                          Going: {event.going_count}
+                        </button>
+                        <button
+                          onClick={async (e) => {
+                            e.stopPropagation()
+                            await handleEventResponse(event.id, 'not_going')
+                          }}
+                          disabled={!isConnected}
+                          className={`px-3 lg:px-4 py-2 rounded-lg lg:rounded-xl text-xs lg:text-sm transition-colors ${
+                            event.user_response === 'not_going' 
+                              ? 'bg-red-500 text-white' 
+                              : 'border border-red-500/50 text-red-400 hover:bg-red-500 hover:text-white'
+                          } ${!isConnected ? 'opacity-50 cursor-not-allowed' : ''}`}
+                          title={!isConnected ? 'Connection required to respond' : ''}
+                        >
+                          Not Going: {event.not_going_count}
+                        </button>
+                      </div>
+                      
+                      <div className="flex space-x-2">
+                        <button
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            try {
+                              const full = await api.getEvent(event.id);
+                              handleEditEvent(full);
+                            } catch (err) {
+                              console.error('Failed to load event for edit:', err);
+                            }
+                          }}
+                          disabled={!isConnected}
+                          className="p-2 text-gray-400 hover:text-white hover:bg-white/10 rounded-lg transition-colors disabled:opacity-50"
+                          aria-label="Edit event"
+                          title={!isConnected ? 'Connection required to edit events' : 'Edit event'}
+                        >
+                          <Edit className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            ))
+              )
+            })
           )}
         </div>
       </div>

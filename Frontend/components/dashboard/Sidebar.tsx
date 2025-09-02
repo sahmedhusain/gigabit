@@ -1,5 +1,6 @@
 'use client'
 import { Home, Users, Calendar, Filter, X } from 'lucide-react'
+import { useNotifications, useRealTimeGroups, useRealTimeEvents, useConnectionStatus } from '@/hooks'
 
 interface SidebarProps {
   isMobileMenuOpen: boolean
@@ -20,6 +21,15 @@ export default function Sidebar({
   fetchEvents,
   fetchFollowers
 }: SidebarProps) {
+  const { items: notifications, unread } = useNotifications()
+  const { groups, getUnreadCount: getGroupsUnread } = useRealTimeGroups()
+  const { events, getUnreadCount: getEventsUnread } = useRealTimeEvents()
+  const { isConnected } = useConnectionStatus()
+
+  // Calculate unread counts
+  const groupsUnread = getGroupsUnread()
+  const eventsUnread = getEventsUnread()
+
   const handleTabClick = (itemId: string) => {
     setActiveTab(itemId)
     setIsMobileMenuOpen(false)
@@ -62,25 +72,42 @@ export default function Sidebar({
           
           <nav className="space-y-2">
             {[
-              { id: 'home', icon: Home, label: 'Home Feed' },
-              { id: 'categories', icon: Filter, label: 'Categories' },
-              { id: 'followers', icon: Users, label: 'Followers' },
-              { id: 'groups', icon: Users, label: 'Groups' },
-              { id: 'events', icon: Calendar, label: 'Events' }
+              { id: 'home', icon: Home, label: 'Home Feed', unread: 0 },
+              { id: 'categories', icon: Filter, label: 'Categories', unread: 0 },
+              { id: 'followers', icon: Users, label: 'Followers', unread: 0 },
+              { id: 'groups', icon: Users, label: 'Groups', unread: groupsUnread },
+              { id: 'events', icon: Calendar, label: 'Events', unread: eventsUnread }
             ].map((item) => (
               <button
                 key={item.id}
                 onClick={() => handleTabClick(item.id)}
-                className={`w-full flex items-center px-3 lg:px-4 py-2 lg:py-3 rounded-xl transition-all duration-200 text-sm lg:text-base ${
+                disabled={!isConnected && (item.id === 'groups' || item.id === 'events')}
+                className={`w-full flex items-center justify-between px-3 lg:px-4 py-2 lg:py-3 rounded-xl transition-all duration-200 text-sm lg:text-base ${
                   activeTab === item.id
                     ? 'bg-gradient-to-r from-emerald-500/20 to-teal-500/20 text-emerald-300 border border-emerald-400/30'
+                    : !isConnected && (item.id === 'groups' || item.id === 'events')
+                    ? 'text-white/40 cursor-not-allowed'
                     : 'text-white/70 hover:text-white hover:bg-white/10'
                 }`}
               >
-                <item.icon className="w-4 h-4 lg:w-5 lg:h-5 mr-2 lg:mr-3" />
-                {item.label}
+                <div className="flex items-center">
+                  <item.icon className="w-4 h-4 lg:w-5 lg:h-5 mr-2 lg:mr-3" />
+                  {item.label}
+                </div>
+                {item.unread > 0 && (
+                  <span className="bg-emerald-500 text-white text-xs rounded-full min-w-[20px] h-5 flex items-center justify-center px-2">
+                    {item.unread > 99 ? '99+' : item.unread}
+                  </span>
+                )}
               </button>
             ))}
+            
+            {/* Connection Status Indicator */}
+            {!isConnected && (
+              <div className="mt-4 p-3 bg-red-500/10 border border-red-400/20 rounded-xl">
+                <p className="text-red-400 text-xs text-center">Offline - Some features unavailable</p>
+              </div>
+            )}
           </nav>
         </div>
       </div>

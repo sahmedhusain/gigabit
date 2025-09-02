@@ -4,6 +4,7 @@ import { useParams, useRouter } from 'next/navigation'
 import ProtectedRoute from '@/components/ProtectedRoute'
 import { useAuth } from '@/context/AuthContext'
 import { useToast } from '@/context/ToastContext'
+import { useRealTimeGroups, useRealTimeEvents, useConnectionStatus, useOnlineStatus } from '@/hooks'
 import { api, Group, Event, User, API_BASE_URL, getToken, PostResponse } from '@/lib/api'
 import GroupChat from '@/components/GroupChat'
 import {
@@ -58,6 +59,10 @@ function GroupDetailsPage() {
   const router = useRouter()
   const { user } = useAuth()
   const { success, error } = useToast()
+  const { isConnected } = useConnectionStatus()
+  const { onlineUsers } = useOnlineStatus()
+  const { getGroup, loading: groupLoading } = useRealTimeGroups()
+  const { events: liveEvents } = useRealTimeEvents()
 
   const [group, setGroup] = useState<GroupDetails | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -68,6 +73,11 @@ function GroupDetailsPage() {
   const [isInviting, setIsInviting] = useState(false)
   const [posts, setPosts] = useState<PostResponse[]>([])
   const [showCreateEvent, setShowCreateEvent] = useState(false)
+
+  // Get online member count
+  const onlineMemberCount = group?.members.filter(member => 
+    onlineUsers.some(onlineUser => onlineUser.user_id === member.id && onlineUser.is_online)
+  ).length || 0
 
   useEffect(() => {
     if (id) {
@@ -222,8 +232,18 @@ function GroupDetailsPage() {
                 <ArrowLeft className="w-5 h-5" />
               </button>
               <div>
-                <h1 className="text-2xl lg:text-3xl font-bold text-white">{group.title}</h1>
+                <h1 className="text-2xl lg:text-3xl font-bold text-white flex items-center space-x-3">
+                  <span>{group.title}</span>
+                  <div className={`text-xs px-2 py-1 rounded ${isConnected ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
+                    {isConnected ? 'Live' : 'Offline'}
+                  </div>
+                </h1>
                 <p className="text-white/70 mt-1">{group.description}</p>
+                {!isConnected && (
+                  <p className="text-yellow-400 text-sm mt-1">
+                    Group data may be outdated while offline
+                  </p>
+                )}
               </div>
             </div>
 
@@ -238,19 +258,28 @@ function GroupDetailsPage() {
               {group.is_member ? (
                 <button
                   onClick={handleLeaveGroup}
-                  className="flex items-center px-4 py-2 bg-red-500/20 hover:bg-red-500/30 border border-red-400/30 rounded-xl text-red-300 hover:text-red-200 transition-all duration-200"
+                  disabled={!isConnected}
+                  className={`flex items-center px-4 py-2 rounded-xl transition-all duration-200 disabled:opacity-50 ${
+                    isConnected 
+                      ? 'bg-red-500/20 hover:bg-red-500/30 border border-red-400/30 text-red-300 hover:text-red-200' 
+                      : 'bg-gray-500 border border-gray-600 text-gray-400 cursor-not-allowed'
+                  }`}
                 >
                   <LogOut className="w-4 h-4 mr-2" />
-                  Leave Group
+                  {isConnected ? 'Leave Group' : 'Offline'}
                 </button>
               ) : (
                 <button
                   onClick={handleJoinGroup}
-                  disabled={isJoining}
-                  className="flex items-center px-4 py-2 bg-emerald-500 hover:bg-emerald-600 rounded-xl text-white transition-all duration-200 disabled:opacity-50"
+                  disabled={isJoining || !isConnected}
+                  className={`flex items-center px-4 py-2 rounded-xl text-white transition-all duration-200 disabled:opacity-50 ${
+                    isConnected 
+                      ? 'bg-emerald-500 hover:bg-emerald-600' 
+                      : 'bg-gray-500 cursor-not-allowed'
+                  }`}
                 >
                   <UserPlus className="w-4 h-4 mr-2" />
-                  {isJoining ? 'Joining...' : 'Join Group'}
+                  {isJoining ? 'Joining...' : isConnected ? 'Join Group' : 'Offline'}
                 </button>
               )}
             </div>
@@ -295,8 +324,16 @@ function GroupDetailsPage() {
                 <div className="flex items-center space-x-3">
                   <Users className="w-8 h-8 text-emerald-400" />
                   <div>
-                    <div className="text-2xl font-bold text-white">{group.member_count}</div>
+                    <div className="text-2xl font-bold text-white flex items-center space-x-2">
+                      <span>{group.member_count}</span>
+                      {isConnected && onlineMemberCount > 0 && (
+                        <span className="text-sm text-green-400">({onlineMemberCount} online)</span>
+                      )}
+                    </div>
                     <div className="text-white/70">Members</div>
+                    {!isConnected && (
+                      <div className="text-yellow-400 text-xs mt-1">Status offline</div>
+                    )}
                   </div>
                 </div>
               </div>

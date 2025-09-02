@@ -2,6 +2,8 @@
 import { X, Calendar, Clock } from 'lucide-react'
 import { api } from '@/lib/api'
 import { useState } from 'react'
+import { useOptimisticUpdate, useConnectionStatus } from '@/hooks'
+import { useToast } from '@/context/ToastContext'
 
 interface CreateEventProps {
   show: boolean
@@ -20,8 +22,26 @@ export default function CreateEvent({
   const [eventDescription, setEventDescription] = useState('')
   const [eventDate, setEventDate] = useState('')
   const [eventTime, setEventTime] = useState('')
-  const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string>('')
+  const { success, error: showError } = useToast()
+  const { isConnected } = useConnectionStatus()
+  
+  const { isLoading, performUpdate } = useOptimisticUpdate({
+    onSuccess: () => {
+      success('Event created successfully!')
+      // Reset form
+      setEventTitle('')
+      setEventDescription('')
+      setEventDate('')
+      setEventTime('')
+      setError('')
+      onEventCreated?.()
+      onClose()
+    },
+    onError: (error: any) => {
+      showError(`Failed to create event: ${error.message}`)
+    }
+  })
 
   const handleCreateEvent = async () => {
     // Validation
@@ -50,47 +70,34 @@ export default function CreateEvent({
       return
     }
 
-    try {
-      setIsLoading(true)
-      setError('')
-
-      // Combine date and time
-      const eventDateTime = new Date(`${eventDate}T${eventTime}`)
-      
-      if (eventDateTime <= new Date()) {
-        setError('Event must be scheduled for a future date and time')
-        return
-      }
-
-      const eventData = {
-        title: eventTitle.trim(),
-        description: eventDescription.trim(),
-        event_time: eventDateTime.toISOString()
-      }
-
-      await api.createGroupEvent(groupId, eventData)
-
-      // Reset form
-      setEventTitle('')
-      setEventDescription('')
-      setEventDate('')
-      setEventTime('')
-      setError('')
-
-      // Close modal and notify parent
-      onClose()
-      onEventCreated?.()
-
-    } catch (err) {
-      console.error('Error creating event:', err)
-      if (err instanceof Error) {
-        setError(err.message)
-      } else {
-        setError('Failed to create event. Please try again.')
-      }
-    } finally {
-      setIsLoading(false)
+    if (!isConnected) {
+      showError('Cannot create event while offline')
+      return
     }
+
+    // Combine date and time
+    const eventDateTime = new Date(`${eventDate}T${eventTime}`)
+    
+    if (eventDateTime <= new Date()) {
+      setError('Event must be scheduled for a future date and time')
+      return
+    }
+
+    const eventData = {
+      title: eventTitle.trim(),
+      description: eventDescription.trim(),
+      event_time: eventDateTime.toISOString()
+    }
+
+    setError('')
+    
+    performUpdate(
+      (current) => ({ ...current, isCreating: true }),
+      async () => {
+        await api.createEvent(groupId, eventData)
+        return {}
+      }
+    )
   }
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -221,10 +228,14 @@ export default function CreateEvent({
               </button>
               <button
                 onClick={handleCreateEvent}
-                disabled={isLoading || !eventTitle.trim() || !eventDate || !eventTime}
-                className="w-full sm:w-auto px-4 lg:px-6 py-2 bg-gradient-to-r from-blue-500 to-purple-600 rounded-xl text-white hover:from-blue-600 hover:to-purple-700 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed text-sm lg:text-base"
+                disabled={isLoading || !eventTitle.trim() || !eventDate || !eventTime || !isConnected}
+                className={`w-full sm:w-auto px-4 lg:px-6 py-2 rounded-xl text-white transition-all duration-200 text-sm lg:text-base ${
+                  isLoading || !eventTitle.trim() || !eventDate || !eventTime || !isConnected
+                    ? 'bg-white/20 cursor-not-allowed'
+                    : 'bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700'
+                }`}
               >
-                {isLoading ? 'Creating...' : 'Create Event'}
+                {isLoading ? 'Creating...' : !isConnected ? 'Offline' : 'Create Event'}
               </button>
             </div>
           </div>

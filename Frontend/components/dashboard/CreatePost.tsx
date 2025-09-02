@@ -2,6 +2,8 @@
 import { X, Camera, Image as ImageIcon, Globe, Users, Lock, User } from 'lucide-react'
 import { CategoryResponse, CreatePostRequest, api } from '@/lib/api'
 import { ChangeEvent, useRef, useState } from 'react'
+import { useOptimisticUpdate, useConnectionStatus, useUpload } from '@/hooks'
+import { useToast } from '@/context/ToastContext'
 
 interface CreatePostProps {
   show: boolean
@@ -44,6 +46,43 @@ export default function CreatePost({
 }: CreatePostProps) {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [uploadError, setUploadError] = useState<string>('')
+  const { success, error } = useToast()
+  const { isConnected } = useConnectionStatus()
+  const { progress, isUploading, uploadImage: uploadFile } = useUpload()
+  
+  const { isLoading, performUpdate } = useOptimisticUpdate({
+    onSuccess: () => {
+      success('Post created successfully!')
+      // Reset form
+      setNewPostContent('')
+      setNewPostImage(null)
+      setPostPrivacy('public')
+      setSelectedUsers([])
+      setSelectedPostCategory(categories[0]?.id || 1)
+      if (fileInputRef.current) {
+        fileInputRef.current.value = ''
+      }
+      onClose()
+    },
+    onError: (error: any) => {
+      error(`Failed to create post: ${error.message}`)
+    }
+  })
+
+  const handleCreatePost = async () => {
+    if (!isConnected) {
+      error('Cannot create post while offline')
+      return
+    }
+    
+    performUpdate(
+      (current) => ({ ...current, isCreating: true }),
+      async () => {
+        await onCreatePost()
+        return {}
+      }
+    )
+  }
 
   const handleImageClick = () => {
     fileInputRef.current?.click()
@@ -104,6 +143,7 @@ export default function CreatePost({
             <h3 className="text-lg lg:text-xl font-semibold text-white">Create New Post</h3>
             <button
               onClick={onClose}
+              title="Close"
               className="p-2 text-white/70 hover:text-white hover:bg-white/10 rounded-xl transition-all duration-200"
             >
               <X className="w-5 h-5" />
@@ -125,7 +165,9 @@ export default function CreatePost({
             </div>
             
             <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-2 sm:space-y-0 sm:space-x-4">
+              <label htmlFor="image-upload" className="sr-only">Upload image</label>
               <input
+              id="image-upload"
               ref={fileInputRef}
               type="file"
               accept="image/*"
@@ -134,6 +176,7 @@ export default function CreatePost({
             />
             <button
               onClick={handleImageClick}
+              title="Add Image or GIF"
               className="flex items-center px-3 lg:px-4 py-2 bg-white/10 hover:bg-white/20 border border-white/20 rounded-xl text-white transition-all duration-200 text-sm lg:text-base"
             >
               <ImageIcon className="w-4 h-4 mr-2" />
@@ -149,6 +192,7 @@ export default function CreatePost({
                     <span className="text-white text-sm font-medium">Selected Image:</span>
                     <button 
                       onClick={removeImage}
+                      title="Remove image"
                       className="p-1 text-white/70 hover:text-white hover:bg-white/10 rounded-lg transition-all duration-200"
                     >
                       <X className="w-4 h-4" />
@@ -169,10 +213,26 @@ export default function CreatePost({
               </div>
             )}
 
-            {/* Upload Error Display */}
-            {uploadError && (
+            {/* Upload Progress */}
+            {isUploading && (
+              <div className="bg-white/10 border border-white/20 rounded-xl p-3">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-white text-sm">Uploading image...</span>
+                  <span className="text-white/70 text-sm">{progress}%</span>
+                </div>
+                <div className="w-full bg-white/20 rounded-full h-2">
+                  <div 
+                  className={`bg-gradient-to-r from-emerald-500 to-teal-600 h-2 rounded-full transition-all duration-300`}
+                    style={{ width: `${Math.min(100, Math.max(0, progress))}%` }}
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Connection Status */}
+            {!isConnected && (
               <div className="bg-red-500/10 border border-red-400/20 rounded-xl p-3">
-                <p className="text-red-400 text-sm">{uploadError}</p>
+                <p className="text-red-400 text-sm">You're currently offline. Post will be created when connection is restored.</p>
               </div>
             )}
 
@@ -181,6 +241,7 @@ export default function CreatePost({
               <select
                 value={selectedPostCategory}
                 onChange={(e) => setSelectedPostCategory(parseInt(e.target.value))}
+                aria-label="Select post category"
                 className="w-full bg-white/10 border border-white/20 rounded-xl p-3 text-white focus:outline-none focus:ring-2 focus:ring-emerald-400/50"
               >
                 {categories.map((category) => (
@@ -281,10 +342,15 @@ export default function CreatePost({
                 Cancel
               </button>
               <button 
-                onClick={onCreatePost}
-                className="w-full sm:w-auto px-4 lg:px-6 py-2 bg-gradient-to-r from-emerald-500 to-teal-600 rounded-xl text-white hover:from-emerald-600 hover:to-teal-700 transition-all duration-200 text-sm lg:text-base"
+                onClick={handleCreatePost}
+                disabled={isLoading || isUploading || !isConnected}
+                className={`w-full sm:w-auto px-4 lg:px-6 py-2 rounded-xl text-white transition-all duration-200 text-sm lg:text-base ${
+                  isLoading || isUploading || !isConnected
+                    ? 'bg-white/20 cursor-not-allowed'
+                    : 'bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700'
+                }`}
               >
-                Post
+                {isLoading ? 'Creating...' : isUploading ? 'Uploading...' : 'Post'}
               </button>
             </div>
           </div>

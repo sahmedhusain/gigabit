@@ -228,6 +228,26 @@ export interface EventResponse {
   }>
 }
 
+export interface CreateEventRequest {
+  title: string;
+  description: string;
+  event_time: string; // ISO string format
+}
+
+export interface UpdateEventRequest {
+  title?: string;
+  description?: string;
+  event_time?: string; // ISO string format
+}
+
+export interface EventResponseDetail {
+  id: number;
+  event_id: number;
+  user: User;
+  option: 'going' | 'not_going';
+  created_at: string;
+}
+
 export interface ConversationResponse {
   id: number;
   type: 'private' | 'group';
@@ -568,11 +588,11 @@ export class ApiClient {
 
   // Groups endpoints
   async getUserGroups(userId: number): Promise<{ data: GroupResponse[] }> {
-    const response = await this.request<{ groups: GroupResponse[], count: number, limit: number, offset: number }>('/api/groups', {
+  const response = await this.request<{ groups: GroupResponse[], count: number, limit: number, offset: number }>(`/api/groups`, {
       method: 'GET',
     });
-    // Transform the response to match the expected format
-    return { data: response.groups };
+    // Return only the groups the user is a member of (defensive filter)
+    return { data: (response.groups || []).filter(g => g.is_member) };
   }
 
   async getGroup(groupId: number): Promise<GroupResponse> {
@@ -647,20 +667,56 @@ export class ApiClient {
     });
   }
 
-  async respondToEvent(eventId: number, response: 'going' | 'not_going'): Promise<{ message: string }> {
-    return this.request<{ message: string }>(`/api/events/${eventId}/respond`, {
-      method: 'POST',
-      body: JSON.stringify({ response }),
+  // Events endpoints
+  async getUserEvents(): Promise<{ events: EventResponse[], count: number, limit: number, offset: number }> {
+    return this.request<{ events: EventResponse[], count: number, limit: number, offset: number }>('/api/events?limit=20&offset=0', {
+      method: 'GET',
     });
   }
 
-  // Events endpoints
-  async getUserEvents(): Promise<{ data: EventResponse[] }> {
-    const response = await this.request<{ events: EventResponse[], count: number, limit: number, offset: number }>('/api/events', {
+  async getGroupEvents(groupId: number, limit: number = 20, offset: number = 0): Promise<{ events: EventResponse[], count: number, limit: number, offset: number }> {
+    return this.request<{ events: EventResponse[], count: number, limit: number, offset: number }>(`/api/groups/${groupId}/events?limit=${limit}&offset=${offset}`, {
       method: 'GET',
     });
-    // Transform the response to match the expected format
-    return { data: response.events };
+  }
+
+  async getEvent(eventId: number): Promise<EventResponse> {
+    return this.request<EventResponse>(`/api/events/${eventId}`, {
+      method: 'GET',
+    });
+  }
+
+  async createEvent(groupId: number, data: CreateEventRequest): Promise<{ message: string; event: EventResponse }> {
+    return this.request<{ message: string; event: EventResponse }>(`/api/groups/${groupId}/events`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateEvent(eventId: number, data: UpdateEventRequest): Promise<{ message: string }> {
+    return this.request<{ message: string }>(`/api/events/${eventId}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteEvent(eventId: number): Promise<{ message: string }> {
+    return this.request<{ message: string }>(`/api/events/${eventId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async respondToEvent(eventId: number, option: 'going' | 'not_going'): Promise<{ message: string; response: string }> {
+    return this.request<{ message: string; response: string }>(`/api/events/${eventId}/respond`, {
+      method: 'POST',
+      body: JSON.stringify({ option }),
+    });
+  }
+
+  async getEventResponses(eventId: number): Promise<{ responses: { going: EventResponseDetail[], not_going: EventResponseDetail[] }, counts: { going: number, not_going: number, total: number } }> {
+    return this.request<{ responses: { going: EventResponseDetail[], not_going: EventResponseDetail[] }, counts: { going: number, not_going: number, total: number } }>(`/api/events/${eventId}/responses`, {
+      method: 'GET',
+    });
   }
 
   // Messages endpoints

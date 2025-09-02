@@ -1,21 +1,10 @@
 'use client'
-import { useState, useEffect } from 'react'
-import { Check, X, Bell, Users, Calendar, MessageCircle, Heart, UserPlus, Trash2, Settings } from 'lucide-react'
+import { useState } from 'react'
+import { Check, X, Bell, Users, Calendar, MessageCircle, Heart, UserPlus, Trash2, Settings, Wifi, WifiOff } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
-import { useWebSocket } from '../../context/WebSocketContext'
-import { api, API_BASE_URL, User } from '../../lib/api'
+import { User } from '../../lib/api'
 import NotificationSettingsModal from './NotificationSettingsModal'
-
-import { User } from '../../lib/api';
-
-interface Notification {
-  id: number;
-  type: string;
-  message: string;
-  actor: User;
-  is_read: boolean;
-  created_at: string;
-}
+import { useNotifications, useConnectionStatus } from '@/hooks'
 
 interface NotificationsDropdownProps {
   show: boolean
@@ -23,120 +12,28 @@ interface NotificationsDropdownProps {
 }
 
 export default function NotificationsDropdown({ show, onClose }: NotificationsDropdownProps) {
-  const [notifications, setNotifications] = useState<Notification[]>([])
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
-  const [unreadCount, setUnreadCount] = useState(0)
   const [showSettings, setShowSettings] = useState(false)
   const { user } = useAuth()
-  const { socket, isConnected } = useWebSocket()
-
-  useEffect(() => {
-    if (show && user) {
-      fetchNotifications()
-    }
-  }, [show, user])
-
-  useEffect(() => {
-    if (socket && isConnected) {
-      socket.onmessage = (event) => {
-        const data = JSON.parse(event.data)
-        if (data.type === 'notification') {
-          // Add new notification to the list
-          const newNotification: Notification = data.Data;
-          setNotifications(prev => [newNotification, ...prev])
-          setUnreadCount(prev => prev + 1)
-        }
-      }
-    }
-  }, [socket, isConnected, user])
-
-  const fetchNotifications = async () => {
-    if (!user) return
-
-    setLoading(true)
-    setError('')
-
-    try {
-      const response = await api.getNotifications(20, 0)
-      setNotifications(response.data || [])
-      setUnreadCount(response.data.filter(n => !n.is_read).length || 0)
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred';
-      setError('Failed to load notifications')
-      console.error('Error fetching notifications:', err)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const markAsRead = async (notificationId: number) => {
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/notifications/mark-read`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
-        body: JSON.stringify({ notification_ids: [notificationId] })
-      })
-
-      if (response.ok) {
-        setNotifications(prev =>
-          prev.map(notif =>
-            notif.id === notificationId ? { ...notif, is_read: true } : notif
-          )
-        )
-        setUnreadCount(prev => Math.max(0, prev - 1))
-      }
-    } catch (err) {
-      console.error('Error marking notification as read:', err)
-    }
-  }
-
-  const markAllAsRead = async () => {
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/notifications/mark-read`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
-        body: JSON.stringify({ mark_all: true })
-      })
-
-      if (response.ok) {
-        setNotifications(prev =>
-          prev.map(notif => ({ ...notif, is_read: true }))
-        )
-        setUnreadCount(0)
-      }
-    } catch (err) {
-      console.error('Error marking all notifications as read:', err)
-    }
-  }
-
-  const deleteNotification = async (notificationId: number) => {
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/notifications/${notificationId}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      })
-
-      if (response.ok) {
-        setNotifications(prev => prev.filter(notif => notif.id !== notificationId))
-        // Update unread count if deleted notification was unread
-        const deletedNotif = notifications.find(n => n.id === notificationId)
-        if (deletedNotif && !deletedNotif.is_read) {
-          setUnreadCount(prev => Math.max(0, prev - 1))
-        }
-      }
-    } catch (err) {
-      console.error('Error deleting notification:', err)
-    }
-  }
+  
+  // Enhanced notifications hook with real-time capabilities
+  const { 
+    items: notifications, 
+    unread: unreadCount,
+    loading: isLoading,
+    error,
+    markAsRead, 
+    markAllAsReadLocal: markAllAsRead,
+    deleteNotification,
+    isConnected: notificationsConnected,
+    refetch: refreshNotifications 
+  } = useNotifications()
+  
+  // Connection status monitoring
+  const { 
+    isConnected, 
+    connectionQuality, 
+    statusMessage 
+  } = useConnectionStatus()
 
   const getNotificationIcon = (type: string) => {
     switch (type) {
@@ -194,6 +91,10 @@ export default function NotificationsDropdown({ show, onClose }: NotificationsDr
                 {unreadCount}
               </span>
             )}
+            {/* Connection status indicator */}
+            <div className={`w-2 h-2 rounded-full ml-2 ${
+              isConnected ? 'bg-green-400' : 'bg-red-400'
+            }`} title={`WebSocket ${isConnected ? 'Connected' : 'Disconnected'}`} />
           </h3>
           <div className="flex items-center gap-2">
             <button
@@ -207,6 +108,7 @@ export default function NotificationsDropdown({ show, onClose }: NotificationsDr
               <button
                 onClick={markAllAsRead}
                 className="text-xs text-emerald-400 hover:text-emerald-300 transition-colors"
+                disabled={!isConnected}
               >
                 Mark all read
               </button>
@@ -219,10 +121,25 @@ export default function NotificationsDropdown({ show, onClose }: NotificationsDr
             </button>
           </div>
         </div>
+        
+        {/* Connection warning */}
+        {!isConnected && (
+          <div className="mt-2 flex items-center gap-2 text-orange-400 text-xs">
+            <WifiOff className="w-3 h-3" />
+            <span>Notifications may be delayed - connection issues</span>
+          </div>
+        )}
+        
+        {connectionQuality === 'poor' && isConnected && (
+          <div className="mt-2 flex items-center gap-2 text-yellow-400 text-xs">
+            <Wifi className="w-3 h-3" />
+            <span>Poor connection - real-time updates may be slow</span>
+          </div>
+        )}
       </div>
 
       <div className="max-h-80 lg:max-h-96 overflow-y-auto">
-        {loading ? (
+        {isLoading ? (
           <div className="flex items-center justify-center py-8">
             <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-emerald-400"></div>
           </div>
@@ -230,7 +147,7 @@ export default function NotificationsDropdown({ show, onClose }: NotificationsDr
           <div className="text-center text-red-400 py-8 px-4">
             <p className="text-sm">{error}</p>
             <button
-              onClick={fetchNotifications}
+              onClick={refreshNotifications}
               className="mt-2 text-xs text-emerald-400 hover:text-emerald-300"
             >
               Try again
@@ -259,7 +176,7 @@ export default function NotificationsDropdown({ show, onClose }: NotificationsDr
                     <div className="flex items-start justify-between">
                       <div className="flex-1 min-w-0">
                         <p className="text-white text-sm font-medium truncate">
-                          {notification.title}
+                          {notification.type}
                         </p>
                         <p className="text-slate-300 text-sm mt-1 leading-relaxed">
                           {notification.message}
@@ -322,7 +239,7 @@ export default function NotificationsDropdown({ show, onClose }: NotificationsDr
       {notifications.length > 0 && (
         <div className="p-3 border-t border-slate-700/50 bg-slate-800/50">
           <button
-            onClick={fetchNotifications}
+            onClick={refreshNotifications}
             className="w-full text-center text-slate-400 hover:text-white text-sm transition-colors"
           >
             Refresh notifications

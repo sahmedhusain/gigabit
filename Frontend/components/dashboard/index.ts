@@ -7,6 +7,7 @@ export { default as NotificationsDropdown } from './NotificationsDropdown'
 export { default as ChatDropdown } from './ChatDropdown'
 export { default as HomeFeed } from './HomeFeed'
 export { default as ProfileSection } from './ProfileSection'
+export { default as EventsSection } from './EventsSection'
 export {
   CategoriesSection,
   FollowersSection,

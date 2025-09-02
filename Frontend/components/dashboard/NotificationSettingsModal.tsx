@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react'
 import { X, Bell, BellOff, Volume2, VolumeX, Mail, Smartphone } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
+import { useConnectionStatus } from '@/hooks'
 
 interface NotificationSettingsModalProps {
   show: boolean
@@ -23,6 +24,7 @@ interface NotificationPreferences {
 
 export default function NotificationSettingsModal({ show, onClose }: NotificationSettingsModalProps) {
   const { user } = useAuth()
+  const { isConnected } = useConnectionStatus()
   const [preferences, setPreferences] = useState<NotificationPreferences>({
     email_notifications: true,
     push_notifications: true,
@@ -107,16 +109,30 @@ export default function NotificationSettingsModal({ show, onClose }: Notificatio
               <Bell className="w-5 h-5" />
               Notification Settings
             </h2>
-            <button
-              onClick={onClose}
-              className="text-slate-400 hover:text-white transition-colors"
-            >
-              <X className="w-5 h-5" />
-            </button>
+            <div className="flex items-center space-x-3">
+              <div className={`text-xs px-2 py-1 rounded ${isConnected ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
+                {isConnected ? 'Online' : 'Offline'}
+              </div>
+              <button
+                type="button"
+                title="Close notification settings"
+                onClick={onClose}
+                className="text-slate-400 hover:text-white transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
           </div>
         </div>
 
         <div className="p-6 max-h-96 overflow-y-auto">
+          {!isConnected && (
+            <div className="mb-4 p-3 bg-yellow-500/20 border border-yellow-500/30 rounded-lg">
+              <p className="text-yellow-400 text-sm">
+                You're currently offline. Changes will be saved when connection is restored.
+              </p>
+            </div>
+          )}
           {loading ? (
             <div className="flex items-center justify-center py-8">
               <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-emerald-400"></div>
@@ -323,12 +339,21 @@ export default function NotificationSettingsModal({ show, onClose }: Notificatio
             </button>
             <button
               onClick={savePreferences}
-              disabled={saving}
-              className="flex-1 px-4 py-2 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={saving || !isConnected}
+              className={`flex-1 px-4 py-2 rounded-lg text-white transition-colors ${
+                isConnected 
+                  ? 'bg-emerald-500 hover:bg-emerald-600' 
+                  : 'bg-gray-500 cursor-not-allowed'
+              } disabled:opacity-50 disabled:cursor-not-allowed`}
             >
-              {saving ? 'Saving...' : 'Save Settings'}
+              {saving ? 'Saving...' : isConnected ? 'Save Settings' : 'Offline'}
             </button>
           </div>
+          {!isConnected && (
+            <p className="text-center text-slate-400 text-xs mt-2">
+              Settings will be saved when connection is restored
+            </p>
+          )}
         </div>
       </div>
     </div>

@@ -3,6 +3,7 @@ import { User, Heart, MessageSquare, Share, MoreHorizontal, Bookmark, Image as I
 import { useRouter } from 'next/navigation'
 import CategoryBadge from '@/components/ui/CategoryBadge'
 import { Post } from '@/lib/api'
+import { useRealTimeComments, useConnectionStatus } from '@/hooks'
 
 interface PostCardProps {
   post: Post
@@ -11,6 +12,17 @@ interface PostCardProps {
 
 export default function PostCard({ post, onLike }: PostCardProps) {
   const router = useRouter()
+  
+  // Real-time comment integration
+  const { 
+    comments, 
+    newCommentsCount, 
+    isConnected: commentsConnected,
+    markNewCommentsAsRead 
+  } = useRealTimeComments(post.id)
+  
+  // Connection status monitoring
+  const { isConnected } = useConnectionStatus()
 
   const handlePostClick = (e: React.MouseEvent) => {
     // Don't navigate if clicking on interactive elements
@@ -44,7 +56,10 @@ export default function PostCard({ post, onLike }: PostCardProps) {
             <p className="text-white/60 text-xs lg:text-sm">@{post.user.username} • {post.timeAgo}</p>
           </div>
         </div>
-        <button className="p-2 text-white/70 hover:text-white hover:bg-white/10 rounded-lg lg:rounded-xl transition-all duration-200 flex-shrink-0">
+        <button 
+          className="p-2 text-white/70 hover:text-white hover:bg-white/10 rounded-lg lg:rounded-xl transition-all duration-200 flex-shrink-0"
+          title="More options"
+          aria-label="More options">
           <MoreHorizontal className="w-4 h-4 lg:w-5 lg:h-5" />
         </button>
       </div>
@@ -76,11 +91,17 @@ export default function PostCard({ post, onLike }: PostCardProps) {
         <button
           onClick={(e) => {
             e.stopPropagation()
+            markNewCommentsAsRead()
             router.push(`/post/${post.id}`)
           }}
-          className="flex items-center space-x-1 lg:space-x-2 px-2 lg:px-4 py-1.5 lg:py-2 text-white/70 hover:text-white hover:bg-white/10 rounded-lg lg:rounded-xl transition-all duration-200 text-xs lg:text-sm">
+          className="flex items-center space-x-1 lg:space-x-2 px-2 lg:px-4 py-1.5 lg:py-2 text-white/70 hover:text-white hover:bg-white/10 rounded-lg lg:rounded-xl transition-all duration-200 text-xs lg:text-sm relative">
           <MessageSquare className="w-3 h-3 lg:w-4 lg:h-4" />
-          <span>{post.comments}</span>
+          <span>{comments.length || post.comments}</span>
+          {newCommentsCount > 0 && (
+            <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full min-w-[16px] h-4 flex items-center justify-center px-1">
+              {newCommentsCount > 99 ? '99+' : newCommentsCount}
+            </span>
+          )}
         </button>
 
         <button
@@ -92,7 +113,9 @@ export default function PostCard({ post, onLike }: PostCardProps) {
 
         <button
           onClick={(e) => e.stopPropagation()}
-          className="p-1.5 lg:p-2 text-white/70 hover:text-white hover:bg-white/10 rounded-lg lg:rounded-xl transition-all duration-200">
+          className="p-1.5 lg:p-2 text-white/70 hover:text-white hover:bg-white/10 rounded-lg lg:rounded-xl transition-all duration-200"
+          title="Bookmark post"
+          aria-label="Bookmark post">
           <Bookmark className="w-3 h-3 lg:w-4 lg:h-4" />
         </button>
       </div>

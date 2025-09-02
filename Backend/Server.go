@@ -156,8 +156,8 @@ func (s *Server) setupRoutes() {
 	s.router.HandleFunc("/api/groups/", s.handleGroupRoute(groupHandler, eventHandler))
 
 	// Event routes
-	s.router.HandleFunc("/api/events/", s.handleEventRoute(eventHandler))
 	s.router.HandleFunc("/api/events", s.handleUserEventsRoute(eventHandler))
+	s.router.HandleFunc("/api/events/", s.handleEventRoute(eventHandler))
 
 	// Message routes
 	s.router.HandleFunc("/api/messages", s.handleMessagesRoute(messageHandler))

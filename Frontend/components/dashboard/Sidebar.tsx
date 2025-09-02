@@ -63,7 +63,6 @@ export default function Sidebar({
           <nav className="space-y-2">
             {[
               { id: 'home', icon: Home, label: 'Home Feed' },
-              { id: 'categories', icon: Filter, label: 'Categories' },
               { id: 'followers', icon: Users, label: 'Followers' },
               { id: 'groups', icon: Users, label: 'Groups' },
               { id: 'events', icon: Calendar, label: 'Events' }

@@ -10,7 +10,6 @@ type Post struct {
 	Content    string    `json:"content"`
 	ImageURL   *string   `json:"image_url"`
 	Privacy    string    `json:"privacy"` // "public", "almost_private", "private"
-	CategoryID uint      `json:"category_id"`
 	CreatedAt  time.Time `json:"created_at"`
 	UpdatedAt  time.Time `json:"updated_at"`
 }
@@ -21,11 +20,9 @@ type PostResponse struct {
 	Content      string            `json:"content"`
 	ImageURL     *string           `json:"image_url"`
 	Privacy      string            `json:"privacy"`
-	CategoryID   uint              `json:"category_id"`
 	CreatedAt    time.Time         `json:"created_at"`
 	UpdatedAt    time.Time         `json:"updated_at"`
 	User         UserResponse      `json:"user"`
-	Category     CategoryResponse  `json:"category"`
 	LikeCount    int64             `json:"like_count"`
 	CommentCount int64             `json:"comment_count"`
 	IsLiked      bool              `json:"is_liked"`
@@ -36,7 +33,6 @@ type CreatePostRequest struct {
 	Content         string   `json:"content" binding:"required,min=1,max=1000"`
 	ImageURL        string   `json:"image_url"`
 	Privacy         string   `json:"privacy" binding:"required,oneof=public almost_private private"`
-	CategoryID      uint     `json:"category_id" binding:"required,min=1"`
 	SpecificUserIDs []uint   `json:"specific_user_ids"`
 }
 
@@ -44,7 +40,6 @@ type UpdatePostRequest struct {
 	Content         string   `json:"content" binding:"min=1,max=1000"`
 	ImageURL        string   `json:"image_url"`
 	Privacy         string   `json:"privacy" binding:"oneof=public almost_private private"`
-	CategoryID      *uint    `json:"category_id,omitempty" binding:"omitempty,min=1"`
 	SpecificUserIDs []uint   `json:"specific_user_ids"`
 }
 

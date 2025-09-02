@@ -1,6 +1,6 @@
 'use client'
 import { X, Camera, Image as ImageIcon, Globe, Users, Lock, User } from 'lucide-react'
-import { CategoryResponse, CreatePostRequest, api } from '@/lib/api'
+import { CreatePostRequest, api } from '@/lib/api'
 import { ChangeEvent, useRef, useState } from 'react'
 
 interface CreatePostProps {
@@ -14,9 +14,6 @@ interface CreatePostProps {
   setPostPrivacy: (privacy: string) => void
   selectedUsers: number[]
   setSelectedUsers: (users: number[]) => void
-  selectedPostCategory: number
-  setSelectedPostCategory: (categoryId: number) => void
-  categories: CategoryResponse[]
   availableUsers: any[]
   loadingUsers: boolean
   onCreatePost: () => void
@@ -35,9 +32,6 @@ export default function CreatePost({
   setPostPrivacy,
   selectedUsers,
   setSelectedUsers,
-  selectedPostCategory,
-  setSelectedPostCategory,
-  categories,
   availableUsers,
   loadingUsers,
   onCreatePost
@@ -175,21 +169,6 @@ export default function CreatePost({
                 <p className="text-red-400 text-sm">{uploadError}</p>
               </div>
             )}
-
-            <div className="space-y-3">
-              <label className="text-white font-medium text-sm lg:text-base">Category:</label>
-              <select
-                value={selectedPostCategory}
-                onChange={(e) => setSelectedPostCategory(parseInt(e.target.value))}
-                className="w-full bg-white/10 border border-white/20 rounded-xl p-3 text-white focus:outline-none focus:ring-2 focus:ring-emerald-400/50"
-              >
-                {categories.map((category) => (
-                  <option key={category.id} value={category.id} className="text-black">
-                    {category.name}
-                  </option>
-                ))}
-              </select>
-            </div>
 
             <div className="space-y-3">
               <label className="text-white font-medium text-sm lg:text-base">Privacy Settings:</label>

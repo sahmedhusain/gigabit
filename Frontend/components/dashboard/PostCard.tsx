@@ -1,7 +1,6 @@
 'use client'
 import { User, Heart, MessageSquare, Share, MoreHorizontal, Bookmark, Image as ImageIcon } from 'lucide-react'
 import { useRouter } from 'next/navigation'
-import CategoryBadge from '@/components/ui/CategoryBadge'
 import { Post } from '@/lib/api'
 
 interface PostCardProps {
@@ -39,7 +38,6 @@ export default function PostCard({ post, onLike }: PostCardProps) {
           <div className="flex-1 min-w-0">
             <div className="flex items-center space-x-2 mb-1">
               <h4 className="text-white font-medium text-sm lg:text-base truncate">{post.user.name}</h4>
-              {post.category && <CategoryBadge category={post.category} size="sm" />}
             </div>
             <p className="text-white/60 text-xs lg:text-sm">@{post.user.username} • {post.timeAgo}</p>
           </div>

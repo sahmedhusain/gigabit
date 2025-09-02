@@ -34,7 +34,6 @@ const (
 	MessageTypeFollowUpdate   = "follow_update"
 	MessageTypeGroupUpdate    = "group_update"
 	MessageTypeEventUpdate    = "event_update"
-	MessageTypeCategoryUpdate = "category_update"
 	MessageTypeError          = "error"
 	MessageTypePing           = "ping"
 	MessageTypePong           = "pong"

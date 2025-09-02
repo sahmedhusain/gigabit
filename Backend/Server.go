@@ -102,7 +102,6 @@ func (s *Server) setupRoutes() {
 	userHandler := handlers.NewUserHandler(s.DB.GetDB())
 	followHandler := handlers.NewFollowHandler(s.DB.GetDB())
 	postHandler := handlers.NewPostHandler(s.DB.GetDB(), s.Hub)
-	categoryHandler := handlers.NewCategoryHandler(s.DB.GetDB(), s.Hub)
 	groupHandler := handlers.NewGroupHandler(s.DB.GetDB())
 	eventHandler := handlers.NewEventHandler(s.DB.GetDB())
 	messageHandler := handlers.NewMessageHandler(s.DB.GetDB(), s.Hub)
@@ -145,11 +144,6 @@ func (s *Server) setupRoutes() {
 	s.router.HandleFunc("/api/posts", s.handlePostsRoute(postHandler))
 	s.router.HandleFunc("/api/posts/", s.handlePostRoute(postHandler))
 	s.router.HandleFunc("/api/feed", s.handleRoute(postHandler.GetFeedPosts, true))
-
-	// Category routes
-	s.router.HandleFunc("/api/categories", s.handleCategoriesRoute(categoryHandler))
-	s.router.HandleFunc("/api/categories/", s.handleCategoryRoute(categoryHandler))
-	s.router.HandleFunc("/api/categories/stats", s.handleRoute(categoryHandler.GetCategoryStats, true))
 
 	// Group routes
 	s.router.HandleFunc("/api/groups", s.handleGroupsRoute(groupHandler))
@@ -398,94 +392,14 @@ func (s *Server) handlePostRoute(handler *handlers.PostHandler) http.HandlerFunc
 			authMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				handler.GetUserPosts(w, r, userID)
 			})).ServeHTTP(w, r)
-		} else if len(parts) >= 3 && parts[1] == "category" {
-			categoryID := parts[2]
-			if r.Method != http.MethodGet {
-				writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
-				return
-			}
-			authMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				handler.GetPostsByCategory(w, r, categoryID)
-			})).ServeHTTP(w, r)
 		} else {
 			writeError(w, http.StatusNotFound, "Route not found")
 		}
 	}
 }
 
-func (s *Server) handleCategoriesRoute(handler *handlers.CategoryHandler) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		authMiddleware := middleware.AuthMiddleware(s.DB.GetDB())
 
-		switch r.Method {
-		case http.MethodGet:
-			authMiddleware(http.HandlerFunc(handler.GetAllCategories)).ServeHTTP(w, r)
-		case http.MethodPost:
-			authMiddleware(http.HandlerFunc(handler.CreateCategory)).ServeHTTP(w, r)
-		default:
-			writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
-		}
-	}
-}
 
-func (s *Server) handleCategoryRoute(handler *handlers.CategoryHandler) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		path := strings.TrimPrefix(r.URL.Path, "/api/categories/")
-		parts := strings.Split(path, "/")
-
-		if len(parts) == 0 || parts[0] == "" {
-			writeError(w, http.StatusNotFound, "Category ID required")
-			return
-		}
-
-		// Handle special endpoints first
-		if parts[0] == "stats" {
-			if r.Method != http.MethodGet {
-				writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
-				return
-			}
-			authMiddleware := middleware.AuthMiddleware(s.DB.GetDB())
-			authMiddleware(http.HandlerFunc(handler.GetCategoryStats)).ServeHTTP(w, r)
-			return
-		}
-
-		if parts[0] == "search" {
-			if r.Method != http.MethodGet {
-				writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
-				return
-			}
-			authMiddleware := middleware.AuthMiddleware(s.DB.GetDB())
-			authMiddleware(http.HandlerFunc(handler.SearchCategories)).ServeHTTP(w, r)
-			return
-		}
-
-		// Handle category ID routes
-		categoryID := parts[0]
-		authMiddleware := middleware.AuthMiddleware(s.DB.GetDB())
-
-		if len(parts) == 1 {
-			switch r.Method {
-			case http.MethodGet:
-				authMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-					handler.GetCategory(w, r, categoryID)
-				})).ServeHTTP(w, r)
-			case http.MethodPut:
-				authMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-					handler.UpdateCategory(w, r, categoryID)
-				})).ServeHTTP(w, r)
-			case http.MethodDelete:
-				authMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-					handler.DeleteCategory(w, r, categoryID)
-				})).ServeHTTP(w, r)
-			default:
-				writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
-			}
-		} else if len(parts) == 2 {
-			// No additional actions needed for individual categories currently
-			writeError(w, http.StatusNotFound, "Route not found")
-		}
-	}
-}
 
 func (s *Server) handleGroupsRoute(handler *handlers.GroupHandler) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {

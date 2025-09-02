@@ -32,7 +32,6 @@ import ChatDropdown from '@/components/dashboard/ChatDropdown'
 import HomeFeed from '@/components/dashboard/HomeFeed'
 import ProfileSection from '@/components/dashboard/ProfileSection'
 import {
-  FollowersSection,
   GroupsSection,
   SettingsSection
 } from '@/components/dashboard/DashboardSections'
@@ -572,14 +571,6 @@ function DashboardPage() {
             isLoadingFollowers={isLoadingFollowers}
           />
         )
-      case 'followers':
-        return (
-          <FollowersSection
-            followers={followers}
-            following={following}
-            isLoadingFollowers={isLoadingFollowers}
-          />
-        )
       case 'groups': 
         return <GroupsSection groups={groups} />
       case 'events': 
@@ -634,7 +625,6 @@ function DashboardPage() {
         setActiveTab={setActiveTab}
         fetchGroups={fetchGroups}
         fetchEvents={fetchEvents}
-        fetchFollowers={fetchFollowers}
       />
 
       <TopBar

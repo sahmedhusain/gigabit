@@ -1,5 +1,6 @@
 'use client'
-import { Home, Users, Calendar, X } from 'lucide-react'
+import { Home, Users, Calendar, X, Search } from 'lucide-react'
+import { useState } from 'react'
 import { useNotifications, useRealTimeGroups, useRealTimeEvents, useConnectionStatus } from '@/hooks'
 
 interface SidebarProps {
@@ -9,7 +10,6 @@ interface SidebarProps {
   setActiveTab: (tab: string) => void
   fetchGroups: () => void
   fetchEvents: () => void
-  fetchFollowers: () => void
 }
 
 export default function Sidebar({
@@ -18,9 +18,9 @@ export default function Sidebar({
   activeTab,
   setActiveTab,
   fetchGroups,
-  fetchEvents,
-  fetchFollowers
+  fetchEvents
 }: SidebarProps) {
+  const [searchQuery, setSearchQuery] = useState('')
   const { items: notifications, unread } = useNotifications()
   const { groups, getUnreadCount: getGroupsUnread } = useRealTimeGroups()
   const { events, getUnreadCount: getEventsUnread } = useRealTimeEvents()
@@ -40,6 +40,19 @@ export default function Sidebar({
     } else if (itemId === 'events') {
       fetchEvents()
     } 
+  }
+
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!searchQuery.trim()) return
+    
+    // TODO: Implement search functionality
+    // This could navigate to a search results page or trigger search in current context
+    console.log('Searching for:', searchQuery)
+  }
+
+  const clearSearch = () => {
+    setSearchQuery('')
   }
 
   return (
@@ -70,10 +83,43 @@ export default function Sidebar({
             </button>
           </div>
           
+          {/* Search Section */}
+          <div className="mb-4 lg:mb-6">
+            <form onSubmit={handleSearch} className="relative">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-white/50" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search users, posts, groups..."
+                  disabled={!isConnected}
+                  className={`w-full pl-10 pr-10 py-2 lg:py-3 rounded-xl bg-white/10 border border-white/20 text-white placeholder-white/50 text-sm lg:text-base transition-all duration-200 focus:outline-none ${
+                    isConnected 
+                      ? 'focus:ring-2 focus:ring-emerald-400/50 focus:border-emerald-400/50 hover:bg-white/15' 
+                      : 'cursor-not-allowed bg-white/5 border-white/10'
+                  }`}
+                />
+                {searchQuery && (
+                  <button
+                    type="button"
+                    onClick={clearSearch}
+                    title="Clear search"
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-white/50 hover:text-white transition-colors"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+              {!isConnected && (
+                <p className="text-xs text-white/40 mt-1">Search unavailable offline</p>
+              )}
+            </form>
+          </div>
+          
           <nav className="space-y-2">
             {[
-              { id: 'home', icon: Home, label: 'Home Feed', unread: 0 },
-              { id: 'followers', icon: Users, label: 'Followers', unread: 0 },
+              { id: 'home', icon: Home, label: 'Home', unread: 0 },
               { id: 'groups', icon: Users, label: 'Groups', unread: groupsUnread },
               { id: 'events', icon: Calendar, label: 'Events', unread: eventsUnread }
             ].map((item) => (

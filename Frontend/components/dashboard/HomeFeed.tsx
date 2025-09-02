@@ -1,6 +1,6 @@
 'use client'
-import { TrendingUp, Activity, Wifi, WifiOff, RefreshCw } from 'lucide-react'
-import { useEffect } from 'react'
+import { TrendingUp, Activity, Wifi, WifiOff, RefreshCw, Users, UserCheck, Heart, Filter } from 'lucide-react'
+import { useEffect, useState } from 'react'
 import PostCard from './PostCard'
 import { Post, APIPost } from '@/lib/api'
 import { useRealTimePosts, useConnectionStatus, useDocumentTitle } from '@/hooks'
@@ -8,6 +8,8 @@ import { useRealTimePosts, useConnectionStatus, useDocumentTitle } from '@/hooks
 interface HomeFeedProps {
   setActiveTab: (tab: string) => void
 }
+
+type FeedFilter = 'all' | 'followers' | 'friends' | 'favorites'
 
 // Transform APIPost to Post interface for compatibility
 const transformPost = (apiPost: APIPost): Post => {
@@ -38,6 +40,9 @@ const transformPost = (apiPost: APIPost): Post => {
 export default function HomeFeed({
   setActiveTab
 }: HomeFeedProps) {
+  // Feed filter state
+  const [activeFilter, setActiveFilter] = useState<FeedFilter>('all')
+  
   // Use real-time posts hook
   const {
     posts,
@@ -95,8 +100,66 @@ export default function HomeFeed({
     refreshPosts()
   }
 
+  // Filter posts based on active filter
+  const filteredPosts = posts.filter(post => {
+    switch (activeFilter) {
+      case 'all':
+        return true
+      case 'followers':
+        // TODO: Add logic to filter posts from followers only
+        return true
+      case 'friends':
+        // TODO: Add logic to filter posts from friends only
+        return true
+      case 'favorites':
+        // TODO: Add logic to filter favorited posts only
+        return post.is_liked // For now, show liked posts as favorites
+      default:
+        return true
+    }
+  })
+
+  const feedFilters = [
+    { id: 'all' as FeedFilter, label: 'All', icon: Filter, count: posts.length },
+    { id: 'followers' as FeedFilter, label: 'Followers', icon: Users, count: posts.length },
+    { id: 'friends' as FeedFilter, label: 'Friends', icon: UserCheck, count: posts.length },
+    { id: 'favorites' as FeedFilter, label: 'Favorites', icon: Heart, count: posts.filter(p => p.is_liked).length }
+  ]
+
   return (
     <div className="space-y-4 lg:space-y-6">
+      {/* Feed Filter Tabs */}
+      <div className="bg-gradient-to-r from-white/10 to-white/5 backdrop-blur-xl rounded-2xl lg:rounded-3xl border border-white/20 p-4">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <h2 className="text-lg lg:text-xl font-bold text-white">Feed</h2>
+          <div className="flex flex-wrap gap-2">
+            {feedFilters.map((filter) => (
+              <button
+                key={filter.id}
+                onClick={() => setActiveFilter(filter.id)}
+                className={`flex items-center space-x-2 px-3 lg:px-4 py-2 rounded-lg lg:rounded-xl transition-all duration-200 text-xs lg:text-sm font-medium ${
+                  activeFilter === filter.id
+                    ? 'bg-gradient-to-r from-emerald-500/30 to-teal-500/30 text-emerald-300 border border-emerald-400/30'
+                    : 'text-white/70 hover:text-white hover:bg-white/10 border border-white/20'
+                }`}
+              >
+                <filter.icon className="w-3 h-3 lg:w-4 lg:h-4" />
+                <span>{filter.label}</span>
+                {filter.count > 0 && (
+                  <span className={`text-xs px-1.5 py-0.5 rounded-full ${
+                    activeFilter === filter.id
+                      ? 'bg-emerald-500/30 text-emerald-200'
+                      : 'bg-white/20 text-white/60'
+                  }`}>
+                    {filter.count > 99 ? '99+' : filter.count}
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
       {/* Connection Status & Unread Indicator */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center space-x-3">
@@ -163,13 +226,20 @@ export default function HomeFeed({
 
       {/* Posts Feed */}
       <div className="space-y-4 lg:space-y-6">
-        {!isLoading && posts.length === 0 ? (
+        {!isLoading && filteredPosts.length === 0 ? (
           <div className="bg-gradient-to-r from-white/10 to-white/5 backdrop-blur-xl rounded-2xl lg:rounded-3xl border border-white/20 p-8 text-center">
-            <p className="text-white/60 text-lg">No posts to show</p>
-            <p className="text-white/40 text-sm mt-2">Start following people or join groups to see posts in your feed!</p>
+            <p className="text-white/60 text-lg">
+              {activeFilter === 'all' ? 'No posts to show' : `No ${activeFilter} posts to show`}
+            </p>
+            <p className="text-white/40 text-sm mt-2">
+              {activeFilter === 'all' 
+                ? 'Start following people or join groups to see posts in your feed!' 
+                : `Try switching to "All" to see more posts, or interact with more ${activeFilter} content.`
+              }
+            </p>
           </div>
         ) : (
-          posts.map((apiPost) => (
+          filteredPosts.map((apiPost) => (
             <PostCard
               key={apiPost.id}
               post={transformPost(apiPost)}

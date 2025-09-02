@@ -6,10 +6,11 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strconv"
+
 	"social/models"
 	"social/services"
 	"social/websocket"
-	"strconv"
 )
 
 type NotificationHandler struct {

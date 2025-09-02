@@ -1,5 +1,7 @@
 'use client'
 import { MessageSquare, User, Users } from 'lucide-react'
+import { useRealTimeMessages, useOnlineStatus, useConnectionStatus } from '@/hooks'
+import { useEffect } from 'react'
 
 interface Chat {
   id: number
@@ -26,32 +28,55 @@ export default function ChatDropdown({
   onClose,
   isUserOnline
 }: ChatDropdownProps) {
+  const { conversations, getUnreadCount: getMessageUnread } = useRealTimeMessages()
+  const { onlineUsers } = useOnlineStatus()
+  const { isConnected } = useConnectionStatus()
+  
+  // Merge real-time conversation data with provided chats
+  const enhancedChats = chats.map(chat => {
+    const unreadCount = getMessageUnread(chat.id)
+    const isOnline = chat.isGroup ? false : onlineUsers.some(user => user.username === chat.name && user.is_online)
+    
+    return {
+      ...chat,
+      unread: unreadCount,
+      isOnline: isOnline
+    }
+  })
+
   if (!show) return null
 
   return (
     <div className="fixed top-14 lg:top-16 right-2 lg:right-6 w-72 sm:w-80 h-80 lg:h-96 bg-gradient-to-r from-white/10 to-white/5 backdrop-blur-xl rounded-xl lg:rounded-2xl border border-white/20 shadow-2xl z-40 flex flex-col">
       <div className="p-3 lg:p-4 border-b border-white/20">
-        <h3 className="text-base lg:text-lg font-semibold text-white">Messages</h3>
+        <div className="flex items-center justify-between">
+          <h3 className="text-base lg:text-lg font-semibold text-white">Messages</h3>
+          {!isConnected && (
+            <span className="text-xs text-red-400">Offline</span>
+          )}
+        </div>
       </div>
       
       <div className="flex-1 overflow-y-auto p-3 lg:p-4">
         <div className="space-y-2 lg:space-y-3">
-          {chats.length === 0 ? (
+          {enhancedChats.length === 0 ? (
             <div className="text-center text-white/60 py-8">
               <p className="text-sm">No conversations yet</p>
             </div>
           ) : (
-            chats.map((chat) => (
+            enhancedChats.map((chat) => (
               <div
                 key={chat.id}
                 className="flex items-center space-x-2 lg:space-x-3 p-2 lg:p-3 rounded-lg lg:rounded-xl hover:bg-white/10 cursor-pointer transition-all duration-200"
                 onClick={() => {
-                  onChatClick({
-                    conversationId: chat.id,
-                    type: chat.isGroup ? 'group' : 'private',
-                    name: chat.name
-                  })
-                  onClose()
+                  if (isConnected) {
+                    onChatClick({
+                      conversationId: chat.id,
+                      type: chat.isGroup ? 'group' : 'private',
+                      name: chat.name
+                    })
+                    onClose()
+                  }
                 }}
               >
                 <div className="relative flex-shrink-0">
@@ -62,7 +87,7 @@ export default function ChatDropdown({
                       <User className="w-4 h-4 lg:w-5 lg:h-5 text-white" />
                     )}
                   </div>
-                  {!chat.isGroup && (isUserOnline(chat.name) || chat.isOnline) && (
+                  {!chat.isGroup && chat.isOnline && (
                     <div className="absolute -bottom-0.5 -right-0.5 w-2 h-2 lg:w-3 lg:h-3 bg-green-500 rounded-full border border-white"></div>
                   )}
                 </div>
@@ -76,8 +101,8 @@ export default function ChatDropdown({
                 </div>
                 
                 {chat.unread > 0 && (
-                  <div className="w-4 h-4 lg:w-5 lg:h-5 bg-emerald-500 rounded-full flex items-center justify-center flex-shrink-0">
-                    <span className="text-white text-xs">{chat.unread}</span>
+                  <div className="bg-emerald-500 rounded-full flex items-center justify-center flex-shrink-0 min-w-[20px] h-5 px-2">
+                    <span className="text-white text-xs">{chat.unread > 99 ? '99+' : chat.unread}</span>
                   </div>
                 )}
               </div>
@@ -87,9 +112,16 @@ export default function ChatDropdown({
       </div>
       
       <div className="p-3 lg:p-4 border-t border-white/20">
-        <button className="w-full flex items-center justify-center py-2 bg-gradient-to-r from-emerald-500 to-teal-600 rounded-lg lg:rounded-xl text-white hover:from-emerald-600 hover:to-teal-700 transition-all duration-200 text-sm lg:text-base">
+        <button 
+          disabled={!isConnected}
+          className={`w-full flex items-center justify-center py-2 rounded-lg lg:rounded-xl text-white transition-all duration-200 text-sm lg:text-base ${
+            isConnected 
+              ? 'bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700'
+              : 'bg-white/20 cursor-not-allowed'
+          }`}
+        >
           <MessageSquare className="w-4 h-4 mr-2" />
-          New Message
+          {isConnected ? 'New Message' : 'Offline'}
         </button>
       </div>
     </div>

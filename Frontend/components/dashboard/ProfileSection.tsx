@@ -1,6 +1,7 @@
 'use client'
 import { User, Settings, Lock, Globe } from 'lucide-react'
 import { Post } from '@/lib/api'
+import { useRealTimePosts, useFollowers, useConnectionStatus } from '@/hooks'
 
 interface ProfileSectionProps {
   currentUser: {
@@ -23,6 +24,15 @@ export default function ProfileSection({
   posts,
   isLoadingFollowers
 }: ProfileSectionProps) {
+  const { posts: realTimePosts, isConnected } = useRealTimePosts()
+  const { followers: liveFollowers, following: liveFollowing } = useFollowers()
+  const { isConnected: connectionStatus } = useConnectionStatus()
+  
+  // Use real-time data when connected, fallback to provided data
+  const displayPosts = isConnected ? realTimePosts.filter(p => p.user_id === currentUser?.id) : posts
+  const displayFollowers = isConnected ? liveFollowers : followers
+  const displayFollowing = isConnected ? liveFollowing : following
+
   return (
     <div className="space-y-4 lg:space-y-6">
       {/* Profile Header */}
@@ -38,15 +48,30 @@ export default function ProfileSection({
             
             <div className="flex justify-center lg:justify-start space-x-6 lg:space-x-8 mb-4 lg:mb-6">
               <div className="text-center">
-                <div className="text-xl lg:text-2xl font-bold text-white">{followers?.length ?? 0}</div>
+                <div className="text-xl lg:text-2xl font-bold text-white">
+                  {displayFollowers?.length ?? 0}
+                  {connectionStatus && (
+                    <span className="ml-1 text-xs text-emerald-400">●</span>
+                  )}
+                </div>
                 <div className="text-white/60 text-sm lg:text-base">Followers</div>
               </div>
               <div className="text-center">
-                <div className="text-xl lg:text-2xl font-bold text-white">{following?.length ?? 0}</div>
+                <div className="text-xl lg:text-2xl font-bold text-white">
+                  {displayFollowing?.length ?? 0}
+                  {connectionStatus && (
+                    <span className="ml-1 text-xs text-emerald-400">●</span>
+                  )}
+                </div>
                 <div className="text-white/60 text-sm lg:text-base">Following</div>
               </div>
               <div className="text-center">
-                <div className="text-xl lg:text-2xl font-bold text-white">{posts?.length ?? 0}</div>
+                <div className="text-xl lg:text-2xl font-bold text-white">
+                  {displayPosts?.length ?? 0}
+                  {connectionStatus && (
+                    <span className="ml-1 text-xs text-emerald-400">●</span>
+                  )}
+                </div>
                 <div className="text-white/60 text-sm lg:text-base">Posts</div>
               </div>
             </div>
@@ -79,23 +104,33 @@ export default function ProfileSection({
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:gap-6">
         <div className="lg:col-span-2">
           <div className="bg-gradient-to-r from-white/10 to-white/5 backdrop-blur-xl rounded-2xl lg:rounded-3xl border border-white/20 p-4 lg:p-6">
-            <h3 className="text-lg lg:text-xl font-semibold text-white mb-3 lg:mb-4">My Posts</h3>
+            <div className="flex items-center justify-between mb-3 lg:mb-4">
+              <h3 className="text-lg lg:text-xl font-semibold text-white">My Posts</h3>
+              {!connectionStatus && (
+                <span className="text-xs text-red-400">Offline</span>
+              )}
+            </div>
             <div className="space-y-3 lg:space-y-4">
-              {posts.slice(0, 2).map((post) => (
+              {displayPosts.slice(0, 2).map((post) => (
                 <div key={post.id} className="bg-white/5 rounded-xl lg:rounded-2xl p-3 lg:p-4">
                   <p className="text-white mb-2 lg:mb-3 text-sm lg:text-base">{post.content}</p>
                   <div className="flex items-center justify-between text-xs lg:text-sm text-white/60">
-                    <span>{post.timeAgo}</span>
+                    <span>Just now</span>
                     <div className="flex space-x-3 lg:space-x-4">
-                      <span>{post.likes} likes</span>
-                      <span>{post.comments} comments</span>
+                      <span>0 likes</span>
+                      <span>0 comments</span>
                     </div>
                   </div>
                 </div>
               ))}
-              {posts.length === 0 && (
+              {displayPosts.length === 0 && (
                 <div className="text-white/60 text-center py-8">
                   <p className="text-sm">No posts yet</p>
+                </div>
+              )}
+              {!connectionStatus && displayPosts.length > 0 && (
+                <div className="text-center py-2">
+                  <p className="text-xs text-white/50">Posts may not be up to date while offline</p>
                 </div>
               )}
             </div>

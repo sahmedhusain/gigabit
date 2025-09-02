@@ -2,6 +2,8 @@
 import { X, Users } from 'lucide-react'
 import { CreateGroupRequest, api } from '@/lib/api'
 import { useState } from 'react'
+import { useOptimisticUpdate, useConnectionStatus } from '@/hooks'
+import { useToast } from '@/context/ToastContext'
 
 interface CreateGroupProps {
   show: boolean
@@ -16,8 +18,24 @@ export default function CreateGroup({
 }: CreateGroupProps) {
   const [groupTitle, setGroupTitle] = useState('')
   const [groupDescription, setGroupDescription] = useState('')
-  const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string>('')
+  const { success, error: showError } = useToast()
+  const { isConnected } = useConnectionStatus()
+  
+  const { isLoading, performUpdate } = useOptimisticUpdate({
+    onSuccess: () => {
+      success('Group created successfully!')
+      // Reset form
+      setGroupTitle('')
+      setGroupDescription('')
+      setError('')
+      onGroupCreated?.()
+      onClose()
+    },
+    onError: (error: any) => {
+      showError(`Failed to create group: ${error.message}`)
+    }
+  })
 
   const handleCreateGroup = async () => {
     // Validation
@@ -36,36 +54,25 @@ export default function CreateGroup({
       return
     }
 
-    try {
-      setIsLoading(true)
-      setError('')
-
-      const groupData: CreateGroupRequest = {
-        title: groupTitle.trim(),
-        description: groupDescription.trim()
-      }
-
-      await api.createGroup(groupData)
-
-      // Reset form
-      setGroupTitle('')
-      setGroupDescription('')
-      setError('')
-
-      // Close modal and notify parent
-      onClose()
-      onGroupCreated?.()
-
-    } catch (err) {
-      console.error('Error creating group:', err)
-      if (err instanceof Error) {
-        setError(err.message)
-      } else {
-        setError('Failed to create group. Please try again.')
-      }
-    } finally {
-      setIsLoading(false)
+    if (!isConnected) {
+      showError('Cannot create group while offline')
+      return
     }
+
+    setError('')
+
+    const groupData: CreateGroupRequest = {
+      title: groupTitle.trim(),
+      description: groupDescription.trim()
+    }
+
+    performUpdate(
+      (current) => ({ ...current, isCreating: true }),
+      async () => {
+        await api.createGroup(groupData)
+        return {}
+      }
+    )
   }
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -166,10 +173,14 @@ export default function CreateGroup({
               </button>
               <button
                 onClick={handleCreateGroup}
-                disabled={isLoading || !groupTitle.trim()}
-                className="w-full sm:w-auto px-4 lg:px-6 py-2 bg-gradient-to-r from-emerald-500 to-teal-600 rounded-xl text-white hover:from-emerald-600 hover:to-teal-700 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed text-sm lg:text-base"
+                disabled={isLoading || !groupTitle.trim() || !isConnected}
+                className={`w-full sm:w-auto px-4 lg:px-6 py-2 rounded-xl text-white transition-all duration-200 text-sm lg:text-base ${
+                  isLoading || !groupTitle.trim() || !isConnected
+                    ? 'bg-white/20 cursor-not-allowed'
+                    : 'bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700'
+                }`}
               >
-                {isLoading ? 'Creating...' : 'Create Group'}
+                {isLoading ? 'Creating...' : !isConnected ? 'Offline' : 'Create Group'}
               </button>
             </div>
           </div>

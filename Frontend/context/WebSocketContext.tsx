@@ -6,7 +6,7 @@ import { useAuth } from './AuthContext'
 export interface WebSocketMessage {
   type: 'private_message' | 'group_message' | 'notification' | 'user_status' | 'typing' | 
         'post_update' | 'comment_update' | 'like_update' | 'like' | 'follow_update' | 
-        'group_update' | 'event_update' | 'category_update' | 'ping' | 'pong' | 'error'
+        'group_update' | 'event_update' | 'ping' | 'pong' | 'error'
   from?: number
   to?: number
   group_id?: number
@@ -142,8 +142,6 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
           case 'follow_update':
           case 'group_update':
           case 'event_update':
-          case 'category_update':
-            // Handle real-time updates - pass to listeners
             console.log(`Real-time ${message.type}:`, message)
             messageListeners.current.forEach(callback => callback(message))
             break

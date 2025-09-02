@@ -22,12 +22,12 @@ func NewPostService(db *sql.DB, hub *websocket.Hub) *PostService {
 
 func (s *PostService) CreatePost(post *models.Post) error {
 	query := `
-		INSERT INTO posts (user_id, content, image_url, privacy, category_id, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?)
+		INSERT INTO posts (user_id, content, image_url, privacy, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?)
 	`
 
 	now := time.Now()
-	result, err := s.db.Exec(query, post.UserID, post.Content, post.ImageURL, post.Privacy, post.CategoryID, now, now)
+	result, err := s.db.Exec(query, post.UserID, post.Content, post.ImageURL, post.Privacy, now, now)
 	if err != nil {
 		return err
 	}
@@ -41,19 +41,15 @@ func (s *PostService) CreatePost(post *models.Post) error {
 	post.CreatedAt = now
 	post.UpdatedAt = now
 
-	// Increment category post count
-	s.db.Exec("UPDATE categories SET post_count = post_count + 1, updated_at = ? WHERE id = ?", now, post.CategoryID)
-
 	// Broadcast real-time post creation to followers
 	if s.hub != nil {
 		postData := map[string]interface{}{
-			"id":          post.ID,
-			"user_id":     post.UserID,
-			"content":     post.Content,
-			"image_url":   post.ImageURL,
-			"privacy":     post.Privacy,
-			"category_id": post.CategoryID,
-			"created_at":  post.CreatedAt,
+			"id":         post.ID,
+			"user_id":    post.UserID,
+			"content":    post.Content,
+			"image_url":  post.ImageURL,
+			"privacy":    post.Privacy,
+			"created_at": post.CreatedAt,
 		}
 		s.hub.BroadcastPostUpdate(post.ID, post.UserID, "create", postData)
 	}
@@ -80,32 +76,27 @@ func (s *PostService) AddPostPrivacyUsers(postID uint, userIDs []uint) error {
 
 func (s *PostService) GetPostByID(postID uint, currentUserID uint) (*models.PostResponse, error) {
 	query := `
-		SELECT p.id, p.user_id, p.content, p.image_url, p.privacy, p.category_id, p.created_at, p.updated_at,
+		SELECT p.id, p.user_id, p.content, p.image_url, p.privacy, p.created_at, p.updated_at,
 			   u.first_name, u.last_name, u.avatar, u.nickname,
-			   cat.id, cat.name, cat.description, cat.color, cat.icon, cat.is_active, cat.post_count, cat.created_at, cat.updated_at,
 			   COUNT(DISTINCT l.id) as like_count,
 			   COUNT(DISTINCT c.id) as comment_count,
 			   CASE WHEN ul.id IS NOT NULL THEN 1 ELSE 0 END as is_liked
 		FROM posts p
 		JOIN users u ON p.user_id = u.id
-		JOIN categories cat ON p.category_id = cat.id
 		LEFT JOIN likes l ON p.id = l.post_id
 		LEFT JOIN comments c ON p.id = c.post_id
 		LEFT JOIN likes ul ON p.id = ul.post_id AND ul.user_id = ?
 		WHERE p.id = ?
-		GROUP BY p.id, u.id, cat.id
+		GROUP BY p.id, u.id
 	`
 
 	var post models.PostResponse
 	var user models.UserResponse
-	var category models.Category
 
 	err := s.db.QueryRow(query, currentUserID, postID).Scan(
-		&post.ID, &post.UserID, &post.Content, &post.ImageURL, &post.Privacy, &post.CategoryID,
+		&post.ID, &post.UserID, &post.Content, &post.ImageURL, &post.Privacy,
 		&post.CreatedAt, &post.UpdatedAt,
 		&user.FirstName, &user.LastName, &user.Avatar, &user.Nickname,
-		&category.ID, &category.Name, &category.Description, &category.Color, &category.Icon,
-		&category.IsActive, &category.PostCount, &category.CreatedAt, &category.UpdatedAt,
 		&post.LikeCount, &post.CommentCount, &post.IsLiked,
 	)
 	if err != nil {
@@ -114,17 +105,6 @@ func (s *PostService) GetPostByID(postID uint, currentUserID uint) (*models.Post
 
 	user.ID = post.UserID
 	post.User = user
-	post.Category = models.CategoryResponse{
-		ID:          category.ID,
-		Name:        category.Name,
-		Description: category.Description,
-		Color:       category.Color,
-		Icon:        category.Icon,
-		IsActive:    category.IsActive,
-		PostCount:   category.PostCount,
-		CreatedAt:   category.CreatedAt.Format(time.RFC3339),
-		UpdatedAt:   category.UpdatedAt.Format(time.RFC3339),
-	}
 
 	// Check if current user can view this post
 	canView, err := s.CanViewPost(postID, currentUserID)
@@ -376,77 +356,3 @@ func (s *PostService) isInPostPrivacyList(postID, userID uint) (bool, error) {
 	return count > 0, nil
 }
 
-// GetPostsByCategory retrieves posts filtered by category
-func (s *PostService) GetPostsByCategory(categoryID uint, currentUserID uint, limit, offset int) ([]models.PostResponse, error) {
-	query := `
-		SELECT DISTINCT p.id, p.user_id, p.content, p.image_url, p.privacy, p.category_id, p.created_at, p.updated_at,
-			   u.first_name, u.last_name, u.avatar, u.nickname,
-			   cat.id, cat.name, cat.description, cat.color, cat.icon, cat.is_active, cat.post_count, cat.created_at, cat.updated_at,
-			   COUNT(DISTINCT l.id) as like_count,
-			   COUNT(DISTINCT c.id) as comment_count,
-			   CASE WHEN ul.id IS NOT NULL THEN 1 ELSE 0 END as is_liked
-		FROM posts p
-		JOIN users u ON p.user_id = u.id
-		JOIN categories cat ON p.category_id = cat.id
-		LEFT JOIN likes l ON p.id = l.post_id
-		LEFT JOIN comments c ON p.id = c.post_id
-		LEFT JOIN likes ul ON p.id = ul.post_id AND ul.user_id = ?
-		LEFT JOIN follows f ON p.user_id = f.following_id AND f.follower_id = ? AND f.status = 'accepted'
-		LEFT JOIN post_privacy pp ON p.id = pp.post_id
-		WHERE p.category_id = ? AND (
-			-- User's own posts
-			p.user_id = ?
-			-- Public posts
-			OR p.privacy = 'public'
-			-- Almost private posts from followed users
-			OR (p.privacy = 'almost_private' AND f.id IS NOT NULL)
-			-- Private posts specifically shared with user
-			OR (p.privacy = 'private' AND pp.user_id = ?)
-		)
-		GROUP BY p.id, u.id, cat.id
-		ORDER BY p.created_at DESC
-		LIMIT ? OFFSET ?
-	`
-
-	rows, err := s.db.Query(query, currentUserID, currentUserID, categoryID, currentUserID, currentUserID, limit, offset)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var posts []models.PostResponse
-	for rows.Next() {
-		var post models.PostResponse
-		var user models.UserResponse
-		var category models.Category
-
-		err := rows.Scan(
-			&post.ID, &post.UserID, &post.Content, &post.ImageURL, &post.Privacy, &post.CategoryID,
-			&post.CreatedAt, &post.UpdatedAt,
-			&user.FirstName, &user.LastName, &user.Avatar, &user.Nickname,
-			&category.ID, &category.Name, &category.Description, &category.Color, &category.Icon,
-			&category.IsActive, &category.PostCount, &category.CreatedAt, &category.UpdatedAt,
-			&post.LikeCount, &post.CommentCount, &post.IsLiked,
-		)
-		if err != nil {
-			return nil, err
-		}
-
-		user.ID = post.UserID
-		post.User = user
-		post.Category = models.CategoryResponse{
-			ID:          category.ID,
-			Name:        category.Name,
-			Description: category.Description,
-			Color:       category.Color,
-			Icon:        category.Icon,
-			IsActive:    category.IsActive,
-			PostCount:   category.PostCount,
-			CreatedAt:   category.CreatedAt.Format(time.RFC3339),
-			UpdatedAt:   category.UpdatedAt.Format(time.RFC3339),
-		}
-		posts = append(posts, post)
-	}
-
-	return posts, nil
-}

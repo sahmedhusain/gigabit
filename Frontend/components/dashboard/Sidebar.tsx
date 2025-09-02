@@ -1,5 +1,5 @@
 'use client'
-import { Home, Users, Calendar, Filter, X } from 'lucide-react'
+import { Home, Users, Calendar, X } from 'lucide-react'
 import { useNotifications, useRealTimeGroups, useRealTimeEvents, useConnectionStatus } from '@/hooks'
 
 interface SidebarProps {
@@ -73,7 +73,6 @@ export default function Sidebar({
           <nav className="space-y-2">
             {[
               { id: 'home', icon: Home, label: 'Home Feed', unread: 0 },
-              { id: 'categories', icon: Filter, label: 'Categories', unread: 0 },
               { id: 'followers', icon: Users, label: 'Followers', unread: 0 },
               { id: 'groups', icon: Users, label: 'Groups', unread: groupsUnread },
               { id: 'events', icon: Calendar, label: 'Events', unread: eventsUnread }

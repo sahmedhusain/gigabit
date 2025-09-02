@@ -156,6 +156,7 @@ func (s *Server) setupRoutes() {
 	s.router.HandleFunc("/api/groups/", s.handleGroupRoute(groupHandler, eventHandler))
 
 	// Event routes
+	s.router.HandleFunc("/api/events", s.handleUserEventsRoute(eventHandler))
 	s.router.HandleFunc("/api/events/", s.handleEventRoute(eventHandler))
 
 	// Message routes
@@ -625,6 +626,13 @@ func (s *Server) handleGroupRoute(groupHandler *handlers.GroupHandler, eventHand
 				writeError(w, http.StatusNotFound, "Route not found")
 			}
 		}
+	}
+}
+
+func (s *Server) handleUserEventsRoute(handler *handlers.EventHandler) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		authMiddleware := middleware.AuthMiddleware(s.DB.GetDB())
+		authMiddleware(http.HandlerFunc(handler.GetUserEvents)).ServeHTTP(w, r)
 	}
 }
 

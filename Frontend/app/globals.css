@@ -24,3 +24,10 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+.floating-particle {
+  left: var(--left);
+  top: var(--top);
+  animation-delay: var(--delay);
+  animation-duration: var(--duration);
+}

@@ -6,19 +6,19 @@ import { useAuth } from '@/context/AuthContext'
 import { useWebSocket } from '@/context/WebSocketContext'
 import { useToast } from '@/context/ToastContext'
 import { useOffline } from '@/hooks/useOffline'
-import { 
-  api, 
-  ApiClient, 
-  Post, 
-  type Notification as NotificationType, 
-  Group, 
-  Event, 
-  Chat, 
-  NetworkError, 
-  ValidationError, 
-  AuthenticationError, 
-  CategoryResponse, 
-  CreatePostRequest 
+import {
+  api,
+  ApiClient,
+  Post,
+  type Notification as NotificationType,
+  Group,
+  Event,
+  Chat,
+  NetworkError,
+  ValidationError,
+  AuthenticationError,
+  CategoryResponse,
+  CreatePostRequest
 } from '@/lib/api'
 import { Sparkles } from 'lucide-react'
 
@@ -26,31 +26,33 @@ import { Sparkles } from 'lucide-react'
 import TopBar from '@/components/dashboard/TopBar'
 import Sidebar from '@/components/dashboard/Sidebar'
 import CreatePost from '@/components/dashboard/CreatePost'
+import CreateGroup from '@/components/dashboard/CreateGroup'
 import NotificationsDropdown from '@/components/dashboard/NotificationsDropdown'
 import ChatDropdown from '@/components/dashboard/ChatDropdown'
 import HomeFeed from '@/components/dashboard/HomeFeed'
 import ProfileSection from '@/components/dashboard/ProfileSection'
-import { 
-  CategoriesSection, 
-  FollowersSection, 
-  GroupsSection, 
-  EventsSection, 
-  SettingsSection 
+import {
+  CategoriesSection,
+  FollowersSection,
+  GroupsSection,
+  SettingsSection
 } from '@/components/dashboard/DashboardSections'
+import EventsSection from '@/components/dashboard/EventsSection'
 
 function DashboardPage() {
   const { user, logout, checkAuth } = useAuth()
   const { isConnected, onlineUsers, addMessageListener, sendMessage } = useWebSocket()
   const { success, error, warning } = useToast()
   const { isOffline, lastConnectionCheck } = useOffline()
-  
+
   // UI State
   const [activeTab, setActiveTab] = useState('home')
   const [showCreatePost, setShowCreatePost] = useState(false)
+  const [showCreateGroup, setShowCreateGroup] = useState(false)
   const [showNotifications, setShowNotifications] = useState(false)
   const [showChat, setShowChat] = useState(false)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
-  
+
   // Post Creation State
   const [newPostContent, setNewPostContent] = useState('')
   const [newPostImage, setNewPostImage] = useState<File | null>(null)
@@ -176,6 +178,12 @@ function DashboardPage() {
 
         case 'user_status':
           console.log('User status update received:', message.data)
+          // Handle user online/offline status updates
+          if (message.data?.user_id && message.data?.is_online !== undefined) {
+            // Update online users list if needed
+            // This could be used to update chat user status indicators
+            console.log(`User ${message.data.user_id} is now ${message.data.is_online ? 'online' : 'offline'}`)
+          }
           break
 
         case 'ping':
@@ -289,8 +297,8 @@ function DashboardPage() {
       const mappedPosts = postsArr.map((post: any) => ({
         id: post.id,
         user: {
-          name: `${post.user.first_name} ${post.user.last_name}`, 
-          username: post.user.nickname || post.user.email.split('@')[0], 
+          name: `${post.user.first_name} ${post.user.last_name}`,
+          username: post.user.nickname || post.user.email.split('@')[0],
           avatar: post.user.avatar
         },
         content: post.content,
@@ -374,21 +382,7 @@ function DashboardPage() {
       const data = await api.getUserEvents()
       const dataAny: any = data
       const eventsArr = Array.isArray(dataAny?.events) ? dataAny.events : Array.isArray(dataAny?.data) ? dataAny.data : []
-      setEvents(eventsArr.map((event: any) => {
-        const eventDateStr = event.event_time ?? event.event_date ?? event.eventTime ?? new Date().toISOString()
-        return {
-          id: event.id,
-          title: event.title ?? '',
-          description: event.description ?? '',
-          date: new Date(eventDateStr).toLocaleDateString(),
-          time: new Date(eventDateStr).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
-          location: event.location ?? 'Location not specified',
-          group: (event.group && (event.group.title ?? event.group.name)) || 'Unknown Group',
-          going: event.going_count ?? event.goingCount ?? 0,
-          notGoing: event.not_going_count ?? event.notGoingCount ?? 0,
-          userResponse: event.user_response ?? event.userResponse ?? 'not_responded' as string
-        }
-      }))
+      setEvents(eventsArr)
     } catch (err) {
       console.error('Error fetching events:', err)
       if (err instanceof NetworkError) {
@@ -407,7 +401,7 @@ function DashboardPage() {
       const data = await api.getConversations()
       setChats(data.conversations.map(conversation => ({
         id: conversation.id,
-        name: conversation.type === 'private' 
+        name: conversation.type === 'private'
           ? `${conversation.participant?.first_name || ''} ${conversation.participant?.last_name || ''}`.trim() || 'Unknown User'
           : conversation.group?.title || 'Unknown Group',
         lastMessage: conversation.last_message.content,
@@ -447,14 +441,14 @@ function DashboardPage() {
 
   const fetchFollowers = async () => {
     if (!user) return
-    
+
     try {
       setIsLoadingFollowers(true)
       const [followersData, followingData] = await Promise.all([
         api.getFollowers(user.id),
         api.getFollowing(user.id)
       ])
-      
+
       setFollowers(Array.isArray(followersData?.data) ? followersData.data : [])
       setFollowing(Array.isArray(followingData?.data) ? followingData.data : [])
     } catch (err) {
@@ -476,7 +470,7 @@ function DashboardPage() {
     if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m ago`
     if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h ago`
     if (diffInSeconds < 604800) return `${Math.floor(diffInSeconds / 86400)}d ago`
-    
+
     return date.toLocaleDateString()
   }
 
@@ -490,7 +484,7 @@ function DashboardPage() {
     try {
 
       let imageUrl = '';
-      
+
       if (newPostImage) {
         const formData = new FormData();
         formData.append('image', newPostImage);
@@ -515,11 +509,11 @@ function DashboardPage() {
         category_id: selectedPostCategory,
         image_url: imageUrl
       }
-      
+
       if (postPrivacy === 'private' && selectedUsers.length > 0) {
         postData.specific_user_ids = selectedUsers
       }
-      
+
       await api.createPost(postData)
       setNewPostContent('')
       setNewPostImage(null)
@@ -621,7 +615,7 @@ function DashboardPage() {
 
   const renderContent = () => {
     switch (activeTab) {
-      case 'home': 
+      case 'home':
         return (
           <HomeFeed
             posts={posts}
@@ -631,7 +625,7 @@ function DashboardPage() {
             setActiveTab={setActiveTab}
           />
         )
-      case 'categories': 
+      case 'categories':
         return (
           <CategoriesSection
             categories={categories}
@@ -646,7 +640,7 @@ function DashboardPage() {
             searchCategories={searchCategories}
           />
         )
-      case 'profile': 
+      case 'profile':
         return (
           <ProfileSection
             currentUser={currentUser}
@@ -656,7 +650,7 @@ function DashboardPage() {
             isLoadingFollowers={isLoadingFollowers}
           />
         )
-      case 'followers': 
+      case 'followers':
         return (
           <FollowersSection
             followers={followers}
@@ -667,7 +661,7 @@ function DashboardPage() {
       case 'groups': 
         return <GroupsSection groups={groups} />
       case 'events': 
-        return <EventsSection events={events} />
+        return <EventsSection events={events} onEventsUpdate={fetchEvents} />
       case 'settings': 
         return (
           <SettingsSection
@@ -675,7 +669,7 @@ function DashboardPage() {
             testTokenExpiration={testTokenExpiration}
           />
         )
-      default: 
+      default:
         return (
           <HomeFeed
             posts={posts}
@@ -696,13 +690,13 @@ function DashboardPage() {
         <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-teal-500/20 rounded-full blur-3xl animate-pulse delay-1000"></div>
         <div className="absolute top-3/4 left-1/2 w-64 h-64 bg-cyan-500/20 rounded-full blur-3xl animate-pulse delay-2000"></div>
       </div>
-      
+
       {/* Floating Particles */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         {[...Array(20)].map((_, i) => (
           <div
             key={i}
-            className="absolute animate-bounce"
+            className="absolute animate-bounce floating-particle"
             style={{
               left: `${Math.random() * 100}%`,
               top: `${Math.random() * 100}%`,
@@ -760,10 +754,19 @@ function DashboardPage() {
         onCreatePost={handleCreatePost}
       />
 
+      <CreateGroup
+        show={showCreateGroup}
+        onClose={() => setShowCreateGroup(false)}
+        onGroupCreated={() => {
+          fetchGroups()
+          setShowCreateGroup(false)
+          success('Group created successfully!')
+        }}
+      />
+
       <NotificationsDropdown
         show={showNotifications}
-        notifications={notifications}
-        fetchNotifications={fetchNotifications}
+        onClose={() => setShowNotifications(false)}
       />
 
       <ChatDropdown
@@ -773,7 +776,7 @@ function DashboardPage() {
         onClose={() => setShowChat(false)}
         isUserOnline={isUserOnline}
       />
-      
+
       {/* Chat Window */}
       {openChatWindow && (
         <ChatWindow

@@ -243,6 +243,7 @@ function PostDetailPage() {
                 {/* Header */}
                 <div className="flex items-center mb-6">
                     <button
+                    title="Back"
                         onClick={() => router.back()}
                         className="p-2 text-white/70 hover:text-white hover:bg-white/10 rounded-lg transition-all duration-200 mr-4"
                     >
@@ -271,7 +272,11 @@ function PostDetailPage() {
                                 </p>
                             </div>
                         </div>
-                        <button className="p-2 text-white/70 hover:text-white hover:bg-white/10 rounded-xl transition-all duration-200">
+                        <button 
+                            className="p-2 text-white/70 hover:text-white hover:bg-white/10 rounded-xl transition-all duration-200"
+                            title="More options"
+                            aria-label="More options"
+                        >
                             <MoreHorizontal className="w-5 h-5" />
                         </button>
                     </div>

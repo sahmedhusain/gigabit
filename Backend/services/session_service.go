@@ -147,7 +147,7 @@ func (s *SessionService) CleanupExpiredSessions() error {
         DELETE FROM sessions WHERE expires_at < ?
     `
 
-	now := time.Now().In(gmt3Location)
+	now := time.Now()
 	_, err := s.db.Exec(query, now)
 	return err
 }

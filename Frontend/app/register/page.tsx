@@ -154,6 +154,8 @@ export default function RegisterPage() {
                       type="file"
                       accept="image/*"
                       className="hidden"
+                      title="Upload avatar image"
+                      aria-label="Upload avatar image"
                       onChange={handleAvatarChange}
                     />
                   </div>
@@ -254,6 +256,7 @@ export default function RegisterPage() {
 
                 {/* Date of Birth */}
                 <div className="relative group">
+                  <label htmlFor="dateOfBirth" className="sr-only">Date of Birth</label>
                   <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none z-10">
                     <Calendar className="h-5 w-5 text-white/70 group-focus-within:text-emerald-400 transition-colors" />
                   </div>
@@ -262,6 +265,8 @@ export default function RegisterPage() {
                     name="dateOfBirth"
                     type="date"
                     required
+                    title="Date of Birth"
+                    aria-label="Date of Birth"
                     className="w-full pl-12 pr-4 py-4 bg-white/10 border border-white/20 rounded-2xl placeholder-white/50 text-white focus:outline-none focus:ring-2 focus:ring-emerald-400/50 focus:border-emerald-400/50 focus:bg-white/15 transition-all duration-300 backdrop-blur-sm text-base [color-scheme:dark]"
                     value={formData.dateOfBirth}
                     onChange={handleInputChange}

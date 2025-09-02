@@ -6,11 +6,11 @@ import (
 
 type Notification struct {
 	ID         uint      `json:"id"`
-	UserID     uint      `json:"user_id"`       // Recipient
-	ActorID    uint      `json:"actor_id"`      // Who performed the action
-	Type       string    `json:"type"`          // "follow_request", "group_invite", "join_request", "event_created", "message", etc.
-	EntityType string    `json:"entity_type"`   // "user", "group", "event", "post", "message"
-	EntityID   uint      `json:"entity_id"`     // ID of the entity
+	UserID     uint      `json:"user_id"`     // Recipient
+	ActorID    uint      `json:"actor_id"`    // Who performed the action
+	Type       string    `json:"type"`        // "follow_request", "group_invite", "join_request", "event_created", "message", etc.
+	EntityType string    `json:"entity_type"` // "user", "group", "event", "post", "message"
+	EntityID   uint      `json:"entity_id"`   // ID of the entity
 	Title      string    `json:"title"`
 	Message    string    `json:"message"`
 	IsRead     bool      `json:"is_read"`
@@ -61,4 +61,6 @@ const (
 	NotificationPostLiked      = "post_liked"
 	NotificationPostCommented  = "post_commented"
 	NotificationEventReminder  = "event_reminder"
+	NotificationGroupPost      = "group_post"
+	NotificationGroupPostLiked = "group_post_liked"
 )

@@ -104,6 +104,7 @@ export default function CreatePost({
             <h3 className="text-lg lg:text-xl font-semibold text-white">Create New Post</h3>
             <button
               onClick={onClose}
+              title="Close"
               className="p-2 text-white/70 hover:text-white hover:bg-white/10 rounded-xl transition-all duration-200"
             >
               <X className="w-5 h-5" />
@@ -125,7 +126,9 @@ export default function CreatePost({
             </div>
             
             <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-2 sm:space-y-0 sm:space-x-4">
+              <label htmlFor="image-upload" className="sr-only">Upload image</label>
               <input
+              id="image-upload"
               ref={fileInputRef}
               type="file"
               accept="image/*"
@@ -134,6 +137,7 @@ export default function CreatePost({
             />
             <button
               onClick={handleImageClick}
+              title="Add Image or GIF"
               className="flex items-center px-3 lg:px-4 py-2 bg-white/10 hover:bg-white/20 border border-white/20 rounded-xl text-white transition-all duration-200 text-sm lg:text-base"
             >
               <ImageIcon className="w-4 h-4 mr-2" />
@@ -149,6 +153,7 @@ export default function CreatePost({
                     <span className="text-white text-sm font-medium">Selected Image:</span>
                     <button 
                       onClick={removeImage}
+                      title="Remove image"
                       className="p-1 text-white/70 hover:text-white hover:bg-white/10 rounded-lg transition-all duration-200"
                     >
                       <X className="w-4 h-4" />
@@ -181,6 +186,7 @@ export default function CreatePost({
               <select
                 value={selectedPostCategory}
                 onChange={(e) => setSelectedPostCategory(parseInt(e.target.value))}
+                aria-label="Select post category"
                 className="w-full bg-white/10 border border-white/20 rounded-xl p-3 text-white focus:outline-none focus:ring-2 focus:ring-emerald-400/50"
               >
                 {categories.map((category) => (

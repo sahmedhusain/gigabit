@@ -36,11 +36,11 @@ VALUES (?, ?, ?, ?, ?)
 	group.UpdatedAt = now
 
 	// Add creator as member automatically
-memberQuery := `
+	memberQuery := `
 INSERT INTO group_members (group_id, user_id, status, created_at, updated_at)
 VALUES (?, ?, 'member', ?, ?)
 `
-_, err = s.db.Exec(memberQuery, group.ID, group.CreatorID, now, now)
+	_, err = s.db.Exec(memberQuery, group.ID, group.CreatorID, now, now)
 
 	return err
 }
@@ -48,11 +48,11 @@ _, err = s.db.Exec(memberQuery, group.ID, group.CreatorID, now, now)
 func (s *GroupService) GetGroupByID(groupID, currentUserID uint) (*models.GroupResponse, error) {
 	query := `
 SELECT g.id, g.creator_id, g.name as title, g.description, g.created_at, g.updated_at,
-   u.first_name, u.last_name, u.avatar, u.nickname,
-   COUNT(DISTINCT gm.id) as member_count
+	u.first_name, u.last_name, u.avatar, u.nickname,
+	COUNT(DISTINCT gm.id) as member_count
 FROM groups g
 JOIN users u ON g.creator_id = u.id
-LEFT JOIN group_members gm ON g.id = gm.group_id AND gm.status = 'member'
+LEFT JOIN group_members gm ON g.id = gm.group_id AND gm.status IN ('member','accepted')
 WHERE g.id = ?
 GROUP BY g.id, u.id
 	`
@@ -80,7 +80,7 @@ GROUP BY g.id, u.id
 	}
 
 	group.MemberStatus = memberStatus
-	group.IsMember = memberStatus == "member"
+	group.IsMember = memberStatus == "member" || memberStatus == "accepted"
 
 	return &group, nil
 }
@@ -88,11 +88,11 @@ GROUP BY g.id, u.id
 func (s *GroupService) GetAllGroups(currentUserID uint, limit, offset int) ([]models.GroupResponse, error) {
 	query := `
 SELECT g.id, g.creator_id, g.name as title, g.description, g.created_at, g.updated_at,
-   u.first_name, u.last_name, u.avatar, u.nickname,
-   COUNT(DISTINCT gm.id) as member_count
+	u.first_name, u.last_name, u.avatar, u.nickname,
+	COUNT(DISTINCT gm.id) as member_count
 FROM groups g
 JOIN users u ON g.creator_id = u.id
-LEFT JOIN group_members gm ON g.id = gm.group_id AND gm.status = 'member'
+LEFT JOIN group_members gm ON g.id = gm.group_id AND gm.status IN ('member','accepted')
 GROUP BY g.id, u.id
 ORDER BY g.created_at DESC
 LIMIT ? OFFSET ?
@@ -129,7 +129,7 @@ LIMIT ? OFFSET ?
 		}
 
 		group.MemberStatus = memberStatus
-		group.IsMember = memberStatus == "member"
+		group.IsMember = memberStatus == "member" || memberStatus == "accepted"
 
 		groups = append(groups, group)
 	}
@@ -140,12 +140,12 @@ LIMIT ? OFFSET ?
 func (s *GroupService) GetUserGroups(userID uint, limit, offset int) ([]models.GroupResponse, error) {
 	query := `
 SELECT g.id, g.creator_id, g.name as title, g.description, g.created_at, g.updated_at,
-   u.first_name, u.last_name, u.avatar, u.nickname,
-   COUNT(DISTINCT gm2.id) as member_count
+	u.first_name, u.last_name, u.avatar, u.nickname,
+	COUNT(DISTINCT gm2.id) as member_count
 FROM groups g
 JOIN users u ON g.creator_id = u.id
-JOIN group_members gm ON g.id = gm.group_id AND gm.user_id = ? AND gm.status = 'member'
-LEFT JOIN group_members gm2 ON g.id = gm2.group_id AND gm2.status = 'member'
+JOIN group_members gm ON g.id = gm.group_id AND gm.user_id = ? AND gm.status IN ('member','accepted')
+LEFT JOIN group_members gm2 ON g.id = gm2.group_id AND gm2.status IN ('member','accepted')
 GROUP BY g.id, u.id
 ORDER BY gm.created_at DESC
 LIMIT ? OFFSET ?
@@ -283,12 +283,12 @@ func (s *GroupService) RespondToInvitation(groupID, userID uint, accept bool) er
 
 	if accept {
 		// Accept invitation - become member
-query := `
+		query := `
 UPDATE group_members SET status = 'member', created_at = ?, updated_at = ?
 WHERE group_id = ? AND user_id = ? AND status = 'invited'
 `
-now := time.Now()
-_, err = s.db.Exec(query, now, now, groupID, userID)
+		now := time.Now()
+		_, err = s.db.Exec(query, now, now, groupID, userID)
 	} else {
 		// Decline invitation - remove record
 		query := `DELETE FROM group_members WHERE group_id = ? AND user_id = ? AND status = 'invited'`
@@ -318,12 +318,12 @@ func (s *GroupService) RespondToJoinRequest(groupID, requestUserID, responderID 
 
 	if accept {
 		// Accept request - make user member
-query := `
+		query := `
 UPDATE group_members SET status = 'member', created_at = ?, updated_at = ?
 WHERE group_id = ? AND user_id = ? AND status = 'pending'
 `
-now := time.Now()
-_, err = s.db.Exec(query, now, now, groupID, requestUserID)
+		now := time.Now()
+		_, err = s.db.Exec(query, now, now, groupID, requestUserID)
 	} else {
 		// Decline request - remove record
 		query := `DELETE FROM group_members WHERE group_id = ? AND user_id = ? AND status = 'pending'`
@@ -362,7 +362,7 @@ SELECT gm.id, gm.group_id, gm.user_id, gm.status, gm.created_at,
    u.first_name, u.last_name, u.avatar, u.nickname
 FROM group_members gm
 JOIN users u ON gm.user_id = u.id
-WHERE gm.group_id = ? AND gm.status = 'member'
+WHERE gm.group_id = ? AND gm.status IN ('member','accepted')
 ORDER BY gm.created_at ASC
 	`
 
@@ -459,5 +459,5 @@ func (s *GroupService) IsUserMember(groupID, userID uint) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	return status == "member", nil
+	return status == "member" || status == "accepted", nil
 }

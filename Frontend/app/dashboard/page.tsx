@@ -303,7 +303,11 @@ function DashboardPage() {
           avatar: post.user.avatar
         },
         content: post.content,
-        image: post.image_url,
+        image: post.image_url ? 
+          (post.image_url.startsWith('http') ? 
+            post.image_url : 
+            `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}${post.image_url}`
+          ) : undefined,
         likes: post.like_count,
         comments: post.comment_count,
         shares: 0,

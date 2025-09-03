@@ -24,6 +24,8 @@ func (s *PostService) CreatePost(post *models.Post) error {
 	query := `
 		INSERT INTO posts (user_id, content, image_url, privacy, created_at, updated_at)
 		VALUES (?, ?, ?, ?, ?, ?)
+		INSERT INTO posts (user_id, content, image_url, privacy, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?)
 	`
 
 	now := time.Now()
@@ -63,7 +65,7 @@ func (s *PostService) AddPostPrivacyUsers(postID uint, userIDs []uint) error {
 	}
 
 	query := `INSERT INTO post_privacy (post_id, user_id) VALUES (?, ?)`
-	
+
 	for _, userID := range userIDs {
 		_, err := s.db.Exec(query, postID, userID)
 		if err != nil {
@@ -355,4 +357,3 @@ func (s *PostService) isInPostPrivacyList(postID, userID uint) (bool, error) {
 
 	return count > 0, nil
 }
-

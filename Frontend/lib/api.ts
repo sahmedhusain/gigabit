@@ -614,6 +614,12 @@ export class ApiClient {
     });
   }
 
+  async getUserRole(groupId: number): Promise<{ role: string; is_admin_or_creator: boolean }> {
+    return this.request<{ role: string; is_admin_or_creator: boolean }>(`/api/groups/${groupId}/role`, {
+      method: 'GET',
+    });
+  }
+
   async getGroupPosts(groupId: number, limit: number = 20, offset: number = 0): Promise<{ posts: PostResponse[], count: number }> {
     return this.request<{ posts: PostResponse[], count: number }>(`/api/groups/${groupId}/posts?limit=${limit}&offset=${offset}`, {
       method: 'GET',

@@ -1,71 +1,75 @@
 package handlers
 
 import (
-"database/sql"
-"encoding/json"
-"log"
-"net/http"
-"social/models"
-"social/services"
-"social/websocket"
-"strconv"
+	"database/sql"
+	"encoding/json"
+	"log"
+	"net/http"
+	"strconv"
+
+	// "strings"
+
+	"social/models"
+	"social/services"
+
+	// "social/utils"
+	"social/websocket"
 )
 
 type PostHandler struct {
-postService    *services.PostService
-commentService *services.CommentService
-likeService    *services.LikeService
+	postService    *services.PostService
+	commentService *services.CommentService
+	likeService    *services.LikeService
 }
 
 func NewPostHandler(db *sql.DB, hub *websocket.Hub) *PostHandler {
-return &PostHandler{
-postService:    services.NewPostService(db, hub),
-commentService: services.NewCommentService(db, hub),
-likeService:    services.NewLikeService(db, hub),
+	return &PostHandler{
+		postService:    services.NewPostService(db, hub),
+		commentService: services.NewCommentService(db, hub),
+		likeService:    services.NewLikeService(db, hub),
+	}
 }
-}
-
 
 func (h *PostHandler) CreatePost(w http.ResponseWriter, r *http.Request) {
-if r.Method != http.MethodPost {
-writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
-return
-}
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
 
-userID := r.Context().Value("user_id")
-if userID == nil {
-writeError(w, http.StatusUnauthorized, "User not authenticated")
-return
-}
+	userID := r.Context().Value("user_id")
+	if userID == nil {
+		writeError(w, http.StatusUnauthorized, "User not authenticated")
+		return
+	}
 
-var req models.CreatePostRequest
-if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-log.Printf("Invalid request data for CreatePost: %v", err)
-writeError(w, http.StatusBadRequest, "Invalid request data: "+err.Error())
-return
-}
+	var req models.CreatePostRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		log.Printf("Invalid request data for CreatePost: %v", err)
+		writeError(w, http.StatusBadRequest, "Invalid request data: "+err.Error())
+		return
+	}
 
-// Set default privacy if not provided
-if req.Privacy == "" {
-req.Privacy = "public"
-}
+	// Set default privacy if not provided
+	if req.Privacy == "" {
+		req.Privacy = "public"
+	}
 
-// Validate privacy value
-validPrivacy := []string{"public", "followers", "private"}
-isValid := false
-for _, v := range validPrivacy {
-if req.Privacy == v {
-isValid = true
-break
-}
-}
+	// Validate privacy value
+	validPrivacy := []string{"public", "followers", "private"}
+	isValid := false
+	for _, v := range validPrivacy {
+		if req.Privacy == v {
+			isValid = true
+			break
+		}
+	}
 
-if !isValid {
-writeError(w, http.StatusBadRequest, "Invalid privacy setting. Must be 'public', 'followers', or 'private'")
-return
-}
+	if !isValid {
+		writeError(w, http.StatusBadRequest, "Invalid privacy setting. Must be 'public', 'followers', or 'private'")
+		return
+	}
 
-log.Printf("Creating post with privacy: %s for user: %v", req.Privacy, userID)
+	log.Printf("Creating post with privacy: %s for user: %v", req.Privacy, userID)
 
 	post := &models.Post{
 		UserID:   userID.(uint),
@@ -75,321 +79,321 @@ log.Printf("Creating post with privacy: %s for user: %v", req.Privacy, userID)
 	}
 
 	if req.ImageURL == "" {
-post.ImageURL = nil
-}
+		post.ImageURL = nil
+	}
 
-if err := h.postService.CreatePost(post); err != nil {
-log.Printf("Failed to create post: %v", err)
-writeError(w, http.StatusInternalServerError, "Failed to create post")
-return
-}
+	if err := h.postService.CreatePost(post); err != nil {
+		log.Printf("Failed to create post: %v", err)
+		writeError(w, http.StatusInternalServerError, "Failed to create post")
+		return
+	}
 
-// Add specific users for private posts
-if req.Privacy == "private" && len(req.SpecificUserIDs) > 0 {
-if err := h.postService.AddPostPrivacyUsers(post.ID, req.SpecificUserIDs); err != nil {
-log.Printf("Failed to add privacy users for post %d: %v", post.ID, err)
-writeError(w, http.StatusInternalServerError, "Failed to set post privacy")
-return
-}
-log.Printf("Added %d users to private post %d", len(req.SpecificUserIDs), post.ID)
-}
+	// Add specific users for private posts
+	if req.Privacy == "private" && len(req.SpecificUserIDs) > 0 {
+		if err := h.postService.AddPostPrivacyUsers(post.ID, req.SpecificUserIDs); err != nil {
+			log.Printf("Failed to add privacy users for post %d: %v", post.ID, err)
+			writeError(w, http.StatusInternalServerError, "Failed to set post privacy")
+			return
+		}
+		log.Printf("Added %d users to private post %d", len(req.SpecificUserIDs), post.ID)
+	}
 
-log.Printf("Post created successfully with ID: %d", post.ID)
-writeJSON(w, http.StatusCreated, map[string]interface{}{
-"message": "Post created successfully",
-"post":    post,
-})
+	log.Printf("Post created successfully with ID: %d", post.ID)
+	writeJSON(w, http.StatusCreated, map[string]interface{}{
+		"message": "Post created successfully",
+		"post":    post,
+	})
 }
 
 func (h *PostHandler) GetPost(w http.ResponseWriter, r *http.Request, postIDStr string) {
-if r.Method != http.MethodGet {
-writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
-return
-}
+	if r.Method != http.MethodGet {
+		writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
 
-postID, err := strconv.ParseUint(postIDStr, 10, 32)
-if err != nil {
-writeError(w, http.StatusBadRequest, "Invalid post ID")
-return
-}
+	postID, err := strconv.ParseUint(postIDStr, 10, 32)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "Invalid post ID")
+		return
+	}
 
-userID := r.Context().Value("user_id")
-if userID == nil {
-writeError(w, http.StatusUnauthorized, "User not authenticated")
-return
-}
+	userID := r.Context().Value("user_id")
+	if userID == nil {
+		writeError(w, http.StatusUnauthorized, "User not authenticated")
+		return
+	}
 
-post, err := h.postService.GetPostByID(uint(postID), userID.(uint))
-if err != nil {
-writeError(w, http.StatusNotFound, "Post not found")
-return
-}
+	post, err := h.postService.GetPostByID(uint(postID), userID.(uint))
+	if err != nil {
+		writeError(w, http.StatusNotFound, "Post not found")
+		return
+	}
 
-writeJSON(w, http.StatusOK, post)
+	writeJSON(w, http.StatusOK, post)
 }
 
 func (h *PostHandler) GetPosts(w http.ResponseWriter, r *http.Request) {
-if r.Method != http.MethodGet {
-writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
-return
-}
+	if r.Method != http.MethodGet {
+		writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
 
-currentUserID := r.Context().Value("user_id")
-if currentUserID == nil {
-writeError(w, http.StatusUnauthorized, "User not authenticated")
-return
-}
+	currentUserID := r.Context().Value("user_id")
+	if currentUserID == nil {
+		writeError(w, http.StatusUnauthorized, "User not authenticated")
+		return
+	}
 
-// Get pagination parameters
-limitStr := r.URL.Query().Get("limit")
-if limitStr == "" {
-limitStr = "50"
-}
-offsetStr := r.URL.Query().Get("offset")
-if offsetStr == "" {
-offsetStr = "0"
-}
+	// Get pagination parameters
+	limitStr := r.URL.Query().Get("limit")
+	if limitStr == "" {
+		limitStr = "50"
+	}
+	offsetStr := r.URL.Query().Get("offset")
+	if offsetStr == "" {
+		offsetStr = "0"
+	}
 
-limit, err := strconv.Atoi(limitStr)
-if err != nil || limit > 50 {
-limit = 50
-}
+	limit, err := strconv.Atoi(limitStr)
+	if err != nil || limit > 50 {
+		limit = 50
+	}
 
-offset, err := strconv.Atoi(offsetStr)
-if err != nil || offset < 0 {
-offset = 0
-}
+	offset, err := strconv.Atoi(offsetStr)
+	if err != nil || offset < 0 {
+		offset = 0
+	}
 
-// Use the service layer to get posts with proper privacy filtering
-posts, err := h.postService.GetFeedPosts(currentUserID.(uint), limit, offset)
-if err != nil {
-writeError(w, http.StatusInternalServerError, "Failed to get posts")
-return
-}
+	// Use the service layer to get posts with proper privacy filtering
+	posts, err := h.postService.GetFeedPosts(currentUserID.(uint), limit, offset)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "Failed to get posts")
+		return
+	}
 
-writeJSON(w, http.StatusOK, map[string]interface{}{
-"posts":  posts,
-"count":  len(posts),
-"limit":  limit,
-"offset": offset,
-})
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"posts":  posts,
+		"count":  len(posts),
+		"limit":  limit,
+		"offset": offset,
+	})
 }
 
 func (h *PostHandler) GetUserPosts(w http.ResponseWriter, r *http.Request, userIDStr string) {
-if r.Method != http.MethodGet {
-writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
-return
-}
+	if r.Method != http.MethodGet {
+		writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
 
-userID, err := strconv.ParseUint(userIDStr, 10, 32)
-if err != nil {
-writeError(w, http.StatusBadRequest, "Invalid user ID")
-return
-}
+	userID, err := strconv.ParseUint(userIDStr, 10, 32)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "Invalid user ID")
+		return
+	}
 
-currentUserID := r.Context().Value("user_id")
-if currentUserID == nil {
-writeError(w, http.StatusUnauthorized, "User not authenticated")
-return
-}
+	currentUserID := r.Context().Value("user_id")
+	if currentUserID == nil {
+		writeError(w, http.StatusUnauthorized, "User not authenticated")
+		return
+	}
 
-// Get pagination parameters
-limitStr := r.URL.Query().Get("limit")
-if limitStr == "" {
-limitStr = "20"
-}
-offsetStr := r.URL.Query().Get("offset")
-if offsetStr == "" {
-offsetStr = "0"
-}
+	// Get pagination parameters
+	limitStr := r.URL.Query().Get("limit")
+	if limitStr == "" {
+		limitStr = "20"
+	}
+	offsetStr := r.URL.Query().Get("offset")
+	if offsetStr == "" {
+		offsetStr = "0"
+	}
 
-limit, err := strconv.Atoi(limitStr)
-if err != nil || limit > 50 {
-limit = 20
-}
+	limit, err := strconv.Atoi(limitStr)
+	if err != nil || limit > 50 {
+		limit = 20
+	}
 
-offset, err := strconv.Atoi(offsetStr)
-if err != nil || offset < 0 {
-offset = 0
-}
+	offset, err := strconv.Atoi(offsetStr)
+	if err != nil || offset < 0 {
+		offset = 0
+	}
 
-posts, err := h.postService.GetUserPosts(uint(userID), currentUserID.(uint), limit, offset)
-if err != nil {
-writeError(w, http.StatusInternalServerError, "Failed to get posts")
-return
-}
+	posts, err := h.postService.GetUserPosts(uint(userID), currentUserID.(uint), limit, offset)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "Failed to get posts")
+		return
+	}
 
-writeJSON(w, http.StatusOK, map[string]interface{}{
-"posts":  posts,
-"count":  len(posts),
-"limit":  limit,
-"offset": offset,
-})
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"posts":  posts,
+		"count":  len(posts),
+		"limit":  limit,
+		"offset": offset,
+	})
 }
 
 func (h *PostHandler) GetFeedPosts(w http.ResponseWriter, r *http.Request) {
-if r.Method != http.MethodGet {
-writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
-return
-}
+	if r.Method != http.MethodGet {
+		writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
 
-currentUserID := r.Context().Value("user_id")
-if currentUserID == nil {
-writeError(w, http.StatusUnauthorized, "User not authenticated")
-return
-}
+	currentUserID := r.Context().Value("user_id")
+	if currentUserID == nil {
+		writeError(w, http.StatusUnauthorized, "User not authenticated")
+		return
+	}
 
-// Get pagination parameters
-limitStr := r.URL.Query().Get("limit")
-if limitStr == "" {
-limitStr = "20"
-}
-offsetStr := r.URL.Query().Get("offset")
-if offsetStr == "" {
-offsetStr = "0"
-}
+	// Get pagination parameters
+	limitStr := r.URL.Query().Get("limit")
+	if limitStr == "" {
+		limitStr = "20"
+	}
+	offsetStr := r.URL.Query().Get("offset")
+	if offsetStr == "" {
+		offsetStr = "0"
+	}
 
-limit, err := strconv.Atoi(limitStr)
-if err != nil || limit > 50 {
-limit = 20
-}
+	limit, err := strconv.Atoi(limitStr)
+	if err != nil || limit > 50 {
+		limit = 20
+	}
 
-offset, err := strconv.Atoi(offsetStr)
-if err != nil || offset < 0 {
-offset = 0
-}
+	offset, err := strconv.Atoi(offsetStr)
+	if err != nil || offset < 0 {
+		offset = 0
+	}
 
-posts, err := h.postService.GetFeedPosts(currentUserID.(uint), limit, offset)
-if err != nil {
-writeError(w, http.StatusInternalServerError, "Failed to get feed")
-return
-}
+	posts, err := h.postService.GetFeedPosts(currentUserID.(uint), limit, offset)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "Failed to get feed")
+		return
+	}
 
-writeJSON(w, http.StatusOK, map[string]interface{}{
-"posts":  posts,
-"count":  len(posts),
-"limit":  limit,
-"offset": offset,
-})
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"posts":  posts,
+		"count":  len(posts),
+		"limit":  limit,
+		"offset": offset,
+	})
 }
 
 func (h *PostHandler) UpdatePost(w http.ResponseWriter, r *http.Request, postIDStr string) {
-if r.Method != http.MethodPut {
-writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
-return
-}
+	if r.Method != http.MethodPut {
+		writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
 
-postID, err := strconv.ParseUint(postIDStr, 10, 32)
-if err != nil {
-writeError(w, http.StatusBadRequest, "Invalid post ID")
-return
-}
+	postID, err := strconv.ParseUint(postIDStr, 10, 32)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "Invalid post ID")
+		return
+	}
 
-userID := r.Context().Value("user_id")
-if userID == nil {
-writeError(w, http.StatusUnauthorized, "User not authenticated")
-return
-}
+	userID := r.Context().Value("user_id")
+	if userID == nil {
+		writeError(w, http.StatusUnauthorized, "User not authenticated")
+		return
+	}
 
-var req models.UpdatePostRequest
-if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-writeError(w, http.StatusBadRequest, err.Error())
-return
-}
+	var req models.UpdatePostRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
 
-if err := h.postService.UpdatePost(uint(postID), userID.(uint), &req); err != nil {
-if err == sql.ErrNoRows {
-writeError(w, http.StatusForbidden, "Cannot update this post")
-} else {
-writeError(w, http.StatusInternalServerError, "Failed to update post")
-}
-return
-}
+	if err := h.postService.UpdatePost(uint(postID), userID.(uint), &req); err != nil {
+		if err == sql.ErrNoRows {
+			writeError(w, http.StatusForbidden, "Cannot update this post")
+		} else {
+			writeError(w, http.StatusInternalServerError, "Failed to update post")
+		}
+		return
+	}
 
-writeJSON(w, http.StatusOK, map[string]string{"message": "Post updated successfully"})
+	writeJSON(w, http.StatusOK, map[string]string{"message": "Post updated successfully"})
 }
 
 func (h *PostHandler) DeletePost(w http.ResponseWriter, r *http.Request, postIDStr string) {
-if r.Method != http.MethodDelete {
-writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
-return
-}
+	if r.Method != http.MethodDelete {
+		writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
 
-postID, err := strconv.ParseUint(postIDStr, 10, 32)
-if err != nil {
-writeError(w, http.StatusBadRequest, "Invalid post ID")
-return
-}
+	postID, err := strconv.ParseUint(postIDStr, 10, 32)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "Invalid post ID")
+		return
+	}
 
-userID := r.Context().Value("user_id")
-if userID == nil {
-writeError(w, http.StatusUnauthorized, "User not authenticated")
-return
-}
+	userID := r.Context().Value("user_id")
+	if userID == nil {
+		writeError(w, http.StatusUnauthorized, "User not authenticated")
+		return
+	}
 
-if err := h.postService.DeletePost(uint(postID), userID.(uint)); err != nil {
-if err == sql.ErrNoRows {
-writeError(w, http.StatusForbidden, "Cannot delete this post")
-} else {
-writeError(w, http.StatusInternalServerError, "Failed to delete post")
-}
-return
-}
+	if err := h.postService.DeletePost(uint(postID), userID.(uint)); err != nil {
+		if err == sql.ErrNoRows {
+			writeError(w, http.StatusForbidden, "Cannot delete this post")
+		} else {
+			writeError(w, http.StatusInternalServerError, "Failed to delete post")
+		}
+		return
+	}
 
-writeJSON(w, http.StatusOK, map[string]string{"message": "Post deleted successfully"})
+	writeJSON(w, http.StatusOK, map[string]string{"message": "Post deleted successfully"})
 }
 
 func (h *PostHandler) LikePost(w http.ResponseWriter, r *http.Request, postIDStr string) {
-if r.Method != http.MethodPost {
-writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
-return
-}
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
 
-postID, err := strconv.ParseUint(postIDStr, 10, 32)
-if err != nil {
-writeError(w, http.StatusBadRequest, "Invalid post ID")
-return
-}
+	postID, err := strconv.ParseUint(postIDStr, 10, 32)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "Invalid post ID")
+		return
+	}
 
-userID := r.Context().Value("user_id")
-if userID == nil {
-writeError(w, http.StatusUnauthorized, "User not authenticated")
-return
-}
+	userID := r.Context().Value("user_id")
+	if userID == nil {
+		writeError(w, http.StatusUnauthorized, "User not authenticated")
+		return
+	}
 
-if err := h.likeService.LikePost(uint(postID), userID.(uint)); err != nil {
-log.Printf("Failed to like post %d for user %v: %v", postID, userID, err)
-writeError(w, http.StatusInternalServerError, "Failed to like post")
-return
-}
+	if err := h.likeService.LikePost(uint(postID), userID.(uint)); err != nil {
+		log.Printf("Failed to like post %d for user %v: %v", postID, userID, err)
+		writeError(w, http.StatusInternalServerError, "Failed to like post")
+		return
+	}
 
-log.Printf("Post %d liked successfully by user %v", postID, userID)
-writeJSON(w, http.StatusOK, map[string]string{"message": "Post liked successfully"})
+	log.Printf("Post %d liked successfully by user %v", postID, userID)
+	writeJSON(w, http.StatusOK, map[string]string{"message": "Post liked successfully"})
 }
 
 func (h *PostHandler) UnlikePost(w http.ResponseWriter, r *http.Request, postIDStr string) {
-if r.Method != http.MethodDelete {
-writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
-return
-}
+	if r.Method != http.MethodDelete {
+		writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
 
-postID, err := strconv.ParseUint(postIDStr, 10, 32)
-if err != nil {
-writeError(w, http.StatusBadRequest, "Invalid post ID")
-return
-}
+	postID, err := strconv.ParseUint(postIDStr, 10, 32)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "Invalid post ID")
+		return
+	}
 
-userID := r.Context().Value("user_id")
-if userID == nil {
-writeError(w, http.StatusUnauthorized, "User not authenticated")
-return
-}
+	userID := r.Context().Value("user_id")
+	if userID == nil {
+		writeError(w, http.StatusUnauthorized, "User not authenticated")
+		return
+	}
 
-if err := h.likeService.UnlikePost(uint(postID), userID.(uint)); err != nil {
-log.Printf("Failed to unlike post %d for user %v: %v", postID, userID, err)
-writeError(w, http.StatusInternalServerError, "Failed to unlike post")
-return
-}
+	if err := h.likeService.UnlikePost(uint(postID), userID.(uint)); err != nil {
+		log.Printf("Failed to unlike post %d for user %v: %v", postID, userID, err)
+		writeError(w, http.StatusInternalServerError, "Failed to unlike post")
+		return
+	}
 
 	log.Printf("Post %d unliked successfully by user %v", postID, userID)
 	writeJSON(w, http.StatusOK, map[string]string{"message": "Post unliked successfully"})

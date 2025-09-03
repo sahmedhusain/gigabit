@@ -283,12 +283,6 @@ function PostDetailPage() {
                                     <h3 className="text-white font-medium">
                                         {post.user.first_name} {post.user.last_name}
                                     </h3>
-                                    {isAuthorOnline && (
-                                        <div className="flex items-center space-x-1">
-                                            <div className="w-2 h-2 bg-green-400 rounded-full"></div>
-                                            <span className="text-green-400 text-xs">Online</span>
-                                        </div>
-                                    )}
                                 </div>
                                 <p className="text-white/60 text-sm">
                                     @{post.user.nickname || post.user.email.split('@')[0]} • {formatTimeAgo(post.created_at)}
@@ -312,9 +306,23 @@ function PostDetailPage() {
                     {/* Post Image */}
                     {post.image_url && (
                         <div className="mb-4 rounded-xl overflow-hidden bg-white/5">
-                            <div className="aspect-video bg-gradient-to-br from-emerald-500/20 to-teal-500/20 flex items-center justify-center">
+                            <img 
+                                src={post.image_url.startsWith('http') ? 
+                                    post.image_url : 
+                                    `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}${post.image_url}`
+                                } 
+                                alt="Post image" 
+                                className="w-full h-auto object-cover"
+                                onError={(e) => {
+                                    // Fallback to placeholder on error
+                                    const target = e.target as HTMLImageElement;
+                                    target.style.display = 'none';
+                                    target.nextElementSibling?.classList.remove('hidden');
+                                }}
+                            />
+                            <div className="aspect-video bg-gradient-to-br from-emerald-500/20 to-teal-500/20 flex items-center justify-center hidden">
                                 <ImageIcon className="w-12 h-12 text-white/50" />
-                                <span className="ml-2 text-white/70">Image will be displayed here</span>
+                                <span className="ml-2 text-white/70">Image failed to load</span>
                             </div>
                         </div>
                     )}

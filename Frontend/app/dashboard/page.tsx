@@ -18,6 +18,7 @@ import {
   NetworkError,
   ValidationError,
   AuthenticationError,
+  getToken,
   CreatePostRequest
 } from '@/lib/api'
 import { Sparkles } from 'lucide-react'
@@ -79,14 +80,8 @@ function DashboardPage() {
   const [events, setEvents] = useState<Event[]>([])
   const [isLoadingEvents, setIsLoadingEvents] = useState(false)
   const [unreadNotifications, setUnreadNotifications] = useState(0)
-
-  // Use live data when available, fallback to local state
-  const displayPosts = livePosts && livePosts.length > 0 ? livePosts : posts
-  const displayNotifications = liveNotifications && liveNotifications.length > 0 ? liveNotifications : notifications
-  const displayGroups = liveGroups && liveGroups.length > 0 ? liveGroups : groups
-  const displayEvents = liveEvents && liveEvents.length > 0 ? liveEvents : events
-  const displayChats = liveConversations && liveConversations.length > 0 ? liveConversations : chats
-  const displayUnreadCount = liveUnreadCount || unreadNotifications
+  const [isSearching, setIsSearching] = useState(false)
+  const [isLoadingTrending, setIsLoadingTrending] = useState(false)
   const [openChatWindow, setOpenChatWindow] = useState<{
     conversationId: number
     type: 'private' | 'group'
@@ -123,6 +118,7 @@ function DashboardPage() {
     if (user) {
       fetchFeedPosts()
       fetchUsers()
+      fetchEvents() // Add this to load events immediately
     }
   }, [user])
 
@@ -248,7 +244,11 @@ function DashboardPage() {
           avatar: post.user.avatar
         },
         content: post.content,
-        image: post.image_url,
+        image: post.image_url ? 
+          (post.image_url.startsWith('http') ? 
+            post.image_url : 
+            `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}${post.image_url}`
+          ) : undefined,
         likes: post.like_count,
         comments: post.comment_count,
         shares: 0,
@@ -325,9 +325,11 @@ function DashboardPage() {
   const fetchEvents = async () => {
     try {
       setIsLoadingEvents(true)
+      console.log('Fetching events...')
       const data = await api.getUserEvents()
-      const dataAny: any = data
-      const eventsArr = Array.isArray(dataAny?.events) ? dataAny.events : Array.isArray(dataAny?.data) ? dataAny.data : []
+      console.log('Events API response:', data)
+      const eventsArr = Array.isArray(data?.events) ? data.events : []
+      console.log('Events array:', eventsArr)
       setEvents(eventsArr)
     } catch (err) {
       console.error('Error fetching events:', err)
@@ -428,22 +430,30 @@ function DashboardPage() {
     }
 
     try {
-
+      console.log("I am in handle create post")
       let imageUrl = '';
 
       if (newPostImage) {
         const formData = new FormData();
         formData.append('image', newPostImage);
+        const token = getToken();
+        
+        console.log("Uploading image to backend uploads endpoint")
 
-        const uploadResponse = await fetch('/api/uploads', {
+        const uploadResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/api/uploads`, {
           method: 'POST',
           body: formData,
+          headers: {
+            ...(token && { Authorization: `Bearer ${token}` }),
+          },
           credentials: 'include'
         })
 
+        console.log("Upload response:", uploadResponse);
         if (uploadResponse.ok) {
           const uploadData = await uploadResponse.json();
-          imageUrl = `/uploads/${uploadData.filename}`;
+          imageUrl = `/api/images/${uploadData.filename}`;
+          console.log("Image uploaded successfully:", imageUrl);
         } else {
           const errorData = await uploadResponse.json();
           throw new Error(errorData.error || 'Failed to upload image');
@@ -558,7 +568,22 @@ function DashboardPage() {
       case 'home':
         return (
           <HomeFeed
+            posts={posts}
+            onPostLike={handleLikePost}
             setActiveTab={setActiveTab}
+            showCreatePost={showCreatePost}
+            setShowCreatePost={setShowCreatePost}
+            newPostContent={newPostContent}
+            setNewPostContent={setNewPostContent}
+            newPostImage={newPostImage}
+            setNewPostImage={setNewPostImage}
+            postPrivacy={postPrivacy}
+            setPostPrivacy={setPostPrivacy}
+            selectedUsers={selectedUsers}
+            setSelectedUsers={setSelectedUsers}
+            availableUsers={availableUsers}
+            loadingUsers={loadingUsers}
+            onCreatePost={handleCreatePost}
           />
         )
       case 'profile':
@@ -574,7 +599,7 @@ function DashboardPage() {
       case 'groups': 
         return <GroupsSection groups={groups} />
       case 'events': 
-        return <EventsSection events={events} onEventsUpdate={fetchEvents} />
+        return <EventsSection events={events} onEventsUpdate={fetchEvents} isLoading={isLoadingEvents} />
       case 'settings': 
         return (
           <SettingsSection
@@ -585,6 +610,8 @@ function DashboardPage() {
       default:
         return (
           <HomeFeed
+            posts={posts}
+            onPostLike={handleLikePost}
             setActiveTab={setActiveTab}
           />
         )
@@ -630,7 +657,6 @@ function DashboardPage() {
       <TopBar
         isMobileMenuOpen={isMobileMenuOpen}
         setIsMobileMenuOpen={setIsMobileMenuOpen}
-        setShowCreatePost={setShowCreatePost}
         setShowNotifications={handleNotificationsToggle}
         setShowChat={handleChatToggle}
         showNotifications={showNotifications}

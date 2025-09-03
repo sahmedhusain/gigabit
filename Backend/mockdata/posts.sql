@@ -1,5 +1,7 @@
 -- Mock Posts Data
 -- Creating diverse posts from different users
+-- Mock Posts Data
+-- Creating diverse posts from different users
 
 INSERT INTO posts (user_id, content, image_url, privacy, created_at, updated_at) VALUES
 -- John's posts (Technology & General)

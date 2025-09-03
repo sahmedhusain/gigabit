@@ -65,6 +65,38 @@ export default function RegisterPage() {
         throw new Error('Password must be at least 6 characters long')
       }
 
+      let avatarUrl = '';
+
+      // Upload avatar image if provided
+      if (formData.avatar) {
+        try {
+          const avatarFormData = new FormData();
+          avatarFormData.append('image', formData.avatar);
+          
+          console.log("Uploading avatar to backend uploads endpoint")
+
+          const uploadResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/api/uploads`, {
+            method: 'POST',
+            body: avatarFormData,
+            credentials: 'include'
+          })
+
+          console.log("Avatar upload response:", uploadResponse);
+          if (uploadResponse.ok) {
+            const uploadData = await uploadResponse.json();
+            avatarUrl = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/api/images/${uploadData.filename}`;
+            console.log("Avatar uploaded successfully:", avatarUrl);
+          } else {
+            const errorData = await uploadResponse.json();
+            console.warn('Avatar upload failed:', errorData.error);
+          }
+        } catch (avatarError) {
+          console.warn('Avatar upload error:', avatarError);
+        }
+      } else {
+        avatarUrl = "avatar1.png";
+      }
+
       // Call register function from auth context
       await register({
         email: formData.email,
@@ -74,6 +106,7 @@ export default function RegisterPage() {
         dateOfBirth: formData.dateOfBirth,
         nickname: formData.nickname,
         aboutMe: formData.aboutMe,
+        avatar: avatarUrl,
       })
 
       // Redirect to dashboard on success

@@ -38,8 +38,24 @@ export default function ProfileSection({
       {/* Profile Header */}
       <div className="bg-gradient-to-r from-white/10 to-white/5 backdrop-blur-xl rounded-2xl lg:rounded-3xl border border-white/20 p-4 lg:p-8">
         <div className="flex flex-col items-center space-y-4 lg:flex-row lg:items-start lg:space-y-0 lg:space-x-8">
-          <div className="w-24 h-24 lg:w-32 lg:h-32 bg-gradient-to-r from-emerald-500 to-teal-600 rounded-full flex items-center justify-center">
-            <User className="w-12 h-12 lg:w-16 lg:h-16 text-white" />
+          <div className="w-24 h-24 lg:w-32 lg:h-32 bg-gradient-to-r from-emerald-500 to-teal-600 rounded-full flex items-center justify-center overflow-hidden">
+            {currentUser?.avatar ? (
+              <img 
+                src={currentUser.avatar.startsWith('http') ? 
+                  currentUser.avatar : 
+                  `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}${currentUser.avatar}`
+                }
+                alt={`${currentUser.name}'s avatar`}
+                className="w-full h-full object-cover"
+                onError={(e) => {
+                  // Fallback to default User icon on error
+                  const target = e.target as HTMLImageElement;
+                  target.style.display = 'none';
+                  target.nextElementSibling?.classList.remove('hidden');
+                }}
+              />
+            ) : null}
+            <User className={`w-12 h-12 lg:w-16 lg:h-16 text-white ${currentUser?.avatar ? 'hidden' : ''}`} />
           </div>
           
           <div className="flex-1 text-center lg:text-left">

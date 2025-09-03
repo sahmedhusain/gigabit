@@ -28,15 +28,16 @@ import TopBar from '@/components/dashboard/TopBar'
 import Sidebar from '@/components/dashboard/Sidebar'
 import CreatePost from '@/components/dashboard/CreatePost'
 import CreateGroup from '@/components/dashboard/CreateGroup'
+import CreateGeneralEvent from '@/components/dashboard/CreateGeneralEvent'
 import NotificationsDropdown from '@/components/dashboard/NotificationsDropdown'
-import ChatDropdown from '@/components/dashboard/ChatDropdown'
 import HomeFeed from '@/components/dashboard/HomeFeed'
 import ProfileSection from '@/components/dashboard/ProfileSection'
+import ChatsSection from '@/components/dashboard/ChatsSection'
+import ActivitySection from '@/components/dashboard/ActivitySection'
+import CommunitySection from '@/components/dashboard/CommunitySection'
 import {
-  GroupsSection,
   SettingsSection
 } from '@/components/dashboard/DashboardSections'
-import EventsSection from '@/components/dashboard/EventsSection'
 
 function DashboardPage() {
   const { user, logout, checkAuth } = useAuth()
@@ -49,15 +50,25 @@ function DashboardPage() {
   const { posts: livePosts, isLoading: postsLoading } = useRealTimePosts()
   const { items: liveNotifications, unread: liveUnreadCount } = useNotifications()
   const { groups: liveGroups } = useRealTimeGroups()
-  const { events: liveEvents } = useRealTimeEvents()
+  const { 
+    events: liveEvents, 
+    loading: eventsLoading, 
+    respond: respondToEvent,
+    refetch: refetchEvents 
+  } = useRealTimeEvents()
   const { conversations: liveConversations } = useConversations()
 
   // UI State
-  const [activeTab, setActiveTab] = useState('home')
+  const [activeTab, setActiveTab] = useState('feed')
+  const [previousTab, setPreviousTab] = useState('feed')
+  const [feedSubTab, setFeedSubTab] = useState('all')
+  const [activitySubTab, setActivitySubTab] = useState('liked')
+  const [communitySubTab, setCommunitySubTab] = useState('events')
+  const [chatSubTab, setChatSubTab] = useState('all')
   const [showCreatePost, setShowCreatePost] = useState(false)
   const [showCreateGroup, setShowCreateGroup] = useState(false)
+  const [showCreateEvent, setShowCreateEvent] = useState(false)
   const [showNotifications, setShowNotifications] = useState(false)
-  const [showChat, setShowChat] = useState(false)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
 
   // Post Creation State
@@ -77,8 +88,6 @@ function DashboardPage() {
   const [isLoadingGroups, setIsLoadingGroups] = useState(false)
   const [chats, setChats] = useState<Chat[]>([])
   const [isLoadingChats, setIsLoadingChats] = useState(false)
-  const [events, setEvents] = useState<Event[]>([])
-  const [isLoadingEvents, setIsLoadingEvents] = useState(false)
   const [unreadNotifications, setUnreadNotifications] = useState(0)
   const [isSearching, setIsSearching] = useState(false)
   const [isLoadingTrending, setIsLoadingTrending] = useState(false)
@@ -118,7 +127,7 @@ function DashboardPage() {
     if (user) {
       fetchFeedPosts()
       fetchUsers()
-      fetchEvents() // Add this to load events immediately
+      refetchEvents() // Add this to load events immediately
     }
   }, [user])
 
@@ -152,7 +161,7 @@ function DashboardPage() {
 
         case 'post_update':
           console.log('Post update received:', message.data)
-          if (activeTab === 'home') {
+          if (activeTab === 'feed') {
             fetchFeedPosts()
           }
           break
@@ -319,27 +328,6 @@ function DashboardPage() {
       }
     } finally {
       setIsLoadingGroups(false)
-    }
-  }
-
-  const fetchEvents = async () => {
-    try {
-      setIsLoadingEvents(true)
-      console.log('Fetching events...')
-      const data = await api.getUserEvents()
-      console.log('Events API response:', data)
-      const eventsArr = Array.isArray(data?.events) ? data.events : []
-      console.log('Events array:', eventsArr)
-      setEvents(eventsArr)
-    } catch (err) {
-      console.error('Error fetching events:', err)
-      if (err instanceof NetworkError) {
-        error('Failed to load events.')
-      } else {
-        error('Unable to load events right now.')
-      }
-    } finally {
-      setIsLoadingEvents(false)
     }
   }
 
@@ -556,21 +544,35 @@ function DashboardPage() {
     }
   }
 
+  // Custom function to handle tab changes and track previous tab
+  const handleTabChange = (newTab: string) => {
+    if (newTab !== activeTab) {
+      setPreviousTab(activeTab)
+      setActiveTab(newTab)
+    }
+  }
+
   const handleChatToggle = () => {
-    setShowChat(!showChat)
-    if (!showChat) {
+    if (activeTab === 'chats') {
+      // If we're already on chats, go back to previous tab
+      setActiveTab(previousTab)
+    } else {
+      // Navigate to chats tab and fetch data
+      setPreviousTab(activeTab)
+      setActiveTab('chats')
       fetchConversations()
+      fetchGroups()
     }
   }
 
   const renderContent = () => {
     switch (activeTab) {
-      case 'home':
+      case 'feed':
         return (
           <HomeFeed
             posts={posts}
             onPostLike={handleLikePost}
-            setActiveTab={setActiveTab}
+            setActiveTab={handleTabChange}
             showCreatePost={showCreatePost}
             setShowCreatePost={setShowCreatePost}
             newPostContent={newPostContent}
@@ -584,6 +586,46 @@ function DashboardPage() {
             availableUsers={availableUsers}
             loadingUsers={loadingUsers}
             onCreatePost={handleCreatePost}
+            feedSubTab={feedSubTab}
+            setFeedSubTab={setFeedSubTab}
+          />
+        )
+      case 'chats':
+        return (
+          <ChatsSection
+            chats={chats}
+            groups={groups}
+            isLoadingChats={isLoadingChats}
+            isLoadingGroups={isLoadingGroups}
+            chatSubTab={chatSubTab}
+            setChatSubTab={setChatSubTab}
+            onChatClick={setOpenChatWindow}
+            isUserOnline={isUserOnline}
+            showCreateGroup={showCreateGroup}
+            setShowCreateGroup={setShowCreateGroup}
+          />
+        )
+      case 'activity':
+        return (
+          <ActivitySection
+            activitySubTab={activitySubTab}
+            setActivitySubTab={setActivitySubTab}
+            posts={posts}
+            onPostLike={handleLikePost}
+          />
+        )
+      case 'community':
+        return (
+          <CommunitySection
+            events={liveEvents}
+            onEventsUpdate={refetchEvents}
+            isLoadingEvents={eventsLoading}
+            notifications={notifications}
+            isLoadingNotifications={isLoadingNotifications}
+            showCreateEvent={showCreateEvent}
+            setShowCreateEvent={setShowCreateEvent}
+            onEventRespond={respondToEvent}
+            communitySubTab={communitySubTab}
           />
         )
       case 'profile':
@@ -596,10 +638,6 @@ function DashboardPage() {
             isLoadingFollowers={isLoadingFollowers}
           />
         )
-      case 'groups': 
-        return <GroupsSection groups={groups} />
-      case 'events': 
-        return <EventsSection events={events} onEventsUpdate={fetchEvents} isLoading={isLoadingEvents} />
       case 'settings': 
         return (
           <SettingsSection
@@ -612,7 +650,22 @@ function DashboardPage() {
           <HomeFeed
             posts={posts}
             onPostLike={handleLikePost}
-            setActiveTab={setActiveTab}
+            setActiveTab={handleTabChange}
+            showCreatePost={showCreatePost}
+            setShowCreatePost={setShowCreatePost}
+            newPostContent={newPostContent}
+            setNewPostContent={setNewPostContent}
+            newPostImage={newPostImage}
+            setNewPostImage={setNewPostImage}
+            postPrivacy={postPrivacy}
+            setPostPrivacy={setPostPrivacy}
+            selectedUsers={selectedUsers}
+            setSelectedUsers={setSelectedUsers}
+            availableUsers={availableUsers}
+            loadingUsers={loadingUsers}
+            onCreatePost={handleCreatePost}
+            feedSubTab={feedSubTab}
+            setFeedSubTab={setFeedSubTab}
           />
         )
     }
@@ -633,12 +686,6 @@ function DashboardPage() {
           <div
             key={i}
             className="absolute animate-bounce floating-particle"
-            style={{
-              left: `${Math.random() * 100}%`,
-              top: `${Math.random() * 100}%`,
-              animationDelay: `${Math.random() * 3}s`,
-              animationDuration: `${3 + Math.random() * 2}s`
-            }}
           >
             <Sparkles className="w-2 h-2 text-white/30" />
           </div>
@@ -649,24 +696,31 @@ function DashboardPage() {
         isMobileMenuOpen={isMobileMenuOpen}
         setIsMobileMenuOpen={setIsMobileMenuOpen}
         activeTab={activeTab}
-        setActiveTab={setActiveTab}
-        fetchGroups={fetchGroups}
-        fetchEvents={fetchEvents}
+        setActiveTab={handleTabChange}
+        feedSubTab={feedSubTab}
+        setFeedSubTab={setFeedSubTab}
+        activitySubTab={activitySubTab}
+        setActivitySubTab={setActivitySubTab}
+        communitySubTab={communitySubTab}
+        setCommunitySubTab={setCommunitySubTab}
+        fetchEvents={refetchEvents}
+        currentUser={currentUser}
+        logout={logout}
       />
 
       <TopBar
         isMobileMenuOpen={isMobileMenuOpen}
         setIsMobileMenuOpen={setIsMobileMenuOpen}
-        setShowNotifications={handleNotificationsToggle}
-        setShowChat={handleChatToggle}
+        activeTab={activeTab}
+        setActiveTab={handleTabChange}
         showNotifications={showNotifications}
-        showChat={showChat}
-        notifications={notifications}
-        currentUser={currentUser}
+        setShowNotifications={handleNotificationsToggle}
+        unreadCount={liveUnreadCount || unreadNotifications}
         isOffline={isOffline}
         isConnected={isConnected}
-        logout={logout}
-        setActiveTab={setActiveTab}
+        currentUser={currentUser}
+        onChatClick={handleChatToggle}
+        unreadChatsCount={chats.reduce((sum, chat) => sum + chat.unread, 0)}
       />
 
       <CreatePost
@@ -685,6 +739,16 @@ function DashboardPage() {
         onCreatePost={handleCreatePost}
       />
 
+      <CreateGeneralEvent
+        show={showCreateEvent}
+        onClose={() => setShowCreateEvent(false)}
+        onEventCreated={() => {
+          refetchEvents()
+          setShowCreateEvent(false)
+          success('Event created successfully!')
+        }}
+      />
+
       <CreateGroup
         show={showCreateGroup}
         onClose={() => setShowCreateGroup(false)}
@@ -700,14 +764,6 @@ function DashboardPage() {
         onClose={() => setShowNotifications(false)}
       />
 
-      <ChatDropdown
-        show={showChat}
-        chats={chats}
-        onChatClick={setOpenChatWindow}
-        onClose={() => setShowChat(false)}
-        isUserOnline={isUserOnline}
-      />
-
       {/* Chat Window */}
       {openChatWindow && (
         <ChatWindow
@@ -719,7 +775,7 @@ function DashboardPage() {
       )}
 
       {/* Main Content */}
-      <div className="lg:ml-64 pt-14 lg:pt-16 p-3 lg:p-6 relative z-10">
+      <div className="main-content-layout p-2 lg:p-4 relative z-10">
         <div className="max-w-6xl mx-auto">
           {renderContent()}
         </div>

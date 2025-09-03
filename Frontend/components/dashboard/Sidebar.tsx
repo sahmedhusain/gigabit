@@ -1,161 +1,353 @@
 'use client'
-import { Home, Users, Calendar, X, Search } from 'lucide-react'
 import { useState } from 'react'
-import { useNotifications, useRealTimeGroups, useRealTimeEvents, useConnectionStatus } from '@/hooks'
+import { Home, User, MessageCircle, Activity, Users, Calendar, Settings, X, Sparkles, Bell, Search, LogOut, Heart } from 'lucide-react'
 
 interface SidebarProps {
   isMobileMenuOpen: boolean
   setIsMobileMenuOpen: (open: boolean) => void
   activeTab: string
   setActiveTab: (tab: string) => void
-  fetchGroups: () => void
+  feedSubTab: string
+  setFeedSubTab: (subTab: string) => void
+  activitySubTab: string
+  setActivitySubTab: (subTab: string) => void
+  communitySubTab: string
+  setCommunitySubTab: (subTab: string) => void
   fetchEvents: () => void
+  currentUser: {
+    id: number
+    name: string
+    username: string
+    avatar?: string
+    isPrivate: boolean
+    followers: number
+    following: number
+  } | null
+  logout: () => void
 }
 
-export default function Sidebar({
-  isMobileMenuOpen,
-  setIsMobileMenuOpen,
-  activeTab,
+export default function Sidebar({ 
+  isMobileMenuOpen, 
+  setIsMobileMenuOpen, 
+  activeTab, 
   setActiveTab,
-  fetchGroups,
-  fetchEvents
+  feedSubTab,
+  setFeedSubTab,
+  activitySubTab,
+  setActivitySubTab,
+  communitySubTab,
+  setCommunitySubTab,
+  fetchEvents,
+  currentUser,
+  logout
 }: SidebarProps) {
+  const [hoveredItem, setHoveredItem] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
-  const { items: notifications, unread } = useNotifications()
-  const { groups, getUnreadCount: getGroupsUnread } = useRealTimeGroups()
-  const { events, getUnreadCount: getEventsUnread } = useRealTimeEvents()
-  const { isConnected } = useConnectionStatus()
 
-  // Calculate unread counts
-  const groupsUnread = getGroupsUnread()
-  const eventsUnread = getEventsUnread()
-
-  const handleTabClick = (itemId: string) => {
-    setActiveTab(itemId)
-    setIsMobileMenuOpen(false)
-    
-    // Fetch data based on the selected tab
-    if (itemId === 'groups') {
-      fetchGroups()
-    } else if (itemId === 'events') {
-      fetchEvents()
-    } 
-  }
-
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!searchQuery.trim()) return
-    
-    // TODO: Implement search functionality
-    // This could navigate to a search results page or trigger search in current context
-    console.log('Searching for:', searchQuery)
-  }
-
-  const clearSearch = () => {
-    setSearchQuery('')
-  }
+  const menuSections = [
+    {
+      title: 'Feed',
+      items: [
+        { 
+          id: 'all', 
+          label: 'All Posts', 
+          icon: Home, 
+          description: 'See all public posts',
+          color: 'from-emerald-500 to-teal-600',
+          onClick: () => {
+            setActiveTab('feed')
+            setFeedSubTab('all')
+          },
+          isActive: activeTab === 'feed' && feedSubTab === 'all'
+        },
+        { 
+          id: 'following', 
+          label: 'Following', 
+          icon: Users, 
+          description: 'Posts from people you follow',
+          color: 'from-emerald-500 to-teal-600',
+          onClick: () => {
+            setActiveTab('feed')
+            setFeedSubTab('following')
+          },
+          isActive: activeTab === 'feed' && feedSubTab === 'following'
+        },
+        { 
+          id: 'friends', 
+          label: 'Friends', 
+          icon: Heart, 
+          description: 'Posts from your friends',
+          color: 'from-emerald-500 to-teal-600',
+          onClick: () => {
+            setActiveTab('feed')
+            setFeedSubTab('friends')
+          },
+          isActive: activeTab === 'feed' && feedSubTab === 'friends'
+        }
+      ]
+    },
+    {
+      title: 'Your Activity',
+      items: [
+        { 
+          id: 'liked', 
+          label: 'Liked Posts', 
+          icon: Heart, 
+          description: 'Posts you\'ve liked',
+          color: 'from-teal-500 to-cyan-600',
+          onClick: () => {
+            setActiveTab('activity')
+            setActivitySubTab('liked')
+          },
+          isActive: activeTab === 'activity' && activitySubTab === 'liked'
+        },
+        { 
+          id: 'commented', 
+          label: 'Commented Posts', 
+          icon: MessageCircle, 
+          description: 'Posts you\'ve commented on',
+          color: 'from-teal-500 to-cyan-600',
+          onClick: () => {
+            setActiveTab('activity')
+            setActivitySubTab('commented')
+          },
+          isActive: activeTab === 'activity' && activitySubTab === 'commented'
+        },
+        { 
+          id: 'saved', 
+          label: 'Saved Posts', 
+          icon: Sparkles, 
+          description: 'Your bookmarked posts',
+          color: 'from-teal-500 to-cyan-600',
+          onClick: () => {
+            setActiveTab('activity')
+            setActivitySubTab('saved')
+          },
+          isActive: activeTab === 'activity' && activitySubTab === 'saved'
+        }
+      ]
+    },
+    {
+      title: 'Community',
+      items: [
+        { 
+          id: 'events', 
+          label: 'Events', 
+          icon: Calendar, 
+          description: 'Upcoming events',
+          color: 'from-cyan-500 to-emerald-600',
+          onClick: () => {
+            setActiveTab('community')
+            setCommunitySubTab('events')
+            fetchEvents()
+          },
+          isActive: activeTab === 'community' && communitySubTab === 'events'
+        },
+        { 
+          id: 'activity-history', 
+          label: 'Activity History', 
+          icon: Activity, 
+          description: 'Your recent activity',
+          color: 'from-cyan-500 to-emerald-600',
+          onClick: () => {
+            setActiveTab('community')
+            setCommunitySubTab('activity')
+          },
+          isActive: activeTab === 'community' && communitySubTab === 'activity'
+        }
+      ]
+    }
+  ]
 
   return (
     <>
-      {/* Mobile Menu Overlay */}
+      {/* Mobile Overlay */}
       {isMobileMenuOpen && (
         <div 
-          className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 lg:hidden"
-          onClick={() => setIsMobileMenuOpen(false)}
+          className="fixed top-16 left-0 right-0 bottom-0 bg-black/50 backdrop-blur-sm z-20 lg:hidden transition-opacity duration-300" 
+          onClick={() => setIsMobileMenuOpen(false)} 
         />
       )}
       
       {/* Sidebar */}
-      <div className={`fixed left-0 top-0 h-full w-64 bg-gradient-to-b from-white/10 to-white/5 backdrop-blur-xl border-r border-white/20 z-50 transform transition-transform duration-300 ease-in-out ${
-        isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
-      } lg:translate-x-0`}>
-        <div className="p-4 lg:p-6">
-          <div className="flex items-center justify-between mb-6 lg:mb-8">
-            <h1 className="text-xl lg:text-2xl font-bold bg-gradient-to-r from-white via-emerald-100 to-teal-200 bg-clip-text text-transparent">
-              SocialConnect
-            </h1>
-            <button
-              onClick={() => setIsMobileMenuOpen(false)}
-              className="lg:hidden p-2 text-white/70 hover:text-white hover:bg-white/10 rounded-xl transition-all duration-200"
-              title="Close menu"
-            >
-              <X className="w-5 h-5" />
-            </button>
+      <aside className={`
+        sidebar-layout bg-gradient-to-br from-emerald-900/95 via-teal-900/95 to-cyan-800/95 backdrop-blur-xl border-r border-emerald-400/20 shadow-2xl transform transition-all duration-300 ease-in-out
+        ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}
+        lg:translate-x-0
+      `}>
+        <div className="flex flex-col h-full">
+          {/* Search Bar */}
+          <div className="p-2 border-b border-emerald-400/20">
+            <div className="relative">
+              <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 text-emerald-100/60 w-3.5 h-3.5" />
+              <input
+                type="text"
+                placeholder="Search navigation..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-8 pr-2.5 py-1.5 bg-emerald-400/10 backdrop-blur-sm rounded-md border border-emerald-400/20 text-white placeholder-emerald-100/50 focus:outline-none focus:ring-2 focus:ring-emerald-400/50 focus:border-transparent transition-all duration-200 text-sm"
+              />
+            </div>
           </div>
-          
-          {/* Search Section */}
-          <div className="mb-4 lg:mb-6">
-            <form onSubmit={handleSearch} className="relative">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-white/50" />
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search users, posts, groups..."
-                  disabled={!isConnected}
-                  className={`w-full pl-10 pr-10 py-2 lg:py-3 rounded-xl bg-white/10 border border-white/20 text-white placeholder-white/50 text-sm lg:text-base transition-all duration-200 focus:outline-none ${
-                    isConnected 
-                      ? 'focus:ring-2 focus:ring-emerald-400/50 focus:border-emerald-400/50 hover:bg-white/15' 
-                      : 'cursor-not-allowed bg-white/5 border-white/10'
-                  }`}
-                />
-                {searchQuery && (
-                  <button
-                    type="button"
-                    onClick={clearSearch}
-                    title="Clear search"
-                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-white/50 hover:text-white transition-colors"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                )}
-              </div>
-              {!isConnected && (
-                <p className="text-xs text-white/40 mt-1">Search unavailable offline</p>
-              )}
-            </form>
-          </div>
-          
-          <nav className="space-y-2">
-            {[
-              { id: 'home', icon: Home, label: 'Home', unread: 0 },
-              { id: 'groups', icon: Users, label: 'Groups', unread: groupsUnread },
-              { id: 'events', icon: Calendar, label: 'Events', unread: eventsUnread }
-            ].map((item) => (
+
+          {/* Navigation */}
+          <nav className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-emerald-400/20 scrollbar-track-transparent">
+            <div className="p-2 space-y-3">
+              {menuSections.map((section) => (
+                <div key={section.title} className="space-y-1">
+                  {/* Section Title */}
+                  <div className="px-2 py-1">
+                    <h3 className="text-emerald-100/70 text-xs font-semibold uppercase tracking-wider">
+                      {section.title}
+                    </h3>
+                  </div>
+
+                  {/* Section Items */}
+                  <div className="space-y-0.5">
+                    {section.items.map((item) => {
+                      const Icon = item.icon
+                      const isActive = item.isActive
+                      const isHovered = hoveredItem === item.id
+
+                      return (
+                        <button
+                          key={item.id}
+                          onClick={() => {
+                            item.onClick()
+                            setIsMobileMenuOpen(false)
+                          }}
+                          onMouseEnter={() => setHoveredItem(item.id)}
+                          onMouseLeave={() => setHoveredItem(null)}
+                          className={`w-full group relative overflow-hidden rounded-md transition-all duration-300 ${
+                            isActive
+                              ? `bg-gradient-to-r ${item.color} shadow-md scale-101 transform`
+                              : 'hover:bg-emerald-500/10 hover:scale-100 hover:shadow-sm'
+                          }`}
+                        >
+                          <div className={`flex items-center space-x-2.5 p-2.5 ${
+                            isActive ? 'text-white' : 'text-emerald-100/80 group-hover:text-white'
+                          }`}>
+                            <div className={`relative p-1 rounded-md transition-all duration-300 ${
+                              isActive 
+                                ? 'bg-white/20 shadow-sm' 
+                                : 'bg-emerald-400/10 group-hover:bg-emerald-400/20'
+                            }`}>
+                              <Icon className={`w-3.5 h-3.5 transition-transform duration-300 ${
+                                isHovered ? 'scale-110' : ''
+                              }`} />
+                            </div>
+                            <div className="text-left flex-1">
+                              <span className="font-semibold text-xs">{item.label}</span>
+                              <p className={`text-xs ${
+                                isActive ? 'text-white/80' : 'text-emerald-100/60'
+                              }`}>{item.description}</p>
+                            </div>
+                          </div>
+
+                          {/* Active item glow effect */}
+                          {isActive && (
+                            <div className="absolute inset-0 bg-gradient-to-r from-white/10 to-transparent opacity-50 animate-pulse"></div>
+                          )}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </nav>
+
+          {/* Profile */}
+          <div className="p-2 border-t border-emerald-400/20 bg-gradient-to-r from-teal-800/50 to-cyan-700/50">
+            <div className="flex items-center space-x-2.5">
+              {/* Profile Button */}
               <button
-                key={item.id}
-                onClick={() => handleTabClick(item.id)}
-                disabled={!isConnected && (item.id === 'groups' || item.id === 'events')}
-                className={`w-full flex items-center justify-between px-3 lg:px-4 py-2 lg:py-3 rounded-xl transition-all duration-200 text-sm lg:text-base ${
-                  activeTab === item.id
-                    ? 'bg-gradient-to-r from-emerald-500/20 to-teal-500/20 text-emerald-300 border border-emerald-400/30'
-                    : !isConnected && (item.id === 'groups' || item.id === 'events')
-                    ? 'text-white/40 cursor-not-allowed'
-                    : 'text-white/70 hover:text-white hover:bg-white/10'
+                onClick={() => {
+                  setActiveTab('profile')
+                  setIsMobileMenuOpen(false)
+                }}
+                onMouseEnter={() => setHoveredItem('profile')}
+                onMouseLeave={() => setHoveredItem(null)}
+                className={`flex-1 group relative overflow-hidden rounded-md transition-all duration-300 ${
+                  activeTab === 'profile'
+                    ? 'bg-gradient-to-r from-emerald-500 to-teal-600 shadow-md scale-101 transform text-white'
+                    : 'hover:bg-emerald-500/10 hover:scale-100 hover:shadow-sm text-emerald-100/80 hover:text-white'
                 }`}
               >
-                <div className="flex items-center">
-                  <item.icon className="w-4 h-4 lg:w-5 lg:h-5 mr-2 lg:mr-3" />
-                  {item.label}
+                <div className="flex items-center space-x-2 p-2.5">
+                  <div className={`relative transition-all duration-300 ${
+                    activeTab === 'profile' ? 'shadow-sm' : 'group-hover:shadow-sm'
+                  }`}>
+                    {currentUser?.avatar ? (
+                      <img
+                        src={currentUser.avatar}
+                        alt={currentUser.name}
+                        className="w-7 h-7 rounded-full object-cover border-2 border-white/20"
+                      />
+                    ) : (
+                      <div className="w-7 h-7 bg-gradient-to-r from-emerald-400 to-teal-500 rounded-full flex items-center justify-center text-white font-bold text-xs">
+                        {currentUser?.name?.[0]?.toUpperCase() || <User className="w-3.5 h-3.5" />}
+                      </div>
+                    )}
+                    {/* Online status indicator */}
+                    <div className="absolute -bottom-0.5 -right-0.5 w-2 h-2 bg-green-500 rounded-full border border-emerald-900"></div>
+                  </div>
+                  <div className="text-left flex-1">
+                    <span className="font-semibold text-xs truncate block">
+                      {currentUser?.name || 'User'}
+                    </span>
+                    <p className={`text-xs truncate ${
+                      activeTab === 'profile' ? 'text-white/80' : 'text-emerald-100/60'
+                    }`}>@{currentUser?.username || 'username'}</p>
+                  </div>
                 </div>
-                {item.unread > 0 && (
-                  <span className="bg-emerald-500 text-white text-xs rounded-full min-w-[20px] h-5 flex items-center justify-center px-2">
-                    {item.unread > 99 ? '99+' : item.unread}
-                  </span>
+
+                {/* Active item glow effect */}
+                {activeTab === 'profile' && (
+                  <div className="absolute inset-0 bg-gradient-to-r from-white/10 to-transparent opacity-50 animate-pulse"></div>
                 )}
               </button>
-            ))}
-            
-            {/* Connection Status Indicator */}
-            {!isConnected && (
-              <div className="mt-4 p-3 bg-red-500/10 border border-red-400/20 rounded-xl">
-                <p className="text-red-400 text-xs text-center">Offline - Some features unavailable</p>
+
+              {/* Action Buttons */}
+              <div className="flex flex-col space-y-1">
+                {/* Settings Button */}
+                <button
+                  onClick={() => {
+                    setActiveTab('settings')
+                    setIsMobileMenuOpen(false)
+                  }}
+                  className={`p-1 rounded-sm transition-all duration-200 ${
+                    activeTab === 'settings'
+                      ? 'bg-white/20 text-white shadow-sm'
+                      : 'bg-emerald-400/10 text-emerald-100/70 hover:bg-emerald-400/20 hover:text-white'
+                  }`}
+                  title="Settings"
+                >
+                  <Settings className="w-3 h-3" />
+                </button>
+                {/* Logout Button */}
+                <button
+                  onClick={() => logout()}
+                  className="p-1 rounded-sm bg-red-500/10 text-red-400 hover:bg-red-500/20 hover:text-red-300 transition-all duration-200"
+                  title="Logout"
+                >
+                  <LogOut className="w-3 h-3" />
+                </button>
               </div>
-            )}
-          </nav>
+            </div>
+          </div>
         </div>
-      </div>
+
+        {/* Floating particles effect */}
+        <div className="absolute inset-0 pointer-events-none overflow-hidden">
+          {[...Array(3)].map((_, i) => (
+            <div
+              key={i}
+              className={`absolute w-0.5 h-0.5 bg-emerald-400/20 rounded-full animate-float particle-${i + 1}`}
+            />
+          ))}
+        </div>
+      </aside>
     </>
   )
 }

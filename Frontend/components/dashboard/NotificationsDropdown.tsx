@@ -80,7 +80,7 @@ export default function NotificationsDropdown({ show, onClose }: NotificationsDr
   if (!show) return null
 
   return (
-    <div className="fixed top-14 lg:top-16 right-2 lg:right-6 w-80 sm:w-96 max-h-96 lg:max-h-[32rem] overflow-hidden bg-gradient-to-br from-slate-900/95 to-slate-800/95 backdrop-blur-xl rounded-xl lg:rounded-2xl border border-slate-700/50 shadow-2xl z-50">
+    <div className="fixed top-14 lg:top-16 left-1/2 transform -translate-x-1/2 w-80 sm:w-96 max-h-96 lg:max-h-[32rem] overflow-hidden bg-gradient-to-br from-slate-900/95 to-slate-800/95 backdrop-blur-xl rounded-xl lg:rounded-2xl border border-slate-700/50 shadow-2xl z-50">
       <div className="p-4 border-b border-slate-700/50">
         <div className="flex items-center justify-between">
           <h3 className="text-lg font-semibold text-white flex items-center gap-2">

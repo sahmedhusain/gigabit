@@ -106,8 +106,8 @@ export const ToastProvider: React.FC<ToastProviderProps> = ({ children }) => {
     <ToastContext.Provider value={contextValue}>
       {children}
       
-      {/* Toast Container */}
-      <div className="fixed top-4 right-4 z-[9999] space-y-2 max-w-sm">
+      {/* Toast Container - Centered at top */}
+      <div className="fixed top-4 left-1/2 transform -translate-x-1/2 z-[9999] space-y-2 max-w-sm w-full px-4">
         {toasts.map((toast) => (
           <div
             key={toast.id}
@@ -115,20 +115,23 @@ export const ToastProvider: React.FC<ToastProviderProps> = ({ children }) => {
               ${getToastStyles(toast.type)}
               backdrop-blur-xl border rounded-xl p-4 shadow-2xl
               transform transition-all duration-300 ease-in-out
-              animate-in slide-in-from-right-full
+              animate-in slide-in-from-top
+              mx-auto
             `}
           >
             <div className="flex items-start space-x-3">
               {getToastIcon(toast.type)}
               <div className="flex-1 min-w-0">
-                <p className="text-white text-sm font-medium">{toast.message}</p>
+                <p className="text-white text-sm font-medium text-center">{toast.message}</p>
                 {toast.action && (
-                  <button
-                    onClick={toast.action.onClick}
-                    className="mt-2 text-xs text-emerald-400 hover:text-emerald-300 font-medium"
-                  >
-                    {toast.action.label}
-                  </button>
+                  <div className="text-center">
+                    <button
+                      onClick={toast.action.onClick}
+                      className="mt-2 text-xs text-emerald-400 hover:text-emerald-300 font-medium"
+                    >
+                      {toast.action.label}
+                    </button>
+                  </div>
                 )}
               </div>
               <button

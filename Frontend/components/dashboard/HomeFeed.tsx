@@ -1,6 +1,6 @@
 'use client'
-import { TrendingUp, Activity, Wifi, WifiOff, RefreshCw, Users, UserCheck, Heart, Filter } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useState, useEffect } from 'react'
+import { TrendingUp, Activity, Wifi, WifiOff, RefreshCw, Users, UserCheck, Heart, Filter, Globe, Lock, EyeOff, MessageCircle, Share, Sparkles } from 'lucide-react'
 import PostCard from './PostCard'
 import CreatePost from './CreatePost'
 import { Post } from '@/lib/api'
@@ -8,6 +8,7 @@ import { Plus } from 'lucide-react'
 import { useRealTimePosts } from '@/hooks/useRealTimePosts'
 import { useConnectionStatus } from '@/hooks/useConnectionStatus'
 import { useDocumentTitle } from '@/hooks/useDocumentTitle'
+import { useRouter } from 'next/navigation'
 
 type FeedFilter = 'all' | 'followers' | 'friends' | 'favorites'
 
@@ -25,9 +26,11 @@ interface HomeFeedProps {
   setPostPrivacy: (privacy: string) => void
   selectedUsers: number[]
   setSelectedUsers: (users: number[]) => void
-  availableUsers: any[]
+  availableUsers: { id: number; email: string; first_name: string; last_name: string; avatar?: string; nickname?: string; display_name?: string; }[]
   loadingUsers: boolean
   onCreatePost: () => Promise<void>
+  feedSubTab: string
+  setFeedSubTab: (tab: string) => void
 }
 
 export default function HomeFeed({
@@ -46,11 +49,15 @@ export default function HomeFeed({
   setSelectedUsers,
   availableUsers,
   loadingUsers,
-  onCreatePost
+  onCreatePost,
+  feedSubTab,
+  setFeedSubTab
 }: HomeFeedProps) {
+  const router = useRouter()
   // Feed filter state
   const [activeFilter, setActiveFilter] = useState<FeedFilter>('all')
-  
+  const [isLoadingPosts, setIsLoadingPosts] = useState(false)
+
   // Use real-time posts hook
   const {
     isLoading,
@@ -118,43 +125,163 @@ export default function HomeFeed({
     refreshPosts()
   }
 
-  // Filter posts based on active filter
-  const filteredPosts = posts.filter(post => {
-    switch (activeFilter) {
-      case 'all':
-        return true
-      case 'followers':
-        // TODO: Add logic to filter posts from followers only
-        return true
-      case 'friends':
-        // TODO: Add logic to filter posts from friends only
-        return true
-      case 'favorites':
-        // TODO: Add logic to filter favorited posts only
-        return post.isLiked // For now, show liked posts as favorites
+  const getPrivacyIcon = (privacy: string) => {
+    switch (privacy) {
+      case 'public':
+        return <Globe className="w-4 h-4" />
+      case 'private':
+        return <Lock className="w-4 h-4" />
+      case 'almost_private':
+        return <EyeOff className="w-4 h-4" />
       default:
-        return true
+        return <Globe className="w-4 h-4" />
     }
-  })
+  }
 
-  const feedFilters = [
-    { id: 'all' as FeedFilter, label: 'All', icon: Filter, count: posts.length },
-    { id: 'followers' as FeedFilter, label: 'Followers', icon: Users, count: posts.length },
-    { id: 'friends' as FeedFilter, label: 'Friends', icon: UserCheck, count: posts.length },
-    { id: 'favorites' as FeedFilter, label: 'Favorites', icon: Heart, count: posts.filter(p => p.isLiked).length }
-  ]
+  // Filter posts based on active filter
+  const filteredPosts = () => {
+    switch (feedSubTab) {
+      case 'following':
+        return posts // Filter posts from users the current user follows
+      case 'friends':
+        return posts // Filter posts from mutual followers
+      default:
+        return posts // All posts
+    }
+  }
+
+  const renderPost = (post: Post) => (
+    <div
+      key={post.id}
+      className="bg-white/10 backdrop-blur-sm rounded-lg p-6 border border-white/20 hover:bg-white/15 transition-all"
+    >
+      <div className="flex items-start space-x-3">
+        <div className="w-12 h-12 bg-gradient-to-r from-emerald-400 to-teal-500 rounded-full flex items-center justify-center text-white font-bold">
+          {post.user.avatar ? (
+            <img
+              src={post.user.avatar}
+              alt={post.user.name}
+              className="w-12 h-12 rounded-full object-cover"
+            />
+          ) : (
+            post.user.name[0]?.toUpperCase()
+          )}
+        </div>
+        
+        <div className="flex-1">
+          <div className="flex items-center justify-between mb-2">
+            <div>
+              <h3 className="text-white font-medium">{post.user.name}</h3>
+              <p className="text-white/60 text-sm">@{post.user.username}</p>
+            </div>
+            <div className="flex items-center space-x-2 text-white/60 text-sm">
+              {getPrivacyIcon(post.privacy)}
+              <span>{post.timeAgo}</span>
+            </div>
+          </div>
+          
+          <p className="text-white/80 mb-4 leading-relaxed">{post.content}</p>
+          
+          {post.image && (
+            <div className="mb-4 rounded-lg overflow-hidden">
+              <img
+                src={post.image}
+                alt="Post content"
+                className="w-full h-64 object-cover"
+              />
+            </div>
+          )}
+          
+          <div className="flex items-center justify-between pt-4 border-t border-white/10">
+            <div className="flex items-center space-x-6">
+              <button
+                onClick={() => onPostLike(post.id)}
+                className={`flex items-center space-x-2 transition-all ${
+                  post.isLiked
+                    ? 'text-red-400 hover:text-red-300'
+                    : 'text-white/60 hover:text-red-400'
+                }`}
+              >
+                <Heart className={`w-5 h-5 ${post.isLiked ? 'fill-current' : ''}`} />
+                <span>{post.likes}</span>
+              </button>
+              
+              <button className="flex items-center space-x-2 text-white/60 hover:text-blue-400 transition-colors">
+                <MessageCircle className="w-5 h-5" />
+                <span>{post.comments}</span>
+              </button>
+              
+              <button className="flex items-center space-x-2 text-white/60 hover:text-emerald-400 transition-colors">
+                <Share className="w-5 h-5" />
+                <span>{post.shares}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+
+  const renderContent = () => {
+    const postsToShow = filteredPosts()
+    
+    if (isLoadingPosts) {
+      return (
+        <div className="flex items-center justify-center py-12">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
+        </div>
+      )
+    }
+
+    if (postsToShow.length === 0) {
+      return (
+        <div className="text-center py-16">
+          <Sparkles className="w-16 h-16 text-white/30 mx-auto mb-4" />
+          <p className="text-white/60 mb-2">No posts found</p>
+          <p className="text-white/40 text-sm">
+            {feedSubTab === 'following' && "Start following users to see their posts here"}
+            {feedSubTab === 'friends' && "Connect with friends to see their posts here"}
+            {feedSubTab === 'all' && "Be the first to share something!"}
+          </p>
+        </div>
+      )
+    }
+
+    return (
+      <div className="space-y-6">
+        {postsToShow.map(renderPost)}
+      </div>
+    )
+  }
 
   return (
-    <div className="space-y-4 lg:space-y-6">
-      {/* Create Post Section - Inline */}
-      <div className="bg-gradient-to-r from-white/10 to-white/5 backdrop-blur-xl rounded-2xl lg:rounded-3xl border border-white/20 p-4 lg:p-6">
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-white mb-2">
+            {feedSubTab === 'all' && 'All Posts'}
+            {feedSubTab === 'following' && 'Following'}
+            {feedSubTab === 'friends' && 'Friends'}
+          </h1>
+          <p className="text-white/70">
+            {feedSubTab === 'all' && 'Stay connected with your network'}
+            {feedSubTab === 'following' && 'Posts from people you follow'}
+            {feedSubTab === 'friends' && 'Posts from your friends'}
+          </p>
+        </div>
         <button
           onClick={() => setShowCreatePost(true)}
-          className="w-full flex items-center justify-center px-4 py-3 bg-gradient-to-r from-emerald-500 to-teal-600 rounded-xl text-white hover:from-emerald-600 hover:to-teal-700 transition-all duration-200 text-sm lg:text-base"
+          className="bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white px-4 py-2 rounded-lg transition-all flex items-center space-x-2"
         >
-          <Plus className="w-5 h-5 mr-2" />
-          What's on your mind?
+          <Plus className="w-4 h-4" />
+          <span>New Post</span>
         </button>
+      </div>
+
+      {/* Content */}
+      <div className="min-h-96">
+        {renderContent()}
       </div>
 
       {/* Create Post Modal */}
@@ -173,38 +300,6 @@ export default function HomeFeed({
         loadingUsers={loadingUsers}
         onCreatePost={onCreatePost}
       />
-
-      {/* Posts Feed */}
-      <div className="space-y-4 lg:space-y-6">
-        {!isLoading && filteredPosts.length === 0 ? (
-          <div className="bg-gradient-to-r from-white/10 to-white/5 backdrop-blur-xl rounded-2xl lg:rounded-3xl border border-white/20 p-8 text-center">
-            <p className="text-white/60 text-lg">
-              {activeFilter === 'all' ? 'No posts to show' : `No ${activeFilter} posts to show`}
-            </p>
-            <p className="text-white/40 text-sm mt-2">
-              {activeFilter === 'all' 
-                ? 'Start following people or join groups to see posts in your feed!' 
-                : `Try switching to "All" to see more posts, or interact with more ${activeFilter} content.`
-              }
-            </p>
-          </div>
-        ) : (
-          filteredPosts.map((apiPost) => (
-            <PostCard
-              key={apiPost.id}
-              post={transformPost(apiPost)}
-              onLike={handlePostLike}
-            />
-          ))
-        )}
-      </div>
-
-      {/* Loading More Indicator */}
-      {isLoading && posts.length > 0 && (
-        <div className="flex justify-center py-4">
-          <RefreshCw className="w-6 h-6 animate-spin text-emerald-400" />
-        </div>
-      )}
     </div>
   )
 }

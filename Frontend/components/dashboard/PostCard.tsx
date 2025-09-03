@@ -1,5 +1,5 @@
 'use client'
-import { User, Heart, MessageSquare, Share, MoreHorizontal, Bookmark, Image as ImageIcon } from 'lucide-react'
+import { User, Heart, MessageSquare, MoreHorizontal, Bookmark, Image as ImageIcon, Send } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { Post } from '@/lib/api'
 import { useRealTimeComments, useConnectionStatus } from '@/hooks'
@@ -7,9 +7,10 @@ import { useRealTimeComments, useConnectionStatus } from '@/hooks'
 interface PostCardProps {
   post: Post
   onLike: (postId: number) => void
+  onBookmark?: (postId: number) => void
 }
 
-export default function PostCard({ post, onLike }: PostCardProps) {
+export default function PostCard({ post, onLike, onBookmark }: PostCardProps) {
   const router = useRouter()
   
   // Real-time comment integration
@@ -34,6 +35,13 @@ export default function PostCard({ post, onLike }: PostCardProps) {
   const handleLikeClick = (e: React.MouseEvent) => {
     e.stopPropagation()
     onLike(post.id)
+  }
+
+  const handleBookmarkClick = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (onBookmark) {
+      onBookmark(post.id)
+    }
   }
 
   return (
@@ -79,7 +87,7 @@ export default function PostCard({ post, onLike }: PostCardProps) {
               target.nextElementSibling?.classList.remove('hidden');
             }}
           />
-          <div className="aspect-video bg-gradient-to-br from-emerald-500/20 to-teal-500/20 flex items-center justify-center hidden">
+          <div className="aspect-video bg-gradient-to-br from-emerald-500/20 to-teal-500/20 flex items-center justify-center">
             <ImageIcon className="w-8 h-8 lg:w-12 lg:h-12 text-white/50" />
           </div>
         </div>
@@ -87,45 +95,49 @@ export default function PostCard({ post, onLike }: PostCardProps) {
 
       {/* Post Actions */}
       <div className="flex items-center justify-between pt-3 lg:pt-4 border-t border-white/10">
-        <button
-          onClick={handleLikeClick}
-          className={`flex items-center space-x-1 lg:space-x-2 px-2 lg:px-4 py-1.5 lg:py-2 rounded-lg lg:rounded-xl transition-all duration-200 text-xs lg:text-sm ${post.isLiked
-            ? 'text-red-400 bg-red-500/10'
-            : 'text-white/70 hover:text-white hover:bg-white/10'
-            }`}>
-          <Heart className={`w-3 h-3 lg:w-4 lg:h-4 ${post.isLiked ? 'fill-current' : ''}`} />
-          <span>{post.likes}</span>
-        </button>
+        <div className="flex items-center space-x-2 lg:space-x-4">
+          <button
+            onClick={handleLikeClick}
+            className={`flex items-center space-x-1 lg:space-x-2 px-2 lg:px-4 py-1.5 lg:py-2 rounded-lg lg:rounded-xl transition-all duration-200 text-xs lg:text-sm ${post.isLiked
+              ? 'text-red-400 bg-red-500/10'
+              : 'text-white/70 hover:text-white hover:bg-white/10'
+              }`}>
+            <Heart className={`w-3 h-3 lg:w-4 lg:h-4 ${post.isLiked ? 'fill-current' : ''}`} />
+            <span>{post.likes}</span>
+          </button>
+
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              markNewCommentsAsRead()
+              router.push(`/post/${post.id}`)
+            }}
+            className="flex items-center space-x-1 lg:space-x-2 px-2 lg:px-4 py-1.5 lg:py-2 text-white/70 hover:text-white hover:bg-white/10 rounded-lg lg:rounded-xl transition-all duration-200 text-xs lg:text-sm relative">
+            <MessageSquare className="w-3 h-3 lg:w-4 lg:h-4" />
+            <span>{comments.length || post.comments}</span>
+            {newCommentsCount > 0 && (
+              <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full min-w-[16px] h-4 flex items-center justify-center px-1">
+                {newCommentsCount > 99 ? '99+' : newCommentsCount}
+              </span>
+            )}
+          </button>
+
+          <button
+            onClick={(e) => e.stopPropagation()}
+            className="flex items-center space-x-1 lg:space-x-2 px-2 lg:px-4 py-1.5 lg:py-2 text-white/70 hover:text-white hover:bg-white/10 rounded-lg lg:rounded-xl transition-all duration-200 text-xs lg:text-sm">
+            <Send className="w-3 h-3 lg:w-4 lg:h-4" />
+            <span>{post.shares}</span>
+          </button>
+        </div>
 
         <button
-          onClick={(e) => {
-            e.stopPropagation()
-            markNewCommentsAsRead()
-            router.push(`/post/${post.id}`)
-          }}
-          className="flex items-center space-x-1 lg:space-x-2 px-2 lg:px-4 py-1.5 lg:py-2 text-white/70 hover:text-white hover:bg-white/10 rounded-lg lg:rounded-xl transition-all duration-200 text-xs lg:text-sm relative">
-          <MessageSquare className="w-3 h-3 lg:w-4 lg:h-4" />
-          <span>{comments.length || post.comments}</span>
-          {newCommentsCount > 0 && (
-            <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full min-w-[16px] h-4 flex items-center justify-center px-1">
-              {newCommentsCount > 99 ? '99+' : newCommentsCount}
-            </span>
-          )}
-        </button>
-
-        <button
-          onClick={(e) => e.stopPropagation()}
-          className="flex items-center space-x-1 lg:space-x-2 px-2 lg:px-4 py-1.5 lg:py-2 text-white/70 hover:text-white hover:bg-white/10 rounded-lg lg:rounded-xl transition-all duration-200 text-xs lg:text-sm">
-          <Share className="w-3 h-3 lg:w-4 lg:h-4" />
-          <span>{post.shares}</span>
-        </button>
-
-        <button
-          onClick={(e) => e.stopPropagation()}
-          className="p-1.5 lg:p-2 text-white/70 hover:text-white hover:bg-white/10 rounded-lg lg:rounded-xl transition-all duration-200"
-          title="Bookmark post"
-          aria-label="Bookmark post">
-          <Bookmark className="w-3 h-3 lg:w-4 lg:h-4" />
+          onClick={handleBookmarkClick}
+          className={`p-1.5 lg:p-2 text-white/70 hover:text-white hover:bg-white/10 rounded-lg lg:rounded-xl transition-all duration-200 ${
+            post.isBookmarked ? 'text-yellow-400' : ''
+          }`}
+          title={post.isBookmarked ? "Remove bookmark" : "Bookmark post"}
+          aria-label={post.isBookmarked ? "Remove bookmark" : "Bookmark post"}>
+          <Bookmark className={`w-3 h-3 lg:w-4 lg:h-4 ${post.isBookmarked ? 'fill-current' : ''}`} />
         </button>
       </div>
     </div>

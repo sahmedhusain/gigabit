@@ -2,6 +2,7 @@
 import { User, Settings, Lock, Globe } from 'lucide-react'
 import { Post } from '@/lib/api'
 import { useRealTimePosts, useFollowers, useConnectionStatus } from '@/hooks'
+import { useRouter } from 'next/navigation'
 
 interface ProfileSectionProps {
   currentUser: {
@@ -24,6 +25,7 @@ export default function ProfileSection({
   posts,
   isLoadingFollowers
 }: ProfileSectionProps) {
+  const router = useRouter()
   const { posts: realTimePosts, isConnected } = useRealTimePosts()
   const { followers: liveFollowers, following: liveFollowing } = useFollowers()
   const { isConnected: connectionStatus } = useConnectionStatus()
@@ -32,6 +34,10 @@ export default function ProfileSection({
   const displayPosts = isConnected ? realTimePosts.filter(p => p.user_id === currentUser?.id) : posts
   const displayFollowers = isConnected ? liveFollowers : followers
   const displayFollowing = isConnected ? liveFollowing : following
+
+  const handlePostClick = (postId: number) => {
+    router.push(`/post/${postId}`)
+  }
 
   return (
     <div className="space-y-4 lg:space-y-6">
@@ -128,13 +134,17 @@ export default function ProfileSection({
             </div>
             <div className="space-y-3 lg:space-y-4">
               {displayPosts.slice(0, 2).map((post) => (
-                <div key={post.id} className="bg-white/5 rounded-xl lg:rounded-2xl p-3 lg:p-4">
+                <div 
+                  key={post.id} 
+                  className="bg-white/5 rounded-xl lg:rounded-2xl p-3 lg:p-4 cursor-pointer hover:bg-white/10 transition-colors"
+                  onClick={() => handlePostClick(post.id)}
+                >
                   <p className="text-white mb-2 lg:mb-3 text-sm lg:text-base">{post.content}</p>
                   <div className="flex items-center justify-between text-xs lg:text-sm text-white/60">
                     <span>Just now</span>
                     <div className="flex space-x-3 lg:space-x-4">
-                      <span>0 likes</span>
-                      <span>0 comments</span>
+                      <span>{(post as any).like_count || (post as any).likes || 0} likes</span>
+                      <span>{Array.isArray((post as any).comments) ? (post as any).comments.length : ((post as any).comment_count || (post as any).comments || 0)} comments</span>
                     </div>
                   </div>
                 </div>

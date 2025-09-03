@@ -106,6 +106,7 @@ func (s *Server) setupRoutes() {
 	eventHandler := handlers.NewEventHandler(s.DB.GetDB())
 	messageHandler := handlers.NewMessageHandler(s.DB.GetDB(), s.Hub)
 	notificationHandler := handlers.NewNotificationHandler(s.DB.GetDB(), s.Hub)
+	bookmarkHandler := handlers.NewBookmarkHandler(s.DB.GetDB(), s.Hub)
 	wsHandler := handlers.NewWebSocketHandler(s.Hub)
 
 	// Health check
@@ -144,6 +145,10 @@ func (s *Server) setupRoutes() {
 	s.router.HandleFunc("/api/posts", s.handlePostsRoute(postHandler))
 	s.router.HandleFunc("/api/posts/", s.handlePostRoute(postHandler))
 	s.router.HandleFunc("/api/feed", s.handleRoute(postHandler.GetFeedPosts, true))
+
+	// Bookmark routes
+	s.router.HandleFunc("/api/bookmarks", s.handleRoute(bookmarkHandler.GetUserBookmarks, true))
+	s.router.HandleFunc("/api/bookmarks/", s.handleBookmarkRoute(bookmarkHandler))
 
 	// Group routes
 	s.router.HandleFunc("/api/groups", s.handleGroupsRoute(groupHandler))
@@ -392,6 +397,42 @@ func (s *Server) handlePostRoute(handler *handlers.PostHandler) http.HandlerFunc
 			authMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				handler.GetUserPosts(w, r, userID)
 			})).ServeHTTP(w, r)
+		} else {
+			writeError(w, http.StatusNotFound, "Route not found")
+		}
+	}
+}
+
+func (s *Server) handleBookmarkRoute(handler *handlers.BookmarkHandler) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		path := strings.TrimPrefix(r.URL.Path, "/api/bookmarks/")
+		parts := strings.Split(path, "/")
+
+		if len(parts) == 0 || parts[0] == "" {
+			writeError(w, http.StatusNotFound, "Post ID required")
+			return
+		}
+
+		postID := parts[0]
+		authMiddleware := middleware.AuthMiddleware(s.DB.GetDB())
+
+		if len(parts) == 1 {
+			switch r.Method {
+			case http.MethodPost:
+				authMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					handler.BookmarkPost(w, r, postID)
+				})).ServeHTTP(w, r)
+			case http.MethodDelete:
+				authMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					handler.UnbookmarkPost(w, r, postID)
+				})).ServeHTTP(w, r)
+			case http.MethodGet:
+				authMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					handler.CheckBookmarkStatus(w, r, postID)
+				})).ServeHTTP(w, r)
+			default:
+				writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
+			}
 		} else {
 			writeError(w, http.StatusNotFound, "Route not found")
 		}

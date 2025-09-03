@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { ArrowLeft, User, Heart, MessageSquare, Share, MoreHorizontal, Send, Image as ImageIcon } from 'lucide-react'
+import { ArrowLeft, User, Heart, MessageSquare, MoreHorizontal, Send, Image as ImageIcon, Bookmark } from 'lucide-react'
 import ProtectedRoute from '@/components/ProtectedRoute'
 import { useAuth } from '@/context/AuthContext'
 import { useWebSocket } from '@/context/WebSocketContext'
@@ -122,6 +122,39 @@ function PostDetailPage() {
                 throw err // Let the hook handle the error
             }
         })
+    }
+
+    // Handle bookmark post
+    const handleBookmarkPost = async () => {
+        if (!post || !user) return
+
+        const wasBookmarked = post.is_bookmarked
+        const optimisticPost = {
+            ...post,
+            is_bookmarked: !post.is_bookmarked
+        }
+
+        try {
+            if (wasBookmarked) {
+                await api.unbookmarkPost(post.id)
+            } else {
+                await api.toggleBookmark(post.id)
+            }
+
+            // Update local state
+            setPost(optimisticPost)
+
+            success(wasBookmarked ? 'Post removed from bookmarks' : 'Post bookmarked successfully')
+        } catch (err) {
+            console.error('Error toggling bookmark:', err)
+            // Revert optimistic update on error
+            setPost(prev => prev ? { ...prev, is_bookmarked: wasBookmarked } : null)
+            if (err instanceof NetworkError) {
+                error('Failed to update bookmark. Please try again.')
+            } else {
+                error('Unable to update bookmark right now.')
+            }
+        }
     }
 
     // Handle comment submission via WebSocket
@@ -320,7 +353,7 @@ function PostDetailPage() {
                                     target.nextElementSibling?.classList.remove('hidden');
                                 }}
                             />
-                            <div className="aspect-video bg-gradient-to-br from-emerald-500/20 to-teal-500/20 flex items-center justify-center hidden">
+                            <div className="aspect-video bg-gradient-to-br from-emerald-500/20 to-teal-500/20 flex items-center justify-center">
                                 <ImageIcon className="w-12 h-12 text-white/50" />
                                 <span className="ml-2 text-white/70">Image failed to load</span>
                             </div>
@@ -345,13 +378,29 @@ function PostDetailPage() {
                             )}
                         </button>
 
+                        <button
+                            onClick={handleBookmarkPost}
+                            disabled={!connectionStatus}
+                            className={`flex items-center space-x-2 px-4 py-2 rounded-xl transition-all duration-200 ${
+                                post.is_bookmarked
+                                    ? 'text-yellow-400 bg-yellow-500/10'
+                                    : 'text-white/70 hover:text-white hover:bg-white/10'
+                            } ${!connectionStatus ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        >
+                            <Bookmark className={`w-4 h-4 ${post.is_bookmarked ? 'fill-current' : ''}`} />
+                            <span>{post.is_bookmarked ? 'Bookmarked' : 'Bookmark'}</span>
+                            {!connectionStatus && (
+                                <span className="text-xs text-orange-400 ml-1">(Offline)</span>
+                            )}
+                        </button>
+
                         <button className="flex items-center space-x-2 px-4 py-2 text-white/70 hover:text-white hover:bg-white/10 rounded-xl transition-all duration-200">
                             <MessageSquare className="w-4 h-4" />
                             <span>{comments.length}</span>
                         </button>
 
                         <button className="flex items-center space-x-2 px-4 py-2 text-white/70 hover:text-white hover:bg-white/10 rounded-xl transition-all duration-200">
-                            <Share className="w-4 h-4" />
+                            <Send className="w-4 h-4" />
                             <span>Share</span>
                         </button>
                     </div>

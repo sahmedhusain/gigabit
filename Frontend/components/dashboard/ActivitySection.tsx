@@ -1,20 +1,37 @@
 'use client'
-import { Heart, MessageCircle, Bookmark, Clock } from 'lucide-react'
+import { Heart, MessageCircle, Bookmark, Clock, Send } from 'lucide-react'
 import { Post } from '@/lib/api'
+import { useRouter } from 'next/navigation'
 
 interface ActivitySectionProps {
   activitySubTab: string
   setActivitySubTab: (tab: string) => void
   posts: Post[]
   onPostLike: (postId: number) => void
+  onPostBookmark?: (postId: number) => void
 }
 
 export default function ActivitySection({
   activitySubTab,
   setActivitySubTab,
   posts,
-  onPostLike
+  onPostLike,
+  onPostBookmark
 }: ActivitySectionProps) {
+  const router = useRouter()
+
+  const handlePostClick = (postId: number, e: React.MouseEvent) => {
+    // Don't navigate if clicking on interactive elements
+    if ((e.target as HTMLElement).closest('button')) {
+      return
+    }
+    router.push(`/post/${postId}`)
+  }
+
+  const handleCommentClick = (postId: number, e: React.MouseEvent) => {
+    e.stopPropagation()
+    router.push(`/post/${postId}`)
+  }
   // Mock data for demonstration - in real app, this would come from API
   const likedPosts = posts.filter(post => post.isLiked)
   const commentedPosts = posts.slice(0, 3) // Mock commented posts
@@ -25,7 +42,8 @@ export default function ActivitySection({
   const renderPostCard = (post: Post, activityType: string) => (
     <div
       key={post.id}
-      className="bg-white/10 backdrop-blur-sm rounded-lg p-6 border border-white/20 hover:bg-white/15 transition-all"
+      className="bg-white/10 backdrop-blur-sm rounded-lg p-6 border border-white/20 hover:bg-white/15 transition-all cursor-pointer"
+      onClick={(e) => handlePostClick(post.id, e)}
     >
       <div className="flex items-start space-x-3">
         <div className="w-12 h-12 bg-gradient-to-r from-emerald-400 to-teal-500 rounded-full flex items-center justify-center text-white font-bold">
@@ -61,7 +79,10 @@ export default function ActivitySection({
           <div className="flex items-center justify-between pt-4 border-t border-white/10">
             <div className="flex items-center space-x-6">
               <button
-                onClick={() => onPostLike(post.id)}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onPostLike(post.id)
+                }}
                 className={`flex items-center space-x-2 transition-all ${
                   post.isLiked
                     ? 'text-red-400 hover:text-red-300'
@@ -72,20 +93,37 @@ export default function ActivitySection({
                 <span>{post.likes}</span>
               </button>
               
-              <button className="flex items-center space-x-2 text-white/60 hover:text-blue-400 transition-colors">
+              <button 
+                onClick={(e) => handleCommentClick(post.id, e)}
+                className="flex items-center space-x-2 text-white/60 hover:text-blue-400 transition-colors"
+              >
                 <MessageCircle className="w-5 h-5" />
                 <span>{post.comments}</span>
               </button>
               
               <button 
-                title="Save post"
-                className="flex items-center space-x-2 text-white/60 hover:text-yellow-400 transition-colors"
+                onClick={(e) => e.stopPropagation()}
+                className="flex items-center space-x-2 text-white/60 hover:text-green-400 transition-colors"
               >
-                <Bookmark className="w-5 h-5" />
+                <Send className="w-5 h-5" />
+                <span>{post.shares}</span>
               </button>
             </div>
             
-            <span className="text-white/40 text-sm">{post.privacy}</span>
+            <button 
+              onClick={(e) => {
+                e.stopPropagation()
+                onPostBookmark && onPostBookmark(post.id)
+              }}
+              title={post.isBookmarked ? "Remove bookmark" : "Save post"}
+              className={`p-2 rounded-lg transition-colors ${
+                post.isBookmarked
+                  ? 'text-yellow-400 hover:text-yellow-300 bg-yellow-500/10'
+                  : 'text-white/60 hover:text-yellow-400 hover:bg-white/10'
+              }`}
+            >
+              <Bookmark className={`w-5 h-5 ${post.isBookmarked ? 'fill-current' : ''}`} />
+            </button>
           </div>
         </div>
       </div>

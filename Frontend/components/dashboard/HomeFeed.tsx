@@ -1,6 +1,6 @@
 'use client'
 import { useState, useEffect } from 'react'
-import { TrendingUp, Activity, Wifi, WifiOff, RefreshCw, Users, UserCheck, Heart, Filter, Globe, Lock, EyeOff, MessageCircle, Share, Sparkles } from 'lucide-react'
+import { TrendingUp, Activity, Wifi, WifiOff, RefreshCw, Users, UserCheck, Heart, Filter, Globe, Lock, EyeOff, MessageCircle, Sparkles, Bookmark, Send } from 'lucide-react'
 import PostCard from './PostCard'
 import CreatePost from './CreatePost'
 import { Post } from '@/lib/api'
@@ -15,6 +15,7 @@ type FeedFilter = 'all' | 'followers' | 'friends' | 'favorites'
 interface HomeFeedProps {
   posts: Post[]
   onPostLike: (postId: number) => void
+  onPostBookmark?: (postId: number) => void
   setActiveTab: (tab: string) => void
   showCreatePost: boolean
   setShowCreatePost: (show: boolean) => void
@@ -36,6 +37,7 @@ interface HomeFeedProps {
 export default function HomeFeed({
   posts,
   onPostLike,
+  onPostBookmark,
   setActiveTab,
   showCreatePost,
   setShowCreatePost,
@@ -121,8 +123,17 @@ export default function HomeFeed({
     }
   }
 
-  const handleRefresh = () => {
-    refreshPosts()
+  const handlePostClick = (postId: number, e: React.MouseEvent) => {
+    // Don't navigate if clicking on interactive elements
+    if ((e.target as HTMLElement).closest('button')) {
+      return
+    }
+    router.push(`/post/${postId}`)
+  }
+
+  const handleCommentClick = (postId: number, e: React.MouseEvent) => {
+    e.stopPropagation()
+    router.push(`/post/${postId}`)
   }
 
   const getPrivacyIcon = (privacy: string) => {
@@ -153,7 +164,8 @@ export default function HomeFeed({
   const renderPost = (post: Post) => (
     <div
       key={post.id}
-      className="bg-white/10 backdrop-blur-sm rounded-lg p-6 border border-white/20 hover:bg-white/15 transition-all"
+      className="bg-white/10 backdrop-blur-sm rounded-lg p-6 border border-white/20 hover:bg-white/15 transition-all cursor-pointer"
+      onClick={(e) => handlePostClick(post.id, e)}
     >
       <div className="flex items-start space-x-3">
         <div className="w-12 h-12 bg-gradient-to-r from-emerald-400 to-teal-500 rounded-full flex items-center justify-center text-white font-bold">
@@ -195,7 +207,10 @@ export default function HomeFeed({
           <div className="flex items-center justify-between pt-4 border-t border-white/10">
             <div className="flex items-center space-x-6">
               <button
-                onClick={() => onPostLike(post.id)}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onPostLike(post.id)
+                }}
                 className={`flex items-center space-x-2 transition-all ${
                   post.isLiked
                     ? 'text-red-400 hover:text-red-300'
@@ -206,16 +221,39 @@ export default function HomeFeed({
                 <span>{post.likes}</span>
               </button>
               
-              <button className="flex items-center space-x-2 text-white/60 hover:text-blue-400 transition-colors">
+              <button 
+                onClick={(e) => handleCommentClick(post.id, e)}
+                className="flex items-center space-x-2 text-white/60 hover:text-blue-400 transition-colors"
+              >
                 <MessageCircle className="w-5 h-5" />
                 <span>{post.comments}</span>
               </button>
               
-              <button className="flex items-center space-x-2 text-white/60 hover:text-emerald-400 transition-colors">
-                <Share className="w-5 h-5" />
+              <button 
+                onClick={(e) => e.stopPropagation()}
+                className="flex items-center space-x-2 text-white/60 hover:text-green-400 transition-colors"
+              >
+                <Send className="w-5 h-5" />
                 <span>{post.shares}</span>
               </button>
             </div>
+
+            {onPostBookmark && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onPostBookmark(post.id)
+                }}
+                title={post.isBookmarked ? "Remove bookmark" : "Save post"}
+                className={`p-2 rounded-lg transition-colors ${
+                  post.isBookmarked
+                    ? 'text-yellow-400 hover:text-yellow-300 bg-yellow-500/10'
+                    : 'text-white/60 hover:text-yellow-400 hover:bg-white/10'
+                }`}
+              >
+                <Bookmark className={`w-5 h-5 ${post.isBookmarked ? 'fill-current' : ''}`} />
+              </button>
+            )}
           </div>
         </div>
       </div>

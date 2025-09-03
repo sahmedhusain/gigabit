@@ -477,51 +477,58 @@ function DashboardPage() {
     }
   }
 
+  const handleBookmarkPost = async (postId: number) => {
+    try {
+      const post = posts.find(p => p.id === postId)
+      const wasBookmarked = post?.isBookmarked || false
+
+      if (wasBookmarked) {
+        await api.unbookmarkPost(postId)
+      } else {
+        await api.toggleBookmark(postId)
+      }
+
+      setPosts(posts.map(p =>
+        p.id === postId
+          ? { ...p, isBookmarked: !p.isBookmarked }
+          : p
+      ))
+    } catch (err) {
+      console.error('Error toggling bookmark:', err)
+      setPosts(posts.map(p =>
+        p.id === postId
+          ? { ...p, isBookmarked: !p.isBookmarked }
+          : p
+      ))
+      if (err instanceof NetworkError) {
+        error('Failed to update bookmark. Please try again.')
+      } else {
+        error('Unable to update bookmark right now.')
+      }
+    }
+  }
+
   const handleLikePost = async (postId: number) => {
     try {
       const post = posts.find(p => p.id === postId)
       const wasLiked = post?.isLiked || false
 
-      if (post && post.isLiked) {
+      if (wasLiked) {
         await api.unlikePost(postId)
       } else {
         await api.likePost(postId)
       }
 
-      // Send real-time WebSocket update
-      if (isConnected) {
-        console.log('Sending like WebSocket message:', {
-          type: 'like',
-          from: user?.id,
-          post_id: postId,
-          action: wasLiked ? 'unlike' : 'like'
-        })
-        sendMessage({
-          type: 'like',
-          from: user?.id,
-          post_id: postId,
-          action: wasLiked ? 'unlike' : 'like',
-          data: {
-            post_id: postId,
-            user_id: user?.id,
-            action: wasLiked ? 'unlike' : 'like',
-            like_count: wasLiked ? (post?.likes || 0) - 1 : (post?.likes || 0) + 1
-          }
-        })
-      } else {
-        console.log('WebSocket not connected, cannot send like update')
-      }
-
       setPosts(posts.map(p =>
         p.id === postId
-          ? { ...p, isLiked: !p.isLiked, likes: p.isLiked ? p.likes - 1 : p.likes + 1 }
+          ? { ...p, isLiked: !p.isLiked, likes: p.likes + (wasLiked ? -1 : 1) }
           : p
       ))
     } catch (err) {
       console.error('Error toggling like:', err)
       setPosts(posts.map(p =>
         p.id === postId
-          ? { ...p, isLiked: !p.isLiked, likes: p.isLiked ? p.likes + 1 : p.likes - 1 }
+          ? { ...p, isLiked: !p.isLiked, likes: p.likes + (p.isLiked ? -1 : 1) }
           : p
       ))
       if (err instanceof NetworkError) {
@@ -572,6 +579,7 @@ function DashboardPage() {
           <HomeFeed
             posts={posts}
             onPostLike={handleLikePost}
+            onPostBookmark={handleBookmarkPost}
             setActiveTab={handleTabChange}
             showCreatePost={showCreatePost}
             setShowCreatePost={setShowCreatePost}
@@ -612,6 +620,7 @@ function DashboardPage() {
             setActivitySubTab={setActivitySubTab}
             posts={posts}
             onPostLike={handleLikePost}
+            onPostBookmark={handleBookmarkPost}
           />
         )
       case 'community':
@@ -650,6 +659,7 @@ function DashboardPage() {
           <HomeFeed
             posts={posts}
             onPostLike={handleLikePost}
+            onPostBookmark={handleBookmarkPost}
             setActiveTab={handleTabChange}
             showCreatePost={showCreatePost}
             setShowCreatePost={setShowCreatePost}

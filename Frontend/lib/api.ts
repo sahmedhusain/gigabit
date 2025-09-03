@@ -42,12 +42,6 @@ export interface Post {
     username: string;
     avatar: string;
   };
-  category?: {
-    id: number;
-    name: string;
-    color: string;
-    icon: string;
-  };
   content: string;
   image?: string;
   likes: number;
@@ -65,11 +59,9 @@ export interface APIPost {
   content: string;
   image_url?: string;
   privacy: string;
-  category_id: number;
   created_at: string;
   updated_at: string;
   user: User;
-  category: CategoryResponse;
   like_count: number;
   comment_count: number;
   is_liked: boolean;
@@ -265,7 +257,6 @@ export interface CreatePostRequest {
   content: string;
   privacy?: string;
   image_url?: string;
-  category_id?: number;
   specific_user_ids?: number[];
 }
 
@@ -281,30 +272,6 @@ export interface CreateGroupRequest {
 
 export interface PostsResponse {
   posts: APIPost[];
-}
-
-export interface Category {
-  id: number;
-  name: string;
-  description: string | null;
-  color: string;
-  icon: string;
-  is_active: boolean;
-  post_count: number;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface CategoryResponse {
-  id: number;
-  name: string;
-  description: string | null;
-  color: string;
-  icon: string;
-  is_active: boolean;
-  post_count: number;
-  created_at: string;
-  updated_at: string;
 }
 
 // Error types
@@ -647,6 +614,12 @@ export class ApiClient {
     });
   }
 
+  async getUserRole(groupId: number): Promise<{ role: string; is_admin_or_creator: boolean }> {
+    return this.request<{ role: string; is_admin_or_creator: boolean }>(`/api/groups/${groupId}/role`, {
+      method: 'GET',
+    });
+  }
+
   async getGroupPosts(groupId: number, limit: number = 20, offset: number = 0): Promise<{ posts: PostResponse[], count: number }> {
     return this.request<{ posts: PostResponse[], count: number }>(`/api/groups/${groupId}/posts?limit=${limit}&offset=${offset}`, {
       method: 'GET',
@@ -781,37 +754,6 @@ export class ApiClient {
       return { isValid: false, error: 'Post content cannot exceed 5000 characters' };
     }
     return { isValid: true };
-  }
-
-  // Category methods
-  async getCategories(): Promise<{ categories: CategoryResponse[], count: number }> {
-    return this.request<{ categories: CategoryResponse[], count: number }>('/api/categories', {
-      method: 'GET',
-    });
-  }
-
-  async getCategory(categoryId: number): Promise<CategoryResponse> {
-    return this.request<CategoryResponse>(`/api/categories/${categoryId}`, {
-      method: 'GET',
-    });
-  }
-
-  async getPostsByCategory(categoryId: number, limit: number = 20, offset: number = 0): Promise<{ posts: PostResponse[], count: number, category_id: number }> {
-    return this.request<{ posts: PostResponse[], count: number, category_id: number }>(`/api/posts/category/${categoryId}?limit=${limit}&offset=${offset}`, {
-      method: 'GET',
-    });
-  }
-
-  async getCategoryStats(): Promise<{ stats: any[], count: number }> {
-    return this.request<{ stats: any[], count: number }>('/api/categories/stats', {
-      method: 'GET',
-    });
-  }
-
-  async searchCategories(query: string): Promise<{ categories: CategoryResponse[], count: number, search: string }> {
-    return this.request<{ categories: CategoryResponse[], count: number, search: string }>(`/api/categories/search?q=${encodeURIComponent(query)}`, {
-      method: 'GET',
-    });
   }
 }
 

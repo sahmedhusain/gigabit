@@ -2,6 +2,7 @@ package services
 
 import (
 	"database/sql"
+	"log"
 	"social/models"
 	"time"
 )
@@ -237,14 +238,14 @@ func (s *EventService) RespondToEvent(eventID, userID uint, option string) error
 	if existingResponse != "none" {
 		// Update existing response
 		query := `
-			UPDATE event_responses SET response_option = ?, updated_at = ?
+			UPDATE event_responses SET response = ?, updated_at = ?
 			WHERE event_id = ? AND user_id = ?
 		`
 		_, err = s.db.Exec(query, option, now, eventID, userID)
 	} else {
 		// Create new response
 		query := `
-			INSERT INTO event_responses (event_id, user_id, response_option, created_at, updated_at)
+			INSERT INTO event_responses (event_id, user_id, response, created_at, updated_at)
 			VALUES (?, ?, ?, ?, ?)
 		`
 		_, err = s.db.Exec(query, eventID, userID, option, now, now)
@@ -266,7 +267,7 @@ func (s *EventService) GetEventResponses(eventID, currentUserID uint) ([]models.
 	}
 
 	query := `
-		SELECT er.id, er.event_id, er.user_id, er.response_option, er.created_at,
+		SELECT er.id, er.event_id, er.user_id, er.response, er.created_at,
 			   u.first_name, u.last_name, u.avatar, u.nickname
 		FROM event_responses er
 		JOIN users u ON er.user_id = u.id
@@ -310,13 +311,14 @@ SELECT DISTINCT e.id, e.group_id, e.creator_id, e.title, e.description, e.event_
 FROM events e
 JOIN users u ON e.creator_id = u.id
 JOIN groups g ON e.group_id = g.id
-JOIN group_members gm ON e.group_id = gm.group_id AND gm.user_id = ? AND gm.status IN ('member','accepted')
+JOIN group_members gm ON e.group_id = gm.group_id AND gm.user_id = ? AND gm.status IN ('accepted', 'member')
 ORDER BY e.event_date ASC
 LIMIT ? OFFSET ?
 `
 
 	rows, err := s.db.Query(query, userID, limit, offset)
 	if err != nil {
+		log.Printf("Error executing GetUserEvents query: %v", err)
 		return nil, err
 	}
 	defer rows.Close()
@@ -336,6 +338,7 @@ LIMIT ? OFFSET ?
 			&group.Title,
 		)
 		if err != nil {
+			log.Printf("Error scanning event row: %v", err)
 			return nil, err
 		}
 
@@ -355,12 +358,14 @@ LIMIT ? OFFSET ?
 		// Get response counts
 		event.GoingCount, event.NotGoingCount, err = s.getEventResponseCounts(event.ID)
 		if err != nil {
+			log.Printf("Error getting event response counts for event %d: %v", event.ID, err)
 			return nil, err
 		}
 
 		// Get current user's response
 		event.UserResponse, err = s.getUserEventResponse(event.ID, userID)
 		if err != nil && err != sql.ErrNoRows {
+			log.Printf("Error getting user event response for event %d, user %d: %v", event.ID, userID, err)
 			return nil, err
 		}
 
@@ -375,8 +380,8 @@ LIMIT ? OFFSET ?
 func (s *EventService) getEventResponseCounts(eventID uint) (going, notGoing int, err error) {
 	query := `
 		SELECT 
-			COALESCE(SUM(CASE WHEN response_option = 'going' THEN 1 ELSE 0 END), 0) as going_count,
-			COALESCE(SUM(CASE WHEN response_option = 'not_going' THEN 1 ELSE 0 END), 0) as not_going_count
+			COALESCE(SUM(CASE WHEN response = 'going' THEN 1 ELSE 0 END), 0) as going_count,
+			COALESCE(SUM(CASE WHEN response = 'not_going' THEN 1 ELSE 0 END), 0) as not_going_count
 		FROM event_responses 
 		WHERE event_id = ?
 	`
@@ -386,7 +391,7 @@ func (s *EventService) getEventResponseCounts(eventID uint) (going, notGoing int
 }
 
 func (s *EventService) getUserEventResponse(eventID, userID uint) (string, error) {
-	query := `SELECT response_option FROM event_responses WHERE event_id = ? AND user_id = ?`
+	query := `SELECT response FROM event_responses WHERE event_id = ? AND user_id = ?`
 
 	var option string
 	err := s.db.QueryRow(query, eventID, userID).Scan(&option)

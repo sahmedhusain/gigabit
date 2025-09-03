@@ -4,10 +4,9 @@ import (
 	"database/sql"
 	"encoding/json"
 	"net/http"
-	"strconv"
-
 	"social/models"
 	"social/services"
+	"strconv"
 )
 
 type EventHandler struct {
@@ -39,6 +38,13 @@ func (h *EventHandler) CreateEvent(w http.ResponseWriter, r *http.Request, group
 	isMember, err := h.groupService.IsUserMember(uint(groupID), userID)
 	if err != nil || !isMember {
 		writeError(w, http.StatusForbidden, "Must be a group member to create events")
+		return
+	}
+
+	// Check if user is an admin or creator of the group
+	isAdminOrCreator, err := h.groupService.IsUserAdminOrCreator(uint(groupID), userID)
+	if err != nil || !isAdminOrCreator {
+		writeError(w, http.StatusForbidden, "Only group admins and creators can create events")
 		return
 	}
 

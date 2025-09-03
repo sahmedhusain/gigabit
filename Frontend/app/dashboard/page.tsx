@@ -18,7 +18,6 @@ import {
   NetworkError,
   ValidationError,
   AuthenticationError,
-  CategoryResponse,
   CreatePostRequest,
   getToken
 } from '@/lib/api'
@@ -34,7 +33,6 @@ import ChatDropdown from '@/components/dashboard/ChatDropdown'
 import HomeFeed from '@/components/dashboard/HomeFeed'
 import ProfileSection from '@/components/dashboard/ProfileSection'
 import {
-  CategoriesSection,
   FollowersSection,
   GroupsSection,
   SettingsSection
@@ -68,7 +66,6 @@ function DashboardPage() {
   const [newPostImage, setNewPostImage] = useState<File | null>(null)
   const [postPrivacy, setPostPrivacy] = useState('public')
   const [selectedUsers, setSelectedUsers] = useState<number[]>([])
-  const [selectedPostCategory, setSelectedPostCategory] = useState<number>(1)
   const [availableUsers, setAvailableUsers] = useState<{ id: number; email: string; first_name: string; last_name: string; avatar?: string; nickname?: string; display_name?: string; }[]>([])
   const [loadingUsers, setLoadingUsers] = useState(false)
 
@@ -84,21 +81,7 @@ function DashboardPage() {
   const [events, setEvents] = useState<Event[]>([])
   const [isLoadingEvents, setIsLoadingEvents] = useState(false)
   const [unreadNotifications, setUnreadNotifications] = useState(0)
-
-  // Use live data when available, fallback to local state
-  const displayPosts = livePosts && livePosts.length > 0 ? livePosts : posts
-  const displayNotifications = liveNotifications && liveNotifications.length > 0 ? liveNotifications : notifications
-  const displayGroups = liveGroups && liveGroups.length > 0 ? liveGroups : groups
-  const displayEvents = liveEvents && liveEvents.length > 0 ? liveEvents : events
-  const displayChats = liveConversations && liveConversations.length > 0 ? liveConversations : chats
-  const displayUnreadCount = liveUnreadCount || unreadNotifications
-  const [categories, setCategories] = useState<CategoryResponse[]>([])
-  const [selectedCategory, setSelectedCategory] = useState<number | null>(null)
-  const [isLoadingCategories, setIsLoadingCategories] = useState(false)
-  const [categorySearchQuery, setCategorySearchQuery] = useState('')
-  const [categorySearchResults, setCategorySearchResults] = useState<CategoryResponse[]>([])
   const [isSearching, setIsSearching] = useState(false)
-  const [trendingCategories, setTrendingCategories] = useState<CategoryResponse[]>([])
   const [isLoadingTrending, setIsLoadingTrending] = useState(false)
   const [openChatWindow, setOpenChatWindow] = useState<{
     conversationId: number
@@ -135,9 +118,8 @@ function DashboardPage() {
   useEffect(() => {
     if (user) {
       fetchFeedPosts()
-      fetchCategories()
-      fetchTrendingCategories()
       fetchUsers()
+      fetchEvents() // Add this to load events immediately
     }
   }, [user])
 
@@ -241,63 +223,9 @@ function DashboardPage() {
     }
   }, [isOffline, warning])
 
-  // API Functions
-  const fetchCategories = async () => {
-    try {
-      setIsLoadingCategories(true)
-      const data = await api.getCategories()
-      setCategories(data.categories)
-    } catch (err) {
-      console.error('Error fetching categories:', err)
-      if (err instanceof NetworkError) {
-        error('Failed to load categories.')
-      } else {
-        error('Unable to load categories right now.')
-      }
-    } finally {
-      setIsLoadingCategories(false)
-    }
-  }
 
-  const fetchTrendingCategories = async () => {
-    try {
-      setIsLoadingTrending(true)
-      const data = await api.getCategoryStats()
-      setTrendingCategories(data.stats.filter(stat => stat.trending).slice(0, 5))
-    } catch (err) {
-      console.error('Error fetching trending categories:', err)
-      if (err instanceof NetworkError) {
-        error('Failed to load trending categories.')
-      } else {
-        error('Unable to load trending categories right now.')
-      }
-    } finally {
-      setIsLoadingTrending(false)
-    }
-  }
 
-  const searchCategories = async (query: string) => {
-    if (!query.trim()) {
-      setCategorySearchResults([])
-      setIsSearching(false)
-      return
-    }
 
-    try {
-      setIsSearching(true)
-      const data = await api.searchCategories(query)
-      setCategorySearchResults(data.categories)
-    } catch (err) {
-      console.error('Error searching categories:', err)
-      if (err instanceof NetworkError) {
-        error('Failed to search categories.')
-      } else {
-        error('Unable to search categories right now.')
-      }
-    } finally {
-      setIsSearching(false)
-    }
-  }
 
   const fetchFeedPosts = async () => {
     try {
@@ -401,9 +329,11 @@ function DashboardPage() {
   const fetchEvents = async () => {
     try {
       setIsLoadingEvents(true)
+      console.log('Fetching events...')
       const data = await api.getUserEvents()
-      const dataAny: any = data
-      const eventsArr = Array.isArray(dataAny?.events) ? dataAny.events : Array.isArray(dataAny?.data) ? dataAny.data : []
+      console.log('Events API response:', data)
+      const eventsArr = Array.isArray(data?.events) ? data.events : []
+      console.log('Events array:', eventsArr)
       setEvents(eventsArr)
     } catch (err) {
       console.error('Error fetching events:', err)
@@ -536,7 +466,6 @@ function DashboardPage() {
       const postData: CreatePostRequest = {
         content: newPostContent,
         privacy: postPrivacy === 'followers' ? 'almost_private' : postPrivacy,
-        category_id: selectedPostCategory,
         image_url: imageUrl
       }
 
@@ -623,10 +552,7 @@ function DashboardPage() {
     return onlineUsers.some(u => u.username === username && u.is_online)
   }
 
-  const handleCategoryClick = (categoryId: number) => {
-    setSelectedCategory(categoryId)
-    setActiveTab('categories')
-  }
+  
 
   const handleNotificationsToggle = () => {
     setShowNotifications(!showNotifications)
@@ -648,24 +574,22 @@ function DashboardPage() {
       case 'home':
         return (
           <HomeFeed
-            trendingCategories={trendingCategories}
-            onCategoryClick={handleCategoryClick}
-            setActiveTab={setActiveTab}
-          />
-        )
-      case 'categories':
-        return (
-          <CategoriesSection
-            categories={categories}
-            trendingCategories={trendingCategories}
-            selectedCategory={selectedCategory}
-            setSelectedCategory={setSelectedCategory}
-            categorySearchQuery={categorySearchQuery}
-            setCategorySearchQuery={setCategorySearchQuery}
-            categorySearchResults={categorySearchResults}
-            isSearching={isSearching}
             posts={posts}
-            searchCategories={searchCategories}
+            onPostLike={handleLikePost}
+            setActiveTab={setActiveTab}
+            showCreatePost={showCreatePost}
+            setShowCreatePost={setShowCreatePost}
+            newPostContent={newPostContent}
+            setNewPostContent={setNewPostContent}
+            newPostImage={newPostImage}
+            setNewPostImage={setNewPostImage}
+            postPrivacy={postPrivacy}
+            setPostPrivacy={setPostPrivacy}
+            selectedUsers={selectedUsers}
+            setSelectedUsers={setSelectedUsers}
+            availableUsers={availableUsers}
+            loadingUsers={loadingUsers}
+            onCreatePost={handleCreatePost}
           />
         )
       case 'profile':
@@ -689,7 +613,7 @@ function DashboardPage() {
       case 'groups': 
         return <GroupsSection groups={groups} />
       case 'events': 
-        return <EventsSection events={events} onEventsUpdate={fetchEvents} />
+        return <EventsSection events={events} onEventsUpdate={fetchEvents} isLoading={isLoadingEvents} />
       case 'settings': 
         return (
           <SettingsSection
@@ -700,8 +624,8 @@ function DashboardPage() {
       default:
         return (
           <HomeFeed
-            trendingCategories={trendingCategories}
-            onCategoryClick={handleCategoryClick}
+            posts={posts}
+            onPostLike={handleLikePost}
             setActiveTab={setActiveTab}
           />
         )
@@ -748,7 +672,6 @@ function DashboardPage() {
       <TopBar
         isMobileMenuOpen={isMobileMenuOpen}
         setIsMobileMenuOpen={setIsMobileMenuOpen}
-        setShowCreatePost={setShowCreatePost}
         setShowNotifications={handleNotificationsToggle}
         setShowChat={handleChatToggle}
         showNotifications={showNotifications}
@@ -759,25 +682,6 @@ function DashboardPage() {
         isConnected={isConnected}
         logout={logout}
         setActiveTab={setActiveTab}
-      />
-
-      <CreatePost
-        show={showCreatePost}
-        onClose={() => setShowCreatePost(false)}
-        newPostContent={newPostContent}
-        setNewPostContent={setNewPostContent}
-        newPostImage={newPostImage}
-        setNewPostImage={setNewPostImage}
-        postPrivacy={postPrivacy}
-        setPostPrivacy={setPostPrivacy}
-        selectedUsers={selectedUsers}
-        setSelectedUsers={setSelectedUsers}
-        selectedPostCategory={selectedPostCategory}
-        setSelectedPostCategory={setSelectedPostCategory}
-        categories={categories}
-        availableUsers={availableUsers}
-        loadingUsers={loadingUsers}
-        onCreatePost={handleCreatePost}
       />
 
       <CreateGroup

@@ -71,13 +71,12 @@ func (h *PostHandler) CreatePost(w http.ResponseWriter, r *http.Request) {
 
 	log.Printf("Creating post with privacy: %s for user: %v", req.Privacy, userID)
 
-	post := &models.Post{
-		UserID:     userID.(uint),
-		Content:    req.Content,
-		ImageURL:   &req.ImageURL,
-		Privacy:    req.Privacy,
-		CategoryID: req.CategoryID,
-	}
+post := &models.Post{
+UserID:     userID.(uint),
+Content:    req.Content,
+ImageURL:   &req.ImageURL,
+Privacy:    req.Privacy,
+}
 
 	if req.ImageURL == "" {
 		post.ImageURL = nil
@@ -400,58 +399,7 @@ func (h *PostHandler) UnlikePost(w http.ResponseWriter, r *http.Request, postIDS
 	writeJSON(w, http.StatusOK, map[string]string{"message": "Post unliked successfully"})
 }
 
-func (h *PostHandler) GetPostsByCategory(w http.ResponseWriter, r *http.Request, categoryIDStr string) {
-	if r.Method != http.MethodGet {
-		writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
-		return
-	}
 
-	categoryID, err := strconv.ParseUint(categoryIDStr, 10, 32)
-	if err != nil {
-		writeError(w, http.StatusBadRequest, "Invalid category ID")
-		return
-	}
-
-	currentUserID := r.Context().Value("user_id")
-	if currentUserID == nil {
-		writeError(w, http.StatusUnauthorized, "User not authenticated")
-		return
-	}
-
-	// Get pagination parameters
-	limitStr := r.URL.Query().Get("limit")
-	if limitStr == "" {
-		limitStr = "20"
-	}
-	offsetStr := r.URL.Query().Get("offset")
-	if offsetStr == "" {
-		offsetStr = "0"
-	}
-
-	limit, err := strconv.Atoi(limitStr)
-	if err != nil || limit > 50 {
-		limit = 20
-	}
-
-	offset, err := strconv.Atoi(offsetStr)
-	if err != nil || offset < 0 {
-		offset = 0
-	}
-
-	posts, err := h.postService.GetPostsByCategory(uint(categoryID), currentUserID.(uint), limit, offset)
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, "Failed to get posts")
-		return
-	}
-
-	writeJSON(w, http.StatusOK, map[string]interface{}{
-		"posts":       posts,
-		"count":       len(posts),
-		"limit":       limit,
-		"offset":      offset,
-		"category_id": categoryID,
-	})
-}
 
 // CreateComment handles creating a new comment on a post
 func (h *PostHandler) CreateComment(w http.ResponseWriter, r *http.Request, postIDStr string) {

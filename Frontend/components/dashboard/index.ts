@@ -9,7 +9,6 @@ export { default as HomeFeed } from './HomeFeed'
 export { default as ProfileSection } from './ProfileSection'
 export { default as EventsSection } from './EventsSection'
 export {
-  CategoriesSection,
   FollowersSection,
   GroupsSection,
   SettingsSection

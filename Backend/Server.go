@@ -398,9 +398,6 @@ func (s *Server) handlePostRoute(handler *handlers.PostHandler) http.HandlerFunc
 	}
 }
 
-
-
-
 func (s *Server) handleGroupsRoute(handler *handlers.GroupHandler) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		authMiddleware := middleware.AuthMiddleware(s.DB.GetDB())
@@ -496,6 +493,14 @@ func (s *Server) handleGroupRoute(groupHandler *handlers.GroupHandler, eventHand
 				}
 				authMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					groupHandler.GetPendingRequests(w, r, groupID)
+				})).ServeHTTP(w, r)
+			case "role":
+				if r.Method != http.MethodGet {
+					writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
+					return
+				}
+				authMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					groupHandler.GetUserRole(w, r, groupID)
 				})).ServeHTTP(w, r)
 			case "events":
 				switch r.Method {

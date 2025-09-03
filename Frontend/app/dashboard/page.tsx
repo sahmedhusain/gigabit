@@ -109,6 +109,7 @@ function DashboardPage() {
     if (user) {
       fetchFeedPosts()
       fetchUsers()
+      fetchEvents() // Add this to load events immediately
     }
   }, [user])
 
@@ -314,9 +315,11 @@ function DashboardPage() {
   const fetchEvents = async () => {
     try {
       setIsLoadingEvents(true)
+      console.log('Fetching events...')
       const data = await api.getUserEvents()
-      const dataAny: any = data
-      const eventsArr = Array.isArray(dataAny?.events) ? dataAny.events : Array.isArray(dataAny?.data) ? dataAny.data : []
+      console.log('Events API response:', data)
+      const eventsArr = Array.isArray(data?.events) ? data.events : []
+      console.log('Events array:', eventsArr)
       setEvents(eventsArr)
     } catch (err) {
       console.error('Error fetching events:', err)
@@ -552,6 +555,19 @@ function DashboardPage() {
             posts={posts}
             onPostLike={handleLikePost}
             setActiveTab={setActiveTab}
+            showCreatePost={showCreatePost}
+            setShowCreatePost={setShowCreatePost}
+            newPostContent={newPostContent}
+            setNewPostContent={setNewPostContent}
+            newPostImage={newPostImage}
+            setNewPostImage={setNewPostImage}
+            postPrivacy={postPrivacy}
+            setPostPrivacy={setPostPrivacy}
+            selectedUsers={selectedUsers}
+            setSelectedUsers={setSelectedUsers}
+            availableUsers={availableUsers}
+            loadingUsers={loadingUsers}
+            onCreatePost={handleCreatePost}
           />
         )
       case 'profile':
@@ -575,7 +591,7 @@ function DashboardPage() {
       case 'groups': 
         return <GroupsSection groups={groups} />
       case 'events': 
-        return <EventsSection events={events} onEventsUpdate={fetchEvents} />
+        return <EventsSection events={events} onEventsUpdate={fetchEvents} isLoading={isLoadingEvents} />
       case 'settings': 
         return (
           <SettingsSection
@@ -634,7 +650,6 @@ function DashboardPage() {
       <TopBar
         isMobileMenuOpen={isMobileMenuOpen}
         setIsMobileMenuOpen={setIsMobileMenuOpen}
-        setShowCreatePost={setShowCreatePost}
         setShowNotifications={handleNotificationsToggle}
         setShowChat={handleChatToggle}
         showNotifications={showNotifications}
@@ -645,22 +660,6 @@ function DashboardPage() {
         isConnected={isConnected}
         logout={logout}
         setActiveTab={setActiveTab}
-      />
-
-      <CreatePost
-        show={showCreatePost}
-        onClose={() => setShowCreatePost(false)}
-        newPostContent={newPostContent}
-        setNewPostContent={setNewPostContent}
-        newPostImage={newPostImage}
-        setNewPostImage={setNewPostImage}
-        postPrivacy={postPrivacy}
-        setPostPrivacy={setPostPrivacy}
-        selectedUsers={selectedUsers}
-        setSelectedUsers={setSelectedUsers}
-        availableUsers={availableUsers}
-        loadingUsers={loadingUsers}
-        onCreatePost={handleCreatePost}
       />
 
       <CreateGroup

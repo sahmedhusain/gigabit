@@ -35,10 +35,10 @@ VALUES (?, ?, ?, ?, ?)
 	group.CreatedAt = now
 	group.UpdatedAt = now
 
-	// Add creator as member automatically
+	// Add creator as member automatically with creator role
 	memberQuery := `
-INSERT INTO group_members (group_id, user_id, status, created_at, updated_at)
-VALUES (?, ?, 'member', ?, ?)
+INSERT INTO group_members (group_id, user_id, status, role, created_at, updated_at)
+VALUES (?, ?, 'member', 'creator', ?, ?)
 `
 	_, err = s.db.Exec(memberQuery, group.ID, group.CreatorID, now, now)
 
@@ -358,7 +358,7 @@ func (s *GroupService) GetGroupMembers(groupID, currentUserID uint) ([]models.Gr
 	}
 
 	query := `
-SELECT gm.id, gm.group_id, gm.user_id, gm.status, gm.created_at,
+SELECT gm.id, gm.group_id, gm.user_id, gm.status, gm.role, gm.created_at,
    u.first_name, u.last_name, u.avatar, u.nickname
 FROM group_members gm
 JOIN users u ON gm.user_id = u.id
@@ -378,7 +378,7 @@ ORDER BY gm.created_at ASC
 		var user models.UserResponse
 
 		err := rows.Scan(
-			&member.ID, &member.GroupID, &user.ID, &member.Status, &member.JoinedAt,
+			&member.ID, &member.GroupID, &user.ID, &member.Status, &member.Role, &member.JoinedAt,
 			&user.FirstName, &user.LastName, &user.Avatar, &user.Nickname,
 		)
 		if err != nil {
@@ -460,4 +460,36 @@ func (s *GroupService) IsUserMember(groupID, userID uint) (bool, error) {
 		return false, err
 	}
 	return status == "member" || status == "accepted", nil
+}
+
+func (s *GroupService) GetUserRole(groupID, userID uint) (string, error) {
+	query := `SELECT role FROM group_members WHERE group_id = ? AND user_id = ? AND status IN ('member','accepted')`
+
+	var role string
+	err := s.db.QueryRow(query, groupID, userID).Scan(&role)
+	if err == sql.ErrNoRows {
+		// Check if user is the group creator
+		var creatorID uint
+		err := s.db.QueryRow("SELECT creator_id FROM groups WHERE id = ?", groupID).Scan(&creatorID)
+		if err != nil {
+			return "", err
+		}
+		if creatorID == userID {
+			return "creator", nil
+		}
+		return "", sql.ErrNoRows
+	}
+	if err != nil {
+		return "", err
+	}
+
+	return role, nil
+}
+
+func (s *GroupService) IsUserAdminOrCreator(groupID, userID uint) (bool, error) {
+	role, err := s.GetUserRole(groupID, userID)
+	if err != nil {
+		return false, err
+	}
+	return role == "admin" || role == "creator", nil
 }

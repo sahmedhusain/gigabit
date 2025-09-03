@@ -5,7 +5,6 @@ import { Search, Plus, Bell, MessageCircle, User, X, Home } from 'lucide-react'
 interface TopBarProps {
   isMobileMenuOpen: boolean
   setIsMobileMenuOpen: (open: boolean) => void
-  setShowCreatePost: (show: boolean) => void
   setShowNotifications: (show: boolean) => void
   setShowChat: (show: boolean) => void
   showNotifications: boolean
@@ -21,7 +20,6 @@ interface TopBarProps {
 export default function TopBar({
   isMobileMenuOpen,
   setIsMobileMenuOpen,
-  setShowCreatePost,
   setShowNotifications,
   setShowChat,
   showNotifications,
@@ -29,8 +27,8 @@ export default function TopBar({
   notifications,
   currentUser,
   isOffline,
-  isConnected
-  , logout,
+  isConnected,
+  logout,
   setActiveTab
 }: TopBarProps) {
   const router = useRouter()
@@ -65,23 +63,6 @@ export default function TopBar({
             title="Open search"
           >
             <Search className="w-5 h-5" />
-          </button>
-
-          <button
-            onClick={() => setShowCreatePost(true)}
-            className="hidden sm:flex items-center px-3 lg:px-4 py-2 bg-gradient-to-r from-emerald-500 to-teal-600 rounded-xl text-white hover:from-emerald-600 hover:to-teal-700 transition-all duration-200 text-sm lg:text-base"
-          >
-            <Plus className="w-4 h-4 mr-1 lg:mr-2" />
-            <span className="hidden md:inline">Create</span>
-          </button>
-
-          {/* Mobile Create Post */}
-          <button
-            onClick={() => setShowCreatePost(true)}
-            title="Create post"
-            className="sm:hidden p-2 bg-gradient-to-r from-emerald-500 to-teal-600 rounded-xl text-white hover:from-emerald-600 hover:to-teal-700 transition-all duration-200"
-          >
-            <Plus className="w-5 h-5" />
           </button>
 
           <button

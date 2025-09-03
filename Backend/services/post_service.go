@@ -63,7 +63,7 @@ func (s *PostService) AddPostPrivacyUsers(postID uint, userIDs []uint) error {
 	}
 
 	query := `INSERT INTO post_privacy (post_id, user_id) VALUES (?, ?)`
-	
+
 	for _, userID := range userIDs {
 		_, err := s.db.Exec(query, postID, userID)
 		if err != nil {
@@ -105,7 +105,6 @@ func (s *PostService) GetPostByID(postID uint, currentUserID uint) (*models.Post
 
 	user.ID = post.UserID
 	post.User = user
-
 
 	// Check if current user can view this post
 	canView, err := s.CanViewPost(postID, currentUserID)
@@ -356,4 +355,3 @@ func (s *PostService) isInPostPrivacyList(postID, userID uint) (bool, error) {
 
 	return count > 0, nil
 }
-

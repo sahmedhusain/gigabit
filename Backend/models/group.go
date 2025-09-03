@@ -41,6 +41,7 @@ type GroupMember struct {
 	GroupID   uint      `json:"group_id"`
 	UserID    uint      `json:"user_id"`
 	Status    string    `json:"status"` // "member", "pending", "invited"
+	Role      string    `json:"role"`   // "member", "admin", "creator"
 	JoinedAt  time.Time `json:"joined_at"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
@@ -51,6 +52,7 @@ type GroupMemberResponse struct {
 	GroupID  uint         `json:"group_id"`
 	User     UserResponse `json:"user"`
 	Status   string       `json:"status"`
+	Role     string       `json:"role"`
 	JoinedAt time.Time    `json:"joined_at"`
 }
 

@@ -9,6 +9,7 @@ import { useAuth } from '@/context/AuthContext';
 interface EventsSectionProps {
   events: Event[];
   onEventsUpdate: () => void;
+  isLoading?: boolean;
 }
 
 interface CreateEventModalProps {
@@ -16,6 +17,7 @@ interface CreateEventModalProps {
   onClose: () => void;
   onEventCreated: () => void;
   groups: GroupResponse[];
+  groupRoles: { [groupId: number]: { role: string; is_admin_or_creator: boolean } };
 }
 
 interface EditEventModalProps {
@@ -33,7 +35,7 @@ interface EventDetailsModalProps {
   onEventUpdated: () => void;
 }
 
-const CreateEventModal: React.FC<CreateEventModalProps> = ({ isOpen, onClose, onEventCreated, groups }) => {
+const CreateEventModal: React.FC<CreateEventModalProps> = ({ isOpen, onClose, onEventCreated, groups, groupRoles }) => {
   const [formData, setFormData] = useState<CreateEventRequest>({
     title: '',
     description: '',
@@ -42,6 +44,11 @@ const CreateEventModal: React.FC<CreateEventModalProps> = ({ isOpen, onClose, on
   const [selectedGroupId, setSelectedGroupId] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const { success, error } = useToast();
+
+  // Filter groups to only show those where user is admin or creator
+  const adminGroups = groups.filter(group => 
+    groupRoles[group.id]?.is_admin_or_creator === true
+  );
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -104,20 +111,26 @@ const CreateEventModal: React.FC<CreateEventModalProps> = ({ isOpen, onClose, on
 
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-2">Group</label>
-            <select
-              value={selectedGroupId || ''}
-              onChange={(e) => setSelectedGroupId(Number(e.target.value))}
-              className="w-full p-3 bg-white/10 rounded-lg text-white border border-white/20 focus:border-emerald-500 focus:outline-none"
-              required
-              aria-label="Select group"
-            >
-              <option value="">Select a group</option>
-              {groups.map((group) => (
-                <option key={group.id} value={group.id} className="bg-slate-800">
-                  {group.title}
-                </option>
-              ))}
-            </select>
+            {adminGroups.length === 0 ? (
+              <div className="w-full p-3 bg-red-500/10 border border-red-400/20 rounded-lg text-red-300 text-sm">
+                You need to be an admin or creator of a group to create events.
+              </div>
+            ) : (
+              <select
+                value={selectedGroupId || ''}
+                onChange={(e) => setSelectedGroupId(Number(e.target.value))}
+                className="w-full p-3 bg-white/10 rounded-lg text-white border border-white/20 focus:border-emerald-500 focus:outline-none"
+                required
+                aria-label="Select group"
+              >
+                <option value="">Select a group</option>
+                {adminGroups.map((group) => (
+                  <option key={group.id} value={group.id} className="bg-slate-800">
+                    {group.title} ({groupRoles[group.id]?.role || 'admin'})
+                  </option>
+                ))}
+              </select>
+            )}
           </div>
 
           <div>
@@ -154,7 +167,7 @@ const CreateEventModal: React.FC<CreateEventModalProps> = ({ isOpen, onClose, on
             </button>
             <button
               type="submit"
-              disabled={isLoading}
+              disabled={isLoading || adminGroups.length === 0}
               className="flex-1 py-2 px-4 bg-gradient-to-r from-emerald-500 to-teal-600 rounded-lg text-white hover:from-emerald-600 hover:to-teal-700 disabled:opacity-50 transition-colors"
             >
               {isLoading ? 'Creating...' : 'Create Event'}
@@ -292,6 +305,7 @@ const EventDetailsModal: React.FC<EventDetailsModalProps> = ({
   const [isRespondingToEvent, setIsRespondingToEvent] = useState(false);
   const [isDeletingEvent, setIsDeletingEvent] = useState(false);
   const { success, error } = useToast();
+  const { user } = useAuth();
 
   useEffect(() => {
     if (event) {
@@ -352,14 +366,17 @@ const EventDetailsModal: React.FC<EventDetailsModalProps> = ({
         <div className="flex items-center justify-between mb-6">
           <h3 className="text-2xl font-bold text-white">{event.title}</h3>
           <div className="flex items-center space-x-2">
-            <button
-              onClick={handleDeleteEvent}
-              disabled={isDeletingEvent}
-              className="p-2 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg transition-colors"
-              aria-label="Delete event"
-            >
-              <Trash2 className="w-5 h-5" />
-            </button>
+            {/* Only show delete button to event creator */}
+            {user && event.creator_id === user.id && (
+              <button
+                onClick={handleDeleteEvent}
+                disabled={isDeletingEvent}
+                className="p-2 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg transition-colors"
+                aria-label="Delete event"
+              >
+                <Trash2 className="w-5 h-5" />
+              </button>
+            )}
             <button onClick={onClose} className="text-gray-400 hover:text-white" aria-label="Close modal">
               <X className="w-5 h-5" />
             </button>
@@ -456,12 +473,13 @@ const EventDetailsModal: React.FC<EventDetailsModalProps> = ({
   );
 };
 
-export const EventsSection: React.FC<EventsSectionProps> = ({ events, onEventsUpdate }) => {
+export const EventsSection: React.FC<EventsSectionProps> = ({ events, onEventsUpdate, isLoading = false }) => {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<EventResponse | null>(null);
   const [groups, setGroups] = useState<GroupResponse[]>([]);
+  const [groupRoles, setGroupRoles] = useState<{ [groupId: number]: { role: string; is_admin_or_creator: boolean } }>({});
   const [isLoadingGroups, setIsLoadingGroups] = useState(false);
   const { user } = useAuth();
 
@@ -474,10 +492,27 @@ export const EventsSection: React.FC<EventsSectionProps> = ({ events, onEventsUp
     setIsLoadingGroups(true);
     try {
       const data = await api.getUserGroups(user.id);
-      setGroups(data.data || []);
+      const userGroups = data.data || [];
+      setGroups(userGroups);
+      
+      // Load user roles for each group
+      const rolesMap: { [groupId: number]: { role: string; is_admin_or_creator: boolean } } = {};
+      await Promise.all(
+        userGroups.map(async (group) => {
+          try {
+            const roleData = await api.getUserRole(group.id);
+            rolesMap[group.id] = roleData;
+          } catch (err) {
+            console.error(`Failed to load role for group ${group.id}:`, err);
+            rolesMap[group.id] = { role: 'member', is_admin_or_creator: false };
+          }
+        })
+      );
+      setGroupRoles(rolesMap);
     } catch (err) {
       console.error('Failed to load user groups:', err);
       setGroups([]);
+      setGroupRoles({});
     } finally {
       setIsLoadingGroups(false);
     }
@@ -499,105 +534,176 @@ export const EventsSection: React.FC<EventsSectionProps> = ({ events, onEventsUp
     setIsDetailsModalOpen(false);
   };
 
+  // Check if user has admin or creator role in any group
+  const canCreateEvents = Object.values(groupRoles).some(role => role.is_admin_or_creator);
+
   return (
     <div className="space-y-4 lg:space-y-6">
       <div className="bg-gradient-to-r from-white/10 to-white/5 backdrop-blur-xl rounded-2xl lg:rounded-3xl border border-white/20 p-4 lg:p-6">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 lg:mb-6 space-y-3 sm:space-y-0">
           <h2 className="text-xl lg:text-2xl font-bold text-white">My Events</h2>
-          <button
-            onClick={() => setIsCreateModalOpen(true)}
-            className="flex items-center px-3 lg:px-4 py-2 bg-gradient-to-r from-emerald-500 to-teal-600 rounded-lg lg:rounded-xl text-white hover:from-emerald-600 hover:to-teal-700 transition-all duration-200 text-sm lg:text-base w-full sm:w-auto justify-center"
-          >
-            <Plus className="w-4 h-4 mr-2" />
-            Create Event
-          </button>
+          {canCreateEvents && (
+            <button
+              onClick={() => setIsCreateModalOpen(true)}
+              className="flex items-center px-3 lg:px-4 py-2 bg-gradient-to-r from-emerald-500 to-teal-600 rounded-lg lg:rounded-xl text-white hover:from-emerald-600 hover:to-teal-700 transition-all duration-200 text-sm lg:text-base w-full sm:w-auto justify-center"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Create Event
+            </button>
+          )}
         </div>
         
         <div className="space-y-3 lg:space-y-4">
-          {events.length === 0 ? (
+          {isLoading ? (
+            <div className="text-center text-white/60 py-8">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white/60 mx-auto mb-4"></div>
+              <p>Loading your events...</p>
+            </div>
+          ) : events.length === 0 ? (
             <div className="text-center text-white/60 py-8">
               <Calendar className="w-16 h-16 mx-auto mb-4 text-white/30" />
               <p className="text-lg mb-2">No events yet</p>
               <p className="text-sm">Create your first event to get started!</p>
             </div>
           ) : (
-            events.map((event) => (
-              <div key={event.id} className="bg-white/5 rounded-xl lg:rounded-2xl p-4 lg:p-6 hover:bg-white/10 transition-all duration-200 cursor-pointer" onClick={() => handleEventClick(event)}>
-                <div className="flex flex-col lg:flex-row lg:items-center justify-between space-y-4 lg:space-y-0 mb-3 lg:mb-4">
-                  <div className="flex-1">
-                    <h3 className="text-lg lg:text-xl font-semibold text-white mb-2">{event.title}</h3>
-                    <p className="text-white/70 mb-3 text-sm lg:text-base line-clamp-2">{event.description}</p>
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-4 space-y-2 sm:space-y-0 text-xs lg:text-sm text-white/60">
-                      <div className="flex items-center">
-                        <Calendar className="w-3 h-3 lg:w-4 lg:h-4 mr-1" />
-                        {new Date(event.event_time).toLocaleDateString()} at {new Date(event.event_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            events
+              .sort((a, b) => {
+                // Sort by event date - upcoming events first, then past events
+                const dateA = new Date(a.event_time);
+                const dateB = new Date(b.event_time);
+                const now = new Date();
+                
+                const aIsPast = dateA < now;
+                const bIsPast = dateB < now;
+                
+                // If both are upcoming or both are past, sort by date
+                if (aIsPast === bIsPast) {
+                  return aIsPast ? dateB.getTime() - dateA.getTime() : dateA.getTime() - dateB.getTime();
+                }
+                
+                // Upcoming events come first
+                return aIsPast ? 1 : -1;
+              })
+              .map((event) => {
+                const eventDate = new Date(event.event_time);
+                const isExpired = eventDate < new Date();
+                const isToday = eventDate.toDateString() === new Date().toDateString();
+                
+                return (
+                  <div 
+                    key={event.id} 
+                    className={`bg-white/5 rounded-xl lg:rounded-2xl p-4 lg:p-6 hover:bg-white/10 transition-all duration-200 cursor-pointer border-l-4 ${
+                      isExpired ? 'border-gray-500 opacity-75' : 
+                      isToday ? 'border-yellow-500' : 
+                      'border-emerald-500'
+                    }`}
+                    onClick={() => handleEventClick(event)}
+                  >
+                    <div className="flex flex-col lg:flex-row lg:items-center justify-between space-y-4 lg:space-y-0 mb-3 lg:mb-4">
+                      <div className="flex-1">
+                        <div className="flex items-center space-x-2 mb-2">
+                          <h3 className="text-lg lg:text-xl font-semibold text-white">{event.title}</h3>
+                          {isToday && (
+                            <span className="px-2 py-1 bg-yellow-500 text-black text-xs rounded-full font-medium">
+                              Today
+                            </span>
+                          )}
+                          {isExpired && (
+                            <span className="px-2 py-1 bg-gray-600 text-white text-xs rounded-full">
+                              Expired
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-white/70 mb-3 text-sm lg:text-base line-clamp-2">{event.description}</p>
+                        <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-4 space-y-2 sm:space-y-0 text-xs lg:text-sm text-white/60">
+                          <div className="flex items-center">
+                            <Calendar className="w-3 h-3 lg:w-4 lg:h-4 mr-1" />
+                            <span className={isToday ? 'text-yellow-400 font-medium' : ''}>
+                              {eventDate.toLocaleDateString()} at {eventDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                          </div>
+                          <div className="flex items-center">
+                            <Users className="w-3 h-3 lg:w-4 lg:h-4 mr-1" />
+                            {event.group?.title || 'Unknown Group'}
+                          </div>
+                        </div>
                       </div>
-                      <div className="flex items-center">
-                        <Users className="w-3 h-3 lg:w-4 lg:h-4 mr-1" />
-                        {event.group.title}
+                      
+                      <div className="text-center lg:text-right">
+                        {/* User status badge */}
+                        <div className="flex flex-wrap items-center justify-center lg:justify-end gap-2 mb-3">
+                          {(() => {
+                            const status = event.user_response === 'going' ? 'Going' : 
+                                         event.user_response === 'not_going' ? 'Not Going' : 'Pending';
+                            const statusClasses =
+                              event.user_response === 'going'
+                                ? 'bg-emerald-600 text-white'
+                                : event.user_response === 'not_going'
+                                ? 'bg-red-600 text-white'
+                                : 'border border-yellow-500 text-yellow-400';
+                            return (
+                              <span className={`px-3 lg:px-4 py-1 rounded-full text-xs lg:text-sm ${statusClasses}`}>
+                                Your status: {status}
+                              </span>
+                            );
+                          })()}
+                        </div>
+                        
+                        {/* Response counts */}
+                        <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2 mb-3">
+                          <div className={`px-3 lg:px-4 py-2 rounded-lg lg:rounded-xl text-xs lg:text-sm ${
+                            event.user_response === 'going' 
+                              ? 'bg-emerald-500 text-white' 
+                              : 'border border-emerald-500/50 text-emerald-400'
+                          }`}>
+                            <Check className="w-3 h-3 inline mr-1" />
+                            Going: {event.going_count || 0}
+                          </div>
+                          <div className={`px-3 lg:px-4 py-2 rounded-lg lg:rounded-xl text-xs lg:text-sm ${
+                            event.user_response === 'not_going' 
+                              ? 'bg-red-500 text-white' 
+                              : 'border border-red-500/50 text-red-400'
+                          }`}>
+                            <X className="w-3 h-3 inline mr-1" />
+                            Not Going: {event.not_going_count || 0}
+                          </div>
+                        </div>
+                        
+                        {/* Action buttons */}
+                        <div className="flex space-x-2 justify-center lg:justify-end">
+                          {/* Only show edit button to event creator */}
+                          {user && event.creator_id === user.id && (
+                            <button
+                              onClick={async (e) => {
+                                e.stopPropagation();
+                                try {
+                                  const full = await api.getEvent(event.id);
+                                  handleEditEvent(full);
+                                } catch (err) {
+                                  console.error('Failed to load event for edit:', err);
+                                }
+                              }}
+                              className="p-2 text-gray-400 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+                              aria-label="Edit event"
+                            >
+                              <Edit className="w-4 h-4" />
+                            </button>
+                          )}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleEventClick(event);
+                            }}
+                            className="px-3 py-2 text-xs bg-blue-500/20 text-blue-400 hover:bg-blue-500/30 rounded-lg transition-colors"
+                          >
+                            View Details
+                          </button>
+                        </div>
                       </div>
                     </div>
                   </div>
-                  
-                  <div className="text-center lg:text-right">
-                    {/* User status and expiry badges */}
-                    <div className="flex flex-wrap items-center justify-center lg:justify-end gap-2 mb-3">
-                      {(() => {
-                        const status = event.user_response === 'going' ? 'Going' : event.user_response === 'not_going' ? 'Not Going' : 'Pending';
-                        const statusClasses =
-                          event.user_response === 'going'
-                            ? 'bg-emerald-600 text-white'
-                            : event.user_response === 'not_going'
-                            ? 'bg-red-600 text-white'
-                            : 'border border-yellow-500 text-yellow-400';
-                        return (
-                          <span className={`px-3 lg:px-4 py-1 rounded-full text-xs lg:text-sm ${statusClasses}`}>
-                            Your status: {status}
-                          </span>
-                        );
-                      })()}
-                      {new Date(event.event_time) < new Date() && (
-                        <span className="px-3 lg:px-4 py-1 rounded-full text-xs lg:text-sm bg-gray-600 text-white">Expired</span>
-                      )}
-                    </div>
-                    <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2 mb-3">
-                      <div className={`px-3 lg:px-4 py-2 rounded-lg lg:rounded-xl text-xs lg:text-sm ${
-                        event.user_response === 'going' 
-                          ? 'bg-emerald-500 text-white' 
-                          : 'border border-emerald-500/50 text-emerald-400'
-                      }`}>
-                        Going: {event.going_count}
-                      </div>
-                      <div className={`px-3 lg:px-4 py-2 rounded-lg lg:rounded-xl text-xs lg:text-sm ${
-                        event.user_response === 'not_going' 
-                          ? 'bg-red-500 text-white' 
-                          : 'border border-red-500/50 text-red-400'
-                      }`}>
-                        Not Going: {event.not_going_count}
-                      </div>
-                    </div>
-                    
-                    <div className="flex space-x-2">
-                      <button
-                        onClick={async (e) => {
-                          e.stopPropagation();
-                          try {
-                            const full = await api.getEvent(event.id);
-                            handleEditEvent(full);
-                          } catch (err) {
-                            console.error('Failed to load event for edit:', err);
-                          }
-                        }}
-                        className="p-2 text-gray-400 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
-                        aria-label="Edit event"
-                      >
-                        <Edit className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ))
+                );
+              })
           )}
         </div>
       </div>
@@ -607,6 +713,7 @@ export const EventsSection: React.FC<EventsSectionProps> = ({ events, onEventsUp
         onClose={() => setIsCreateModalOpen(false)}
         onEventCreated={onEventsUpdate}
         groups={groups}
+        groupRoles={groupRoles}
       />
 
       <EditEventModal

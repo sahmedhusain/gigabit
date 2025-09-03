@@ -45,8 +45,30 @@ export default function PostCard({ post, onLike }: PostCardProps) {
       {/* Post Header */}
       <div className="flex items-center justify-between mb-3 lg:mb-4">
         <div className="flex items-center space-x-3 flex-1 min-w-0">
-          <div className="w-8 h-8 lg:w-10 lg:h-10 bg-gradient-to-r from-emerald-500 to-teal-600 rounded-full flex items-center justify-center">
-            <User className="w-4 h-4 lg:w-5 lg:h-5 text-white" />
+          <div className="w-8 h-8 lg:w-10 lg:h-10 bg-gradient-to-r from-emerald-500 to-teal-600 rounded-full flex items-center justify-center overflow-hidden">
+            {post.user.avatar ? (
+              <>
+                <img 
+                  src={post.user.avatar.startsWith('data:') ? 
+                    post.user.avatar : 
+                    post.user.avatar.startsWith('http') ? 
+                      post.user.avatar : 
+                      `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}${post.user.avatar}`
+                  }
+                  alt={`${post.user.name}'s avatar`}
+                  className="w-full h-full object-cover"
+                  onError={(e) => {
+                    // Fallback to default User icon on error
+                    const target = e.target as HTMLImageElement;
+                    target.style.display = 'none';
+                    target.nextElementSibling?.classList.remove('hidden');
+                  }}
+                />
+                <User className="w-4 h-4 lg:w-5 lg:h-5 text-white hidden" />
+              </>
+            ) : (
+              <User className="w-4 h-4 lg:w-5 lg:h-5 text-white" />
+            )}
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center space-x-2 mb-1">
@@ -71,7 +93,9 @@ export default function PostCard({ post, onLike }: PostCardProps) {
       {post.image && (
         <div className="mb-3 lg:mb-4 rounded-xl lg:rounded-2xl overflow-hidden bg-white/5">
           <img 
-            src={post.image} 
+            src={post.image.startsWith('http') ? 
+              post.image : `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}${post.image}`
+            } 
             alt="Post image" 
             className="w-full h-auto object-cover"
             onError={(e) => {

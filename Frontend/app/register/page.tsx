@@ -9,7 +9,7 @@ import { Eye, EyeOff, Mail, Lock, User, Calendar, Camera, Edit3, ArrowRight, Spa
 export default function RegisterPage() {
   const router = useRouter()
   const { register } = useAuth()
-  
+
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -18,7 +18,7 @@ export default function RegisterPage() {
     dateOfBirth: '',
     nickname: '',
     aboutMe: '',
-    avatar: null as File | null
+    avatar: ''
   })
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
@@ -35,10 +35,12 @@ export default function RegisterPage() {
   const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (file) {
-      setFormData({ ...formData, avatar: file })
       const reader = new FileReader()
       reader.onloadend = () => {
-        setAvatarPreview(reader.result as string)
+        const base64String = reader.result as string
+        console.log("Base64 string:", base64String.substring(0, 100) + "...") // Debug log
+        setFormData({ ...formData, avatar: base64String })
+        setAvatarPreview(base64String)
       }
       reader.readAsDataURL(file)
     }
@@ -47,7 +49,7 @@ export default function RegisterPage() {
   const handleSubmit = async () => {
     setIsLoading(true)
     setError(null)
-    
+
     try {
       // Validate required fields
       if (!formData.email || !formData.password || !formData.firstName || !formData.lastName || !formData.dateOfBirth) {
@@ -65,37 +67,40 @@ export default function RegisterPage() {
         throw new Error('Password must be at least 6 characters long')
       }
 
-      let avatarUrl = '';
+      // let avatarUrl = '';
 
-      // Upload avatar image if provided
-      if (formData.avatar) {
-        try {
-          const avatarFormData = new FormData();
-          avatarFormData.append('image', formData.avatar);
-          
-          console.log("Uploading avatar to backend uploads endpoint")
+      // // Upload avatar image if provided
+      // if (formData.avatar) {
+      //   try {
+      //     const avatarFormData = new FormData();
+      //     avatarFormData.append('image', formData.avatar);
 
-          const uploadResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/api/uploads`, {
-            method: 'POST',
-            body: avatarFormData,
-            credentials: 'include'
-          })
+      //     console.log("Uploading avatar to backend uploads endpoint")
 
-          console.log("Avatar upload response:", uploadResponse);
-          if (uploadResponse.ok) {
-            const uploadData = await uploadResponse.json();
-            avatarUrl = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/api/images/${uploadData.filename}`;
-            console.log("Avatar uploaded successfully:", avatarUrl);
-          } else {
-            const errorData = await uploadResponse.json();
-            console.warn('Avatar upload failed:', errorData.error);
-          }
-        } catch (avatarError) {
-          console.warn('Avatar upload error:', avatarError);
-        }
-      } else {
-        avatarUrl = "avatar1.png";
-      }
+      //     const uploadResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/api/uploads`, {
+      //       method: 'POST',
+      //       body: avatarFormData,
+      //       credentials: 'include'
+      //     })
+
+      //     console.log("Avatar upload response:", uploadResponse);
+      //     if (uploadResponse.ok) {
+      //       const uploadData = await uploadResponse.json();
+      //       avatarUrl = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/api/images/${uploadData.filename}`;
+      //       console.log("Avatar uploaded successfully:", avatarUrl);
+      //     } else {
+      //       const errorData = await uploadResponse.json();
+      //       console.warn('Avatar upload failed:', errorData.error);
+      //     }
+      //   } catch (avatarError) {
+      //     console.warn('Avatar upload error:', avatarError);
+      //   }
+      // }
+
+      console.log("Form data before sending:", {
+        ...formData, 
+        avatar: formData.avatar ? `${formData.avatar.substring(0, 50)}...` : 'No Avatar'
+      })
 
       // Call register function from auth context
       await register({
@@ -106,7 +111,7 @@ export default function RegisterPage() {
         dateOfBirth: formData.dateOfBirth,
         nickname: formData.nickname,
         aboutMe: formData.aboutMe,
-        avatar: avatarUrl,
+        avatar: formData.avatar,
       })
 
       // Redirect to dashboard on success
@@ -126,7 +131,7 @@ export default function RegisterPage() {
         <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-teal-500/20 rounded-full blur-3xl animate-pulse delay-1000"></div>
         <div className="absolute top-3/4 left-1/2 w-64 h-64 bg-cyan-500/20 rounded-full blur-3xl animate-pulse delay-2000"></div>
       </div>
-      
+
       {/* Floating Particles */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         {[...Array(25)].map((_, i) => (
@@ -149,7 +154,7 @@ export default function RegisterPage() {
         {/* Header */}
         <div className="sm:mx-auto sm:w-full sm:max-w-lg text-center mb-6 sm:mb-8">
           <div className="inline-flex items-center justify-center p-2 mb-4">
-            
+
           </div>
           <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold bg-gradient-to-r from-white via-emerald-100 to-teal-200 bg-clip-text text-transparent mb-3 tracking-tight">
             Join SocialConnect
@@ -407,11 +412,11 @@ export default function RegisterPage() {
               <div className="mt-8 text-center">
                 <p className="text-white/70">
                   Already have an account?{' '}
-                    <Link
-                   href="/login"
-                  className="text-emerald-300 hover:text-emerald-200 hover:underline transition-colors font-medium">
+                  <Link
+                    href="/login"
+                    className="text-emerald-300 hover:text-emerald-200 hover:underline transition-colors font-medium">
                     Sign In
-                  
+
                   </Link>
                 </p>
               </div>

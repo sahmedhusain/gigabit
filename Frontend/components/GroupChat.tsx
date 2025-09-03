@@ -1,10 +1,12 @@
 'use client'
+
 import React, { useState, useEffect } from 'react'
 import { useAuth } from '@/context/AuthContext'
 import { useWebSocket } from '@/context/WebSocketContext'
 import { api, API_BASE_URL } from '@/lib/api'
 import ChatWindow from '@/components/ChatWindow'
 import { MessageCircle, Users, Hash, User } from 'lucide-react'
+import { useRealTimeMessages, useOnlineStatus, useConnectionStatus } from '@/hooks'
 
 interface GroupChatProps {
   groupId: number
@@ -14,10 +16,17 @@ interface GroupChatProps {
 const GroupChat: React.FC<GroupChatProps> = ({ groupId, groupTitle }) => {
   const { user } = useAuth()
   const { isConnected, onlineUsers } = useWebSocket()
+  const { isConnected: connectionStatus } = useConnectionStatus()
+  const { onlineUsers: liveOnlineUsers } = useOnlineStatus()
+  const { getUnreadCount, conversations } = useRealTimeMessages()
+  
   const [showChat, setShowChat] = useState(false)
   const [memberCount, setMemberCount] = useState(0)
-  const [onlineMemberCount, setOnlineMemberCount] = useState(0)
   const [recentMessages, setRecentMessages] = useState<any[]>([])
+
+  // Calculate online member count from real-time data
+  const onlineMemberCount = liveOnlineUsers.filter(user => user.is_online).length
+  const unreadCount = getUnreadCount(groupId)
 
   useEffect(() => {
     // Fetch member count
@@ -37,11 +46,6 @@ const GroupChat: React.FC<GroupChatProps> = ({ groupId, groupTitle }) => {
 
     fetchMemberCount()
   }, [groupId])
-
-  useEffect(() => {
-    // Count online members (simplified - in a real app you'd check which group members are online)
-    setOnlineMemberCount(Math.min(onlineUsers.length, memberCount))
-  }, [onlineUsers, memberCount])
 
   useEffect(() => {
     // Fetch recent messages when chat is not open
@@ -96,20 +100,32 @@ const GroupChat: React.FC<GroupChatProps> = ({ groupId, groupTitle }) => {
                   </div>
                 </>
               )}
-              <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`}></div>
-              <span>{isConnected ? 'Live' : 'Offline'}</span>
+              <div className={`w-2 h-2 rounded-full ${connectionStatus ? 'bg-green-500' : 'bg-red-500'}`}></div>
+              <span>{connectionStatus ? 'Live' : 'Offline'}</span>
             </div>
           </div>
         </div>
 
         {!showChat && (
-          <button
-            onClick={handleOpenChat}
-            className="flex items-center px-4 py-2 bg-emerald-500 hover:bg-emerald-600 rounded-xl text-white transition-all duration-200"
-          >
-            <MessageCircle className="w-4 h-4 mr-2" />
-            Open Chat
-          </button>
+          <div className="relative">
+            <button
+              onClick={handleOpenChat}
+              disabled={!connectionStatus}
+              className={`flex items-center px-4 py-2 rounded-xl text-white transition-all duration-200 ${
+                connectionStatus 
+                  ? 'bg-emerald-500 hover:bg-emerald-600' 
+                  : 'bg-gray-500 cursor-not-allowed'
+              }`}
+            >
+              <MessageCircle className="w-4 h-4 mr-2" />
+              {connectionStatus ? 'Open Chat' : 'Offline'}
+            </button>
+            {unreadCount > 0 && (
+              <div className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full min-w-5 h-5 flex items-center justify-center px-1">
+                {unreadCount > 99 ? '99+' : unreadCount}
+              </div>
+            )}
+          </div>
         )}
       </div>
 
@@ -165,11 +181,24 @@ const GroupChat: React.FC<GroupChatProps> = ({ groupId, groupTitle }) => {
               <div className="pt-4">
                 <button
                   onClick={handleOpenChat}
-                  className="flex items-center px-6 py-3 bg-emerald-500 hover:bg-emerald-600 rounded-xl text-white transition-all duration-200 mx-auto"
+                  disabled={!connectionStatus}
+                  className={`flex items-center px-6 py-3 rounded-xl text-white transition-all duration-200 mx-auto ${
+                    connectionStatus 
+                      ? 'bg-emerald-500 hover:bg-emerald-600' 
+                      : 'bg-gray-500 cursor-not-allowed'
+                  }`}
                 >
                   <MessageCircle className="w-5 h-5 mr-2" />
-                  {recentMessages.length > 0 ? 'Continue Chat' : 'Start Chatting'}
+                  {connectionStatus 
+                    ? (recentMessages.length > 0 ? 'Continue Chat' : 'Start Chatting')
+                    : 'Chat Offline'
+                  }
                 </button>
+                {!connectionStatus && (
+                  <p className="text-center text-white/50 text-xs mt-2">
+                    Chat will be available when connection is restored
+                  </p>
+                )}
               </div>
             </div>
           </div>

@@ -1,6 +1,8 @@
 'use client'
 import { useRouter } from 'next/navigation'
 import { Search, Plus, Bell, MessageCircle, User, X, Home } from 'lucide-react'
+import { useSearch, useNotifications, useRealTimeMessages } from '@/hooks'
+import { useState } from 'react'
 
 interface TopBarProps {
   isMobileMenuOpen: boolean
@@ -29,11 +31,26 @@ export default function TopBar({
   notifications,
   currentUser,
   isOffline,
-  isConnected
-  , logout,
+  isConnected,
+  logout,
   setActiveTab
 }: TopBarProps) {
   const router = useRouter()
+  const [searchTerm, setSearchTerm] = useState('')
+  const { results, isSearching, setQuery } = useSearch(async (query: string) => {
+    // Mock search function - replace with actual API call
+    return []
+  })
+  const { unread: notificationUnread } = useNotifications()
+  const { getUnreadCount: getMessagesUnread } = useRealTimeMessages()
+  
+  const messageUnread = getMessagesUnread()
+
+  const handleSearchChange = (value: string) => {
+    setSearchTerm(value)
+    setQuery(value)
+  }
+
   return (
     <div className="fixed top-0 left-0 lg:left-64 right-0 h-14 lg:h-16 bg-gradient-to-r from-white/10 to-white/5 backdrop-blur-xl border-b border-white/20 z-30">
       <div className="flex items-center justify-between h-full px-4 lg:px-6">
@@ -53,8 +70,26 @@ export default function TopBar({
             <input
               type="text"
               placeholder="Search..."
+              value={searchTerm}
+              onChange={(e) => handleSearchChange(e.target.value)}
               className="pl-10 pr-4 py-2 bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-emerald-400/50 focus:border-emerald-400/50 w-40 sm:w-60 lg:w-80 text-sm lg:text-base"
             />
+            {isSearching && (
+              <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+              </div>
+            )}
+            
+            {/* Search Results Dropdown */}
+            {searchTerm && results.length > 0 && (
+              <div className="absolute top-full left-0 right-0 mt-1 bg-white/10 backdrop-blur-xl border border-white/20 rounded-xl shadow-xl max-h-60 overflow-y-auto z-50">
+                {results.slice(0, 5).map((result: any, index) => (
+                  <div key={index} className="p-3 hover:bg-white/10 cursor-pointer border-b border-white/10 last:border-b-0">
+                    <p className="text-white text-sm truncate">Search result {index + 1}</p>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 
@@ -90,8 +125,10 @@ export default function TopBar({
             className="relative p-2 text-white/70 hover:text-white hover:bg-white/10 rounded-xl transition-all duration-200"
           >
             <Bell className="w-4 h-4 lg:w-5 lg:h-5" />
-            {notifications.filter(n => !n.is_read).length > 0 && (
-              <span className="absolute -top-1 -right-1 w-2 h-2 lg:w-3 lg:h-3 bg-emerald-500 rounded-full animate-pulse"></span>
+            {notificationUnread > 0 && (
+              <span className="absolute -top-1 -right-1 bg-emerald-500 text-white text-xs rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1 animate-pulse">
+                {notificationUnread > 99 ? '99+' : notificationUnread}
+              </span>
             )}
           </button>
 
@@ -101,6 +138,11 @@ export default function TopBar({
             className="relative p-2 text-white/70 hover:text-white hover:bg-white/10 rounded-xl transition-all duration-200"
           >
             <MessageCircle className="w-4 h-4 lg:w-5 lg:h-5" />
+            {messageUnread > 0 && (
+              <span className="absolute -top-1 -right-1 bg-emerald-500 text-white text-xs rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1 animate-pulse">
+                {messageUnread > 99 ? '99+' : messageUnread}
+              </span>
+            )}
           </button>
 
           <div className="flex items-center space-x-2 lg:space-x-3">

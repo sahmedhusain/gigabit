@@ -7,6 +7,7 @@ import CategoryBadge from '@/components/ui/CategoryBadge'
 import { useAuth } from '@/context/AuthContext'
 import { useWebSocket } from '@/context/WebSocketContext'
 import { useToast } from '@/context/ToastContext'
+import { useConnectionStatus, useOptimisticUpdate, useOnlineStatus } from '@/hooks'
 import { api, APIPost, Comment as CommentType, NetworkError, ValidationError } from '@/lib/api'
 
 interface CommentWithUser extends CommentType {
@@ -19,6 +20,8 @@ function PostDetailPage() {
     const { user } = useAuth()
     const { sendMessage, addMessageListener, isConnected } = useWebSocket()
     const { success, error } = useToast()
+    const { isConnected: connectionStatus } = useConnectionStatus()
+    const { onlineUsers } = useOnlineStatus()
 
     // State
     const [post, setPost] = useState<APIPost | null>(null)
@@ -27,6 +30,17 @@ function PostDetailPage() {
     const [isLoadingComments, setIsLoadingComments] = useState(false)
     const [newComment, setNewComment] = useState('')
     const [isSubmittingComment, setIsSubmittingComment] = useState(false)
+
+    // Real-time optimistic updates for likes
+    const { performUpdate: performOptimisticUpdate, isLoading: likePending } = useOptimisticUpdate(
+        post ? { ...post, is_liked: post.is_liked, like_count: post.like_count } : null,
+        {
+            onError: () => error('Failed to update like')
+        }
+    )
+
+    // Check if post author is online
+    const isAuthorOnline = post ? onlineUsers.some(u => u.user_id === post.user.id && u.is_online) : false
 
     // Format time ago
     const formatTimeAgo = (dateString: string) => {
@@ -72,48 +86,43 @@ function PostDetailPage() {
         }
     }
 
-    // Handle like post
+    // Handle like post with optimistic updates
     const handleLikePost = async () => {
-        if (!post || !user) return
+        if (!post || !user || likePending) return
 
         const wasLiked = post.is_liked
-
-        // Optimistic update
-        setPost(prev => prev ? {
-            ...prev,
-            is_liked: !prev.is_liked,
-            like_count: prev.is_liked ? prev.like_count - 1 : prev.like_count + 1
-        } : null)
-
-        try {
-            if (wasLiked) {
-                await api.unlikePost(post.id)
-            } else {
-                await api.likePost(post.id)
-            }
-
-            // Send WebSocket message for real-time updates
-            if (isConnected) {
-                sendMessage({
-                    type: 'like',
-                    from: user.id,
-                    post_id: post.id,
-                    action: wasLiked ? 'unlike' : 'like'
-                })
-            }
-        } catch (err) {
-            // Revert optimistic update
-            setPost(prev => prev ? {
-                ...prev,
-                is_liked: wasLiked,
-                like_count: wasLiked ? prev.like_count + 1 : prev.like_count - 1
-            } : null)
-
-            console.error('Error toggling like:', err)
-            if (err instanceof NetworkError) {
-                error('Failed to update like. Please try again.')
-            }
+        const optimisticPost = {
+            ...post,
+            is_liked: !post.is_liked,
+            like_count: post.is_liked ? post.like_count - 1 : post.like_count + 1
         }
+
+        // Use optimistic update hook
+        await performOptimisticUpdate((current) => optimisticPost, async () => {
+            try {
+                if (wasLiked) {
+                    await api.unlikePost(post.id)
+                } else {
+                    await api.likePost(post.id)
+                }
+
+                // Send WebSocket message for real-time updates
+                if (isConnected) {
+                    sendMessage({
+                        type: 'like',
+                        from: user.id,
+                        post_id: post.id,
+                        action: wasLiked ? 'unlike' : 'like'
+                    })
+                }
+
+                // Update local state with the optimistic data
+                setPost(optimisticPost)
+            } catch (err) {
+                console.error('Error toggling like:', err)
+                throw err // Let the hook handle the error
+            }
+        })
     }
 
     // Handle comment submission via WebSocket
@@ -241,15 +250,25 @@ function PostDetailPage() {
         <div className="min-h-screen bg-gradient-to-br from-emerald-900 via-teal-900 to-cyan-800">
             <div className="container mx-auto px-4 py-6 max-w-4xl">
                 {/* Header */}
-                <div className="flex items-center mb-6">
-                    <button
-                    title="Back"
-                        onClick={() => router.back()}
-                        className="p-2 text-white/70 hover:text-white hover:bg-white/10 rounded-lg transition-all duration-200 mr-4"
-                    >
-                        <ArrowLeft className="w-5 h-5" />
-                    </button>
-                    <h1 className="text-xl font-semibold text-white">Post Details</h1>
+                <div className="flex items-center justify-between mb-6">
+                    <div className="flex items-center">
+                        <button
+                        title="Back"
+                            onClick={() => router.back()}
+                            className="p-2 text-white/70 hover:text-white hover:bg-white/10 rounded-lg transition-all duration-200 mr-4"
+                        >
+                            <ArrowLeft className="w-5 h-5" />
+                        </button>
+                        <h1 className="text-xl font-semibold text-white">Post Details</h1>
+                    </div>
+                    
+                    {/* Connection Status */}
+                    <div className="flex items-center space-x-2">
+                        <div className={`flex items-center space-x-1 text-xs ${connectionStatus ? 'text-green-400' : 'text-red-400'}`}>
+                            <div className={`w-2 h-2 rounded-full ${connectionStatus ? 'bg-green-400' : 'bg-red-400'}`}></div>
+                            <span>{connectionStatus ? 'Connected' : 'Offline'}</span>
+                        </div>
+                    </div>
                 </div>
 
                 {/* Post Card */}
@@ -265,6 +284,12 @@ function PostDetailPage() {
                                     <h3 className="text-white font-medium">
                                         {post.user.first_name} {post.user.last_name}
                                     </h3>
+                                    {isAuthorOnline && (
+                                        <div className="flex items-center space-x-1">
+                                            <div className="w-2 h-2 bg-green-400 rounded-full"></div>
+                                            <span className="text-green-400 text-xs">Online</span>
+                                        </div>
+                                    )}
                                     {post.category && <CategoryBadge category={post.category} size="sm" />}
                                 </div>
                                 <p className="text-white/60 text-sm">
@@ -314,13 +339,18 @@ function PostDetailPage() {
                     <div className="flex items-center justify-between pt-4 border-t border-white/10">
                         <button
                             onClick={handleLikePost}
-                            className={`flex items-center space-x-2 px-4 py-2 rounded-xl transition-all duration-200 ${post.is_liked
-                                ? 'text-red-400 bg-red-500/10'
-                                : 'text-white/70 hover:text-white hover:bg-white/10'
-                                }`}
+                            disabled={likePending || !connectionStatus}
+                            className={`flex items-center space-x-2 px-4 py-2 rounded-xl transition-all duration-200 ${
+                                post.is_liked
+                                    ? 'text-red-400 bg-red-500/10'
+                                    : 'text-white/70 hover:text-white hover:bg-white/10'
+                            } ${likePending || !connectionStatus ? 'opacity-50 cursor-not-allowed' : ''}`}
                         >
-                            <Heart className={`w-4 h-4 ${post.is_liked ? 'fill-current' : ''}`} />
+                            <Heart className={`w-4 h-4 ${post.is_liked ? 'fill-current' : ''} ${likePending ? 'animate-pulse' : ''}`} />
                             <span>{post.like_count}</span>
+                            {!connectionStatus && (
+                                <span className="text-xs text-orange-400 ml-1">(Offline)</span>
+                            )}
                         </button>
 
                         <button className="flex items-center space-x-2 px-4 py-2 text-white/70 hover:text-white hover:bg-white/10 rounded-xl transition-all duration-200">
@@ -351,16 +381,30 @@ function PostDetailPage() {
                                 maxLength={500}
                             />
                             <div className="flex items-center justify-between mt-2">
-                                <span className="text-white/60 text-xs">
-                                    {newComment.length}/500 characters
-                                </span>
+                                <div className="flex items-center space-x-3">
+                                    <span className="text-white/60 text-xs">
+                                        {newComment.length}/500 characters
+                                    </span>
+                                    {!connectionStatus && (
+                                        <span className="text-orange-400 text-xs flex items-center space-x-1">
+                                            <div className="w-1.5 h-1.5 bg-orange-400 rounded-full"></div>
+                                            <span>Offline mode</span>
+                                        </span>
+                                    )}
+                                </div>
                                 <button
                                     onClick={handleSubmitComment}
                                     disabled={!newComment.trim() || isSubmittingComment || !isConnected}
                                     className="bg-emerald-600 hover:bg-emerald-700 disabled:bg-white/10 disabled:text-white/50 text-white px-4 py-2 rounded-lg flex items-center space-x-2 transition-all duration-200"
                                 >
                                     <Send className="w-4 h-4" />
-                                    <span>{isSubmittingComment ? 'Posting...' : 'Post'}</span>
+                                    <span>
+                                        {isSubmittingComment 
+                                            ? 'Posting...' 
+                                            : !connectionStatus 
+                                                ? 'Reconnecting...' 
+                                                : 'Post'}
+                                    </span>
                                 </button>
                             </div>
                         </div>

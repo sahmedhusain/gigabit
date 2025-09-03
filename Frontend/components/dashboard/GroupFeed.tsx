@@ -1,9 +1,10 @@
 'use client'
 
-import React, { useState, useEffect, useContext } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useAuth } from '../../context/AuthContext'
 import { useToast } from '../../context/ToastContext'
-import { Heart, MessageCircle, User } from 'lucide-react'
+import { Heart, MessageCircle, User, Wifi, WifiOff } from 'lucide-react'
+import { useRealTimeGroups, useConnectionStatus, useOptimisticUpdate, useOnlineStatus } from '@/hooks'
 
 type GroupPost = {
   id: string
@@ -31,6 +32,19 @@ export default function GroupFeed({ groupId }: Props) {
   const [posts, setPosts] = useState<GroupPost[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  
+  // Real-time hooks
+  const { isConnected } = useConnectionStatus()
+  const { groups } = useRealTimeGroups()
+  const { onlineUsers } = useOnlineStatus()
+  
+  // Optimistic updates for likes
+  const { performUpdate: performOptimisticLike, isLoading: likePending } = useOptimisticUpdate(
+    null,
+    {
+      onError: () => toast.error('Failed to update like')
+    }
+  )
 
   useEffect(() => {
     fetchPosts()
@@ -58,6 +72,22 @@ export default function GroupFeed({ groupId }: Props) {
   }
 
   async function handleLike(postId: string) {
+    if (likePending || !isConnected) return
+
+    const post = posts.find(p => p.id === postId)
+    if (!post) return
+
+    const optimisticPost = {
+      ...post,
+      is_liked: !post.is_liked,
+      likes_count: post.is_liked ? post.likes_count - 1 : post.likes_count + 1
+    }
+
+    // Immediately update UI
+    setPosts(prev => prev.map(p =>
+      p.id === postId ? optimisticPost : p
+    ))
+
     try {
       const res = await fetch(`/api/posts/${postId}/like`, {
         method: 'POST',
@@ -67,18 +97,11 @@ export default function GroupFeed({ groupId }: Props) {
       if (!res.ok) {
         throw new Error('Failed to like post')
       }
-
-      // Update local state
-      setPosts(prev => prev.map(post =>
-        post.id === postId
-          ? {
-            ...post,
-            is_liked: !post.is_liked,
-            likes_count: post.is_liked ? post.likes_count - 1 : post.likes_count + 1
-          }
-          : post
-      ))
     } catch (err: any) {
+      // Revert on error
+      setPosts(prev => prev.map(p =>
+        p.id === postId ? post : p
+      ))
       toast.error('Failed to like post')
     }
   }
@@ -91,6 +114,12 @@ export default function GroupFeed({ groupId }: Props) {
   if (loading) {
     return (
       <div className="space-y-4">
+        {/* Connection status indicator */}
+        {!isConnected && (
+          <div className="bg-orange-100 border border-orange-400 text-orange-700 px-4 py-2 rounded">
+            Connection issues - posts may not update in real-time
+          </div>
+        )}
         {[...Array(3)].map((_, i) => (
           <div key={i} className="animate-pulse">
             <div className="bg-gray-200 h-4 rounded w-1/4 mb-2"></div>
@@ -105,10 +134,16 @@ export default function GroupFeed({ groupId }: Props) {
   if (error) {
     return (
       <div className="text-center py-8">
+        {!isConnected && (
+          <div className="bg-orange-100 border border-orange-400 text-orange-700 px-4 py-2 rounded mb-4">
+            Connection issues detected
+          </div>
+        )}
         <p className="text-red-600 mb-4">{error}</p>
         <button
           onClick={fetchPosts}
-          className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+          disabled={!isConnected}
+          className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
         >
           Try Again
         </button>
@@ -126,22 +161,41 @@ export default function GroupFeed({ groupId }: Props) {
 
   return (
     <div className="space-y-6">
-      {posts.map(post => (
-        <div key={post.id} className="bg-white rounded-lg shadow p-4">
-          {/* Post Header */}
-          <div className="flex items-center space-x-3 mb-3">
-            <div className="w-10 h-10 bg-gray-300 rounded-full flex items-center justify-center">
-              <User className="w-6 h-6 text-gray-600" />
+      {/* Connection status indicator */}
+      {!isConnected && (
+        <div className="bg-orange-100 border border-orange-400 text-orange-700 px-4 py-2 rounded">
+          Connection lost - posts may not update in real-time
+        </div>
+      )}
+      
+      {posts.map(post => {
+        // Check if post author is online
+        const isAuthorOnline = onlineUsers.some(u => u.user_id.toString() === post.user.id && u.is_online)
+        
+        return (
+          <div key={post.id} className="bg-white rounded-lg shadow p-4">
+            {/* Post Header */}
+            <div className="flex items-center space-x-3 mb-3">
+              <div className="w-10 h-10 bg-gray-300 rounded-full flex items-center justify-center">
+                <User className="w-6 h-6 text-gray-600" />
+              </div>
+              <div className="flex-1">
+                <div className="flex items-center space-x-2">
+                  <p className="font-medium">
+                    {post.user.nickname || `${post.user.first_name} ${post.user.last_name}`}
+                  </p>
+                  {isAuthorOnline && (
+                    <div className="flex items-center space-x-1">
+                      <div className="w-2 h-2 bg-green-400 rounded-full"></div>
+                      <span className="text-green-600 text-xs">Online</span>
+                    </div>
+                  )}
+                </div>
+                <p className="text-sm text-gray-500">
+                  {formatDate(post.created_at)}
+                </p>
+              </div>
             </div>
-            <div>
-              <p className="font-medium">
-                {post.user.nickname || `${post.user.first_name} ${post.user.last_name}`}
-              </p>
-              <p className="text-sm text-gray-500">
-                {formatDate(post.created_at)}
-              </p>
-            </div>
-          </div>
 
           {/* Post Content */}
           <div className="mb-3">
@@ -159,22 +213,30 @@ export default function GroupFeed({ groupId }: Props) {
           <div className="flex items-center space-x-4 pt-3 border-t">
             <button
               onClick={() => handleLike(post.id)}
-              className={`flex items-center space-x-1 px-3 py-1 rounded ${post.is_liked
+              disabled={!isConnected}
+              className={`flex items-center space-x-1 px-3 py-1 rounded transition-colors ${
+                post.is_liked
                   ? 'text-red-600 bg-red-50'
                   : 'text-gray-600 hover:bg-gray-50'
-                }`}
+              } ${!isConnected ? 'opacity-50 cursor-not-allowed' : ''}`}
+              title={!isConnected ? 'Connection required to like posts' : ''}
             >
               <Heart className={`w-4 h-4 ${post.is_liked ? 'fill-current' : ''}`} />
               <span className="text-sm">{post.likes_count}</span>
             </button>
 
-            <button className="flex items-center space-x-1 px-3 py-1 rounded text-gray-600 hover:bg-gray-50">
+            <button 
+              className="flex items-center space-x-1 px-3 py-1 rounded text-gray-600 hover:bg-gray-50"
+              disabled={!isConnected}
+              title={!isConnected ? 'Connection required to view comments' : ''}
+            >
               <MessageCircle className="w-4 h-4" />
               <span className="text-sm">{post.comments_count}</span>
             </button>
           </div>
         </div>
-      ))}
+        )
+      })}
     </div>
   )
 }

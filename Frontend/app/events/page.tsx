@@ -6,6 +6,7 @@ import { EventsSection } from '@/components/dashboard';
 import { api, Event, NetworkError } from '@/lib/api';
 import { useToast } from '@/context/ToastContext';
 import { useAuth } from '@/context/AuthContext';
+import { useRealTimeEvents, useConnectionStatus } from '@/hooks';
 import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 
@@ -14,6 +15,12 @@ export default function EventsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const { error } = useToast();
   const { user } = useAuth();
+  const { isConnected } = useConnectionStatus();
+  const { events: liveEvents, loading: liveLoading } = useRealTimeEvents();
+
+  // Use real-time events if available, fallback to local state
+  const displayEvents = liveEvents && liveEvents.length > 0 ? liveEvents : events;
+  const loading = liveLoading || isLoading;
 
   useEffect(() => {
     fetchEvents();
@@ -77,16 +84,27 @@ export default function EventsPage() {
 
           <div className="max-w-6xl mx-auto">
             <div className="text-center mb-8">
-              <h1 className="text-4xl font-bold text-white mb-2">Events</h1>
+              <div className="flex items-center justify-center space-x-4 mb-4">
+                <h1 className="text-4xl font-bold text-white">Events</h1>
+                <div className={`text-sm px-3 py-1 rounded-full ${isConnected ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
+                  {isConnected ? 'Live Updates' : 'Offline Mode'}
+                </div>
+              </div>
               <p className="text-xl text-white/70">Manage and participate in community events</p>
+              {!isConnected && (
+                <p className="text-yellow-400 text-sm mt-2">
+                  You're offline. Events will sync when connection is restored.
+                </p>
+              )}
             </div>
 
-            {isLoading ? (
+            {loading ? (
               <div className="flex justify-center items-center py-20">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white"></div>
+                <span className="ml-3 text-white">Loading events...</span>
               </div>
             ) : (
-              <EventsSection events={events} onEventsUpdate={fetchEvents} />
+              <EventsSection events={displayEvents} onEventsUpdate={fetchEvents} />
             )}
           </div>
         </div>

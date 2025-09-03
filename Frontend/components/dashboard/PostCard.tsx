@@ -70,7 +70,18 @@ export default function PostCard({ post, onLike }: PostCardProps) {
       {/* Post Image */}
       {post.image && (
         <div className="mb-3 lg:mb-4 rounded-xl lg:rounded-2xl overflow-hidden bg-white/5">
-          <div className="aspect-video bg-gradient-to-br from-emerald-500/20 to-teal-500/20 flex items-center justify-center">
+          <img 
+            src={post.image} 
+            alt="Post image" 
+            className="w-full h-auto object-cover"
+            onError={(e) => {
+              // Fallback to placeholder on error
+              const target = e.target as HTMLImageElement;
+              target.style.display = 'none';
+              target.nextElementSibling?.classList.remove('hidden');
+            }}
+          />
+          <div className="aspect-video bg-gradient-to-br from-emerald-500/20 to-teal-500/20 flex items-center justify-center hidden">
             <ImageIcon className="w-8 h-8 lg:w-12 lg:h-12 text-white/50" />
           </div>
         </div>

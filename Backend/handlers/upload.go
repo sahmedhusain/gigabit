@@ -46,7 +46,7 @@ func (h *UploadHandler) UploadImage(w http.ResponseWriter, r *http.Request) {
 
 func (h *UploadHandler) ServeImage(w http.ResponseWriter, r *http.Request) {
 	// Extract filename from URL path
-	path := strings.TrimPrefix(r.URL.Path, "/uploads/")
+	path := strings.TrimPrefix(r.URL.Path, "/api/uploads/")
 	filename := filepath.Base(path)
 
 	if filename == "" || filename == "." {
@@ -67,7 +67,7 @@ func (h *UploadHandler) ServeImage(w http.ResponseWriter, r *http.Request) {
 
 func (h *UploadHandler) DeleteImage(w http.ResponseWriter, r *http.Request) {
 	// Extract filename from URL path
-	path := strings.TrimPrefix(r.URL.Path, "/uploads/")
+	path := strings.TrimPrefix(r.URL.Path, "/api/uploads/")
 	filename := filepath.Base(path)
 
 	if filename == "" || filename == "." {

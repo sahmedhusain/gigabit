@@ -19,7 +19,8 @@ import {
   ValidationError,
   AuthenticationError,
   CategoryResponse,
-  CreatePostRequest
+  CreatePostRequest,
+  getToken
 } from '@/lib/api'
 import { Sparkles } from 'lucide-react'
 
@@ -319,7 +320,11 @@ function DashboardPage() {
           avatar: post.user.avatar
         },
         content: post.content,
-        image: post.image_url,
+        image: post.image_url ? 
+          (post.image_url.startsWith('http') ? 
+            post.image_url : 
+            `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}${post.image_url}`
+          ) : undefined,
         likes: post.like_count,
         comments: post.comment_count,
         shares: 0,
@@ -499,22 +504,30 @@ function DashboardPage() {
     }
 
     try {
-
+      console.log("I am in handle create post")
       let imageUrl = '';
 
       if (newPostImage) {
         const formData = new FormData();
         formData.append('image', newPostImage);
+        const token = getToken();
+        
+        console.log("Uploading image to backend uploads endpoint")
 
-        const uploadResponse = await fetch('/api/uploads', {
+        const uploadResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/api/uploads`, {
           method: 'POST',
           body: formData,
+          headers: {
+            ...(token && { Authorization: `Bearer ${token}` }),
+          },
           credentials: 'include'
         })
 
+        console.log("Upload response:", uploadResponse);
         if (uploadResponse.ok) {
           const uploadData = await uploadResponse.json();
-          imageUrl = `/uploads/${uploadData.filename}`;
+          imageUrl = `/api/images/${uploadData.filename}`;
+          console.log("Image uploaded successfully:", imageUrl);
         } else {
           const errorData = await uploadResponse.json();
           throw new Error(errorData.error || 'Failed to upload image');

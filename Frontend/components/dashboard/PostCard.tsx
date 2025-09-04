@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation'
 import CategoryBadge from '@/components/ui/CategoryBadge'
 import { Post } from '@/lib/api'
 import { useRealTimeComments, useConnectionStatus } from '@/hooks'
+import { getAvatarUrl } from '@/utils/avatarUtils'
 
 interface PostCardProps {
   post: Post
@@ -46,15 +47,10 @@ export default function PostCard({ post, onLike }: PostCardProps) {
       <div className="flex items-center justify-between mb-3 lg:mb-4">
         <div className="flex items-center space-x-3 flex-1 min-w-0">
           <div className="w-8 h-8 lg:w-10 lg:h-10 bg-gradient-to-r from-emerald-500 to-teal-600 rounded-full flex items-center justify-center overflow-hidden">
-            {post.user.avatar ? (
+            {getAvatarUrl(post.user.avatar) ? (
               <>
                 <img 
-                  src={post.user.avatar.startsWith('data:') ? 
-                    post.user.avatar : 
-                    post.user.avatar.startsWith('http') ? 
-                      post.user.avatar : 
-                      `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}${post.user.avatar}`
-                  }
+                  src={getAvatarUrl(post.user.avatar)!}
                   alt={`${post.user.name}'s avatar`}
                   className="w-full h-full object-cover"
                   onError={(e) => {

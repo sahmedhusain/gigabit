@@ -9,6 +9,7 @@ import { useWebSocket } from '@/context/WebSocketContext'
 import { useToast } from '@/context/ToastContext'
 import { useConnectionStatus, useOptimisticUpdate, useOnlineStatus } from '@/hooks'
 import { api, APIPost, Comment as CommentType, NetworkError, ValidationError } from '@/lib/api'
+import { getAvatarUrl } from '@/utils/avatarUtils'
 
 interface CommentWithUser extends CommentType {
     timeAgo: string
@@ -277,15 +278,10 @@ function PostDetailPage() {
                     <div className="flex items-center justify-between mb-4">
                         <div className="flex items-center space-x-3 flex-1">
                             <div className="w-10 h-10 bg-gradient-to-r from-emerald-500 to-teal-600 rounded-full flex items-center justify-center overflow-hidden">
-                                {post.user.avatar ? (
+                                {getAvatarUrl(post.user.avatar) ? (
                                     <>
                                         <img 
-                                            src={post.user.avatar.startsWith('data:') ? 
-                                                post.user.avatar : 
-                                                post.user.avatar.startsWith('http') ? 
-                                                    post.user.avatar : 
-                                                    `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}${post.user.avatar}`
-                                            }
+                                            src={getAvatarUrl(post.user.avatar)!}
                                             alt={`${post.user.first_name} ${post.user.last_name}'s avatar`}
                                             className="w-full h-full object-cover"
                                             onError={(e) => {
@@ -391,16 +387,11 @@ function PostDetailPage() {
                 <div className="bg-gradient-to-r from-white/10 to-white/5 backdrop-blur-xl rounded-2xl border border-white/20 p-4 mb-6">
                     <div className="flex items-start space-x-3">
                         <div className="w-8 h-8 bg-gradient-to-r from-emerald-500 to-teal-600 rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden">
-                            {user?.avatar ? (
+                            {getAvatarUrl(user?.avatar) ? (
                                 <>
                                     <img 
-                                        src={user.avatar.startsWith('data:') ? 
-                                            user.avatar : 
-                                            user.avatar.startsWith('http') ? 
-                                                user.avatar : 
-                                                `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}${user.avatar}`
-                                        }
-                                        alt={`${user.first_name} ${user.last_name}'s avatar`}
+                                        src={getAvatarUrl(user?.avatar)!}
+                                        alt={`${user?.first_name} ${user?.last_name}'s avatar`}
                                         className="w-full h-full object-cover"
                                         onError={(e) => {
                                             // Fallback to default User icon on error
@@ -470,15 +461,10 @@ function PostDetailPage() {
                             {comments.map((comment) => (
                                 <div key={comment.id} className="flex items-start space-x-3 p-3 rounded-lg bg-white/5">
                                     <div className="w-8 h-8 bg-gradient-to-r from-emerald-500 to-teal-600 rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden">
-                                        {comment.user.avatar ? (
+                                        {getAvatarUrl(comment.user.avatar) ? (
                                             <>
                                                 <img 
-                                                    src={comment.user.avatar.startsWith('data:') ? 
-                                                        comment.user.avatar : 
-                                                        comment.user.avatar.startsWith('http') ? 
-                                                            comment.user.avatar : 
-                                                            `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}${comment.user.avatar}`
-                                                    }
+                                                    src={getAvatarUrl(comment.user.avatar)!}
                                                     alt={`${comment.user.first_name} ${comment.user.last_name}'s avatar`}
                                                     className="w-full h-full object-cover"
                                                     onError={(e) => {

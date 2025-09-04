@@ -58,10 +58,10 @@ export default function CreatePost({
       setNewPostImage(null)
       setPostPrivacy('public')
       setSelectedUsers([])
-      setSelectedPostCategory(categories[0]?.id || 1)
-      if (fileInputRef.current) {
-        fileInputRef.current.value = ''
-      }
+      // setSelectedPostCategory(categories[0]?.id || 1)
+      // if (fileInputRef.current) {
+      //   fileInputRef.current.value = ''
+      // }
       onClose()
     },
     onError: (error: any) => {
@@ -235,22 +235,6 @@ export default function CreatePost({
                 <p className="text-red-400 text-sm">You're currently offline. Post will be created when connection is restored.</p>
               </div>
             )}
-
-            <div className="space-y-3">
-              <label className="text-white font-medium text-sm lg:text-base">Category:</label>
-              <select
-                value={selectedPostCategory}
-                onChange={(e) => setSelectedPostCategory(parseInt(e.target.value))}
-                aria-label="Select post category"
-                className="w-full bg-white/10 border border-white/20 rounded-xl p-3 text-white focus:outline-none focus:ring-2 focus:ring-emerald-400/50"
-              >
-                {categories.map((category) => (
-                  <option key={category.id} value={category.id} className="text-black">
-                    {category.name}
-                  </option>
-                ))}
-              </select>
-            </div>
 
             <div className="space-y-3">
               <label className="text-white font-medium text-sm lg:text-base">Privacy Settings:</label>

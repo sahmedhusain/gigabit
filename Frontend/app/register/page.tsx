@@ -3,6 +3,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
+import { getAvatarOptions } from '@/utils/avatarUtils'
 
 import { Eye, EyeOff, Mail, Lock, User, Calendar, Camera, Edit3, ArrowRight, Sparkles, Upload, Chrome, Apple as AppleIcon, GithubIcon } from 'lucide-react'
 
@@ -22,7 +23,7 @@ export default function RegisterPage() {
   })
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
-  const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
+  const [avatarPreview, setAvatarPreview] = useState<string | null>('/avatars/defaultM.png') // Default avatar
   const [error, setError] = useState<string | null>(null)
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -32,19 +33,27 @@ export default function RegisterPage() {
     })
   }
 
-  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (file) {
-      const reader = new FileReader()
-      reader.onloadend = () => {
-        const base64String = reader.result as string
-        console.log("Base64 string:", base64String.substring(0, 100) + "...") // Debug log
-        setFormData({ ...formData, avatar: base64String })
-        setAvatarPreview(base64String)
-      }
-      reader.readAsDataURL(file)
-    }
+  const handleAvatarSelect = (avatarId: string) => {
+    const selectedAvatar = getAvatarOptions().find(avatar => avatar.id === avatarId);
+    // Store the image URL instead of the ID in the database
+    setFormData({ ...formData, avatar: selectedAvatar?.imageUrl || avatarId })
+    // Set preview to the selected avatar's image URL or ID for fallback
+    setAvatarPreview(selectedAvatar?.imageUrl || avatarId)
   }
+
+  // const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  //   const file = e.target.files?.[0]
+  //   if (file) {
+  //     const reader = new FileReader()
+  //     reader.onloadend = () => {
+  //       const base64String = reader.result as string
+  //       console.log("Base64 string:", base64String.substring(0, 100) + "...") // Debug log
+  //       setFormData({ ...formData, avatar: base64String })
+  //       setAvatarPreview(base64String)
+  //     }
+  //     reader.readAsDataURL(file)
+  //   }
+  // }
 
   const handleSubmit = async () => {
     setIsLoading(true)
@@ -66,36 +75,6 @@ export default function RegisterPage() {
       if (formData.password.length < 6) {
         throw new Error('Password must be at least 6 characters long')
       }
-
-      // let avatarUrl = '';
-
-      // // Upload avatar image if provided
-      // if (formData.avatar) {
-      //   try {
-      //     const avatarFormData = new FormData();
-      //     avatarFormData.append('image', formData.avatar);
-
-      //     console.log("Uploading avatar to backend uploads endpoint")
-
-      //     const uploadResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/api/uploads`, {
-      //       method: 'POST',
-      //       body: avatarFormData,
-      //       credentials: 'include'
-      //     })
-
-      //     console.log("Avatar upload response:", uploadResponse);
-      //     if (uploadResponse.ok) {
-      //       const uploadData = await uploadResponse.json();
-      //       avatarUrl = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/api/images/${uploadData.filename}`;
-      //       console.log("Avatar uploaded successfully:", avatarUrl);
-      //     } else {
-      //       const errorData = await uploadResponse.json();
-      //       console.warn('Avatar upload failed:', errorData.error);
-      //     }
-      //   } catch (avatarError) {
-      //     console.warn('Avatar upload error:', avatarError);
-      //   }
-      // }
 
       console.log("Form data before sending:", {
         ...formData, 
@@ -173,29 +152,86 @@ export default function RegisterPage() {
 
             <div className="relative p-6 sm:p-8">
               <div className="space-y-6">
-                {/* Avatar Upload */}
-                <div className="flex justify-center mb-6">
-                  <div className="relative group">
-                    <div className="w-24 h-24 rounded-full bg-white/10 border-2 border-white/20 flex items-center justify-center overflow-hidden backdrop-blur-sm">
-                      {avatarPreview ? (
-                        <img src={avatarPreview} alt="Avatar" className="w-full h-full object-cover" />
-                      ) : (
-                        <Camera className="w-8 h-8 text-white/50" />
-                      )}
+                {/* Avatar Selection */}
+                <div className="flex flex-col items-center mb-6 space-y-6">
+                  {/* Current Avatar Preview with Label */}
+                  <div className="text-center space-y-3">
+                    <h3 className="text-sm font-medium text-white/80 mb-2">Your Avatar</h3>
+                    <div className="relative group">
+                      <div className="w-28 h-28 rounded-full bg-white/10 border-2 border-emerald-400/50 shadow-lg shadow-emerald-400/20 flex items-center justify-center overflow-hidden backdrop-blur-sm">
+                        {avatarPreview ? (
+                          avatarPreview.startsWith('/') || avatarPreview.startsWith('data:') ? (
+                            <img src={avatarPreview} alt="Selected Avatar" className="w-full h-full object-cover rounded-full" />
+                          ) : (
+                            // Show gradient for selected avatar ID
+                            (() => {
+                              const selectedAvatar = getAvatarOptions().find(avatar => avatar.id === avatarPreview);
+                              return selectedAvatar ? (
+                                <div className={`w-full h-full rounded-full bg-gradient-to-r ${selectedAvatar.gradient} flex items-center justify-center`}>
+                                  <span className="text-white font-semibold text-2xl drop-shadow-lg">
+                                    {selectedAvatar.label}
+                                  </span>
+                                </div>
+                              ) : (
+                                <Camera className="w-8 h-8 text-white/50" />
+                              );
+                            })()
+                          )
+                        ) : (
+                          <Camera className="w-8 h-8 text-white/50" />
+                        )}
+                      </div>
                     </div>
-                    <label htmlFor="avatar" className="absolute -bottom-2 -right-2 w-8 h-8 bg-gradient-to-r from-emerald-500 to-teal-600 rounded-full flex items-center justify-center cursor-pointer hover:scale-110 transition-transform shadow-lg">
-                      <Upload className="w-4 h-4 text-white" />
-                    </label>
-                    <input
-                      id="avatar"
-                      name="avatar"
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      title="Upload avatar image"
-                      aria-label="Upload avatar image"
-                      onChange={handleAvatarChange}
-                    />
+                  </div>
+
+                  {/* Avatar Options with Label */}
+                  <div className="text-center space-y-4">
+                    <div className="flex items-center justify-center space-x-2">
+                      <div className="h-px w-8 bg-white/20"></div>
+                      <h4 className="text-sm font-medium text-white/70">Choose an Avatar</h4>
+                      <div className="h-px w-8 bg-white/20"></div>
+                    </div>
+                    <div className="flex space-x-4">
+                      {getAvatarOptions().map((avatar) => (
+                        <div
+                          key={avatar.id}
+                          onClick={() => handleAvatarSelect(avatar.id)}
+                          className={`relative w-20 h-20 rounded-full border-2 cursor-pointer hover:scale-110 transition-all duration-300 flex items-center justify-center backdrop-blur-sm overflow-hidden group ${
+                            formData.avatar === avatar.id
+                              ? 'border-emerald-400 shadow-lg shadow-emerald-400/30 ring-2 ring-emerald-400/20'
+                              : 'border-white/30 hover:border-emerald-400/60 hover:shadow-md hover:shadow-emerald-400/20'
+                          }`}
+                        >
+                          {/* Image layer */}
+                          <img 
+                            src={avatar.imageUrl} 
+                            alt={`Avatar option ${avatar.label}`}
+                            className="w-full h-full object-cover absolute inset-0 z-10 rounded-full"
+                            onError={(e) => {
+                              // Hide image on error, showing gradient fallback
+                              e.currentTarget.style.display = 'none';
+                            }}
+                          />
+                          {/* Gradient fallback layer */}
+                          <div className={`w-full h-full rounded-full bg-gradient-to-r ${avatar.gradient} flex items-center justify-center absolute inset-0 z-0`}>
+                            <span className="text-white font-semibold text-lg drop-shadow-lg">
+                              {avatar.label}
+                            </span>
+                          </div>
+                          
+                          {/* Selected indicator */}
+                          {formData.avatar === avatar.id && (
+                            <div className="absolute -top-1 -right-1 w-4 h-4 bg-emerald-400 rounded-full flex items-center justify-center shadow-lg z-20">
+                              <div className="w-1.5 h-1.5 bg-white rounded-full"></div>
+                            </div>
+                          )}
+                          
+                          {/* Hover overlay */}
+                          <div className="absolute inset-0 rounded-full bg-emerald-400/0 group-hover:bg-emerald-400/10 transition-all duration-200 z-10"></div>
+                        </div>
+                      ))}
+                    </div>
+                    <p className="text-xs text-white/50">Click on any avatar to select it</p>
                   </div>
                 </div>
 

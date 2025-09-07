@@ -1,6 +1,6 @@
 'use client'
 import { X, Camera, Image as ImageIcon, Globe, Users, Lock, User } from 'lucide-react'
-import { CategoryResponse, CreatePostRequest, api } from '@/lib/api'
+import { CreatePostRequest, api } from '@/lib/api'
 import { ChangeEvent, useRef, useState } from 'react'
 import { useOptimisticUpdate, useConnectionStatus, useUpload } from '@/hooks'
 import { useToast } from '@/context/ToastContext'
@@ -16,9 +16,6 @@ interface CreatePostProps {
   setPostPrivacy: (privacy: string) => void
   selectedUsers: number[]
   setSelectedUsers: (users: number[]) => void
-  selectedPostCategory: number
-  setSelectedPostCategory: (categoryId: number) => void
-  categories: CategoryResponse[]
   availableUsers: any[]
   loadingUsers: boolean
   onCreatePost: () => void
@@ -37,9 +34,6 @@ export default function CreatePost({
   setPostPrivacy,
   selectedUsers,
   setSelectedUsers,
-  selectedPostCategory,
-  setSelectedPostCategory,
-  categories,
   availableUsers,
   loadingUsers,
   onCreatePost

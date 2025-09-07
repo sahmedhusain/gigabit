@@ -2,7 +2,7 @@
 import React from 'react'
 import { useRouter } from 'next/navigation'
 import { User, Users, Plus, MessageCircle, Calendar, MapPin} from 'lucide-react'
-import { useRealTimeGroups, useRealTimeEvents, useConnectionStatus, useOnlineStatus, useCategories } from '@/hooks'
+import { useRealTimeGroups, useRealTimeEvents, useConnectionStatus, useOnlineStatus } from '@/hooks'
 
 // Clean DashboardSections: Categories, Followers, Groups, Settings
 
@@ -17,93 +17,6 @@ interface CategoriesSectionProps {
   isSearching: boolean
   posts: any[]
   searchCategories: (q: string) => void
-}
-
-export function CategoriesSection({ categories, trendingCategories, selectedCategory, setSelectedCategory, categorySearchQuery, setCategorySearchQuery, categorySearchResults, isSearching, posts, searchCategories }: CategoriesSectionProps) {
-  const { isConnected } = useConnectionStatus()
-  const { categories: liveCategories, loading } = useCategories()
-  
-  // Use live categories if available, fallback to props
-  const displayCategories = liveCategories && liveCategories.length > 0 ? liveCategories : categories
-
-  return (
-    <div className="space-y-4 lg:space-y-6">
-      <div className="bg-white/5 rounded-2xl p-4 lg:p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-bold text-white">Categories</h2>
-          <div className={`text-xs px-2 py-1 rounded ${isConnected ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
-            {isConnected ? 'Live' : 'Offline'}
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          <div className="col-span-2">
-            <div className="mb-4">
-              <input
-                aria-label="Search categories"
-                value={categorySearchQuery}
-                onChange={(e) => setCategorySearchQuery(e.target.value)}
-                onKeyDown={(e) => { if (e.key === 'Enter') searchCategories(categorySearchQuery) }}
-                disabled={!isConnected}
-                className={`w-full p-2 rounded-md text-white transition-all ${
-                  isConnected 
-                    ? 'bg-white/5 focus:bg-white/10' 
-                    : 'bg-gray-600 cursor-not-allowed'
-                }`}
-                placeholder={isConnected ? "Search categories..." : "Search offline..."}
-              />
-              {!isConnected && (
-                <p className="text-xs text-red-400 mt-1">Search unavailable while offline</p>
-              )}
-            </div>
-
-            <div>
-              {loading ? (
-                <div className="text-white/60 flex items-center">
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                  Loading categories...
-                </div>
-              ) : isSearching ? (
-                <div className="text-white/60">Searching...</div>
-              ) : (categorySearchResults || []).length > 0 ? (
-                (categorySearchResults || []).map((c) => (
-                  <div key={c.id} className="p-3 mb-2 bg-white/3 rounded-md">
-                    <button onClick={() => setSelectedCategory(c.id)} className="text-white">{c.name}</button>
-                  </div>
-                ))
-              ) : (
-                (displayCategories || []).map((c) => (
-                  <div key={c.id} className="p-3 mb-2 bg-white/3 rounded-md">
-                    <button onClick={() => setSelectedCategory(c.id)} className={`text-white ${selectedCategory === c.id ? 'font-bold' : ''}`}>{c.name}</button>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-
-          <aside className="col-span-1">
-            <h3 className="text-sm text-white/80 mb-2">Trending</h3>
-            <div className="space-y-2">
-              {(trendingCategories || []).map((tc) => (
-                <div key={tc.id} className="p-2 bg-white/3 rounded-md text-white">{tc.name}</div>
-              ))}
-            </div>
-          </aside>
-        </div>
-
-        <div className="mt-6">
-          <h3 className="text-lg text-white/90 mb-3">Posts</h3>
-          {(posts || []).length === 0 ? (
-            <div className="text-white/60">No posts for this category.</div>
-          ) : (
-            (posts || []).map((p) => (
-              <div key={p.id} className="p-3 mb-2 bg-white/3 rounded-md text-white">{p.content || p}</div>
-            ))
-          )}
-        </div>
-      </div>
-    </div>
-  )
 }
 
 interface FollowersSectionProps {

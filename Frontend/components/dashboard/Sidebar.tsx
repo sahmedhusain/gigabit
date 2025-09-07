@@ -177,27 +177,27 @@ export default function Sidebar({
       `}>
         <div className="flex flex-col h-full">
           {/* Search Bar */}
-          <div className="p-2 border-b border-emerald-400/20">
+          <div className="p-4 border-b border-emerald-400/20">
             <div className="relative">
-              <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 text-emerald-100/60 w-3.5 h-3.5" />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-emerald-100/60 w-4 h-4" />
               <input
                 type="text"
                 placeholder="Search navigation..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-8 pr-2.5 py-1.5 bg-emerald-400/10 backdrop-blur-sm rounded-md border border-emerald-400/20 text-white placeholder-emerald-100/50 focus:outline-none focus:ring-2 focus:ring-emerald-400/50 focus:border-transparent transition-all duration-200 text-sm"
+                className="w-full pl-10 pr-3 py-2 bg-emerald-400/10 backdrop-blur-sm rounded-md border border-emerald-400/20 text-white placeholder-emerald-100/50 focus:outline-none focus:ring-2 focus:ring-emerald-400/50 focus:border-transparent transition-all duration-200 text-sm"
               />
             </div>
           </div>
 
           {/* Navigation */}
           <nav className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-emerald-400/20 scrollbar-track-transparent">
-            <div className="p-2 space-y-3">
+            <div className="p-4 space-y-4">
               {menuSections.map((section) => (
-                <div key={section.title} className="space-y-1">
+                <div key={section.title} className="space-y-2">
                   {/* Section Title */}
-                  <div className="px-2 py-1">
-                    <h3 className="text-emerald-100/70 text-xs font-semibold uppercase tracking-wider">
+                  <div className="px-3 py-2">
+                    <h3 className="text-emerald-100/70 text-sm font-semibold uppercase tracking-wider">
                       {section.title}
                     </h3>
                   </div>
@@ -224,23 +224,20 @@ export default function Sidebar({
                               : 'hover:bg-emerald-500/10 hover:scale-100 hover:shadow-sm'
                           }`}
                         >
-                          <div className={`flex items-center space-x-2.5 p-2.5 ${
+                          <div className={`flex items-center space-x-3 p-3 ${
                             isActive ? 'text-white' : 'text-emerald-100/80 group-hover:text-white'
                           }`}>
-                            <div className={`relative p-1 rounded-md transition-all duration-300 ${
+                            <div className={`relative p-1.5 rounded-md transition-all duration-300 ${
                               isActive 
                                 ? 'bg-white/20 shadow-sm' 
                                 : 'bg-emerald-400/10 group-hover:bg-emerald-400/20'
                             }`}>
-                              <Icon className={`w-3.5 h-3.5 transition-transform duration-300 ${
+                              <Icon className={`w-4 h-4 transition-transform duration-300 ${
                                 isHovered ? 'scale-110' : ''
                               }`} />
                             </div>
                             <div className="text-left flex-1">
-                              <span className="font-semibold text-xs">{item.label}</span>
-                              <p className={`text-xs ${
-                                isActive ? 'text-white/80' : 'text-emerald-100/60'
-                              }`}>{item.description}</p>
+                              <span className="font-semibold text-sm">{item.label}</span>
                             </div>
                           </div>
 
@@ -258,8 +255,8 @@ export default function Sidebar({
           </nav>
 
           {/* Profile */}
-          <div className="p-2 border-t border-emerald-400/20 bg-gradient-to-r from-teal-800/50 to-cyan-700/50">
-            <div className="flex items-center space-x-2.5">
+          <div className="p-4 border-t border-emerald-400/20 bg-gradient-to-r from-teal-800/50 to-cyan-700/50">
+            <div className="flex items-center space-x-3">
               {/* Profile Button */}
               <button
                 onClick={() => {
@@ -274,7 +271,7 @@ export default function Sidebar({
                     : 'hover:bg-emerald-500/10 hover:scale-100 hover:shadow-sm text-emerald-100/80 hover:text-white'
                 }`}
               >
-                <div className="flex items-center space-x-2 p-2.5">
+                <div className="flex items-center space-x-3 p-3">
                   <div className={`relative transition-all duration-300 ${
                     activeTab === 'profile' ? 'shadow-sm' : 'group-hover:shadow-sm'
                   }`}>
@@ -282,18 +279,18 @@ export default function Sidebar({
                       <img
                         src={currentUser.avatar}
                         alt={currentUser.name}
-                        className="w-7 h-7 rounded-full object-cover border-2 border-white/20"
+                        className="w-8 h-8 rounded-full object-cover border-2 border-white/20"
                       />
                     ) : (
-                      <div className="w-7 h-7 bg-gradient-to-r from-emerald-400 to-teal-500 rounded-full flex items-center justify-center text-white font-bold text-xs">
-                        {currentUser?.name?.[0]?.toUpperCase() || <User className="w-3.5 h-3.5" />}
+                      <div className="w-8 h-8 bg-gradient-to-r from-emerald-400 to-teal-500 rounded-full flex items-center justify-center text-white font-bold text-sm">
+                        {currentUser?.name?.[0]?.toUpperCase() || <User className="w-4 h-4" />}
                       </div>
                     )}
                     {/* Online status indicator */}
-                    <div className="absolute -bottom-0.5 -right-0.5 w-2 h-2 bg-green-500 rounded-full border border-emerald-900"></div>
+                    <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-green-500 rounded-full border border-emerald-900"></div>
                   </div>
                   <div className="text-left flex-1">
-                    <span className="font-semibold text-xs truncate block">
+                    <span className="font-semibold text-sm truncate block">
                       {currentUser?.name || 'User'}
                     </span>
                     <p className={`text-xs truncate ${
@@ -309,29 +306,29 @@ export default function Sidebar({
               </button>
 
               {/* Action Buttons */}
-              <div className="flex flex-col space-y-1">
+              <div className="flex flex-col space-y-1.5">
                 {/* Settings Button */}
                 <button
                   onClick={() => {
                     setActiveTab('settings')
                     setIsMobileMenuOpen(false)
                   }}
-                  className={`p-1 rounded-sm transition-all duration-200 ${
+                  className={`p-1.5 rounded-sm transition-all duration-200 ${
                     activeTab === 'settings'
                       ? 'bg-white/20 text-white shadow-sm'
                       : 'bg-emerald-400/10 text-emerald-100/70 hover:bg-emerald-400/20 hover:text-white'
                   }`}
                   title="Settings"
                 >
-                  <Settings className="w-3 h-3" />
+                  <Settings className="w-3.5 h-3.5" />
                 </button>
                 {/* Logout Button */}
                 <button
                   onClick={() => logout()}
-                  className="p-1 rounded-sm bg-red-500/10 text-red-400 hover:bg-red-500/20 hover:text-red-300 transition-all duration-200"
+                  className="p-1.5 rounded-sm bg-red-500/10 text-red-400 hover:bg-red-500/20 hover:text-red-300 transition-all duration-200"
                   title="Logout"
                 >
-                  <LogOut className="w-3 h-3" />
+                  <LogOut className="w-3.5 h-3.5" />
                 </button>
               </div>
             </div>

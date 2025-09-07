@@ -494,6 +494,14 @@ func (s *Server) handleGroupRoute(groupHandler *handlers.GroupHandler, eventHand
 				authMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					groupHandler.GetPendingRequests(w, r, groupID)
 				})).ServeHTTP(w, r)
+			case "role":
+				if r.Method != http.MethodGet {
+					writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
+					return
+				}
+				authMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					groupHandler.GetUserRole(w, r, groupID)
+				})).ServeHTTP(w, r)
 			case "events":
 				switch r.Method {
 				case http.MethodGet:

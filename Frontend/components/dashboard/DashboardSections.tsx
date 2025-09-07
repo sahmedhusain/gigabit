@@ -4,20 +4,7 @@ import { useRouter } from 'next/navigation'
 import { User, Users, Plus, MessageCircle, Calendar, MapPin} from 'lucide-react'
 import { useRealTimeGroups, useRealTimeEvents, useConnectionStatus, useOnlineStatus } from '@/hooks'
 
-// Clean DashboardSections: Categories, Followers, Groups, Settings
-
-interface CategoriesSectionProps {
-  categories: any[]
-  trendingCategories: any[]
-  selectedCategory: number | null
-  setSelectedCategory: (id: number | null) => void
-  categorySearchQuery: string
-  setCategorySearchQuery: (q: string) => void
-  categorySearchResults: any[]
-  isSearching: boolean
-  posts: any[]
-  searchCategories: (q: string) => void
-}
+// Clean DashboardSections: Followers, Groups, Settings
 
 interface FollowersSectionProps {
   followers: any[]

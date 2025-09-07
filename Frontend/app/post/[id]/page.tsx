@@ -301,12 +301,6 @@ function PostDetailPage() {
                                     <h3 className="text-white font-medium">
                                         {post.user.first_name} {post.user.last_name}
                                     </h3>
-                                    {isAuthorOnline && (
-                                        <div className="flex items-center space-x-1">
-                                            <div className="w-2 h-2 bg-green-400 rounded-full"></div>
-                                            <span className="text-green-400 text-xs">Online</span>
-                                        </div>
-                                    )}
                                 </div>
                                 <p className="text-white/60 text-sm">
                                     @{post.user.nickname || post.user.email.split('@')[0]} • {formatTimeAgo(post.created_at)}

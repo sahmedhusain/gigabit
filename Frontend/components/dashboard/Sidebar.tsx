@@ -72,11 +72,10 @@ export default function Sidebar({
           
           <nav className="space-y-2">
             {[
-              { id: 'home', icon: Home, label: 'Home Feed', unread: 0 },
-              { id: 'categories', icon: Filter, label: 'Categories', unread: 0 },
-              { id: 'followers', icon: Users, label: 'Followers', unread: 0 },
-              { id: 'groups', icon: Users, label: 'Groups', unread: groupsUnread },
-              { id: 'events', icon: Calendar, label: 'Events', unread: eventsUnread }
+              { id: 'home', icon: Home, label: 'Home Feed' },
+              { id: 'followers', icon: Users, label: 'Followers' },
+              { id: 'groups', icon: Users, label: 'Groups' },
+              { id: 'events', icon: Calendar, label: 'Events' }
             ].map((item) => (
               <button
                 key={item.id}

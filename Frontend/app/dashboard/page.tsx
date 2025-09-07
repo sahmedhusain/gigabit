@@ -66,7 +66,6 @@ function DashboardPage() {
   const [newPostImage, setNewPostImage] = useState<File | null>(null)
   const [postPrivacy, setPostPrivacy] = useState('public')
   const [selectedUsers, setSelectedUsers] = useState<number[]>([])
-  const [selectedPostCategory, setSelectedPostCategory] = useState<number>(1)
   const [availableUsers, setAvailableUsers] = useState<{ id: number; email: string; first_name: string; last_name: string; avatar?: string; nickname?: string; display_name?: string; }[]>([])
   const [loadingUsers, setLoadingUsers] = useState(false)
 
@@ -82,17 +81,6 @@ function DashboardPage() {
   const [events, setEvents] = useState<Event[]>([])
   const [isLoadingEvents, setIsLoadingEvents] = useState(false)
   const [unreadNotifications, setUnreadNotifications] = useState(0)
-
-  // Use live data when available, fallback to local state
-  const displayPosts = livePosts && livePosts.length > 0 ? livePosts : posts
-  const displayNotifications = liveNotifications && liveNotifications.length > 0 ? liveNotifications : notifications
-  const displayGroups = liveGroups && liveGroups.length > 0 ? liveGroups : groups
-  const displayEvents = liveEvents && liveEvents.length > 0 ? liveEvents : events
-  const displayChats = liveConversations && liveConversations.length > 0 ? liveConversations : chats
-  const displayUnreadCount = liveUnreadCount || unreadNotifications
-  const [selectedCategory, setSelectedCategory] = useState<number | null>(null)
-  const [isLoadingCategories, setIsLoadingCategories] = useState(false)
-  const [categorySearchQuery, setCategorySearchQuery] = useState('')
   const [isSearching, setIsSearching] = useState(false)
   const [isLoadingTrending, setIsLoadingTrending] = useState(false)
   const [openChatWindow, setOpenChatWindow] = useState<{
@@ -138,6 +126,7 @@ function DashboardPage() {
     if (user) {
       fetchFeedPosts()
       fetchUsers()
+      fetchEvents() // Add this to load events immediately
     }
   }, [user])
 
@@ -344,9 +333,11 @@ function DashboardPage() {
   const fetchEvents = async () => {
     try {
       setIsLoadingEvents(true)
+      console.log('Fetching events...')
       const data = await api.getUserEvents()
-      const dataAny: any = data
-      const eventsArr = Array.isArray(dataAny?.events) ? dataAny.events : Array.isArray(dataAny?.data) ? dataAny.data : []
+      console.log('Events API response:', data)
+      const eventsArr = Array.isArray(data?.events) ? data.events : []
+      console.log('Events array:', eventsArr)
       setEvents(eventsArr)
     } catch (err) {
       console.error('Error fetching events:', err)
@@ -565,10 +556,7 @@ function DashboardPage() {
     return onlineUsers.some(u => u.username === username && u.is_online)
   }
 
-  const handleCategoryClick = (categoryId: number) => {
-    setSelectedCategory(categoryId)
-    setActiveTab('categories')
-  }
+  
 
   const handleNotificationsToggle = () => {
     setShowNotifications(!showNotifications)
@@ -590,7 +578,22 @@ function DashboardPage() {
       case 'home':
         return (
           <HomeFeed
+            posts={posts}
+            onPostLike={handleLikePost}
             setActiveTab={setActiveTab}
+            showCreatePost={showCreatePost}
+            setShowCreatePost={setShowCreatePost}
+            newPostContent={newPostContent}
+            setNewPostContent={setNewPostContent}
+            newPostImage={newPostImage}
+            setNewPostImage={setNewPostImage}
+            postPrivacy={postPrivacy}
+            setPostPrivacy={setPostPrivacy}
+            selectedUsers={selectedUsers}
+            setSelectedUsers={setSelectedUsers}
+            availableUsers={availableUsers}
+            loadingUsers={loadingUsers}
+            onCreatePost={handleCreatePost}
           />
         )
       case 'profile':
@@ -614,7 +617,7 @@ function DashboardPage() {
       case 'groups': 
         return <GroupsSection groups={groups} />
       case 'events': 
-        return <EventsSection events={events} onEventsUpdate={fetchEvents} />
+        return <EventsSection events={events} onEventsUpdate={fetchEvents} isLoading={isLoadingEvents} />
       case 'settings': 
         return (
           <SettingsSection
@@ -625,6 +628,8 @@ function DashboardPage() {
       default:
         return (
           <HomeFeed
+            posts={posts}
+            onPostLike={handleLikePost}
             setActiveTab={setActiveTab}
           />
         )
@@ -671,7 +676,6 @@ function DashboardPage() {
       <TopBar
         isMobileMenuOpen={isMobileMenuOpen}
         setIsMobileMenuOpen={setIsMobileMenuOpen}
-        setShowCreatePost={setShowCreatePost}
         setShowNotifications={handleNotificationsToggle}
         setShowChat={handleChatToggle}
         showNotifications={showNotifications}
@@ -682,22 +686,6 @@ function DashboardPage() {
         isConnected={isConnected}
         logout={logout}
         setActiveTab={setActiveTab}
-      />
-
-      <CreatePost
-        show={showCreatePost}
-        onClose={() => setShowCreatePost(false)}
-        newPostContent={newPostContent}
-        setNewPostContent={setNewPostContent}
-        newPostImage={newPostImage}
-        setNewPostImage={setNewPostImage}
-        postPrivacy={postPrivacy}
-        setPostPrivacy={setPostPrivacy}
-        selectedUsers={selectedUsers}
-        setSelectedUsers={setSelectedUsers}
-        availableUsers={availableUsers}
-        loadingUsers={loadingUsers}
-        onCreatePost={handleCreatePost}
       />
 
       <CreateGroup

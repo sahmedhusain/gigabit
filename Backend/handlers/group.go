@@ -4,10 +4,9 @@ import (
 	"database/sql"
 	"encoding/json"
 	"net/http"
-	"strconv"
-
 	"social/models"
 	"social/services"
+	"strconv"
 )
 
 type GroupHandler struct {
@@ -428,5 +427,36 @@ func (h *GroupHandler) GetPendingRequests(w http.ResponseWriter, r *http.Request
 	writeJSON(w, http.StatusOK, map[string]interface{}{
 		"requests": requests,
 		"count":    len(requests),
+	})
+}
+
+func (h *GroupHandler) GetUserRole(w http.ResponseWriter, r *http.Request, groupIDStr string) {
+	groupID, err := strconv.ParseUint(groupIDStr, 10, 32)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "Invalid group ID")
+		return
+	}
+
+	userID, ok := r.Context().Value("user_id").(uint)
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "User not authenticated")
+		return
+	}
+
+	role, err := h.groupService.GetUserRole(uint(groupID), userID)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			writeError(w, http.StatusForbidden, "User is not a member of this group")
+		} else {
+			writeError(w, http.StatusInternalServerError, "Failed to get user role")
+		}
+		return
+	}
+
+	isAdminOrCreator := role == "admin" || role == "creator"
+
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"role":                role,
+		"is_admin_or_creator": isAdminOrCreator,
 	})
 }

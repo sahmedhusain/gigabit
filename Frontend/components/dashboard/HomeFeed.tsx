@@ -1,46 +1,45 @@
 'use client'
-import { TrendingUp, Activity, Wifi, WifiOff, RefreshCw } from 'lucide-react'
-import { useEffect } from 'react'
 import PostCard from './PostCard'
-import { Post, APIPost } from '@/lib/api'
-import { useRealTimePosts, useConnectionStatus, useDocumentTitle } from '@/hooks'
+import CreatePost from './CreatePost'
+import { Post } from '@/lib/api'
+import { Plus } from 'lucide-react'
 
 interface HomeFeedProps {
+  posts: Post[]
+  onPostLike: (postId: number) => void
   setActiveTab: (tab: string) => void
-}
-
-// Transform APIPost to Post interface for compatibility
-const transformPost = (apiPost: APIPost): Post => {
-  const timeAgo = new Date(apiPost.created_at).toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric'
-  })
-
-  return {
-    id: apiPost.id,
-    user: {
-      name: `${apiPost.user.first_name} ${apiPost.user.last_name}`,
-      username: apiPost.user.nickname || apiPost.user.email.split('@')[0],
-      avatar: apiPost.user.avatar || ''
-    },
-    content: apiPost.content,
-    image: apiPost.image_url,
-    likes: apiPost.like_count,
-    comments: apiPost.comment_count,
-    shares: 0, // Not available in APIPost
-    timeAgo,
-    privacy: apiPost.privacy,
-    isLiked: apiPost.is_liked
-  }
-}
-
-interface HomeFeedProps {
-  setActiveTab: (tab: string) => void
+  showCreatePost: boolean
+  setShowCreatePost: (show: boolean) => void
+  newPostContent: string
+  setNewPostContent: (content: string) => void
+  newPostImage: File | null
+  setNewPostImage: (image: File | null) => void
+  postPrivacy: string
+  setPostPrivacy: (privacy: string) => void
+  selectedUsers: number[]
+  setSelectedUsers: (users: number[]) => void
+  availableUsers: any[]
+  loadingUsers: boolean
+  onCreatePost: () => Promise<void>
 }
 
 export default function HomeFeed({
-  setActiveTab
+  posts,
+  onPostLike,
+  setActiveTab,
+  showCreatePost,
+  setShowCreatePost,
+  newPostContent,
+  setNewPostContent,
+  newPostImage,
+  setNewPostImage,
+  postPrivacy,
+  setPostPrivacy,
+  selectedUsers,
+  setSelectedUsers,
+  availableUsers,
+  loadingUsers,
+  onCreatePost
 }: HomeFeedProps) {
   // Use real-time posts hook
   const {
@@ -101,69 +100,33 @@ export default function HomeFeed({
 
   return (
     <div className="space-y-4 lg:space-y-6">
-      {/* Connection Status & Unread Indicator */}
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center space-x-3">
-          {/* Connection Status */}
-          <div className={`flex items-center space-x-2 px-3 py-1 rounded-full text-xs font-medium ${
-            connectionQuality === 'excellent' ? 'bg-green-500/20 text-green-400' :
-            connectionQuality === 'good' ? 'bg-yellow-500/20 text-yellow-400' :
-            connectionQuality === 'poor' ? 'bg-orange-500/20 text-orange-400' :
-            'bg-red-500/20 text-red-400'
-          }`}>
-            {isConnected ? <Wifi className="w-3 h-3" /> : <WifiOff className="w-3 h-3" />}
-            <span>{statusMessage}</span>
-          </div>
-
-          {/* Unread Count */}
-          {unreadCount > 0 && (
-            <div className="bg-blue-500/20 text-blue-400 px-3 py-1 rounded-full text-xs font-medium flex items-center space-x-1">
-              <span>{unreadCount} new post{unreadCount > 1 ? 's' : ''}</span>
-              <button
-                onClick={handleRefresh}
-                title="Refresh posts"
-                className="hover:text-blue-300 transition-colors"
-              >
-                <RefreshCw className="w-3 h-3" />
-              </button>
-            </div>
-          )}
-        </div>
-
-        {/* Manual Refresh Button */}
+      {/* Create Post Section - Inline */}
+      <div className="bg-gradient-to-r from-white/10 to-white/5 backdrop-blur-xl rounded-2xl lg:rounded-3xl border border-white/20 p-4 lg:p-6">
         <button
-          onClick={handleRefresh}
-          disabled={isLoading}
-          title="Refresh posts"
-          className="text-white/60 hover:text-white transition-colors p-2 rounded-lg hover:bg-white/5"
+          onClick={() => setShowCreatePost(true)}
+          className="w-full flex items-center justify-center px-4 py-3 bg-gradient-to-r from-emerald-500 to-teal-600 rounded-xl text-white hover:from-emerald-600 hover:to-teal-700 transition-all duration-200 text-sm lg:text-base"
         >
-          <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+          <Plus className="w-5 h-5 mr-2" />
+          What's on your mind?
         </button>
       </div>
 
-      {/* Error State */}
-      {error && (
-        <div className="bg-red-500/20 border border-red-500/30 rounded-xl p-4 text-red-400">
-          <div className="flex items-center justify-between">
-            <span className="text-sm">{error}</span>
-            <button
-              onClick={handleRefresh}
-              title="Retry loading posts"
-              className="text-red-400 hover:text-red-300 transition-colors"
-            >
-              <RefreshCw className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Loading State */}
-      {isLoading && posts.length === 0 && (
-        <div className="bg-gradient-to-r from-white/10 to-white/5 backdrop-blur-xl rounded-2xl lg:rounded-3xl border border-white/20 p-8 text-center">
-          <RefreshCw className="w-8 h-8 animate-spin text-emerald-400 mx-auto mb-4" />
-          <p className="text-white/60 text-lg">Loading posts...</p>
-        </div>
-      )}
+      {/* Create Post Modal */}
+      <CreatePost
+        show={showCreatePost}
+        onClose={() => setShowCreatePost(false)}
+        newPostContent={newPostContent}
+        setNewPostContent={setNewPostContent}
+        newPostImage={newPostImage}
+        setNewPostImage={setNewPostImage}
+        postPrivacy={postPrivacy}
+        setPostPrivacy={setPostPrivacy}
+        selectedUsers={selectedUsers}
+        setSelectedUsers={setSelectedUsers}
+        availableUsers={availableUsers}
+        loadingUsers={loadingUsers}
+        onCreatePost={onCreatePost}
+      />
 
       {/* Posts Feed */}
       <div className="space-y-4 lg:space-y-6">

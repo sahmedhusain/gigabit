@@ -71,12 +71,12 @@ func (h *PostHandler) CreatePost(w http.ResponseWriter, r *http.Request) {
 
 	log.Printf("Creating post with privacy: %s for user: %v", req.Privacy, userID)
 
-post := &models.Post{
-UserID:     userID.(uint),
-Content:    req.Content,
-ImageURL:   &req.ImageURL,
-Privacy:    req.Privacy,
-}
+	post := &models.Post{
+		UserID:   userID.(uint),
+		Content:  req.Content,
+		ImageURL: &req.ImageURL,
+		Privacy:  req.Privacy,
+	}
 
 	if req.ImageURL == "" {
 		post.ImageURL = nil
@@ -398,8 +398,6 @@ func (h *PostHandler) UnlikePost(w http.ResponseWriter, r *http.Request, postIDS
 	log.Printf("Post %d unliked successfully by user %v", postID, userID)
 	writeJSON(w, http.StatusOK, map[string]string{"message": "Post unliked successfully"})
 }
-
-
 
 // CreateComment handles creating a new comment on a post
 func (h *PostHandler) CreateComment(w http.ResponseWriter, r *http.Request, postIDStr string) {

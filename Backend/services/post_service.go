@@ -63,7 +63,7 @@ func (s *PostService) AddPostPrivacyUsers(postID uint, userIDs []uint) error {
 	}
 
 	query := `INSERT INTO post_privacy (post_id, user_id) VALUES (?, ?)`
-
+	
 	for _, userID := range userIDs {
 		_, err := s.db.Exec(query, postID, userID)
 		if err != nil {

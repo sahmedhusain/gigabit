@@ -2,7 +2,7 @@
 import React from 'react'
 import { useRouter } from 'next/navigation'
 import { User, Users, Plus, MessageCircle, Calendar, MapPin} from 'lucide-react'
-import { useRealTimeGroups, useRealTimeEvents, useConnectionStatus, useOnlineStatus, useCategories } from '@/hooks'
+import { useRealTimeGroups, useRealTimeEvents, useConnectionStatus, useOnlineStatus } from '@/hooks'
 
 // Clean DashboardSections: Followers, Groups, Settings
 

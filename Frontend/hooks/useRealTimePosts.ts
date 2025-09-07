@@ -2,7 +2,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { api, type APIPost, type PostResponse } from '@/lib/api'
 import { useWebSocketSubscription } from './useWebSocketSubscription'
-import { useOptimisticUpdate } from './useOptimisticUpdate'
 import { useAuth } from '@/context/AuthContext'
 
 export function useRealTimePosts() {
@@ -13,21 +12,12 @@ export function useRealTimePosts() {
   const [unreadCount, setUnreadCount] = useState(0)
   const lastFetchTime = useRef<number>(Date.now())
 
-  const { performUpdate: optimisticUpdate } = useOptimisticUpdate(posts, {
-    onError: (error, rollbackData) => {
-      console.error('Optimistic update failed:', error)
-      if (rollbackData) {
-        setPosts(rollbackData)
-      }
-    }
-  })
-
   // WebSocket subscription for real-time updates
   const { isConnected } = useWebSocketSubscription({
     messageTypes: ['post_update', 'like_update', 'comment_update', 'like'],
     onMessage: (message) => {
       const now = Date.now()
-      
+
       switch (message.type) {
         case 'post_update':
           if (message.data) {
@@ -39,8 +29,8 @@ export function useRealTimePosts() {
               }
               setPosts(prev => [newPost, ...prev])
             } else if (message.action === 'updated' && message.post_id) {
-              setPosts(prev => prev.map(post => 
-                post.id === message.post_id 
+              setPosts(prev => prev.map(post =>
+                post.id === message.post_id
                   ? { ...post, ...message.data }
                   : post
               ))
@@ -49,27 +39,27 @@ export function useRealTimePosts() {
             }
           }
           break
-          
+
         case 'like_update':
         case 'like':
           if (message.data && message.post_id) {
-            setPosts(prev => prev.map(post => 
+            setPosts(prev => prev.map(post =>
               post.id === message.post_id
                 ? {
-                    ...post,
-                    like_count: message.data.like_count || post.like_count,
-                    is_liked: message.data.is_liked !== undefined 
-                      ? (message.data.user_id === user?.id ? message.data.is_liked : post.is_liked)
-                      : post.is_liked
-                  }
+                  ...post,
+                  like_count: message.data.like_count || post.like_count,
+                  is_liked: message.data.is_liked !== undefined
+                    ? (message.data.user_id === user?.id ? message.data.is_liked : post.is_liked)
+                    : post.is_liked
+                }
                 : post
             ))
           }
           break
-          
+
         case 'comment_update':
           if (message.data && message.post_id) {
-            setPosts(prev => prev.map(post => 
+            setPosts(prev => prev.map(post =>
               post.id === message.post_id
                 ? { ...post, comment_count: message.data.comment_count || post.comment_count }
                 : post
@@ -84,10 +74,10 @@ export function useRealTimePosts() {
     try {
       setIsLoading(true)
       setError(null)
-      
+
       const response = await api.getPosts()
       const postsData = response.posts || []
-      
+
       setPosts(Array.isArray(postsData) ? postsData : [])
       lastFetchTime.current = Date.now()
       setUnreadCount(0) // Reset unread count on manual fetch
@@ -102,73 +92,74 @@ export function useRealTimePosts() {
 
   const createPost = useCallback(async (postData: any) => {
     try {
-      return await optimisticUpdate(
-        (currentPosts) => {
-          // Create optimistic post
-          const optimisticPost: APIPost = {
-            id: Date.now(), // Temporary ID
-            user_id: user?.id || 0,
-            content: postData.content,
-            image_url: postData.image_url,
-            privacy: postData.privacy || 'public',
-            category_id: postData.category_id || 0,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-            user: user!,
-            category: {} as any,
-            like_count: 0,
-            comment_count: 0,
-            is_liked: false,
-            comments: []
-          }
-          return [optimisticPost, ...currentPosts]
-        },
-        async () => {
-          const response = await api.createPost(postData)
-          // Refresh posts to get the real data with correct ID
-          await fetchPosts()
-          return response
-        }
-      )
+      const response = await api.createPost(postData)
+      // Refresh posts to get the real data with correct ID
+      await fetchPosts()
+      return response
     } catch (err: any) {
       console.error('Failed to create post:', err)
       throw err
     }
-  }, [optimisticUpdate, user, fetchPosts])
+  }, [user, fetchPosts])
 
   const likePost = useCallback(async (postId: number) => {
+    // Find the current post to determine the optimistic update
+    const currentPost = posts.find(post => post.id === postId)
+    if (!currentPost) return
+
+    const willBeLiked = !currentPost.is_liked
+
+    // Apply optimistic update immediately
+    setPosts(currentPosts => currentPosts.map(post =>
+      post.id === postId
+        ? {
+          ...post,
+          is_liked: willBeLiked,
+          like_count: willBeLiked
+            ? post.like_count + 1
+            : Math.max(0, post.like_count - 1)
+        }
+        : post
+    ))
+
     try {
-      return await optimisticUpdate(
-        (currentPosts) => currentPosts.map(post => 
-          post.id === postId
-            ? {
-                ...post,
-                is_liked: !post.is_liked,
-                like_count: post.is_liked 
-                  ? Math.max(0, post.like_count - 1)
-                  : post.like_count + 1
-              }
-            : post
-        ),
-        () => api.likePost(postId)
-      )
-    } catch (err: any) {
-      console.error('Failed to like post:', err)
-      throw err
+      // Call the appropriate API method based on the new state
+      if (willBeLiked) {
+        await api.likePost(postId)
+      } else {
+        await api.unlikePost(postId)
+      }
+    } catch (error) {
+      console.error('Failed to toggle like:', error)
+
+      // Rollback the optimistic update on error
+      setPosts(currentPosts => currentPosts.map(post =>
+        post.id === postId
+          ? {
+            ...post,
+            is_liked: currentPost.is_liked,
+            like_count: currentPost.like_count
+          }
+          : post
+      ))
+      throw error
     }
-  }, [optimisticUpdate])
+  }, [posts])
 
   const deletePost = useCallback(async (postId: number) => {
+    // Apply optimistic update immediately
+    const originalPosts = posts
+    setPosts(currentPosts => currentPosts.filter(post => post.id !== postId))
+
     try {
-      return await optimisticUpdate(
-        (currentPosts) => currentPosts.filter(post => post.id !== postId),
-        () => api.deletePost(postId)
-      )
-    } catch (err: any) {
-      console.error('Failed to delete post:', err)
-      throw err
+      await api.deletePost(postId)
+    } catch (error) {
+      console.error('Failed to delete post:', error)
+      // Rollback the optimistic update on error
+      setPosts(originalPosts)
+      throw error
     }
-  }, [optimisticUpdate])
+  }, [posts])
 
   const refreshPosts = useCallback(async () => {
     await fetchPosts()

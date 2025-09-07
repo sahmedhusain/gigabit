@@ -3,6 +3,7 @@ import { useRouter } from 'next/navigation'
 import { Search, Plus, Bell, MessageCircle, User, X, Home } from 'lucide-react'
 import { useSearch, useNotifications, useRealTimeMessages } from '@/hooks'
 import { useState } from 'react'
+import { getAvatarUrl } from '@/utils/avatarUtils'
 
 interface TopBarProps {
   isMobileMenuOpen: boolean
@@ -153,9 +154,9 @@ export default function TopBar({
                 }}
                 className="w-8 h-8 lg:w-10 lg:h-10 bg-gradient-to-r from-emerald-500 to-teal-600 rounded-full flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-emerald-400/50"
               >
-                {currentUser?.avatar ? (
+                {getAvatarUrl(currentUser?.avatar) ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={currentUser.avatar} alt="avatar" className="w-7 h-7 lg:w-8 lg:h-8 rounded-full object-cover" />
+                  <img src={getAvatarUrl(currentUser?.avatar)!} alt="avatar" className="w-7 h-7 lg:w-8 lg:h-8 rounded-full object-cover" />
                 ) : (
                   <User className="w-4 h-4 lg:w-5 lg:h-5 text-white" />
                 )}

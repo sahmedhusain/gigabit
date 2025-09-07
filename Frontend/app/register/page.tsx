@@ -19,7 +19,7 @@ export default function RegisterPage() {
     dateOfBirth: '',
     nickname: '',
     aboutMe: '',
-    avatar: ''
+    avatar: '/avatars/defaultM.png' // Set default avatar value
   })
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
@@ -35,25 +35,12 @@ export default function RegisterPage() {
 
   const handleAvatarSelect = (avatarId: string) => {
     const selectedAvatar = getAvatarOptions().find(avatar => avatar.id === avatarId);
-    // Store the image URL instead of the ID in the database
     setFormData({ ...formData, avatar: selectedAvatar?.imageUrl || avatarId })
+    
     // Set preview to the selected avatar's image URL or ID for fallback
     setAvatarPreview(selectedAvatar?.imageUrl || avatarId)
   }
 
-  // const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-  //   const file = e.target.files?.[0]
-  //   if (file) {
-  //     const reader = new FileReader()
-  //     reader.onloadend = () => {
-  //       const base64String = reader.result as string
-  //       console.log("Base64 string:", base64String.substring(0, 100) + "...") // Debug log
-  //       setFormData({ ...formData, avatar: base64String })
-  //       setAvatarPreview(base64String)
-  //     }
-  //     reader.readAsDataURL(file)
-  //   }
-  // }
 
   const handleSubmit = async () => {
     setIsLoading(true)

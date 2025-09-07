@@ -111,6 +111,13 @@ function DashboardPage() {
     username: user.nickname || user.email.split('@')[0],
     avatar: user.avatar,
     isPrivate: user.is_private,
+    email: user.email,
+    firstName: user.first_name,
+    lastName: user.last_name,
+    dateOfBirth: user.date_of_birth,
+    nickname: user.nickname,
+    aboutMe: user.about_me,
+    memberSince: user.created_at,
     followers: 0,
     following: 0
   } : null

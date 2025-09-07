@@ -11,6 +11,13 @@ interface ProfileSectionProps {
     username: string
     avatar?: string
     isPrivate: boolean
+    email: string
+    firstName: string
+    lastName: string
+    dateOfBirth: string
+    nickname: string
+    aboutMe: string
+    memberSince: string
   } | null
   followers: any[]
   following: any[]
@@ -113,6 +120,80 @@ export default function ProfileSection({
                   </>
                 )}
               </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Personal Information Section */}
+      <div className="bg-gradient-to-r from-white/10 to-white/5 backdrop-blur-xl rounded-2xl lg:rounded-3xl border border-white/20 p-4 lg:p-6">
+        <h3 className="text-lg lg:text-xl font-semibold text-white mb-4 lg:mb-6">Personal Information</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 lg:gap-6">
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm text-white/60 font-medium">Full Name</label>
+              <p className="text-white text-base lg:text-lg">{currentUser?.name || 'Not provided'}</p>
+            </div>
+            <div>
+              <label className="text-sm text-white/60 font-medium">Email</label>
+              <p className="text-white text-base lg:text-lg">{currentUser?.email || 'Not provided'}</p>
+            </div>
+            <div>
+              <label className="text-sm text-white/60 font-medium">Username</label>
+              <p className="text-white text-base lg:text-lg">@{currentUser?.username || 'Not provided'}</p>
+            </div>
+            <div>
+              <label className="text-sm text-white/60 font-medium">Nickname</label>
+              <p className="text-white text-base lg:text-lg">{currentUser?.nickname || 'Not provided'}</p>
+            </div>
+          </div>
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm text-white/60 font-medium">Date of Birth</label>
+              <p className="text-white text-base lg:text-lg">
+                {currentUser?.dateOfBirth 
+                  ? new Date(currentUser.dateOfBirth).toLocaleDateString('en-US', {
+                      year: 'numeric',
+                      month: 'long',
+                      day: 'numeric'
+                    })
+                  : 'Not provided'
+                }
+              </p>
+            </div>
+            <div>
+              <label className="text-sm text-white/60 font-medium">About Me</label>
+              <p className="text-white text-base lg:text-lg">
+                {currentUser?.aboutMe || 'No description provided'}
+              </p>
+            </div>
+            <div>
+              <label className="text-sm text-white/60 font-medium">Member Since</label>
+              <p className="text-white text-base lg:text-lg">
+                {currentUser?.memberSince 
+                  ? new Date(currentUser.memberSince).toLocaleDateString('en-US', {
+                      year: 'numeric',
+                      month: 'long'
+                    })
+                  : 'Not available'
+                }
+              </p>
+            </div>
+            <div>
+              <label className="text-sm text-white/60 font-medium">Profile Privacy</label>
+              <p className="text-white text-base lg:text-lg flex items-center">
+                {currentUser?.isPrivate ? (
+                  <>
+                    <Lock className="w-4 h-4 mr-2 text-red-400" />
+                    Private Profile
+                  </>
+                ) : (
+                  <>
+                    <Globe className="w-4 h-4 mr-2 text-green-400" />
+                    Public Profile
+                  </>
+                )}
+              </p>
             </div>
           </div>
         </div>

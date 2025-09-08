@@ -8,6 +8,7 @@ type RegisterRequest struct {
 	DateOfBirth string `json:"dateOfBirth" binding:"required"`
 	Nickname    string `json:"nickname" binding:"max=30"`
 	AboutMe     string `json:"aboutMe" binding:"max=500"`
+	Avatar      string `json:"avatar" binding:"max=100"`
 }
 
 type LoginRequest struct {

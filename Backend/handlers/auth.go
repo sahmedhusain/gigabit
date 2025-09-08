@@ -35,6 +35,12 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Debug log
+	log.Printf("Received registration request - Avatar length: %d", len(req.Avatar))
+	if req.Avatar != "" {
+		log.Printf("Avatar starts with: %s", req.Avatar[:min(50, len(req.Avatar))])
+	}
+
 	// Check if user already exists
 	existingUser, err := h.userService.GetUserByEmail(req.Email)
 	if err == nil && existingUser != nil {
@@ -64,6 +70,10 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 	}
 	if req.AboutMe != "" {
 		user.AboutMe = &req.AboutMe
+	}
+
+	if req.Avatar != "" {
+		user.Avatar = &req.Avatar
 	}
 
 	if err := h.userService.CreateUser(user); err != nil {

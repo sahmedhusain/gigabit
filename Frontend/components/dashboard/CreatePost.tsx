@@ -52,6 +52,10 @@ export default function CreatePost({
       setNewPostImage(null)
       setPostPrivacy('public')
       setSelectedUsers([])
+      // setSelectedPostCategory(categories[0]?.id || 1)
+      // if (fileInputRef.current) {
+      //   fileInputRef.current.value = ''
+      // }
       if (fileInputRef.current) {
         fileInputRef.current.value = ''
       }

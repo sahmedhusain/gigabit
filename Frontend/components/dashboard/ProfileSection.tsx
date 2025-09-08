@@ -2,6 +2,7 @@
 import { User, Settings, Lock, Globe } from 'lucide-react'
 import { Post } from '@/lib/api'
 import { useRealTimePosts, useFollowers, useConnectionStatus } from '@/hooks'
+import { getAvatarUrl } from '@/utils/avatarUtils'
 import { useRouter } from 'next/navigation'
 
 interface ProfileSectionProps {
@@ -11,6 +12,13 @@ interface ProfileSectionProps {
     username: string
     avatar?: string
     isPrivate: boolean
+    email: string
+    firstName: string
+    lastName: string
+    dateOfBirth: string
+    nickname: string
+    aboutMe: string
+    memberSince: string
   } | null
   followers: any[]
   following: any[]
@@ -29,7 +37,7 @@ export default function ProfileSection({
   const { posts: realTimePosts, isConnected } = useRealTimePosts()
   const { followers: liveFollowers, following: liveFollowing } = useFollowers()
   const { isConnected: connectionStatus } = useConnectionStatus()
-  
+
   // Use real-time data when connected, fallback to provided data
   const displayPosts = isConnected ? realTimePosts.filter(p => p.user_id === currentUser?.id) : posts
   const displayFollowers = isConnected ? liveFollowers : followers
@@ -45,29 +53,30 @@ export default function ProfileSection({
       <div className="bg-gradient-to-r from-white/10 to-white/5 backdrop-blur-xl rounded-2xl lg:rounded-3xl border border-white/20 p-4 lg:p-8">
         <div className="flex flex-col items-center space-y-4 lg:flex-row lg:items-start lg:space-y-0 lg:space-x-8">
           <div className="w-24 h-24 lg:w-32 lg:h-32 bg-gradient-to-r from-emerald-500 to-teal-600 rounded-full flex items-center justify-center overflow-hidden">
-            {currentUser?.avatar ? (
-              <img 
-                src={currentUser.avatar.startsWith('http') ? 
-                  currentUser.avatar : 
-                  `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}${currentUser.avatar}`
-                }
-                alt={`${currentUser.name}'s avatar`}
-                className="w-full h-full object-cover"
-                onError={(e) => {
-                  // Fallback to default User icon on error
-                  const target = e.target as HTMLImageElement;
-                  target.style.display = 'none';
-                  target.nextElementSibling?.classList.remove('hidden');
-                }}
-              />
-            ) : null}
-            <User className={`w-12 h-12 lg:w-16 lg:h-16 text-white ${currentUser?.avatar ? 'hidden' : ''}`} />
+            {getAvatarUrl(currentUser?.avatar) ? (
+              <>
+                <img
+                  src={getAvatarUrl(currentUser?.avatar)!}
+                  alt={`${currentUser?.name}'s avatar`}
+                  className="w-full h-full object-cover"
+                  onError={(e) => {
+                    // Fallback to default User icon on error
+                    const target = e.target as HTMLImageElement;
+                    target.style.display = 'none';
+                    target.nextElementSibling?.classList.remove('hidden');
+                  }}
+                />
+                <User className="w-12 h-12 lg:w-16 lg:h-16 text-white hidden" />
+              </>
+            ) : (
+              <User className="w-12 h-12 lg:w-16 lg:h-16 text-white" />
+            )}
           </div>
-          
+
           <div className="flex-1 text-center lg:text-left">
             <h2 className="text-2xl lg:text-3xl font-bold text-white mb-2">{currentUser?.name || 'User'}</h2>
             <p className="text-emerald-300 text-base lg:text-lg mb-4">@{currentUser?.username || 'username'}</p>
-            
+
             <div className="flex justify-center lg:justify-start space-x-6 lg:space-x-8 mb-4 lg:mb-6">
               <div className="text-center">
                 <div className="text-xl lg:text-2xl font-bold text-white">
@@ -97,13 +106,13 @@ export default function ProfileSection({
                 <div className="text-white/60 text-sm lg:text-base">Posts</div>
               </div>
             </div>
-            
+
             <div className="flex flex-col sm:flex-row gap-3 lg:gap-4">
               <button className="flex items-center justify-center px-4 lg:px-6 py-2 bg-gradient-to-r from-emerald-500 to-teal-600 rounded-xl text-white hover:from-emerald-600 hover:to-teal-700 transition-all duration-200 text-sm lg:text-base">
                 <Settings className="w-4 h-4 mr-2" />
                 Edit Profile
               </button>
-              
+
               <button className={`flex items-center justify-center px-4 lg:px-6 py-2 border border-white/30 rounded-xl text-white hover:bg-white/10 transition-all duration-200 text-sm lg:text-base`}>
                 {currentUser?.isPrivate ? (
                   <>
@@ -117,6 +126,80 @@ export default function ProfileSection({
                   </>
                 )}
               </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Personal Information Section */}
+      <div className="bg-gradient-to-r from-white/10 to-white/5 backdrop-blur-xl rounded-2xl lg:rounded-3xl border border-white/20 p-4 lg:p-6">
+        <h3 className="text-lg lg:text-xl font-semibold text-white mb-4 lg:mb-6">Personal Information</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 lg:gap-6">
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm text-white/60 font-medium">Full Name</label>
+              <p className="text-white text-base lg:text-lg">{currentUser?.name || 'Not provided'}</p>
+            </div>
+            <div>
+              <label className="text-sm text-white/60 font-medium">Email</label>
+              <p className="text-white text-base lg:text-lg">{currentUser?.email || 'Not provided'}</p>
+            </div>
+            <div>
+              <label className="text-sm text-white/60 font-medium">Username</label>
+              <p className="text-white text-base lg:text-lg">@{currentUser?.username || 'Not provided'}</p>
+            </div>
+            <div>
+              <label className="text-sm text-white/60 font-medium">Nickname</label>
+              <p className="text-white text-base lg:text-lg">{currentUser?.nickname || 'Not provided'}</p>
+            </div>
+          </div>
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm text-white/60 font-medium">Date of Birth</label>
+              <p className="text-white text-base lg:text-lg">
+                {currentUser?.dateOfBirth 
+                  ? new Date(currentUser.dateOfBirth).toLocaleDateString('en-US', {
+                      year: 'numeric',
+                      month: 'long',
+                      day: 'numeric'
+                    })
+                  : 'Not provided'
+                }
+              </p>
+            </div>
+            <div>
+              <label className="text-sm text-white/60 font-medium">About Me</label>
+              <p className="text-white text-base lg:text-lg">
+                {currentUser?.aboutMe || 'No description provided'}
+              </p>
+            </div>
+            <div>
+              <label className="text-sm text-white/60 font-medium">Member Since</label>
+              <p className="text-white text-base lg:text-lg">
+                {currentUser?.memberSince 
+                  ? new Date(currentUser.memberSince).toLocaleDateString('en-US', {
+                      year: 'numeric',
+                      month: 'long'
+                    })
+                  : 'Not available'
+                }
+              </p>
+            </div>
+            <div>
+              <label className="text-sm text-white/60 font-medium">Profile Privacy</label>
+              <p className="text-white text-base lg:text-lg flex items-center">
+                {currentUser?.isPrivate ? (
+                  <>
+                    <Lock className="w-4 h-4 mr-2 text-red-400" />
+                    Private Profile
+                  </>
+                ) : (
+                  <>
+                    <Globe className="w-4 h-4 mr-2 text-green-400" />
+                    Public Profile
+                  </>
+                )}
+              </p>
             </div>
           </div>
         </div>
@@ -162,7 +245,7 @@ export default function ProfileSection({
             </div>
           </div>
         </div>
-        
+
         <div className="space-y-4 lg:space-y-6">
           {/* Activity */}
           <div className="bg-gradient-to-r from-white/10 to-white/5 backdrop-blur-xl rounded-2xl lg:rounded-3xl border border-white/20 p-4 lg:p-6">

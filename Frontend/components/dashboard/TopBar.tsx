@@ -1,6 +1,7 @@
 'use client'
 import { useRef, useEffect } from 'react'
 import { Menu, X, Bell, Settings, LogOut, User, WifiOff, Wifi, MessageCircle } from 'lucide-react'
+import { getAvatarUrl } from '@/utils/avatarUtils'
 
 interface TopBarProps {
   isMobileMenuOpen: boolean
@@ -119,6 +120,83 @@ export default function TopBar({
               </span>
             )}
           </button>
+
+          <div className="flex items-center space-x-2 lg:space-x-3">
+            {/* Connection status indicator */}
+            <div className="flex items-center space-x-1">
+              <div
+                className={`w-2 h-2 lg:w-3 lg:h-3 rounded-full ${isOffline ? 'bg-red-500' : isConnected ? 'bg-green-500' : 'bg-yellow-500'
+                  }`}
+                title={
+                  isOffline ? 'Offline - No internet connection' :
+                    isConnected ? 'Connected to server' :
+                      'Connecting...'
+                }
+              ></div>
+              {isOffline && (
+                <span className="text-xs text-red-300 hidden sm:inline">Offline</span>
+              )}
+            </div>
+            {/* Avatar dropdown (avatar only, no name) */}
+            <div className="relative">
+              <button
+                aria-label="User menu"
+                title="User menu"
+                onClick={(e) => {
+                  const el = document.getElementById('topbar-user-dropdown')
+                  if (el) el.classList.toggle('hidden')
+                }}
+                className="w-8 h-8 lg:w-10 lg:h-10 bg-gradient-to-r from-emerald-500 to-teal-600 rounded-full flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-emerald-400/50"
+              >
+                {getAvatarUrl(currentUser?.avatar) ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={getAvatarUrl(currentUser?.avatar)!} alt="avatar" className="w-7 h-7 lg:w-8 lg:h-8 rounded-full object-cover" />
+                ) : (
+                  <User className="w-4 h-4 lg:w-5 lg:h-5 text-white" />
+                )}
+              </button>
+
+              <div id="topbar-user-dropdown" className="hidden absolute right-0 mt-2 w-44 bg-white/10 backdrop-blur-xl border border-white/20 rounded-xl shadow-xl py-2 z-50">
+                <button
+                  onClick={() => {
+                    const el = document.getElementById('topbar-user-dropdown')
+                    if (el) el.classList.add('hidden')
+                    if (setActiveTab) {
+                      setActiveTab('profile')
+                      return
+                    }
+                    router.push(`/profile/${currentUser?.id || ''}`)
+                  }}
+                  className="block w-full text-left px-4 py-2 text-sm text-white hover:bg-white/10"
+                  title="My Profile"
+                >
+                  My Profile
+                </button>
+                <button
+                  onClick={() => {
+                    const el = document.getElementById('topbar-user-dropdown')
+                    if (el) el.classList.add('hidden')
+                    if (setActiveTab) {
+                      setActiveTab('settings')
+                      return
+                    }
+                    router.push('/settings')
+                  }}
+                  className="block w-full text-left px-4 py-2 text-sm text-white hover:bg-white/10"
+                  title="Settings"
+                >
+                  Settings
+                </button>
+                <button
+                  onClick={() => logout()}
+                  title="Logout"
+                  className="w-full text-left px-4 py-2 text-sm text-white hover:bg-white/10"
+                >
+                  Logout
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </header>

@@ -8,6 +8,7 @@ import { useWebSocket } from '@/context/WebSocketContext'
 import { useToast } from '@/context/ToastContext'
 import { useConnectionStatus, useOptimisticUpdate, useOnlineStatus } from '@/hooks'
 import { api, APIPost, Comment as CommentType, NetworkError, ValidationError } from '@/lib/api'
+import { getAvatarUrl } from '@/utils/avatarUtils'
 
 interface CommentWithUser extends CommentType {
     timeAgo: string
@@ -308,8 +309,25 @@ function PostDetailPage() {
                     {/* Post Header */}
                     <div className="flex items-center justify-between mb-4">
                         <div className="flex items-center space-x-3 flex-1">
-                            <div className="w-10 h-10 bg-gradient-to-r from-emerald-500 to-teal-600 rounded-full flex items-center justify-center">
-                                <User className="w-5 h-5 text-white" />
+                            <div className="w-10 h-10 bg-gradient-to-r from-emerald-500 to-teal-600 rounded-full flex items-center justify-center overflow-hidden">
+                                {getAvatarUrl(post.user.avatar) ? (
+                                    <>
+                                        <img 
+                                            src={getAvatarUrl(post.user.avatar)!}
+                                            alt={`${post.user.first_name} ${post.user.last_name}'s avatar`}
+                                            className="w-full h-full object-cover"
+                                            onError={(e) => {
+                                                // Fallback to default User icon on error
+                                                const target = e.target as HTMLImageElement;
+                                                target.style.display = 'none';
+                                                target.nextElementSibling?.classList.remove('hidden');
+                                            }}
+                                        />
+                                        <User className="w-5 h-5 text-white hidden" />
+                                    </>
+                                ) : (
+                                    <User className="w-5 h-5 text-white" />
+                                )}
                             </div>
                             <div className="flex-1">
                                 <div className="flex items-center space-x-2 mb-1">
@@ -409,8 +427,25 @@ function PostDetailPage() {
                 {/* Comment Form */}
                 <div className="bg-gradient-to-r from-white/10 to-white/5 backdrop-blur-xl rounded-2xl border border-white/20 p-4 mb-6">
                     <div className="flex items-start space-x-3">
-                        <div className="w-8 h-8 bg-gradient-to-r from-emerald-500 to-teal-600 rounded-full flex items-center justify-center flex-shrink-0">
-                            <User className="w-4 h-4 text-white" />
+                        <div className="w-8 h-8 bg-gradient-to-r from-emerald-500 to-teal-600 rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden">
+                            {getAvatarUrl(user?.avatar) ? (
+                                <>
+                                    <img 
+                                        src={getAvatarUrl(user?.avatar)!}
+                                        alt={`${user?.first_name} ${user?.last_name}'s avatar`}
+                                        className="w-full h-full object-cover"
+                                        onError={(e) => {
+                                            // Fallback to default User icon on error
+                                            const target = e.target as HTMLImageElement;
+                                            target.style.display = 'none';
+                                            target.nextElementSibling?.classList.remove('hidden');
+                                        }}
+                                    />
+                                    <User className="w-4 h-4 text-white hidden" />
+                                </>
+                            ) : (
+                                <User className="w-4 h-4 text-white" />
+                            )}
                         </div>
                         <div className="flex-1">
                             <textarea
@@ -466,8 +501,25 @@ function PostDetailPage() {
                         <div className="space-y-4">
                             {comments.map((comment) => (
                                 <div key={comment.id} className="flex items-start space-x-3 p-3 rounded-lg bg-white/5">
-                                    <div className="w-8 h-8 bg-gradient-to-r from-emerald-500 to-teal-600 rounded-full flex items-center justify-center flex-shrink-0">
-                                        <User className="w-4 h-4 text-white" />
+                                    <div className="w-8 h-8 bg-gradient-to-r from-emerald-500 to-teal-600 rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden">
+                                        {getAvatarUrl(comment.user.avatar) ? (
+                                            <>
+                                                <img 
+                                                    src={getAvatarUrl(comment.user.avatar)!}
+                                                    alt={`${comment.user.first_name} ${comment.user.last_name}'s avatar`}
+                                                    className="w-full h-full object-cover"
+                                                    onError={(e) => {
+                                                        // Fallback to default User icon on error
+                                                        const target = e.target as HTMLImageElement;
+                                                        target.style.display = 'none';
+                                                        target.nextElementSibling?.classList.remove('hidden');
+                                                    }}
+                                                />
+                                                <User className="w-4 h-4 text-white hidden" />
+                                            </>
+                                        ) : (
+                                            <User className="w-4 h-4 text-white" />
+                                        )}
                                     </div>
                                     <div className="flex-1">
                                         <div className="flex items-center space-x-2 mb-1">

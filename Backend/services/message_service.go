@@ -29,7 +29,7 @@ func (s *MessageService) SendPrivateMessage(message *models.Message) error {
 	`
 
 	now := time.Now()
-	result, err := s.db.Exec(query, message.SenderID, message.ReceiverID, message.Content, 
+	result, err := s.db.Exec(query, message.SenderID, message.ReceiverID, message.Content,
 		message.ImageURL, now, now)
 	if err != nil {
 		return err
@@ -230,7 +230,7 @@ func (s *MessageService) getPrivateConversations(userID uint) ([]models.Conversa
 		var participantID uint
 		var participant models.UserResponse
 
-		err := rows.Scan(&participantID, &participant.FirstName, &participant.LastName, 
+		err := rows.Scan(&participantID, &participant.FirstName, &participant.LastName,
 			&participant.Avatar, &participant.Nickname)
 		if err != nil {
 			return nil, err
@@ -268,7 +268,7 @@ func (s *MessageService) getPrivateConversations(userID uint) ([]models.Conversa
 
 func (s *MessageService) getGroupConversations(userID uint) ([]models.Conversation, error) {
 	query := `
-		SELECT g.id, g.title
+		SELECT g.id, g.name
 		FROM groups g
 		JOIN group_members gm ON g.id = gm.group_id
 		WHERE gm.user_id = ? AND gm.status = 'member'
@@ -283,14 +283,17 @@ func (s *MessageService) getGroupConversations(userID uint) ([]models.Conversati
 	var conversations []models.Conversation
 	for rows.Next() {
 		var groupID uint
-		var group models.GroupMessageResponse
+		var groupName string
 
-		err := rows.Scan(&groupID, &group.Title)
+		err := rows.Scan(&groupID, &groupName)
 		if err != nil {
 			return nil, err
 		}
 
-		group.ID = groupID
+		group := models.GroupMessageResponse{
+			ID:    groupID,
+			Title: groupName,
+		}
 
 		// Get last message
 		lastMessage, err := s.getLastGroupMessage(groupID)
@@ -406,7 +409,7 @@ func (s *MessageService) MarkMessagesAsRead(messageIDs []uint, userID uint) erro
 	// Create placeholders for IN clause
 	placeholders := make([]string, len(messageIDs))
 	args := make([]interface{}, 0, len(messageIDs)+1)
-	
+
 	for i, id := range messageIDs {
 		placeholders[i] = "?"
 		args = append(args, id)
@@ -417,7 +420,7 @@ func (s *MessageService) MarkMessagesAsRead(messageIDs []uint, userID uint) erro
 		UPDATE messages SET is_read = true, updated_at = ?
 		WHERE id IN (%s) AND receiver_id = ? AND is_read = false
 	`, strings.Join(placeholders, ","))
-	
+
 	args = append([]interface{}{time.Now()}, args...)
 
 	_, err := s.db.Exec(query, args...)

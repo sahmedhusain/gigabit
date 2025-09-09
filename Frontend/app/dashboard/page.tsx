@@ -26,6 +26,7 @@ import { Sparkles } from 'lucide-react'
 // Import all dashboard components
 import TopBar from '@/components/dashboard/TopBar'
 import Sidebar from '@/components/dashboard/Sidebar'
+import UsersSidebar from '@/components/dashboard/UsersSidebar'
 import CreatePost from '@/components/dashboard/CreatePost'
 import CreateGroup from '@/components/dashboard/CreateGroup'
 import NotificationsDropdown from '@/components/dashboard/NotificationsDropdown'
@@ -158,6 +159,11 @@ function DashboardPage() {
           }
           break
 
+        case 'follow_update':
+          console.log('Follow update received:', message.data)
+          // This is now handled in a separate effect after fetchFollowers is defined
+          break
+
         case 'post_update':
           console.log('Post update received:', message.data)
           if (activeTab === 'home') {
@@ -203,7 +209,7 @@ function DashboardPage() {
 
         case 'error':
           console.error('WebSocket error message:', message.data)
-          error('Server error: ' + (message.data?.message || 'Unknown error'))
+          error('Server error: ' + (message.data?.message || message.content || 'Unknown error'))
           break
 
         default:
@@ -212,7 +218,7 @@ function DashboardPage() {
     })
 
     return removeListener
-  }, [isConnected, addMessageListener, activeTab])
+  }, [isConnected, addMessageListener, activeTab, user?.id, error])
 
   // Request browser notification permission
   useEffect(() => {
@@ -405,8 +411,8 @@ function DashboardPage() {
         api.getFollowing(user.id)
       ])
 
-      setFollowers(Array.isArray(followersData?.data) ? followersData.data : [])
-      setFollowing(Array.isArray(followingData?.data) ? followingData.data : [])
+      setFollowers(Array.isArray(followersData?.followers) ? followersData.followers : [])
+      setFollowing(Array.isArray(followingData?.following) ? followingData.following : [])
     } catch (err) {
       console.error('Error fetching followers:', err)
       if (err instanceof NetworkError) {
@@ -416,6 +422,23 @@ function DashboardPage() {
       setIsLoadingFollowers(false)
     }
   }
+
+  // Handle follow updates specifically
+  useEffect(() => {
+    if (!isConnected) return
+
+    const removeListener = addMessageListener((message) => {
+      if (message.type === 'follow_update') {
+        console.log('Follow update received:', message.data)
+        // Refresh followers if we're on followers or profile tab
+        if (activeTab === 'followers' || activeTab === 'profile') {
+          fetchFollowers()
+        }
+      }
+    })
+
+    return removeListener
+  }, [isConnected, addMessageListener, activeTab, fetchFollowers])
 
   const formatTimeAgo = (dateString: string) => {
     const date = new Date(dateString)
@@ -631,6 +654,19 @@ function DashboardPage() {
             posts={posts}
             onPostLike={handleLikePost}
             setActiveTab={setActiveTab}
+            showCreatePost={showCreatePost}
+            setShowCreatePost={setShowCreatePost}
+            newPostContent={newPostContent}
+            setNewPostContent={setNewPostContent}
+            newPostImage={newPostImage}
+            setNewPostImage={setNewPostImage}
+            postPrivacy={postPrivacy}
+            setPostPrivacy={setPostPrivacy}
+            selectedUsers={selectedUsers}
+            setSelectedUsers={setSelectedUsers}
+            availableUsers={availableUsers}
+            loadingUsers={loadingUsers}
+            onCreatePost={handleCreatePost}
           />
         )
     }
@@ -723,8 +759,23 @@ function DashboardPage() {
 
       {/* Main Content */}
       <div className="lg:ml-64 pt-14 lg:pt-16 p-3 lg:p-6 relative z-10">
-        <div className="max-w-6xl mx-auto">
-          {renderContent()}
+        <div className="max-w-7xl mx-auto">
+          <div className="flex flex-col lg:flex-row gap-6">
+            {/* Main Content Area */}
+            <div className="flex-1 min-w-0">
+              {renderContent()}
+            </div>
+            
+            {/* Right Sidebar - Users */}
+            <div className="lg:w-80 xl:w-96">
+              <UsersSidebar 
+                onUserClick={(user) => {
+                  // TODO: Navigate to user profile
+                  console.log('User clicked:', user)
+                }}
+              />
+            </div>
+          </div>
         </div>
       </div>
     </div>

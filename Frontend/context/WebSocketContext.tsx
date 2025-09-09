@@ -6,6 +6,7 @@ import { useAuth } from './AuthContext'
 export interface WebSocketMessage {
   type: 'private_message' | 'group_message' | 'notification' | 'user_status' | 'typing' | 
         'post_update' | 'comment_update' | 'like_update' | 'like' | 'follow_update' | 
+        'follow' | 'unfollow' | 'follow_request' | 'cancel_follow_request' |
         'group_update' | 'event_update' | 'category_update' | 'ping' | 'pong' | 'error'
   from?: number
   to?: number

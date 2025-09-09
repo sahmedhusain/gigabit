@@ -1,3 +1,10 @@
+// receive follower related requests, create a message type for each one.
+// follow, unfollow, follow_request, cancel_follow_request
+// a handler should handle these messages and send the request to the target user
+// if successful, send a ws message back to the client
+// insert the follower to the user table in the database only if request is accepted or if the follow is successful
+// create the followers and following tables fields in the user table in the database
+
 package websocket
 
 import (
@@ -22,33 +29,37 @@ var upgrader = websocket.Upgrader{
 
 // Message types
 const (
-	MessageTypePrivateMessage = "private_message"
-	MessageTypeGroupMessage   = "group_message"
-	MessageTypeNotification   = "notification"
-	MessageTypeUserStatus     = "user_status"
-	MessageTypeTyping         = "typing"
-	MessageTypePostUpdate     = "post_update"
-	MessageTypeCommentUpdate  = "comment_update"
-	MessageTypeLikeUpdate     = "like_update"
-	MessageTypeLike           = "like"
-	MessageTypeFollowUpdate   = "follow_update"
-	MessageTypeGroupUpdate    = "group_update"
-	MessageTypeEventUpdate    = "event_update"
-	MessageTypeError          = "error"
-	MessageTypePing           = "ping"
-	MessageTypePong           = "pong"
+	MessageTypePrivateMessage      = "private_message"
+	MessageTypeGroupMessage        = "group_message"
+	MessageTypeNotification        = "notification"
+	MessageTypeUserStatus          = "user_status"
+	MessageTypeTyping              = "typing"
+	MessageTypePostUpdate          = "post_update"
+	MessageTypeCommentUpdate       = "comment_update"
+	MessageTypeLikeUpdate          = "like_update"
+	MessageTypeLike                = "like"
+	MessageTypeFollowUpdate        = "follow_update"
+	MessageTypeFollow              = "follow"
+	MessageTypeUnfollow            = "unfollow"
+	MessageTypeFollowRequest       = "follow_request"
+	MessageTypeCancelFollowRequest = "cancel_follow_request"
+	MessageTypeGroupUpdate         = "group_update"
+	MessageTypeEventUpdate         = "event_update"
+	MessageTypeError               = "error"
+	MessageTypePing                = "ping"
+	MessageTypePong                = "pong"
 )
 
 // Message represents a websocket message
 type Message struct {
 	Type      string      `json:"type"`
 	From      uint        `json:"from"`
-	To        uint        `json:"to,omitempty"`        // For private messages
-	GroupID   uint        `json:"group_id,omitempty"`  // For group messages
-	PostID    uint        `json:"post_id,omitempty"`   // For post updates
-	EventID   uint        `json:"event_id,omitempty"`  // For event updates
+	To        uint        `json:"to,omitempty"`       // For private messages
+	GroupID   uint        `json:"group_id,omitempty"` // For group messages
+	PostID    uint        `json:"post_id,omitempty"`  // For post updates
+	EventID   uint        `json:"event_id,omitempty"` // For event updates
 	Content   string      `json:"content"`
-	Action    string      `json:"action,omitempty"`    // create, update, delete, like, unlike
+	Action    string      `json:"action,omitempty"` // create, update, delete, like, unlike
 	Data      interface{} `json:"data,omitempty"`
 	MessageID string      `json:"message_id,omitempty"` // For message deduplication
 	Timestamp int64       `json:"timestamp"`
@@ -160,6 +171,14 @@ func (h *Hub) handleMessage(message Message) {
 		h.handleLike(message)
 	case MessageTypeFollowUpdate:
 		h.handleFollowUpdate(message)
+	case MessageTypeFollow:
+		h.handleFollow(message)
+	case MessageTypeUnfollow:
+		h.handleUnfollow(message)
+	case MessageTypeFollowRequest:
+		h.handleFollowRequest(message)
+	case MessageTypeCancelFollowRequest:
+		h.handleCancelFollowRequest(message)
 	case MessageTypeGroupUpdate:
 		h.handleGroupUpdate(message)
 	case MessageTypeEventUpdate:
@@ -487,7 +506,7 @@ func (h *Hub) handleCommentCreate(message Message) {
 	if commentData, ok := message.Data.(map[string]interface{}); ok {
 		postID := message.PostID
 		userID := message.From
-		
+
 		content, contentOk := commentData["content"].(string)
 		if !contentOk || content == "" {
 			log.Printf("Invalid comment content from user %d", userID)
@@ -502,18 +521,18 @@ func (h *Hub) handleCommentCreate(message Message) {
 			h.SendToUser(userID, errorMsg)
 			return
 		}
-		
+
 		// Create the comment directly in the database
 		query := `
 			INSERT INTO comments (post_id, user_id, content, image_url, created_at, updated_at)
 			VALUES (?, ?, ?, ?, ?, ?)
 		`
-		
+
 		var imageURL *string
 		if imgURL, ok := commentData["image_url"].(string); ok && imgURL != "" {
 			imageURL = &imgURL
 		}
-		
+
 		now := time.Now()
 		result, err := h.db.Exec(query, postID, userID, content, imageURL, now, now)
 		if err != nil {
@@ -529,24 +548,24 @@ func (h *Hub) handleCommentCreate(message Message) {
 			h.SendToUser(userID, errorMsg)
 			return
 		}
-		
+
 		commentID, err := result.LastInsertId()
 		if err != nil {
 			log.Printf("Failed to get comment ID: %v", err)
 			return
 		}
-		
+
 		// Get user information for the response
 		userQuery := `SELECT first_name, last_name, avatar, nickname FROM users WHERE id = ?`
 		var firstName, lastName string
 		var avatar, nickname *string
-		
+
 		err = h.db.QueryRow(userQuery, userID).Scan(&firstName, &lastName, &avatar, &nickname)
 		if err != nil {
 			log.Printf("Failed to get user info: %v", err)
 			return
 		}
-		
+
 		// Create response data with complete comment information
 		responseData := map[string]interface{}{
 			"id":         uint(commentID),
@@ -564,10 +583,10 @@ func (h *Hub) handleCommentCreate(message Message) {
 				"nickname":   nickname,
 			},
 		}
-		
+
 		// Broadcast the new comment to all clients
 		h.BroadcastCommentUpdate(postID, uint(commentID), userID, "create", responseData)
-		
+
 		log.Printf("Comment created via WebSocket: postID=%d, userID=%d, commentID=%d", postID, userID, commentID)
 	} else {
 		log.Printf("Invalid comment data format from user %d", message.From)
@@ -619,7 +638,7 @@ func (h *Hub) handleLike(message Message) {
 	defer h.mu.RUnlock()
 
 	log.Printf("Broadcasting like update for post %d by user %d", message.PostID, message.From)
-	
+
 	for userID, client := range h.clients {
 		if userID != message.From { // Don't send back to sender
 			select {
@@ -805,4 +824,321 @@ func (h *Hub) CleanupStaleConnections() {
 	for _, client := range staleClients {
 		client.Conn.Close()
 	}
+}
+
+// handleFollow processes follow requests for public users
+func (h *Hub) handleFollow(message Message) {
+	if h.db == nil {
+		log.Printf("Database not available")
+		h.sendErrorMessage(message.From, "Database not available")
+		return
+	}
+
+	targetUserID := message.To
+	followerID := message.From
+
+	if targetUserID == 0 {
+		log.Printf("Invalid target user ID in follow message")
+		h.sendErrorMessage(followerID, "Invalid target user")
+		return
+	}
+
+	// Check if target user exists and is public
+	var isPrivate bool
+	var firstName, lastName string
+	err := h.db.QueryRow("SELECT is_private, first_name, last_name FROM users WHERE id = ?", targetUserID).Scan(&isPrivate, &firstName, &lastName)
+	if err != nil {
+		log.Printf("User %d not found: %v", targetUserID, err)
+		h.sendErrorMessage(followerID, "User not found")
+		return
+	}
+
+	// If user is private, send error - should use follow_request instead
+	if isPrivate {
+		log.Printf("User %d is private, follow request needed", targetUserID)
+		h.sendErrorMessage(followerID, "This user is private. Send a follow request instead")
+		return
+	}
+
+	// Check if already following
+	var existingID int
+	err = h.db.QueryRow("SELECT id FROM follows WHERE follower_id = ? AND following_id = ? AND status = 'accepted'", followerID, targetUserID).Scan(&existingID)
+	if err == nil {
+		log.Printf("User %d already following user %d", followerID, targetUserID)
+		h.sendErrorMessage(followerID, "Already following this user")
+		return
+	}
+
+	// Create follow relationship
+	now := time.Now()
+	_, err = h.db.Exec("INSERT INTO follows (follower_id, following_id, status, created_at, updated_at) VALUES (?, ?, 'accepted', ?, ?)",
+		followerID, targetUserID, now, now)
+	if err != nil {
+		log.Printf("Failed to create follow relationship: %v", err)
+		h.sendErrorMessage(followerID, "Failed to follow user")
+		return
+	}
+
+	// Update the follower's following list in memory
+	h.AddUserToFollowing(followerID, targetUserID)
+
+	// Send success response to follower
+	h.SendToUser(followerID, Message{
+		Type:   MessageTypeFollowUpdate,
+		From:   0, // System message
+		To:     followerID,
+		Action: "follow_success",
+		Data: map[string]interface{}{
+			"user_id":   targetUserID,
+			"user_name": firstName + " " + lastName,
+			"status":    "following",
+		},
+		Timestamp: time.Now().Unix(),
+	})
+
+	// Send notification to target user
+	h.SendToUser(targetUserID, Message{
+		Type:   MessageTypeNotification,
+		From:   followerID,
+		To:     targetUserID,
+		Action: "new_follower",
+		Data: map[string]interface{}{
+			"type":    "follow",
+			"message": firstName + " " + lastName + " started following you",
+		},
+		Timestamp: time.Now().Unix(),
+	})
+
+	log.Printf("User %d now following user %d", followerID, targetUserID)
+}
+
+// handleUnfollow processes unfollow requests
+func (h *Hub) handleUnfollow(message Message) {
+	if h.db == nil {
+		log.Printf("Database not available")
+		h.sendErrorMessage(message.From, "Database not available")
+		return
+	}
+
+	targetUserID := message.To
+	followerID := message.From
+
+	if targetUserID == 0 {
+		log.Printf("Invalid target user ID in unfollow message")
+		h.sendErrorMessage(followerID, "Invalid target user")
+		return
+	}
+
+	// Check if currently following
+	var followID int
+	err := h.db.QueryRow("SELECT id FROM follows WHERE follower_id = ? AND following_id = ? AND status = 'accepted'", followerID, targetUserID).Scan(&followID)
+	if err != nil {
+		log.Printf("User %d not following user %d: %v", followerID, targetUserID, err)
+		h.sendErrorMessage(followerID, "Not following this user")
+		return
+	}
+
+	// Remove follow relationship
+	_, err = h.db.Exec("DELETE FROM follows WHERE id = ?", followID)
+	if err != nil {
+		log.Printf("Failed to unfollow user: %v", err)
+		h.sendErrorMessage(followerID, "Failed to unfollow user")
+		return
+	}
+
+	// Update the follower's following list in memory
+	h.RemoveUserFromFollowing(followerID, targetUserID)
+
+	// Get target user name
+	var firstName, lastName string
+	h.db.QueryRow("SELECT first_name, last_name FROM users WHERE id = ?", targetUserID).Scan(&firstName, &lastName)
+
+	// Send success response to follower
+	h.SendToUser(followerID, Message{
+		Type:   MessageTypeFollowUpdate,
+		From:   0, // System message
+		To:     followerID,
+		Action: "unfollow_success",
+		Data: map[string]interface{}{
+			"user_id":   targetUserID,
+			"user_name": firstName + " " + lastName,
+			"status":    "not_following",
+		},
+		Timestamp: time.Now().Unix(),
+	})
+
+	log.Printf("User %d unfollowed user %d", followerID, targetUserID)
+}
+
+// handleFollowRequest processes follow requests for private users
+func (h *Hub) handleFollowRequest(message Message) {
+	if h.db == nil {
+		log.Printf("Database not available")
+		h.sendErrorMessage(message.From, "Database not available")
+		return
+	}
+
+	targetUserID := message.To
+	followerID := message.From
+
+	if targetUserID == 0 {
+		log.Printf("Invalid target user ID in follow request message")
+		h.sendErrorMessage(followerID, "Invalid target user")
+		return
+	}
+
+	// Check if target user exists
+	var isPrivate bool
+	var firstName, lastName string
+	err := h.db.QueryRow("SELECT is_private, first_name, last_name FROM users WHERE id = ?", targetUserID).Scan(&isPrivate, &firstName, &lastName)
+	if err != nil {
+		log.Printf("User %d not found: %v", targetUserID, err)
+		h.sendErrorMessage(followerID, "User not found")
+		return
+	}
+
+	// Check if already following or request exists
+	var existingStatus string
+	err = h.db.QueryRow("SELECT status FROM follows WHERE follower_id = ? AND following_id = ?", followerID, targetUserID).Scan(&existingStatus)
+	if err == nil {
+		switch existingStatus {
+		case "accepted":
+			h.sendErrorMessage(followerID, "Already following this user")
+		case "pending":
+			h.sendErrorMessage(followerID, "Follow request already sent")
+		default:
+			h.sendErrorMessage(followerID, "Follow request exists")
+		}
+		return
+	}
+
+	// Create follow request
+	now := time.Now()
+	status := "pending"
+	if !isPrivate {
+		status = "accepted" // Auto-accept for public users
+	}
+
+	_, err = h.db.Exec("INSERT INTO follows (follower_id, following_id, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
+		followerID, targetUserID, status, now, now)
+	if err != nil {
+		log.Printf("Failed to create follow request: %v", err)
+		h.sendErrorMessage(followerID, "Failed to send follow request")
+		return
+	}
+
+	if status == "accepted" {
+		// Update the follower's following list in memory
+		h.AddUserToFollowing(followerID, targetUserID)
+	}
+
+	// Get follower name for notification
+	var followerFirstName, followerLastName string
+	h.db.QueryRow("SELECT first_name, last_name FROM users WHERE id = ?", followerID).Scan(&followerFirstName, &followerLastName)
+
+	// Send success response to follower
+	responseMessage := "Follow request sent"
+	if status == "accepted" {
+		responseMessage = "Now following user"
+	}
+
+	h.SendToUser(followerID, Message{
+		Type:   MessageTypeFollowUpdate,
+		From:   0, // System message
+		To:     followerID,
+		Action: "follow_request_sent",
+		Data: map[string]interface{}{
+			"user_id":   targetUserID,
+			"user_name": firstName + " " + lastName,
+			"status":    status,
+			"message":   responseMessage,
+		},
+		Timestamp: time.Now().Unix(),
+	})
+
+	// Send notification to target user
+	notificationMessage := followerFirstName + " " + followerLastName + " wants to follow you"
+	if status == "accepted" {
+		notificationMessage = followerFirstName + " " + followerLastName + " started following you"
+	}
+
+	h.SendToUser(targetUserID, Message{
+		Type:   MessageTypeNotification,
+		From:   followerID,
+		To:     targetUserID,
+		Action: "follow_request",
+		Data: map[string]interface{}{
+			"type":    "follow_request",
+			"message": notificationMessage,
+		},
+		Timestamp: time.Now().Unix(),
+	})
+
+	log.Printf("Follow request from user %d to user %d with status %s", followerID, targetUserID, status)
+}
+
+// handleCancelFollowRequest processes cancel follow request
+func (h *Hub) handleCancelFollowRequest(message Message) {
+	if h.db == nil {
+		log.Printf("Database not available")
+		h.sendErrorMessage(message.From, "Database not available")
+		return
+	}
+
+	targetUserID := message.To
+	followerID := message.From
+
+	if targetUserID == 0 {
+		log.Printf("Invalid target user ID in cancel follow request message")
+		h.sendErrorMessage(followerID, "Invalid target user")
+		return
+	}
+
+	// Check if pending request exists
+	var followID int
+	err := h.db.QueryRow("SELECT id FROM follows WHERE follower_id = ? AND following_id = ? AND status = 'pending'", followerID, targetUserID).Scan(&followID)
+	if err != nil {
+		log.Printf("No pending follow request from user %d to user %d: %v", followerID, targetUserID, err)
+		h.sendErrorMessage(followerID, "No pending follow request found")
+		return
+	}
+
+	// Delete the follow request
+	_, err = h.db.Exec("DELETE FROM follows WHERE id = ?", followID)
+	if err != nil {
+		log.Printf("Failed to cancel follow request: %v", err)
+		h.sendErrorMessage(followerID, "Failed to cancel follow request")
+		return
+	}
+
+	// Get target user name
+	var firstName, lastName string
+	h.db.QueryRow("SELECT first_name, last_name FROM users WHERE id = ?", targetUserID).Scan(&firstName, &lastName)
+
+	// Send success response to follower
+	h.SendToUser(followerID, Message{
+		Type:   MessageTypeFollowUpdate,
+		From:   0, // System message
+		To:     followerID,
+		Action: "follow_request_cancelled",
+		Data: map[string]interface{}{
+			"user_id":   targetUserID,
+			"user_name": firstName + " " + lastName,
+			"status":    "not_following",
+		},
+		Timestamp: time.Now().Unix(),
+	})
+
+	log.Printf("Follow request cancelled by user %d to user %d", followerID, targetUserID)
+}
+
+// sendErrorMessage sends an error message to a user
+func (h *Hub) sendErrorMessage(userID uint, errorMsg string) {
+	h.SendToUser(userID, Message{
+		Type:      MessageTypeError,
+		From:      0, // System message
+		To:        userID,
+		Content:   errorMsg,
+		Timestamp: time.Now().Unix(),
+	})
 }

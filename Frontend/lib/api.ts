@@ -728,21 +728,34 @@ export class ApiClient {
   }
 
   // Followers endpoints
-  async getFollowers(userId: number): Promise<{ data: User[] }> {
-    return this.request<{ data: User[] }>(`/api/users/${userId}/followers`, {
+  async getFollowers(userId: number): Promise<{ followers: User[], count: number }> {
+    return this.request<{ followers: User[], count: number }>(`/api/users/${userId}/followers`, {
       method: 'GET',
     });
   }
 
-  async getFollowing(userId: number): Promise<{ data: User[] }> {
-    return this.request<{ data: User[] }>(`/api/users/${userId}/following`, {
+  async getFollowing(userId: number): Promise<{ following: User[], count: number }> {
+    return this.request<{ following: User[], count: number }>(`/api/users/${userId}/following`, {
       method: 'GET',
     });
   }
 
-  async followUser(userId: number): Promise<{ message: string; status: string }> {
-    return this.request<{ message: string; status: string }>(`/api/follow/${userId}`, {
+  async sendFollowRequest(userId: number): Promise<{ message: string; status: string }> {
+    return this.request<{ message: string; status: string }>(`/api/users/${userId}/follow`, {
       method: 'POST',
+    });
+  }
+
+  async unfollowUser(userId: number): Promise<{ message: string }> {
+    return this.request<{ message: string }>(`/api/users/${userId}/follow`, {
+      method: 'DELETE',
+    });
+  }
+
+  async respondToFollowRequest(userId: number, action: 'accept' | 'decline'): Promise<{ message: string; status: string }> {
+    return this.request<{ message: string; status: string }>(`/api/users/${userId}/follow`, {
+      method: 'PUT',
+      body: JSON.stringify({ action }),
     });
   }
 

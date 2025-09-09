@@ -28,6 +28,7 @@ import TopBar from '@/components/dashboard/TopBar'
 import Sidebar from '@/components/dashboard/Sidebar'
 import CreatePost from '@/components/dashboard/CreatePost'
 import CreateGroup from '@/components/dashboard/CreateGroup'
+import CreateDirectMessage from '@/components/dashboard/CreateDirectMessage'
 import CreateGeneralEvent from '@/components/dashboard/CreateGeneralEvent'
 import NotificationsDropdown from '@/components/dashboard/NotificationsDropdown'
 import HomeFeed from '@/components/dashboard/HomeFeed'
@@ -35,6 +36,7 @@ import ProfileSection from '@/components/dashboard/ProfileSection'
 import ChatsSection from '@/components/dashboard/ChatsSection'
 import ActivitySection from '@/components/dashboard/ActivitySection'
 import CommunitySection from '@/components/dashboard/CommunitySection'
+import SearchPage from '@/components/dashboard/SearchPage'
 import {
   SettingsSection
 } from '@/components/dashboard/DashboardSections'
@@ -68,8 +70,10 @@ function DashboardPage() {
   const [showCreatePost, setShowCreatePost] = useState(false)
   const [showCreateGroup, setShowCreateGroup] = useState(false)
   const [showCreateEvent, setShowCreateEvent] = useState(false)
+  const [showCreateDirectMessage, setShowCreateDirectMessage] = useState(false)
   const [showNotifications, setShowNotifications] = useState(false)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+  const [showSearchPage, setShowSearchPage] = useState(false)
 
   // Post Creation State
   const [newPostContent, setNewPostContent] = useState('')
@@ -93,8 +97,9 @@ function DashboardPage() {
   const [isLoadingTrending, setIsLoadingTrending] = useState(false)
   const [openChatWindow, setOpenChatWindow] = useState<{
     conversationId: number
-    type: 'private' | 'group'
+    type: 'private' | 'group',
     name: string
+    participantId?: number
   } | null>(null)
   const [followers, setFollowers] = useState<{ id: number; email: string; first_name: string; last_name: string; avatar?: string; nickname?: string; }[]>([])
   const [following, setFollowing] = useState<{ id: number; email: string; first_name: string; last_name: string; avatar?: string; nickname?: string; }[]>([])
@@ -134,6 +139,7 @@ function DashboardPage() {
     if (user) {
       fetchFeedPosts()
       fetchUsers()
+      fetchFollowers()
       refetchEvents() // Add this to load events immediately
     }
   }, [user])
@@ -351,7 +357,8 @@ function DashboardPage() {
         time: formatTimeAgo(conversation.updated_at),
         unread: conversation.unread_count,
         isOnline: false,
-        isGroup: conversation.type === 'group'
+        isGroup: conversation.type === 'group',
+        participantId: conversation.participant?.id
       })))
     } catch (err) {
       console.error('Error fetching conversations:', err)
@@ -579,6 +586,56 @@ function DashboardPage() {
     }
   }
 
+  const handleSearchToggle = () => {
+    setShowSearchPage(!showSearchPage)
+  }
+
+  const handleStartDirectMessage = async (userId: number, userName: string) => {
+    try {
+      // Get existing conversations to check if one already exists
+      const conversationsData = await api.getConversations()
+      
+      // Find existing conversation with this user
+      const existingConversation = conversationsData.conversations.find(
+        conv => conv.type === 'private' && conv.participant?.id === userId
+      )
+      
+      if (existingConversation) {
+        // Open existing conversation
+        setOpenChatWindow({
+          conversationId: existingConversation.id,
+          type: 'private',
+          name: userName,
+          participantId: userId
+        })
+      } else {
+        // Create a new conversation
+        const newConversation = await api.createConversation(userId);
+        setOpenChatWindow({
+          conversationId: newConversation.id,
+          type: 'private',
+          name: userName,
+          participantId: userId
+        })
+      }
+      
+      // Close the create direct message modal
+      setShowCreateDirectMessage(false)
+      
+      // Refresh conversations list
+      fetchConversations()
+      
+      success(`Started conversation with ${userName}`)
+    } catch (err) {
+      console.error('Error starting direct message:', err)
+      if (err instanceof NetworkError) {
+        error('Failed to start conversation. Please try again.')
+      } else {
+        error('Unable to start conversation right now.')
+      }
+    }
+  }
+
   const renderContent = () => {
     switch (activeTab) {
       case 'feed':
@@ -617,6 +674,7 @@ function DashboardPage() {
             onChatClick={setOpenChatWindow}
             isUserOnline={isUserOnline}
             showCreateGroup={showCreateGroup}
+            setShowCreateDirectMessage={setShowCreateDirectMessage}
             setShowCreateGroup={setShowCreateGroup}
           />
         )
@@ -661,6 +719,8 @@ function DashboardPage() {
             testTokenExpiration={testTokenExpiration}
           />
         )
+      case 'search':
+        return <SearchPage onClose={() => setActiveTab(previousTab)} />
       default:
         return (
           <HomeFeed
@@ -733,10 +793,8 @@ function DashboardPage() {
         showNotifications={showNotifications}
         setShowNotifications={handleNotificationsToggle}
         unreadCount={liveUnreadCount || unreadNotifications}
-        isOffline={isOffline}
-        isConnected={isConnected}
-        currentUser={currentUser}
         onChatClick={handleChatToggle}
+        onSearchClick={handleSearchToggle}
         unreadChatsCount={chats.reduce((sum, chat) => sum + chat.unread, 0)}
       />
 
@@ -766,6 +824,20 @@ function DashboardPage() {
         }}
       />
 
+      <CreateDirectMessage
+        show={showCreateDirectMessage}
+        onClose={() => setShowCreateDirectMessage(false)}
+        followers={followers}
+        isLoading={isLoadingFollowers}
+        onStartChat={(followerId: number) => {
+          const follower = followers.find(f => f.id === followerId)
+          if (follower) {
+            const userName = `${follower.first_name} ${follower.last_name}`.trim() || follower.nickname || follower.email
+            handleStartDirectMessage(followerId, userName)
+          }
+        }}
+      />
+
       <CreateGroup
         show={showCreateGroup}
         onClose={() => setShowCreateGroup(false)}
@@ -781,12 +853,15 @@ function DashboardPage() {
         onClose={() => setShowNotifications(false)}
       />
 
+      {showSearchPage && <SearchPage onClose={() => setShowSearchPage(false)} />}
+
       {/* Chat Window */}
       {openChatWindow && (
         <ChatWindow
           conversationId={openChatWindow!.conversationId}
           conversationType={openChatWindow!.type}
           participantName={openChatWindow!.name}
+          participantId={openChatWindow!.participantId}
           onClose={() => setOpenChatWindow(null)}
         />
       )}

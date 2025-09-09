@@ -1,18 +1,19 @@
 'use client'
 import { useState } from 'react'
-import { MessageCircle, Users, Plus, Search, Clock } from 'lucide-react'
+import { MessageCircle, Users, Plus, Search, MessageSquarePlus } from 'lucide-react'
 import { Chat, Group } from '@/lib/api'
 
 interface ChatsSectionProps {
-  chats: Chat[]
+  chats: (Chat & { participantId?: number })[]
   groups: Group[]
   isLoadingChats: boolean
   isLoadingGroups: boolean
   chatSubTab: string
   setChatSubTab: (tab: string) => void
-  onChatClick: (chat: { conversationId: number; type: 'private' | 'group'; name: string }) => void
+  onChatClick: (chat: { conversationId: number; type: 'private' | 'group'; name: string; participantId?: number }) => void
   isUserOnline: (username: string) => boolean
   showCreateGroup: boolean
+  setShowCreateDirectMessage: (show: boolean) => void
   setShowCreateGroup: (show: boolean) => void
 }
 
@@ -25,6 +26,7 @@ export default function ChatsSection({
   setChatSubTab,
   onChatClick,
   isUserOnline,
+  setShowCreateDirectMessage,
   showCreateGroup,
   setShowCreateGroup
 }: ChatsSectionProps) {
@@ -41,7 +43,7 @@ export default function ChatsSection({
   const directMessages = filteredChats.filter(chat => !chat.isGroup)
   const groupChats = filteredChats.filter(chat => chat.isGroup)
 
-  const renderChatList = (chatList: Chat[]) => (
+  const renderChatList = (chatList: (Chat & { participantId?: number })[]) => (
     <div className="space-y-2">
       {chatList.map((chat) => (
         <div
@@ -49,7 +51,8 @@ export default function ChatsSection({
           onClick={() => onChatClick({
             conversationId: chat.id,
             type: chat.isGroup ? 'group' : 'private',
-            name: chat.name
+            name: chat.name,
+            participantId: chat.participantId
           })}
           className="flex items-center space-x-3 p-4 bg-white/10 backdrop-blur-sm rounded-lg hover:bg-white/20 transition-all cursor-pointer border border-white/20"
         >
@@ -165,13 +168,22 @@ export default function ChatsSection({
           <h1 className="text-2xl font-bold text-white mb-2">Chats</h1>
           <p className="text-white/70">Connect with friends and groups</p>
         </div>
-        <button
-          onClick={() => setShowCreateGroup(true)}
-          className="bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white px-4 py-2 rounded-lg transition-all flex items-center space-x-2"
-        >
-          <Plus className="w-4 h-4" />
-          <span>New Group</span>
-        </button>
+        <div className="flex items-center space-x-2">
+          <button
+            onClick={() => setShowCreateDirectMessage(true)}
+            className="bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-lg transition-all flex items-center space-x-2 border border-white/20"
+          >
+            <MessageSquarePlus className="w-4 h-4" />
+            <span>New Message</span>
+          </button>
+          <button
+            onClick={() => setShowCreateGroup(true)}
+            className="bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white px-4 py-2 rounded-lg transition-all flex items-center space-x-2"
+          >
+            <Plus className="w-4 h-4" />
+            <span>New Group</span>
+          </button>
+        </div>
       </div>
 
       {/* Search Bar */}

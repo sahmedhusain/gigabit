@@ -1,6 +1,6 @@
 'use client'
 import { useState } from 'react'
-import { Home, User, MessageCircle, Activity, Users, Calendar, Settings, X, Sparkles, Bell, Search, LogOut, Heart } from 'lucide-react'
+import { Home, User, MessageCircle, Activity, Users, Calendar, Settings, X, Sparkles, Bell, LogOut, Heart, ChevronDown } from 'lucide-react'
 
 interface SidebarProps {
   isMobileMenuOpen: boolean
@@ -26,10 +26,10 @@ interface SidebarProps {
   logout: () => void
 }
 
-export default function Sidebar({ 
-  isMobileMenuOpen, 
-  setIsMobileMenuOpen, 
-  activeTab, 
+export default function Sidebar({
+  isMobileMenuOpen,
+  setIsMobileMenuOpen,
+  activeTab,
   setActiveTab,
   feedSubTab,
   setFeedSubTab,
@@ -42,16 +42,17 @@ export default function Sidebar({
   logout
 }: SidebarProps) {
   const [hoveredItem, setHoveredItem] = useState<string | null>(null)
-  const [searchQuery, setSearchQuery] = useState('')
+  const [isProfileDropdownOpen, setProfileDropdownOpen] = useState(false)
+  const [userStatus, setUserStatus] = useState('online')
 
   const menuSections = [
     {
       title: 'Feed',
       items: [
-        { 
-          id: 'all', 
-          label: 'All Posts', 
-          icon: Home, 
+        {
+          id: 'all',
+          label: 'All Posts',
+          icon: Home,
           description: 'See all public posts',
           color: 'from-emerald-500 to-teal-600',
           onClick: () => {
@@ -60,10 +61,10 @@ export default function Sidebar({
           },
           isActive: activeTab === 'feed' && feedSubTab === 'all'
         },
-        { 
-          id: 'following', 
-          label: 'Following', 
-          icon: Users, 
+        {
+          id: 'following',
+          label: 'Following',
+          icon: Users,
           description: 'Posts from people you follow',
           color: 'from-emerald-500 to-teal-600',
           onClick: () => {
@@ -72,10 +73,10 @@ export default function Sidebar({
           },
           isActive: activeTab === 'feed' && feedSubTab === 'following'
         },
-        { 
-          id: 'friends', 
-          label: 'Friends', 
-          icon: Heart, 
+        {
+          id: 'friends',
+          label: 'Friends',
+          icon: Heart,
           description: 'Posts from your friends',
           color: 'from-emerald-500 to-teal-600',
           onClick: () => {
@@ -89,10 +90,10 @@ export default function Sidebar({
     {
       title: 'Your Activity',
       items: [
-        { 
-          id: 'liked', 
-          label: 'Liked Posts', 
-          icon: Heart, 
+        {
+          id: 'liked',
+          label: 'Liked Posts',
+          icon: Heart,
           description: 'Posts you\'ve liked',
           color: 'from-teal-500 to-cyan-600',
           onClick: () => {
@@ -101,10 +102,10 @@ export default function Sidebar({
           },
           isActive: activeTab === 'activity' && activitySubTab === 'liked'
         },
-        { 
-          id: 'commented', 
-          label: 'Commented Posts', 
-          icon: MessageCircle, 
+        {
+          id: 'commented',
+          label: 'Commented Posts',
+          icon: MessageCircle,
           description: 'Posts you\'ve commented on',
           color: 'from-teal-500 to-cyan-600',
           onClick: () => {
@@ -113,10 +114,10 @@ export default function Sidebar({
           },
           isActive: activeTab === 'activity' && activitySubTab === 'commented'
         },
-        { 
-          id: 'saved', 
-          label: 'Saved Posts', 
-          icon: Sparkles, 
+        {
+          id: 'saved',
+          label: 'Saved Posts',
+          icon: Sparkles,
           description: 'Your bookmarked posts',
           color: 'from-teal-500 to-cyan-600',
           onClick: () => {
@@ -130,10 +131,10 @@ export default function Sidebar({
     {
       title: 'Community',
       items: [
-        { 
-          id: 'events', 
-          label: 'Events', 
-          icon: Calendar, 
+        {
+          id: 'events',
+          label: 'Events',
+          icon: Calendar,
           description: 'Upcoming events',
           color: 'from-cyan-500 to-emerald-600',
           onClick: () => {
@@ -143,10 +144,10 @@ export default function Sidebar({
           },
           isActive: activeTab === 'community' && communitySubTab === 'events'
         },
-        { 
-          id: 'activity-history', 
-          label: 'Activity History', 
-          icon: Activity, 
+        {
+          id: 'activity-history',
+          label: 'Activity History',
+          icon: Activity,
           description: 'Your recent activity',
           color: 'from-cyan-500 to-emerald-600',
           onClick: () => {
@@ -163,12 +164,12 @@ export default function Sidebar({
     <>
       {/* Mobile Overlay */}
       {isMobileMenuOpen && (
-        <div 
-          className="fixed top-16 left-0 right-0 bottom-0 bg-black/50 backdrop-blur-sm z-20 lg:hidden transition-opacity duration-300" 
-          onClick={() => setIsMobileMenuOpen(false)} 
+        <div
+          className="fixed top-16 left-0 right-0 bottom-0 bg-black/50 backdrop-blur-sm z-20 lg:hidden transition-opacity duration-300"
+          onClick={() => setIsMobileMenuOpen(false)}
         />
       )}
-      
+
       {/* Sidebar */}
       <aside className={`
         sidebar-layout bg-gradient-to-br from-emerald-900/95 via-teal-900/95 to-cyan-800/95 backdrop-blur-xl border-r border-emerald-400/20 shadow-2xl transform transition-all duration-300 ease-in-out
@@ -176,17 +177,72 @@ export default function Sidebar({
         lg:translate-x-0
       `}>
         <div className="flex flex-col h-full">
-          {/* Search Bar */}
+          {/* Profile Dropdown */}
           <div className="p-4 border-b border-emerald-400/20">
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-emerald-100/60 w-4 h-4" />
-              <input
-                type="text"
-                placeholder="Search navigation..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-3 py-2 bg-emerald-400/10 backdrop-blur-sm rounded-md border border-emerald-400/20 text-white placeholder-emerald-100/50 focus:outline-none focus:ring-2 focus:ring-emerald-400/50 focus:border-transparent transition-all duration-200 text-sm"
-              />
+              <button
+                onClick={() => setProfileDropdownOpen(!isProfileDropdownOpen)}
+                className="w-full flex items-center justify-between p-3 rounded-lg hover:bg-white/10 transition-colors duration-200"
+              >
+                <div className="flex items-center space-x-3">
+                  <div className={`w-12 h-12 rounded-full p-1 flex-shrink-0 ring-2 ${userStatus === 'online' ? 'ring-green-500' : userStatus === 'busy' ? 'ring-red-500' : 'ring-gray-500'}`}>
+                    {currentUser?.avatar ? (
+                      <img
+                        src={currentUser.avatar}
+                        alt={currentUser.name}
+                        className="w-full h-full rounded-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full rounded-full bg-gradient-to-r from-emerald-400 to-teal-500 flex items-center justify-center text-white font-bold">
+                        {currentUser?.name?.[0]?.toUpperCase() || <User className="w-5 h-5" />}
+                      </div>
+                    )}
+                  </div>
+                  <div className="text-left">
+                    <span className="font-semibold text-white truncate block">
+                      {currentUser?.name || 'User'}
+                    </span>
+                    <p className="text-xs text-emerald-100/60 truncate">@{currentUser?.username || 'username'}</p>
+                  </div>
+                </div>
+                <ChevronDown className={`w-5 h-5 text-white/70 transition-transform duration-200 ${isProfileDropdownOpen ? 'rotate-180' : ''}`} />
+              </button>
+
+              {isProfileDropdownOpen && (
+                <div className="bg-black/20 backdrop-blur-lg rounded-lg shadow-xl py-2 mt-2">
+                  <div className="px-4 py-2">
+                    <p className="text-xs font-semibold text-white/70 mb-2">Status</p>
+                    <div className="flex items-center justify-around">
+                      <button onClick={() => setUserStatus('online')} className={`p-2 rounded-full ${userStatus === 'online' ? 'bg-green-500/50' : ''}`} title="Online"><div className="w-3 h-3 bg-green-500 rounded-full"></div></button>
+                      <button onClick={() => setUserStatus('busy')} className={`p-2 rounded-full ${userStatus === 'busy' ? 'bg-red-500/50' : ''}`} title="Busy"><div className="w-3 h-3 bg-red-500 rounded-full"></div></button>
+                      <button onClick={() => setUserStatus('offline')} className={`p-2 rounded-full ${userStatus === 'offline' ? 'bg-gray-500/50' : ''}`} title="Offline"><div className="w-3 h-3 bg-gray-500 rounded-full"></div></button>
+                    </div>
+                  </div>
+                  <hr className="border-white/10 my-2" />
+                  <button 
+                    onClick={() => setActiveTab('profile')}
+                    className="w-full text-left px-4 py-2 text-sm text-white hover:bg-white/10 flex items-center space-x-2"
+                  >
+                    <User className="w-4 h-4" />
+                    <span>My Profile</span>
+                  </button>
+                  <button 
+                    onClick={() => setActiveTab('settings')}
+                    className="w-full text-left px-4 py-2 text-sm text-white hover:bg-white/10 flex items-center space-x-2"
+                  >
+                    <Settings className="w-4 h-4" />
+                    <span>Settings</span>
+                  </button>
+                  <hr className="border-white/10 my-2" />
+                  <button 
+                    onClick={logout}
+                    className="w-full text-left px-4 py-2 text-sm text-red-400 hover:bg-red-500/20 flex items-center space-x-2"
+                  >
+                    <LogOut className="w-4 h-4" />
+                    <span>Logout</span>
+                  </button>
+                </div>
+              )}
             </div>
           </div>
 
@@ -218,23 +274,11 @@ export default function Sidebar({
                           }}
                           onMouseEnter={() => setHoveredItem(item.id)}
                           onMouseLeave={() => setHoveredItem(null)}
-                          className={`w-full group relative overflow-hidden rounded-md transition-all duration-300 ${
-                            isActive
-                              ? `bg-gradient-to-r ${item.color} shadow-md scale-101 transform`
-                              : 'hover:bg-emerald-500/10 hover:scale-100 hover:shadow-sm'
-                          }`}
+                          className={`w-full group relative overflow-hidden rounded-md transition-all duration-300 ${isActive ? `bg-gradient-to-r ${item.color} shadow-md scale-101 transform` : 'hover:bg-emerald-500/10 hover:scale-100 hover:shadow-sm'}`}
                         >
-                          <div className={`flex items-center space-x-3 p-3 ${
-                            isActive ? 'text-white' : 'text-emerald-100/80 group-hover:text-white'
-                          }`}>
-                            <div className={`relative p-1.5 rounded-md transition-all duration-300 ${
-                              isActive 
-                                ? 'bg-white/20 shadow-sm' 
-                                : 'bg-emerald-400/10 group-hover:bg-emerald-400/20'
-                            }`}>
-                              <Icon className={`w-4 h-4 transition-transform duration-300 ${
-                                isHovered ? 'scale-110' : ''
-                              }`} />
+                          <div className={`flex items-center space-x-3 p-3 ${isActive ? 'text-white' : 'text-emerald-100/80 group-hover:text-white'}`}>
+                            <div className={`p-1.5 rounded-md transition-all duration-300 ${isActive ? 'bg-white/20 shadow-sm' : 'bg-emerald-400/10 group-hover:bg-emerald-400/20'}`}>
+                              <Icon className={`w-4 h-4 transition-transform duration-300 ${isHovered ? 'scale-110' : ''}`} />
                             </div>
                             <div className="text-left flex-1">
                               <span className="font-semibold text-sm">{item.label}</span>
@@ -253,86 +297,6 @@ export default function Sidebar({
               ))}
             </div>
           </nav>
-
-          {/* Profile */}
-          <div className="p-4 border-t border-emerald-400/20 bg-gradient-to-r from-teal-800/50 to-cyan-700/50">
-            <div className="flex items-center space-x-3">
-              {/* Profile Button */}
-              <button
-                onClick={() => {
-                  setActiveTab('profile')
-                  setIsMobileMenuOpen(false)
-                }}
-                onMouseEnter={() => setHoveredItem('profile')}
-                onMouseLeave={() => setHoveredItem(null)}
-                className={`flex-1 group relative overflow-hidden rounded-md transition-all duration-300 ${
-                  activeTab === 'profile'
-                    ? 'bg-gradient-to-r from-emerald-500 to-teal-600 shadow-md scale-101 transform text-white'
-                    : 'hover:bg-emerald-500/10 hover:scale-100 hover:shadow-sm text-emerald-100/80 hover:text-white'
-                }`}
-              >
-                <div className="flex items-center space-x-3 p-3">
-                  <div className={`relative transition-all duration-300 ${
-                    activeTab === 'profile' ? 'shadow-sm' : 'group-hover:shadow-sm'
-                  }`}>
-                    {currentUser?.avatar ? (
-                      <img
-                        src={currentUser.avatar}
-                        alt={currentUser.name}
-                        className="w-8 h-8 rounded-full object-cover border-2 border-white/20"
-                      />
-                    ) : (
-                      <div className="w-8 h-8 bg-gradient-to-r from-emerald-400 to-teal-500 rounded-full flex items-center justify-center text-white font-bold text-sm">
-                        {currentUser?.name?.[0]?.toUpperCase() || <User className="w-4 h-4" />}
-                      </div>
-                    )}
-                    {/* Online status indicator */}
-                    <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-green-500 rounded-full border border-emerald-900"></div>
-                  </div>
-                  <div className="text-left flex-1">
-                    <span className="font-semibold text-sm truncate block">
-                      {currentUser?.name || 'User'}
-                    </span>
-                    <p className={`text-xs truncate ${
-                      activeTab === 'profile' ? 'text-white/80' : 'text-emerald-100/60'
-                    }`}>@{currentUser?.username || 'username'}</p>
-                  </div>
-                </div>
-
-                {/* Active item glow effect */}
-                {activeTab === 'profile' && (
-                  <div className="absolute inset-0 bg-gradient-to-r from-white/10 to-transparent opacity-50 animate-pulse"></div>
-                )}
-              </button>
-
-              {/* Action Buttons */}
-              <div className="flex flex-col space-y-1.5">
-                {/* Settings Button */}
-                <button
-                  onClick={() => {
-                    setActiveTab('settings')
-                    setIsMobileMenuOpen(false)
-                  }}
-                  className={`p-1.5 rounded-sm transition-all duration-200 ${
-                    activeTab === 'settings'
-                      ? 'bg-white/20 text-white shadow-sm'
-                      : 'bg-emerald-400/10 text-emerald-100/70 hover:bg-emerald-400/20 hover:text-white'
-                  }`}
-                  title="Settings"
-                >
-                  <Settings className="w-3.5 h-3.5" />
-                </button>
-                {/* Logout Button */}
-                <button
-                  onClick={() => logout()}
-                  className="p-1.5 rounded-sm bg-red-500/10 text-red-400 hover:bg-red-500/20 hover:text-red-300 transition-all duration-200"
-                  title="Logout"
-                >
-                  <LogOut className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            </div>
-          </div>
         </div>
 
         {/* Floating particles effect */}

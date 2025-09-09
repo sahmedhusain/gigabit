@@ -146,6 +146,7 @@ export interface Chat {
   unread: number;
   isOnline: boolean;
   isGroup: boolean;
+  participantId?: number;
 }
 
 // API Response types
@@ -719,6 +720,13 @@ export class ApiClient {
     });
   }
 
+  async createConversation(userId: number): Promise<ConversationResponse> {
+    return this.request<ConversationResponse>('/api/conversations', {
+      method: 'POST',
+      body: JSON.stringify({ user_id: userId }),
+    });
+  }
+
   // Followers endpoints
   async getFollowers(userId: number): Promise<{ data: User[] }> {
     return this.request<{ data: User[] }>(`/api/users/${userId}/followers`, {
@@ -729,6 +737,12 @@ export class ApiClient {
   async getFollowing(userId: number): Promise<{ data: User[] }> {
     return this.request<{ data: User[] }>(`/api/users/${userId}/following`, {
       method: 'GET',
+    });
+  }
+
+  async followUser(userId: number): Promise<{ message: string; status: string }> {
+    return this.request<{ message: string; status: string }>(`/api/follow/${userId}`, {
+      method: 'POST',
     });
   }
 

@@ -74,6 +74,7 @@ function DashboardPage() {
   const [showNotifications, setShowNotifications] = useState(false)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [showSearchPage, setShowSearchPage] = useState(false)
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
 
   // Post Creation State
   const [newPostContent, setNewPostContent] = useState('')
@@ -165,7 +166,7 @@ function DashboardPage() {
           ])
           setUnreadNotifications(prev => prev + 1)
           if (Notification.permission === 'granted') {
-            new Notification('SocialConnect', {
+            new Notification('Gigabit', {
               body: message.data.message,
               icon: '/favicon.ico'
             })
@@ -783,6 +784,8 @@ function DashboardPage() {
         fetchEvents={refetchEvents}
         currentUser={currentUser}
         logout={logout}
+        isCollapsed={isSidebarCollapsed}
+        setIsCollapsed={setIsSidebarCollapsed}
       />
 
       <TopBar
@@ -867,7 +870,7 @@ function DashboardPage() {
       )}
 
       {/* Main Content */}
-      <div className="main-content-layout p-2 lg:p-4 relative z-10">
+      <div className={`main-content-layout p-2 lg:p-4 relative z-10 ${isSidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
         <div className="max-w-6xl mx-auto">
           {renderContent()}
         </div>

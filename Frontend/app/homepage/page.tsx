@@ -48,7 +48,7 @@ export default function HomePage() {
       <nav className="relative z-10 flex justify-between items-center p-6 lg:px-8">
         <div className="flex items-center">
           <h1 className="text-2xl lg:text-3xl font-bold bg-gradient-to-r from-white via-emerald-100 to-teal-200 bg-clip-text text-transparent">
-            SocialConnect
+            Gigabit
           </h1>
         </div>
         <div className="flex items-center space-x-4">
@@ -128,7 +128,7 @@ export default function HomePage() {
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-16">
             <h2 className="text-3xl sm:text-4xl font-bold bg-gradient-to-r from-white to-emerald-200 bg-clip-text text-transparent mb-4">
-              Why Choose SocialConnect?
+              Why Choose Gigabit?
             </h2>
             <p className="text-white/70 text-lg max-w-2xl mx-auto">
               Experience social networking like never before with our cutting-edge features and user-centric design.
@@ -236,7 +236,7 @@ export default function HomePage() {
           <div className="flex flex-col md:flex-row justify-between items-center">
             <div className="mb-6 md:mb-0">
               <h3 className="text-2xl font-bold bg-gradient-to-r from-white via-emerald-100 to-teal-200 bg-clip-text text-transparent">
-                SocialConnect
+                Gigabit
               </h3>
               <p className="text-white/60 mt-2">Step into tomorrow's social experience</p>
             </div>
@@ -250,7 +250,7 @@ export default function HomePage() {
               </div>
               
               <div className="text-sm text-white/40">
-                SocialConnect © 2025 • Crafted with ✨
+                Gigabit © 2025 All rights reserved.
               </div>
             </div>
           </div>

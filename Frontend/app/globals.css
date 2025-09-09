@@ -109,8 +109,13 @@ body {
   top: 64px; /* Start below topbar */
   left: 0;
   height: calc(100vh - 64px); /* Adjust height to account for topbar */
-  width: 320px;
+  width: 250px;
   z-index: 30;
+  transition: width 0.3s ease-in-out;
+}
+
+.sidebar-layout.collapsed {
+  width: 64px !important;
 }
 
 .topbar-layout {
@@ -142,7 +147,8 @@ body {
 
 @media (min-width: 1024px) {
   .main-content-layout {
-    margin-left: 320px;
+    margin-left: 250px;
+    transition: margin-left 0.3s ease-in-out;
   }
   
   .sidebar-layout {
@@ -151,6 +157,12 @@ body {
   
   .topbar-layout {
     z-index: 30;
+  }
+}
+
+@media (min-width: 1024px) {
+  .sidebar-collapsed + .main-content-layout {
+    margin-left: 64px;
   }
 }
 

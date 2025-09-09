@@ -1,6 +1,6 @@
 'use client'
 import { useState } from 'react'
-import { Home, User, MessageCircle, Activity, Users, Calendar, Settings, X, Sparkles, Bell, LogOut, Heart, ChevronDown } from 'lucide-react'
+import { Home, User, MessageCircle, Activity, Users, Calendar, Settings, X, Sparkles, Bell, LogOut, Heart, ChevronDown, ChevronRight, PanelLeftClose, PanelLeftOpen } from 'lucide-react'
 
 interface SidebarProps {
   isMobileMenuOpen: boolean
@@ -24,6 +24,8 @@ interface SidebarProps {
     following: number
   } | null
   logout: () => void
+  isCollapsed?: boolean
+  setIsCollapsed?: (collapsed: boolean) => void
 }
 
 export default function Sidebar({
@@ -39,7 +41,9 @@ export default function Sidebar({
   setCommunitySubTab,
   fetchEvents,
   currentUser,
-  logout
+  logout,
+  isCollapsed = false,
+  setIsCollapsed
 }: SidebarProps) {
   const [hoveredItem, setHoveredItem] = useState<string | null>(null)
   const [isProfileDropdownOpen, setProfileDropdownOpen] = useState(false)
@@ -175,41 +179,45 @@ export default function Sidebar({
         sidebar-layout bg-gradient-to-br from-emerald-900/95 via-teal-900/95 to-cyan-800/95 backdrop-blur-xl border-r border-emerald-400/20 shadow-2xl transform transition-all duration-300 ease-in-out
         ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}
         lg:translate-x-0
+        ${isCollapsed ? 'collapsed' : ''}
       `}>
         <div className="flex flex-col h-full">
           {/* Profile Dropdown */}
-          <div className="p-4 border-b border-emerald-400/20">
+          <div className={`p-4 ${isCollapsed ? 'lg:px-4 lg:pt-4' : ''}`}>
             <div className="relative">
               <button
                 onClick={() => setProfileDropdownOpen(!isProfileDropdownOpen)}
-                className="w-full flex items-center justify-between p-3 rounded-lg hover:bg-white/10 transition-colors duration-200"
+                className={`w-full flex items-center justify-between p-3 rounded-lg transition-colors duration-200 ${isCollapsed ? 'lg:px-3 lg:justify-center hover:bg-transparent' : 'hover:bg-white/10'}`}
               >
-                <div className="flex items-center space-x-3">
-                  <div className={`w-12 h-12 rounded-full p-1 flex-shrink-0 ring-2 ${userStatus === 'online' ? 'ring-green-500' : userStatus === 'busy' ? 'ring-red-500' : 'ring-gray-500'}`}>
+                <div className={`flex items-center ${isCollapsed ? 'lg:space-x-0' : 'space-x-3'}`}>
+                  <div className={`w-12 h-12 rounded-full p-1 flex-shrink-0 ring-2 transition-all duration-300 hover:scale-110 hover:ring-4 group-hover:ring-emerald-400/50 ${userStatus === 'online' ? 'ring-green-500 hover:ring-green-400' : userStatus === 'busy' ? 'ring-red-500 hover:ring-red-400' : 'ring-gray-500 hover:ring-gray-400'}`}>
                     {currentUser?.avatar ? (
                       <img
                         src={currentUser.avatar}
                         alt={currentUser.name}
-                        className="w-full h-full rounded-full object-cover"
+                        className="w-full h-full rounded-full object-cover transition-all duration-300 hover:brightness-110"
                       />
                     ) : (
-                      <div className="w-full h-full rounded-full bg-gradient-to-r from-emerald-400 to-teal-500 flex items-center justify-center text-white font-bold">
+                      <div className="w-full h-full rounded-full bg-gradient-to-r from-emerald-400 to-teal-500 flex items-center justify-center text-white font-bold transition-all duration-300 hover:from-emerald-300 hover:to-teal-400 hover:shadow-lg">
                         {currentUser?.name?.[0]?.toUpperCase() || <User className="w-5 h-5" />}
                       </div>
                     )}
                   </div>
-                  <div className="text-left">
-                    <span className="font-semibold text-white truncate block">
-                      {currentUser?.name || 'User'}
-                    </span>
-                    <p className="text-xs text-emerald-100/60 truncate">@{currentUser?.username || 'username'}</p>
-                  </div>
+                  {!isCollapsed && (
+                    <div className="text-left">
+                      <span className="font-semibold text-white truncate block">
+                        {currentUser?.name || 'User'}
+                      </span>
+                      <p className="text-xs text-emerald-100/60 truncate">@{currentUser?.username || 'username'}</p>
+                    </div>
+                  )}
                 </div>
-                <ChevronDown className={`w-5 h-5 text-white/70 transition-transform duration-200 ${isProfileDropdownOpen ? 'rotate-180' : ''}`} />
+                {!isCollapsed && <ChevronDown className={`w-5 h-5 text-white/70 transition-transform duration-200 ${isProfileDropdownOpen ? 'rotate-180' : ''}`} />}
               </button>
 
+              {/* Profile Dropdown - External when collapsed */}
               {isProfileDropdownOpen && (
-                <div className="bg-black/20 backdrop-blur-lg rounded-lg shadow-xl py-2 mt-2">
+                <div className={`bg-black/20 backdrop-blur-lg rounded-lg shadow-xl py-2 mt-2 ${isCollapsed ? 'absolute left-full top-0 ml-2 z-50 min-w-48' : ''}`}>
                   <div className="px-4 py-2">
                     <p className="text-xs font-semibold text-white/70 mb-2">Status</p>
                     <div className="flex items-center justify-around">
@@ -248,15 +256,17 @@ export default function Sidebar({
 
           {/* Navigation */}
           <nav className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-emerald-400/20 scrollbar-track-transparent">
-            <div className="p-4 space-y-4">
+            <div className={`p-4 space-y-4 ${isCollapsed ? 'lg:px-4' : ''}`}>
               {menuSections.map((section) => (
                 <div key={section.title} className="space-y-2">
                   {/* Section Title */}
-                  <div className="px-3 py-2">
-                    <h3 className="text-emerald-100/70 text-sm font-semibold uppercase tracking-wider">
-                      {section.title}
-                    </h3>
-                  </div>
+                  {!isCollapsed && (
+                    <div className="px-3 py-2">
+                      <h3 className="text-emerald-100/70 text-sm font-semibold uppercase tracking-wider">
+                        {section.title}
+                      </h3>
+                    </div>
+                  )}
 
                   {/* Section Items */}
                   <div className="space-y-0.5">
@@ -274,19 +284,25 @@ export default function Sidebar({
                           }}
                           onMouseEnter={() => setHoveredItem(item.id)}
                           onMouseLeave={() => setHoveredItem(null)}
-                          className={`w-full group relative overflow-hidden rounded-md transition-all duration-300 ${isActive ? `bg-gradient-to-r ${item.color} shadow-md scale-101 transform` : 'hover:bg-emerald-500/10 hover:scale-100 hover:shadow-sm'}`}
+                          className={`group relative overflow-hidden rounded-md transition-all duration-300 ${isCollapsed ? 'w-auto mx-auto' : 'w-full'} ${isActive && !isCollapsed ? `bg-gradient-to-r ${item.color} shadow-md scale-101 transform` : 'hover:bg-emerald-500/10 hover:scale-100 hover:shadow-sm'}`}
+                          title={isCollapsed ? item.label : undefined}
                         >
-                          <div className={`flex items-center space-x-3 p-3 ${isActive ? 'text-white' : 'text-emerald-100/80 group-hover:text-white'}`}>
-                            <div className={`p-1.5 rounded-md transition-all duration-300 ${isActive ? 'bg-white/20 shadow-sm' : 'bg-emerald-400/10 group-hover:bg-emerald-400/20'}`}>
+                          <div className={`flex items-center justify-center ${isCollapsed ? 'py-2 px-1' : 'p-3 space-x-3'}`}>
+                            <div className={`p-1.5 rounded-md transition-all duration-300 flex items-center justify-center relative ${isActive && isCollapsed ? `bg-gradient-to-r ${item.color} shadow-sm` : 'bg-emerald-400/10 group-hover:bg-emerald-400/20'}`}>
                               <Icon className={`w-4 h-4 transition-transform duration-300 ${isHovered ? 'scale-110' : ''}`} />
+                              {isActive && isCollapsed && (
+                                <div className="absolute inset-0 bg-gradient-to-r from-white/10 to-transparent opacity-50 animate-pulse rounded-md"></div>
+                              )}
                             </div>
-                            <div className="text-left flex-1">
-                              <span className="font-semibold text-sm">{item.label}</span>
-                            </div>
+                            {!isCollapsed && (
+                              <div className="text-left flex-1">
+                                <span className="font-semibold text-sm">{item.label}</span>
+                              </div>
+                            )}
                           </div>
 
-                          {/* Active item glow effect */}
-                          {isActive && (
+                          {/* Active item glow effect for expanded mode */}
+                          {isActive && !isCollapsed && (
                             <div className="absolute inset-0 bg-gradient-to-r from-white/10 to-transparent opacity-50 animate-pulse"></div>
                           )}
                         </button>
@@ -297,6 +313,31 @@ export default function Sidebar({
               ))}
             </div>
           </nav>
+
+          {/* Sidebar Toggle Buttons - Bottom */}
+          <div className="px-4 py-4">
+            {!isCollapsed ? (
+              <button
+                onClick={() => setIsCollapsed?.(!isCollapsed)}
+                className="w-full flex items-center justify-center p-1.5 rounded-lg hover:bg-white/10 transition-colors duration-200 group"
+                title="Collapse Sidebar"
+              >
+                <div className="p-1.5 rounded-md bg-emerald-400/10 group-hover:bg-emerald-400/20 transition-all duration-300">
+                  <PanelLeftClose className="w-4 h-4 text-emerald-100/80 group-hover:text-white" />
+                </div>
+              </button>
+            ) : (
+              <button
+                onClick={() => setIsCollapsed?.(!isCollapsed)}
+                className="w-full flex items-center justify-center p-1.5 rounded-lg hover:bg-white/10 transition-colors duration-200 group"
+                title="Expand Sidebar"
+              >
+                <div className="p-1.5 rounded-md bg-emerald-400/10 group-hover:bg-emerald-400/20 transition-all duration-300">
+                  <PanelLeftOpen className="w-4 h-4 text-emerald-100/80 group-hover:text-white" />
+                </div>
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Floating particles effect */}

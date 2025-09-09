@@ -1,6 +1,7 @@
 'use client'
 
 import { Menu, X, Bell, MessageCircle, Search } from 'lucide-react'
+import { Typography } from '@mui/material'
 
 
 interface TopBarProps {
@@ -31,23 +32,52 @@ export default function TopBar({
   return (
     <header className="topbar-layout bg-white/10 backdrop-blur-md border-b border-white/20">
       <div className="flex items-center justify-between h-full px-4 lg:px-6">
-        {/* Mobile Menu Toggle */}
-        <div className="flex items-center space-x-4">
-          <button
-            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-            className="lg:hidden p-2 text-white/70 hover:text-white transition-colors rounded-lg hover:bg-white/10"
-            aria-label="Toggle menu"
-          >
-            {isMobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
-          </button>
-
-          {/* Logo/Title - Hidden on mobile when sidebar is open */}
-          <div className={`flex items-center space-x-2 transition-opacity duration-300 ${
-            isMobileMenuOpen ? 'lg:opacity-100 opacity-0' : 'opacity-100'
-          }`}>
-            <h1 className="text-xl font-bold text-white lg:text-2xl">SocialConnect</h1>
+        {/* Logo/Title - Hidden on mobile when sidebar is open */}
+        <div className={`flex items-center space-x-2 transition-opacity duration-300 ${
+          isMobileMenuOpen ? 'lg:opacity-100 opacity-0' : 'opacity-100'
+        }`}>
+            <img
+              src="/logo.png"
+              alt="Gigabit Logo"
+              className="w-12 h-10"
+            />
+            <Typography
+              variant="h6"
+              component="h1"
+              sx={{
+                fontWeight: '800',
+                background: 'linear-gradient(135deg, #ffffff 0%, #e0f2fe 25%, #bae6fd 50%, #7dd3fc 75%, #38bdf8 100%)',
+                backgroundClip: 'text',
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+                textShadow: '0 0 20px rgba(56, 189, 248, 0.3), 0 2px 8px rgba(0,0,0,0.2)',
+                fontSize: { xs: '1.5rem', lg: '1.8rem' },
+                letterSpacing: '1px',
+                fontFamily: '"Montserrat", "Poppins", "SF Pro Display", "Segoe UI", sans-serif',
+                textTransform: 'capitalize',
+                position: 'relative',
+                display: 'flex',
+                alignItems: 'center',
+                lineHeight: 1.1,
+                marginTop: '1px',
+                filter: 'drop-shadow(0 0 8px rgba(56, 189, 248, 0.2))',
+                '&::after': {
+                  content: '""',
+                  position: 'absolute',
+                  bottom: '-3px',
+                  left: '0',
+                  width: '100%',
+                  height: '3px',
+                  background: 'linear-gradient(90deg, #38bdf8, #06b6d4, #0891b2, #0e7490)',
+                  borderRadius: '2px',
+                  opacity: 0.9,
+                  boxShadow: '0 0 10px rgba(56, 189, 248, 0.4)',
+                }
+              }}
+            >
+              Gigabit
+            </Typography>
           </div>
-        </div>
 
         
 

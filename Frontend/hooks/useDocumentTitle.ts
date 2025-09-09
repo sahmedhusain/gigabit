@@ -10,7 +10,7 @@ export interface DocumentTitleOptions {
 }
 
 export function useDocumentTitle(
-  baseTitle: string = 'Social Network',
+  baseTitle: string = 'Gigabit',
   options: DocumentTitleOptions = {}
 ) {
   const {

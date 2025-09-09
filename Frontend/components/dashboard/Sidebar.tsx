@@ -1,6 +1,6 @@
 'use client'
 import { useState } from 'react'
-import { Home, User, MessageCircle, Activity, Users, Calendar, Settings, X, Sparkles, Bell, LogOut, Heart, ChevronDown, ChevronRight, PanelLeftClose, PanelLeftOpen } from 'lucide-react'
+import { Home, User, MessageCircle, Activity, Users, Calendar, Settings, X, Sparkles, Bell, LogOut, Heart, ChevronDown, ChevronRight, PanelLeftClose, PanelLeftOpen, Grid3X3, UserCheck, Bookmark } from 'lucide-react'
 
 interface SidebarProps {
   isMobileMenuOpen: boolean
@@ -56,7 +56,7 @@ export default function Sidebar({
         {
           id: 'all',
           label: 'All Posts',
-          icon: Home,
+          icon: Grid3X3,
           description: 'See all public posts',
           color: 'from-emerald-500 to-teal-600',
           onClick: () => {
@@ -68,7 +68,7 @@ export default function Sidebar({
         {
           id: 'following',
           label: 'Following',
-          icon: Users,
+          icon: UserCheck,
           description: 'Posts from people you follow',
           color: 'from-emerald-500 to-teal-600',
           onClick: () => {
@@ -80,7 +80,7 @@ export default function Sidebar({
         {
           id: 'friends',
           label: 'Friends',
-          icon: Heart,
+          icon: Users,
           description: 'Posts from your friends',
           color: 'from-emerald-500 to-teal-600',
           onClick: () => {
@@ -121,7 +121,7 @@ export default function Sidebar({
         {
           id: 'saved',
           label: 'Saved Posts',
-          icon: Sparkles,
+          icon: Bookmark,
           description: 'Your bookmarked posts',
           color: 'from-teal-500 to-cyan-600',
           onClick: () => {

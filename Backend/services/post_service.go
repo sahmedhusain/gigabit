@@ -63,7 +63,7 @@ func (s *PostService) AddPostPrivacyUsers(postID uint, userIDs []uint) error {
 	}
 
 	query := `INSERT INTO post_privacy (post_id, user_id) VALUES (?, ?)`
-	
+
 	for _, userID := range userIDs {
 		_, err := s.db.Exec(query, postID, userID)
 		if err != nil {
@@ -80,12 +80,14 @@ func (s *PostService) GetPostByID(postID uint, currentUserID uint) (*models.Post
 			   u.first_name, u.last_name, u.avatar, u.nickname,
 			   COUNT(DISTINCT l.id) as like_count,
 			   COUNT(DISTINCT c.id) as comment_count,
-			   CASE WHEN ul.id IS NOT NULL THEN 1 ELSE 0 END as is_liked
+			   CASE WHEN ul.id IS NOT NULL THEN 1 ELSE 0 END as is_liked,
+			   CASE WHEN b.id IS NOT NULL THEN 1 ELSE 0 END as is_bookmarked
 		FROM posts p
 		JOIN users u ON p.user_id = u.id
 		LEFT JOIN likes l ON p.id = l.post_id
 		LEFT JOIN comments c ON p.id = c.post_id
 		LEFT JOIN likes ul ON p.id = ul.post_id AND ul.user_id = ?
+		LEFT JOIN bookmarks b ON p.id = b.post_id AND b.user_id = ?
 		WHERE p.id = ?
 		GROUP BY p.id, u.id
 	`
@@ -93,11 +95,11 @@ func (s *PostService) GetPostByID(postID uint, currentUserID uint) (*models.Post
 	var post models.PostResponse
 	var user models.UserResponse
 
-	err := s.db.QueryRow(query, currentUserID, postID).Scan(
+	err := s.db.QueryRow(query, currentUserID, currentUserID, postID).Scan(
 		&post.ID, &post.UserID, &post.Content, &post.ImageURL, &post.Privacy,
 		&post.CreatedAt, &post.UpdatedAt,
 		&user.FirstName, &user.LastName, &user.Avatar, &user.Nickname,
-		&post.LikeCount, &post.CommentCount, &post.IsLiked,
+		&post.LikeCount, &post.CommentCount, &post.IsLiked, &post.IsBookmarked,
 	)
 	if err != nil {
 		return nil, err
@@ -132,19 +134,21 @@ func (s *PostService) GetUserPosts(userID uint, currentUserID uint, limit, offse
 			   u.first_name, u.last_name, u.avatar, u.nickname,
 			   COUNT(DISTINCT l.id) as like_count,
 			   COUNT(DISTINCT c.id) as comment_count,
-			   CASE WHEN ul.id IS NOT NULL THEN 1 ELSE 0 END as is_liked
+			   CASE WHEN ul.id IS NOT NULL THEN 1 ELSE 0 END as is_liked,
+			   CASE WHEN b.id IS NOT NULL THEN 1 ELSE 0 END as is_bookmarked
 		FROM posts p
 		JOIN users u ON p.user_id = u.id
 		LEFT JOIN likes l ON p.id = l.post_id
 		LEFT JOIN comments c ON p.id = c.post_id
 		LEFT JOIN likes ul ON p.id = ul.post_id AND ul.user_id = ?
+		LEFT JOIN bookmarks b ON p.id = b.post_id AND b.user_id = ?
 		WHERE p.user_id = ?
 		GROUP BY p.id, u.id
 		ORDER BY p.created_at DESC
 		LIMIT ? OFFSET ?
 	`
 
-	rows, err := s.db.Query(query, currentUserID, userID, limit, offset)
+	rows, err := s.db.Query(query, currentUserID, currentUserID, userID, limit, offset)
 	if err != nil {
 		return nil, err
 	}
@@ -159,7 +163,7 @@ func (s *PostService) GetUserPosts(userID uint, currentUserID uint, limit, offse
 			&post.ID, &post.UserID, &post.Content, &post.ImageURL, &post.Privacy,
 			&post.CreatedAt, &post.UpdatedAt,
 			&user.FirstName, &user.LastName, &user.Avatar, &user.Nickname,
-			&post.LikeCount, &post.CommentCount, &post.IsLiked,
+			&post.LikeCount, &post.CommentCount, &post.IsLiked, &post.IsBookmarked,
 		)
 		if err != nil {
 			return nil, err
@@ -185,12 +189,14 @@ func (s *PostService) GetFeedPosts(currentUserID uint, limit, offset int) ([]mod
 			   u.first_name, u.last_name, u.avatar, u.nickname,
 			   COUNT(DISTINCT l.id) as like_count,
 			   COUNT(DISTINCT c.id) as comment_count,
-			   CASE WHEN ul.id IS NOT NULL THEN 1 ELSE 0 END as is_liked
+			   CASE WHEN ul.id IS NOT NULL THEN 1 ELSE 0 END as is_liked,
+			   CASE WHEN b.id IS NOT NULL THEN 1 ELSE 0 END as is_bookmarked
 		FROM posts p
 		JOIN users u ON p.user_id = u.id
 		LEFT JOIN likes l ON p.id = l.post_id
 		LEFT JOIN comments c ON p.id = c.post_id
 		LEFT JOIN likes ul ON p.id = ul.post_id AND ul.user_id = ?
+		LEFT JOIN bookmarks b ON p.id = b.post_id AND b.user_id = ?
 		LEFT JOIN follows f ON p.user_id = f.following_id AND f.follower_id = ? AND f.status = 'accepted'
 		LEFT JOIN post_privacy pp ON p.id = pp.post_id
 		WHERE (
@@ -199,7 +205,7 @@ func (s *PostService) GetFeedPosts(currentUserID uint, limit, offset int) ([]mod
 			-- Public posts
 			OR p.privacy = 'public'
 			-- Almost private posts from followed users
-			OR (p.privacy = 'almost_private' AND f.id IS NOT NULL)
+			OR (p.privacy = 'followers' AND f.id IS NOT NULL)
 			-- Private posts specifically shared with user
 			OR (p.privacy = 'private' AND pp.user_id = ?)
 		)
@@ -208,7 +214,7 @@ func (s *PostService) GetFeedPosts(currentUserID uint, limit, offset int) ([]mod
 		LIMIT ? OFFSET ?
 	`
 
-	rows, err := s.db.Query(query, currentUserID, currentUserID, currentUserID, currentUserID, limit, offset)
+	rows, err := s.db.Query(query, currentUserID, currentUserID, currentUserID, currentUserID, currentUserID, limit, offset)
 	if err != nil {
 		return nil, err
 	}
@@ -223,7 +229,7 @@ func (s *PostService) GetFeedPosts(currentUserID uint, limit, offset int) ([]mod
 			&post.ID, &post.UserID, &post.Content, &post.ImageURL, &post.Privacy,
 			&post.CreatedAt, &post.UpdatedAt,
 			&user.FirstName, &user.LastName, &user.Avatar, &user.Nickname,
-			&post.LikeCount, &post.CommentCount, &post.IsLiked,
+			&post.LikeCount, &post.CommentCount, &post.IsLiked, &post.IsBookmarked,
 		)
 		if err != nil {
 			return nil, err
@@ -315,7 +321,7 @@ func (s *PostService) CanViewPost(postID uint, currentUserID uint) (bool, error)
 	switch privacy {
 	case "public":
 		return true, nil
-	case "almost_private":
+	case "followers":
 		// Check if current user follows the post owner
 		return s.isFollowing(currentUserID, ownerID)
 	case "private":

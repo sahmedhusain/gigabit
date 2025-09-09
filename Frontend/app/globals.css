@@ -25,9 +25,160 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
+/* Floating particles animation */
 .floating-particle {
-  left: var(--left);
-  top: var(--top);
-  animation-delay: var(--delay);
-  animation-duration: var(--duration);
+  left: calc(var(--random-x, 0) * 1%);
+  top: calc(var(--random-y, 0) * 1%);
+  animation-delay: calc(var(--random-delay, 0) * 1s);
+  animation-duration: calc(3s + var(--random-duration, 0) * 2s);
 }
+
+.floating-particle:nth-child(1) { --random-x: 10; --random-y: 20; --random-delay: 0; --random-duration: 0.5; }
+.floating-particle:nth-child(2) { --random-x: 80; --random-y: 10; --random-delay: 0.2; --random-duration: 1; }
+.floating-particle:nth-child(3) { --random-x: 30; --random-y: 70; --random-delay: 0.5; --random-duration: 0.8; }
+.floating-particle:nth-child(4) { --random-x: 90; --random-y: 40; --random-delay: 1; --random-duration: 1.2; }
+.floating-particle:nth-child(5) { --random-x: 50; --random-y: 90; --random-delay: 0.8; --random-duration: 0.3; }
+.floating-particle:nth-child(6) { --random-x: 15; --random-y: 50; --random-delay: 1.5; --random-duration: 0.9; }
+.floating-particle:nth-child(7) { --random-x: 70; --random-y: 80; --random-delay: 0.3; --random-duration: 1.5; }
+.floating-particle:nth-child(8) { --random-x: 40; --random-y: 15; --random-delay: 2; --random-duration: 0.7; }
+.floating-particle:nth-child(9) { --random-x: 85; --random-y: 60; --random-delay: 0.7; --random-duration: 1.1; }
+.floating-particle:nth-child(10) { --random-x: 25; --random-y: 35; --random-delay: 1.2; --random-duration: 0.6; }
+.floating-particle:nth-child(11) { --random-x: 60; --random-y: 25; --random-delay: 0.4; --random-duration: 1.3; }
+.floating-particle:nth-child(12) { --random-x: 95; --random-y: 75; --random-delay: 1.8; --random-duration: 0.4; }
+.floating-particle:nth-child(13) { --random-x: 35; --random-y: 55; --random-delay: 0.6; --random-duration: 1.4; }
+.floating-particle:nth-child(14) { --random-x: 75; --random-y: 30; --random-delay: 2.2; --random-duration: 0.8; }
+.floating-particle:nth-child(15) { --random-x: 20; --random-y: 85; --random-delay: 0.9; --random-duration: 1.6; }
+.floating-particle:nth-child(16) { --random-x: 55; --random-y: 45; --random-delay: 1.6; --random-duration: 0.5; }
+.floating-particle:nth-child(17) { --random-x: 90; --random-y: 20; --random-delay: 0.1; --random-duration: 1.7; }
+.floating-particle:nth-child(18) { --random-x: 45; --random-y: 75; --random-delay: 2.5; --random-duration: 0.9; }
+.floating-particle:nth-child(19) { --random-x: 65; --random-y: 65; --random-delay: 1.1; --random-duration: 1.8; }
+.floating-particle:nth-child(20) { --random-x: 5; --random-y: 95; --random-delay: 1.9; --random-duration: 0.2; }
+
+/* Sidebar animations */
+@keyframes float {
+  0%, 100% { 
+    transform: translateY(0px) rotate(0deg); 
+    opacity: 0.3; 
+  }
+  50% { 
+    transform: translateY(-10px) rotate(180deg); 
+    opacity: 0.8; 
+  }
+}
+
+.animate-float {
+  animation: float 3s ease-in-out infinite;
+}
+
+.scrollbar-thin {
+  scrollbar-width: thin;
+}
+
+.scrollbar-thumb-emerald-400\/20::-webkit-scrollbar {
+  width: 6px;
+}
+
+.scrollbar-thumb-emerald-400\/20::-webkit-scrollbar-thumb {
+  background-color: rgba(52, 211, 153, 0.2);
+  border-radius: 4px;
+}
+
+.scrollbar-thumb-emerald-400\/20::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(52, 211, 153, 0.3);
+}
+
+.scrollbar-track-transparent::-webkit-scrollbar-track {
+  background-color: transparent;
+}
+
+.scale-102 {
+  transform: scale(1.02);
+}
+
+/* Sidebar particle positions */
+.particle-1 { left: 10%; top: 20%; animation-delay: 0s; animation-duration: 3s; }
+.particle-2 { left: 25%; top: 32%; animation-delay: 0.5s; animation-duration: 3.5s; }
+.particle-3 { left: 40%; top: 44%; animation-delay: 1s; animation-duration: 4s; }
+.particle-4 { left: 55%; top: 56%; animation-delay: 1.5s; animation-duration: 4.5s; }
+.particle-5 { left: 70%; top: 68%; animation-delay: 2s; animation-duration: 5s; }
+.particle-6 { left: 85%; top: 80%; animation-delay: 2.5s; animation-duration: 5.5s; }
+
+/* Layout fixes */
+.sidebar-layout {
+  position: fixed;
+  top: 64px; /* Start below topbar */
+  left: 0;
+  height: calc(100vh - 64px); /* Adjust height to account for topbar */
+  width: 250px;
+  z-index: 30;
+  transition: width 0.3s ease-in-out;
+}
+
+.sidebar-layout.collapsed {
+  width: 64px !important;
+}
+
+.topbar-layout {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 64px;
+  z-index: 40;
+}
+
+.main-content-layout {
+  margin-top: 64px;
+  margin-left: 0;
+  min-height: calc(100vh - 64px);
+  transition: margin-left 0.3s ease-in-out;
+}
+
+/* Mobile-specific adjustments */
+@media (max-width: 1023px) {
+  .sidebar-layout {
+    z-index: 35;
+  }
+  
+  .topbar-layout {
+    z-index: 45;
+  }
+}
+
+@media (min-width: 1024px) {
+  .main-content-layout {
+    margin-left: 250px;
+    transition: margin-left 0.3s ease-in-out;
+  }
+  
+  .sidebar-layout {
+    z-index: 20;
+  }
+  
+  .topbar-layout {
+    z-index: 30;
+  }
+}
+
+@media (min-width: 1024px) {
+  .sidebar-collapsed + .main-content-layout {
+    margin-left: 64px;
+  }
+}
+
+/* Smooth transitions */
+.sidebar-transition {
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.topbar-transition {
+  transition: all 0.2s ease-in-out;
+}
+
+/* Sidebar particle positions */
+.particle-1 { left: 10%; top: 20%; animation-delay: 0s; animation-duration: 3s; }
+.particle-2 { left: 25%; top: 32%; animation-delay: 0.5s; animation-duration: 3.5s; }
+.particle-3 { left: 40%; top: 44%; animation-delay: 1s; animation-duration: 4s; }
+.particle-4 { left: 55%; top: 56%; animation-delay: 1.5s; animation-duration: 4.5s; }
+.particle-5 { left: 70%; top: 68%; animation-delay: 2s; animation-duration: 5s; }
+.particle-6 { left: 85%; top: 80%; animation-delay: 2.5s; animation-duration: 5.5s; }

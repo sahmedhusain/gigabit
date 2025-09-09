@@ -50,6 +50,7 @@ export interface Post {
   timeAgo: string;
   privacy: string;
   isLiked: boolean;
+  isBookmarked?: boolean;
 }
 
 // Backend API Post interface
@@ -65,6 +66,7 @@ export interface APIPost {
   like_count: number;
   comment_count: number;
   is_liked: boolean;
+  is_bookmarked: boolean;
   comments?: Comment[];
 }
 
@@ -144,6 +146,7 @@ export interface Chat {
   unread: number;
   isOnline: boolean;
   isGroup: boolean;
+  participantId?: number;
 }
 
 // API Response types
@@ -526,9 +529,27 @@ export class ApiClient {
   }
 
   // Alternative like endpoint that returns detailed info
-  async toggleLike(id: number): Promise<{ message: string; is_liked: boolean }> {
-    return this.request<{ message: string; is_liked: boolean }>(`/api/posts/${id}/like`, {
+  async toggleBookmark(id: number): Promise<{ message: string; is_bookmarked: boolean }> {
+    return this.request<{ message: string; is_bookmarked: boolean }>(`/api/bookmarks/${id}`, {
       method: 'POST',
+    });
+  }
+
+  async unbookmarkPost(id: number): Promise<{ message: string }> {
+    return this.request<{ message: string }>(`/api/bookmarks/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async checkBookmarkStatus(id: number): Promise<{ is_bookmarked: boolean }> {
+    return this.request<{ is_bookmarked: boolean }>(`/api/bookmarks/${id}`, {
+      method: 'GET',
+    });
+  }
+
+  async getUserBookmarks(limit: number = 20, offset: number = 0): Promise<{ bookmarks: any[], count: number }> {
+    return this.request<{ bookmarks: any[], count: number }>(`/api/bookmarks?limit=${limit}&offset=${offset}`, {
+      method: 'GET',
     });
   }
 
@@ -696,6 +717,13 @@ export class ApiClient {
   async getConversations(): Promise<{ conversations: ConversationResponse[] }> {
     return this.request<{ conversations: ConversationResponse[] }>('/api/conversations', {
       method: 'GET',
+    });
+  }
+
+  async createConversation(userId: number): Promise<ConversationResponse> {
+    return this.request<ConversationResponse>('/api/conversations', {
+      method: 'POST',
+      body: JSON.stringify({ user_id: userId }),
     });
   }
 

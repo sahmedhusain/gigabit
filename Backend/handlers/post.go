@@ -397,9 +397,7 @@ func (h *PostHandler) UnlikePost(w http.ResponseWriter, r *http.Request, postIDS
 
 	log.Printf("Post %d unliked successfully by user %v", postID, userID)
 	writeJSON(w, http.StatusOK, map[string]string{"message": "Post unliked successfully"})
-}
-
-// CreateComment handles creating a new comment on a post
+}// CreateComment handles creating a new comment on a post
 func (h *PostHandler) CreateComment(w http.ResponseWriter, r *http.Request, postIDStr string) {
 	if r.Method != http.MethodPost {
 		writeError(w, http.StatusMethodNotAllowed, "Method not allowed")

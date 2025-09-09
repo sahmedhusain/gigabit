@@ -68,7 +68,6 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 	if req.Nickname != "" {
 		user.Nickname = &req.Nickname
 	}
-	
 	if req.AboutMe != "" {
 		user.AboutMe = &req.AboutMe
 	}

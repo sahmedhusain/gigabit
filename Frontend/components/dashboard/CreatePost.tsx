@@ -56,6 +56,9 @@ export default function CreatePost({
       // if (fileInputRef.current) {
       //   fileInputRef.current.value = ''
       // }
+      if (fileInputRef.current) {
+        fileInputRef.current.value = ''
+      }
       onClose()
     },
     onError: (error: any) => {

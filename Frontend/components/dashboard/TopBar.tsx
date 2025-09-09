@@ -1,210 +1,224 @@
 'use client'
+
+import { Menu, X, Bell, MessageCircle, Search, Users, Calendar, UserCheck, Hash, Filter, FileText, User, ChevronDown } from 'lucide-react'
+import { Typography } from '@mui/material'
 import { useRouter } from 'next/navigation'
-import { Search, Plus, Bell, MessageCircle, User, X, Home } from 'lucide-react'
-import { useSearch, useNotifications, useRealTimeMessages } from '@/hooks'
 import { useState } from 'react'
-import { getAvatarUrl } from '@/utils/avatarUtils'
+
 
 interface TopBarProps {
   isMobileMenuOpen: boolean
   setIsMobileMenuOpen: (open: boolean) => void
-  setShowNotifications: (show: boolean) => void
-  setShowChat: (show: boolean) => void
+  activeTab: string
+  setActiveTab: (tab: string) => void
   showNotifications: boolean
-  showChat: boolean
-  notifications: any[]
-  currentUser: any
-  isOffline: boolean
-  isConnected: boolean
-  logout: () => void
-  setActiveTab?: (tab: string) => void
+  setShowNotifications: () => void
+  unreadCount: number
+  onChatClick: () => void
+  onSearchClick: () => void
+  unreadChatsCount?: number
 }
 
 export default function TopBar({
   isMobileMenuOpen,
   setIsMobileMenuOpen,
-  setShowNotifications,
-  setShowChat,
+  activeTab,
+  setActiveTab,
   showNotifications,
-  showChat,
-  notifications,
-  currentUser,
-  isOffline,
-  isConnected,
-  logout,
-  setActiveTab
+  setShowNotifications,
+  unreadCount,
+  onChatClick,
+  onSearchClick,
+  unreadChatsCount = 3
 }: TopBarProps) {
   const router = useRouter()
-  const [searchTerm, setSearchTerm] = useState('')
-  const { results, isSearching, setQuery } = useSearch(async (query: string) => {
-    // Mock search function - replace with actual API call
-    return []
-  })
-  const { unread: notificationUnread } = useNotifications()
-  const { getUnreadCount: getMessagesUnread } = useRealTimeMessages()
-  
-  const messageUnread = getMessagesUnread()
+  const [searchQuery, setSearchQuery] = useState('')
+  const [selectedFilter, setSelectedFilter] = useState('all')
+  const [showFilterDropdown, setShowFilterDropdown] = useState(false)
 
-  const handleSearchChange = (value: string) => {
-    setSearchTerm(value)
-    setQuery(value)
+  const handleLogoClick = () => {
+    router.push('/')
+  }
+
+  const searchFilters = [
+    { id: 'all', label: 'All', icon: Filter },
+    { id: 'users', label: 'Users', icon: User },
+    { id: 'events', label: 'Events', icon: Calendar },
+    { id: 'groups', label: 'Groups', icon: Users },
+    { id: 'posts', label: 'Posts', icon: FileText },
+    { id: 'tags', label: 'Tags', icon: Hash }
+  ]
+
+  const handleFilterSelect = (filterId: string) => {
+    setSelectedFilter(filterId)
+    setShowFilterDropdown(false)
+    // Here you can implement the actual search logic
+    console.log(`Searching for "${searchQuery}" in ${filterId}`)
+  }
+
+  const toggleFilterDropdown = () => {
+    setShowFilterDropdown(!showFilterDropdown)
   }
 
   return (
-    <div className="fixed top-0 left-0 lg:left-64 right-0 h-14 lg:h-16 bg-gradient-to-r from-white/10 to-white/5 backdrop-blur-xl border-b border-white/20 z-30">
-      <div className="flex items-center justify-between h-full px-4 lg:px-6">
-        <div className="flex items-center space-x-2 lg:space-x-4">
-          {/* Mobile Menu Button */}
-          <button
-            onClick={() => setIsMobileMenuOpen(true)}
-            title="Open menu"
-            className="lg:hidden p-2 text-white/70 hover:text-white hover:bg-white/10 rounded-xl transition-all duration-200"
-          >
-            <Home className="w-5 h-5" />
-          </button>
-
-          {/* Search Bar */}
-          <div className="relative hidden sm:block">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-white/50" />
-            <input
-              type="text"
-              placeholder="Search..."
-              value={searchTerm}
-              onChange={(e) => handleSearchChange(e.target.value)}
-              className="pl-10 pr-4 py-2 bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-emerald-400/50 focus:border-emerald-400/50 w-40 sm:w-60 lg:w-80 text-sm lg:text-base"
+    <header className="topbar-layout bg-gradient-to-r from-white/20 via-white/10 to-white/5 backdrop-blur-xl border-b border-white/40 shadow-2xl">
+      <div className="grid grid-cols-3 items-center h-full px-6 py-3 gap-4">
+        {/* Logo/Title - Hidden on mobile when sidebar is open */}
+        <div className={`flex items-center space-x-3 transition-all duration-300 hover:scale-105 cursor-pointer justify-start ${
+          isMobileMenuOpen ? 'lg:opacity-100 opacity-0' : 'opacity-100'
+        }`} onClick={handleLogoClick}>
+            <img
+              src="/logo.png"
+              alt="Gigabit Logo"
+              className="w-10 h-8 drop-shadow-xl hover:drop-shadow-2xl transition-all duration-300"
             />
-            {isSearching && (
-              <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+            <Typography
+              variant="h6"
+              component="h1"
+              sx={{
+                fontWeight: '700',
+                color: 'white',
+                fontSize: { xs: '1.5rem', lg: '1.75rem' },
+                letterSpacing: '2px',
+                fontFamily: '"Courier New", "Consolas", "Monaco", "Menlo", monospace',
+                textTransform: 'capitalize',
+                position: 'relative',
+                display: 'flex',
+                alignItems: 'center',
+                lineHeight: 1.1,
+                marginTop: '1px',
+                minWidth: '120px',
+                textAlign: 'center',
+                '&::after': {
+                  content: '""',
+                  position: 'absolute',
+                  bottom: '-3px',
+                  left: '0',
+                  width: '100%',
+                  height: '3px',
+                  background: 'linear-gradient(90deg, #38bdf8, #06b6d4, #0891b2, #0e7490)',
+                  borderRadius: '2px',
+                  opacity: 0.95,
+                  boxShadow: '0 0 12px rgba(56, 189, 248, 0.5)',
+                }
+              }}
+            >
+              Gigabit
+            </Typography>
+          </div>
+
+        {/* Center Search Bar */}
+        <div className="flex justify-center relative">
+          <div className="relative max-w-2xl w-full">
+            <div className="flex items-center bg-white/10 backdrop-blur-md border-2 border-white/30 rounded-2xl transition-all duration-300 focus-within:border-white/50 focus-within:bg-white/15">
+              <div className="flex items-center flex-1">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-white/60" />
+                <input
+                  type="text"
+                  placeholder="Search..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full px-4 py-2 pl-10 pr-4 bg-transparent text-white placeholder-white/60 focus:outline-none"
+                />
               </div>
-            )}
-            
-            {/* Search Results Dropdown */}
-            {searchTerm && results.length > 0 && (
-              <div className="absolute top-full left-0 right-0 mt-1 bg-white/10 backdrop-blur-xl border border-white/20 rounded-xl shadow-xl max-h-60 overflow-y-auto z-50">
-                {results.slice(0, 5).map((result: any, index) => (
-                  <div key={index} className="p-3 hover:bg-white/10 cursor-pointer border-b border-white/10 last:border-b-0">
-                    <p className="text-white text-sm truncate">Search result {index + 1}</p>
+              
+              {/* Filter Dropdown Button */}
+              <div className="relative">
+                <button
+                  onClick={toggleFilterDropdown}
+                  className="flex items-center space-x-2 px-3 py-2 text-white/70 hover:text-white transition-all duration-200 border-l border-white/20"
+                >
+                  {(() => {
+                    const currentFilter = searchFilters.find(f => f.id === selectedFilter)
+                    if (!currentFilter) return null
+                    const IconComponent = currentFilter.icon
+                    return (
+                      <>
+                        <IconComponent className="w-4 h-4" />
+                        <span className="hidden sm:inline text-sm font-medium">{currentFilter.label}</span>
+                        <ChevronDown className={`w-3 h-3 transition-transform duration-200 ${showFilterDropdown ? 'rotate-180' : ''}`} />
+                      </>
+                    )
+                  })()}
+                </button>
+                
+                {/* Filter Dropdown */}
+                {showFilterDropdown && (
+                  <div className="absolute top-full right-0 mt-2 w-48 bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl border border-white/40 overflow-hidden z-50">
+                    <div className="p-2">
+                      <div className="text-xs font-semibold text-gray-600 mb-2 px-2">Search Filters</div>
+                      {searchFilters.map((filter) => {
+                        const IconComponent = filter.icon
+                        const isSelected = selectedFilter === filter.id
+                        return (
+                          <button
+                            key={filter.id}
+                            onClick={() => handleFilterSelect(filter.id)}
+                            className={`w-full flex items-center space-x-3 px-3 py-2 rounded-xl transition-all duration-200 ${
+                              isSelected
+                                ? 'bg-blue-100 text-blue-700 font-semibold'
+                                : 'text-gray-700 hover:bg-blue-50 hover:text-blue-600'
+                            }`}
+                          >
+                            <IconComponent className="w-4 h-4" />
+                            <span className="text-sm">{filter.label}</span>
+                          </button>
+                        )
+                      })}
+                    </div>
                   </div>
-                ))}
+                )}
               </div>
-            )}
+            </div>
           </div>
         </div>
 
-        <div className="flex items-center space-x-2 lg:space-x-4">
-          {/* Mobile Search */}
+        {/* Right Side Actions */}
+        <div className="flex items-center space-x-4 justify-end">
+          {/* Notifications Button - Icon Only */}
           <button
-            className="sm:hidden p-2 text-white/70 hover:text-white hover:bg-white/10 rounded-xl transition-all duration-200"
-            title="Open search"
+            onClick={setShowNotifications}
+            className={`relative p-2 rounded-2xl transition-all duration-300 transform hover:scale-105 hover:shadow-lg ${
+              showNotifications
+                ? 'bg-gradient-to-r from-white to-blue-50 text-emerald-600 shadow-2xl border-2 border-white/40'
+                : 'text-white/90 hover:text-white hover:bg-white/20 backdrop-blur-md border-2 border-white/30 hover:border-white/50'
+            }`}
+            aria-label="Notifications"
           >
-            <Search className="w-5 h-5" />
-          </button>
-
-          <button
-            onClick={() => setShowNotifications(!showNotifications)}
-            title="Notifications"
-            className="relative p-2 text-white/70 hover:text-white hover:bg-white/10 rounded-xl transition-all duration-200"
-          >
-            <Bell className="w-4 h-4 lg:w-5 lg:h-5" />
-            {notificationUnread > 0 && (
-              <span className="absolute -top-1 -right-1 bg-emerald-500 text-white text-xs rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1 animate-pulse">
-                {notificationUnread > 99 ? '99+' : notificationUnread}
+            <Bell className="w-4 h-4" />
+            {unreadCount > 0 && (
+              <span className="absolute -top-2 -right-2 bg-gradient-to-r from-red-500 to-pink-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold shadow-xl border-2 border-white">
+                {unreadCount > 9 ? '9+' : unreadCount}
               </span>
             )}
           </button>
 
+          {/* Chats Button */}
           <button
-            onClick={() => setShowChat(!showChat)}
-            title="Chat"
-            className="relative p-2 text-white/70 hover:text-white hover:bg-white/10 rounded-xl transition-all duration-200"
+            onClick={onChatClick}
+            className={`relative flex items-center space-x-2 px-3 py-2 rounded-2xl transition-all duration-300 transform hover:scale-105 hover:shadow-lg ${
+              activeTab === 'chats'
+                ? 'bg-gradient-to-r from-white to-blue-50 text-emerald-600 shadow-2xl border-2 border-white/40'
+                : 'text-white/90 hover:text-white hover:bg-white/20 backdrop-blur-md border-2 border-white/30 hover:border-white/50'
+            }`}
+            type='button'
+            title="Chats"
           >
-            <MessageCircle className="w-4 h-4 lg:w-5 lg:h-5" />
-            {messageUnread > 0 && (
-              <span className="absolute -top-1 -right-1 bg-emerald-500 text-white text-xs rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1 animate-pulse">
-                {messageUnread > 99 ? '99+' : messageUnread}
+            <MessageCircle className="w-4 h-4" />
+            <span className="hidden md:inline font-semibold text-sm">Chats</span>
+            {unreadChatsCount > 0 && (
+              <span className="absolute -top-2 -right-2 bg-gradient-to-r from-emerald-500 to-teal-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold shadow-xl border-2 border-white">
+                {unreadChatsCount > 9 ? '9+' : unreadChatsCount}
               </span>
             )}
           </button>
 
-          <div className="flex items-center space-x-2 lg:space-x-3">
-            {/* Connection status indicator */}
-            <div className="flex items-center space-x-1">
-              <div
-                className={`w-2 h-2 lg:w-3 lg:h-3 rounded-full ${isOffline ? 'bg-red-500' : isConnected ? 'bg-green-500' : 'bg-yellow-500'
-                  }`}
-                title={
-                  isOffline ? 'Offline - No internet connection' :
-                    isConnected ? 'Connected to server' :
-                      'Connecting...'
-                }
-              ></div>
-              {isOffline && (
-                <span className="text-xs text-red-300 hidden sm:inline">Offline</span>
-              )}
-            </div>
-            {/* Avatar dropdown (avatar only, no name) */}
-            <div className="relative">
-              <button
-                aria-label="User menu"
-                title="User menu"
-                onClick={(e) => {
-                  const el = document.getElementById('topbar-user-dropdown')
-                  if (el) el.classList.toggle('hidden')
-                }}
-                className="w-8 h-8 lg:w-10 lg:h-10 bg-gradient-to-r from-emerald-500 to-teal-600 rounded-full flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-emerald-400/50"
-              >
-                {getAvatarUrl(currentUser?.avatar) ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={getAvatarUrl(currentUser?.avatar)!} alt="avatar" className="w-7 h-7 lg:w-8 lg:h-8 rounded-full object-cover" />
-                ) : (
-                  <User className="w-4 h-4 lg:w-5 lg:h-5 text-white" />
-                )}
-              </button>
-
-              <div id="topbar-user-dropdown" className="hidden absolute right-0 mt-2 w-44 bg-white/10 backdrop-blur-xl border border-white/20 rounded-xl shadow-xl py-2 z-50">
-                <button
-                  onClick={() => {
-                    const el = document.getElementById('topbar-user-dropdown')
-                    if (el) el.classList.add('hidden')
-                    if (setActiveTab) {
-                      setActiveTab('profile')
-                      return
-                    }
-                    router.push(`/profile/${currentUser?.id || ''}`)
-                  }}
-                  className="block w-full text-left px-4 py-2 text-sm text-white hover:bg-white/10"
-                  title="My Profile"
-                >
-                  My Profile
-                </button>
-                <button
-                  onClick={() => {
-                    const el = document.getElementById('topbar-user-dropdown')
-                    if (el) el.classList.add('hidden')
-                    if (setActiveTab) {
-                      setActiveTab('settings')
-                      return
-                    }
-                    router.push('/settings')
-                  }}
-                  className="block w-full text-left px-4 py-2 text-sm text-white hover:bg-white/10"
-                  title="Settings"
-                >
-                  Settings
-                </button>
-                <button
-                  onClick={() => logout()}
-                  title="Logout"
-                  className="w-full text-left px-4 py-2 text-sm text-white hover:bg-white/10"
-                >
-                  Logout
-                </button>
-              </div>
-            </div>
+          <div className="flex items-center space-x-3 lg:space-x-4">
+            
+            
           </div>
         </div>
       </div>
-    </div>
+    </header>
   )
 }

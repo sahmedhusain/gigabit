@@ -123,7 +123,7 @@ export default function RegisterPage() {
 
           </div>
           <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold bg-gradient-to-r from-white via-emerald-100 to-teal-200 bg-clip-text text-transparent mb-3 tracking-tight">
-            Join SocialConnect
+            Join Gigabit
           </h1>
           <p className="text-base sm:text-lg text-white/80 font-light">
             Create your account and start connecting
@@ -454,7 +454,7 @@ export default function RegisterPage() {
               <button className="hover:text-white/80 transition-colors">Cookies</button>
             </div>
             <p className="text-xs text-white/40">
-              SocialConnect © 2025 • Crafted with ✨
+              Gigabit © 2025 All rights reserved.
             </p>
           </div>
         </div>

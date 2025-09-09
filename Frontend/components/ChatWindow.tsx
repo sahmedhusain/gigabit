@@ -1,10 +1,11 @@
 'use client'
 import React, { useState, useRef } from 'react'
 import { X, Send, Smile, Paperclip, Image, Check, CheckCheck, Clock } from 'lucide-react'
+import { useAuth } from '@/context/AuthContext'
 import { useRealTimeMessages, useTypingIndicator, useConnectionStatus } from '@/hooks'
 
 interface Message {
-  id: number
+  id: number | string
   content: string
   sender_id: number
   sender_name: string
@@ -13,12 +14,19 @@ interface Message {
   status?: 'sending' | 'sent' | 'delivered' | 'read'
   type?: 'text' | 'image' | 'file'
   file_url?: string
-  file_name?: string
+  file_name?: string,
+  sender: {
+    id: number;
+    first_name: string;
+    last_name: string;
+    avatar?: string;
+  }
 }
 
 interface ChatWindowProps {
   conversationId: number
   conversationType: 'private' | 'group'
+  participantId?: number
   participantName: string
   onClose: () => void
 }
@@ -26,6 +34,7 @@ interface ChatWindowProps {
 const ChatWindow: React.FC<ChatWindowProps> = ({
   conversationId,
   conversationType,
+  participantId,
   participantName,
   onClose
 }) => {
@@ -35,6 +44,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
   const [isUploading, setIsUploading] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const { user } = useAuth()
 
   // Real-time messaging integration
   const {
@@ -101,7 +111,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
         conversationId,
         messageContent,
         messageType,
-        conversationType === 'private' ? parseInt(participantName) : undefined, // assuming participantName could be ID for private
+        conversationType === 'private' ? participantId : undefined,
         conversationType === 'group' ? conversationId : undefined
       )
 
@@ -206,26 +216,26 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
               {Array.from(messages.get(conversationId) || []).map((message) => (
                 <div
                   key={message.id}
-                  className={`flex ${message.sender_id === message.sender.id ? 'justify-end' : 'justify-start'}`}
+                  className={`flex ${message.sender_id === user?.id ? 'justify-end' : 'justify-start'}`}
                 >
                   <div
                     className={`max-w-xs px-3 py-2 rounded-2xl ${
-                      message.sender_id === message.sender.id
+                      message.sender_id === user?.id
                         ? 'bg-gradient-to-r from-emerald-500 to-teal-600 text-white'
                         : 'bg-white/10 text-white border border-white/20'
                     }`}
                   >
-                    {conversationType === 'group' && message.sender_id !== message.sender.id && (
+                    {conversationType === 'group' && message.sender_id !== user?.id && (
                       <div className="text-xs text-white/60 mb-1 font-medium">
                         {message.sender.first_name} {message.sender.last_name}
                       </div>
                     )}
                     {renderSimpleMessageContent(message)}
                     <div className={`flex items-center justify-between mt-1 ${
-                      message.sender_id === message.sender.id ? 'text-white/80' : 'text-white/60'
+                      message.sender_id === user?.id ? 'text-white/80' : 'text-white/60'
                     }`}>
                       <span className="text-xs">{formatTime(message.created_at)}</span>
-                      {message.sender_id === message.sender.id && renderMessageStatus('sent')}
+                      {message.sender_id === user?.id && renderMessageStatus('sent')}
                     </div>
                   </div>
                 </div>

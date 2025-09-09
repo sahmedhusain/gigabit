@@ -18,8 +18,8 @@ import {
   NetworkError,
   ValidationError,
   AuthenticationError,
-  CreatePostRequest,
-  getToken
+  getToken,
+  CreatePostRequest
 } from '@/lib/api'
 import { Sparkles } from 'lucide-react'
 
@@ -29,16 +29,18 @@ import Sidebar from '@/components/dashboard/Sidebar'
 import UsersSidebar from '@/components/dashboard/UsersSidebar'
 import CreatePost from '@/components/dashboard/CreatePost'
 import CreateGroup from '@/components/dashboard/CreateGroup'
+import CreateDirectMessage from '@/components/dashboard/CreateDirectMessage'
+import CreateGeneralEvent from '@/components/dashboard/CreateGeneralEvent'
 import NotificationsDropdown from '@/components/dashboard/NotificationsDropdown'
-import ChatDropdown from '@/components/dashboard/ChatDropdown'
 import HomeFeed from '@/components/dashboard/HomeFeed'
 import ProfileSection from '@/components/dashboard/ProfileSection'
+import ChatsSection from '@/components/dashboard/ChatsSection'
+import ActivitySection from '@/components/dashboard/ActivitySection'
+import CommunitySection from '@/components/dashboard/CommunitySection'
+import SearchPage from '@/components/dashboard/SearchPage'
 import {
-  FollowersSection,
-  GroupsSection,
   SettingsSection
 } from '@/components/dashboard/DashboardSections'
-import EventsSection from '@/components/dashboard/EventsSection'
 
 function DashboardPage() {
   const { user, logout, checkAuth } = useAuth()
@@ -51,16 +53,29 @@ function DashboardPage() {
   const { posts: livePosts, isLoading: postsLoading } = useRealTimePosts()
   const { items: liveNotifications, unread: liveUnreadCount } = useNotifications()
   const { groups: liveGroups } = useRealTimeGroups()
-  const { events: liveEvents } = useRealTimeEvents()
+  const { 
+    events: liveEvents, 
+    loading: eventsLoading, 
+    respond: respondToEvent,
+    refetch: refetchEvents 
+  } = useRealTimeEvents()
   const { conversations: liveConversations } = useConversations()
 
   // UI State
-  const [activeTab, setActiveTab] = useState('home')
+  const [activeTab, setActiveTab] = useState('feed')
+  const [previousTab, setPreviousTab] = useState('feed')
+  const [feedSubTab, setFeedSubTab] = useState('all')
+  const [activitySubTab, setActivitySubTab] = useState('liked')
+  const [communitySubTab, setCommunitySubTab] = useState('events')
+  const [chatSubTab, setChatSubTab] = useState('all')
   const [showCreatePost, setShowCreatePost] = useState(false)
   const [showCreateGroup, setShowCreateGroup] = useState(false)
+  const [showCreateEvent, setShowCreateEvent] = useState(false)
+  const [showCreateDirectMessage, setShowCreateDirectMessage] = useState(false)
   const [showNotifications, setShowNotifications] = useState(false)
-  const [showChat, setShowChat] = useState(false)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+  const [showSearchPage, setShowSearchPage] = useState(false)
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
 
   // Post Creation State
   const [newPostContent, setNewPostContent] = useState('')
@@ -79,15 +94,14 @@ function DashboardPage() {
   const [isLoadingGroups, setIsLoadingGroups] = useState(false)
   const [chats, setChats] = useState<Chat[]>([])
   const [isLoadingChats, setIsLoadingChats] = useState(false)
-  const [events, setEvents] = useState<Event[]>([])
-  const [isLoadingEvents, setIsLoadingEvents] = useState(false)
   const [unreadNotifications, setUnreadNotifications] = useState(0)
   const [isSearching, setIsSearching] = useState(false)
   const [isLoadingTrending, setIsLoadingTrending] = useState(false)
   const [openChatWindow, setOpenChatWindow] = useState<{
     conversationId: number
-    type: 'private' | 'group'
+    type: 'private' | 'group',
     name: string
+    participantId?: number
   } | null>(null)
   const [followers, setFollowers] = useState<{ id: number; email: string; first_name: string; last_name: string; avatar?: string; nickname?: string; }[]>([])
   const [following, setFollowing] = useState<{ id: number; email: string; first_name: string; last_name: string; avatar?: string; nickname?: string; }[]>([])
@@ -127,7 +141,8 @@ function DashboardPage() {
     if (user) {
       fetchFeedPosts()
       fetchUsers()
-      fetchEvents() // Add this to load events immediately
+      fetchFollowers()
+      refetchEvents() // Add this to load events immediately
     }
   }, [user])
 
@@ -152,7 +167,7 @@ function DashboardPage() {
           ])
           setUnreadNotifications(prev => prev + 1)
           if (Notification.permission === 'granted') {
-            new Notification('SocialConnect', {
+            new Notification('Gigabit', {
               body: message.data.message,
               icon: '/favicon.ico'
             })
@@ -166,7 +181,7 @@ function DashboardPage() {
 
         case 'post_update':
           console.log('Post update received:', message.data)
-          if (activeTab === 'home') {
+          if (activeTab === 'feed') {
             fetchFeedPosts()
           }
           break
@@ -336,27 +351,6 @@ function DashboardPage() {
     }
   }
 
-  const fetchEvents = async () => {
-    try {
-      setIsLoadingEvents(true)
-      console.log('Fetching events...')
-      const data = await api.getUserEvents()
-      console.log('Events API response:', data)
-      const eventsArr = Array.isArray(data?.events) ? data.events : []
-      console.log('Events array:', eventsArr)
-      setEvents(eventsArr)
-    } catch (err) {
-      console.error('Error fetching events:', err)
-      if (err instanceof NetworkError) {
-        error('Failed to load events.')
-      } else {
-        error('Unable to load events right now.')
-      }
-    } finally {
-      setIsLoadingEvents(false)
-    }
-  }
-
   const fetchConversations = async () => {
     try {
       setIsLoadingChats(true)
@@ -370,7 +364,8 @@ function DashboardPage() {
         time: formatTimeAgo(conversation.updated_at),
         unread: conversation.unread_count,
         isOnline: false,
-        isGroup: conversation.type === 'group'
+        isGroup: conversation.type === 'group',
+        participantId: conversation.participant?.id
       })))
     } catch (err) {
       console.error('Error fetching conversations:', err)
@@ -520,51 +515,58 @@ function DashboardPage() {
     }
   }
 
+  const handleBookmarkPost = async (postId: number) => {
+    try {
+      const post = posts.find(p => p.id === postId)
+      const wasBookmarked = post?.isBookmarked || false
+
+      if (wasBookmarked) {
+        await api.unbookmarkPost(postId)
+      } else {
+        await api.toggleBookmark(postId)
+      }
+
+      setPosts(posts.map(p =>
+        p.id === postId
+          ? { ...p, isBookmarked: !p.isBookmarked }
+          : p
+      ))
+    } catch (err) {
+      console.error('Error toggling bookmark:', err)
+      setPosts(posts.map(p =>
+        p.id === postId
+          ? { ...p, isBookmarked: !p.isBookmarked }
+          : p
+      ))
+      if (err instanceof NetworkError) {
+        error('Failed to update bookmark. Please try again.')
+      } else {
+        error('Unable to update bookmark right now.')
+      }
+    }
+  }
+
   const handleLikePost = async (postId: number) => {
     try {
       const post = posts.find(p => p.id === postId)
       const wasLiked = post?.isLiked || false
 
-      if (post && post.isLiked) {
+      if (wasLiked) {
         await api.unlikePost(postId)
       } else {
         await api.likePost(postId)
       }
 
-      // Send real-time WebSocket update
-      if (isConnected) {
-        console.log('Sending like WebSocket message:', {
-          type: 'like',
-          from: user?.id,
-          post_id: postId,
-          action: wasLiked ? 'unlike' : 'like'
-        })
-        sendMessage({
-          type: 'like',
-          from: user?.id,
-          post_id: postId,
-          action: wasLiked ? 'unlike' : 'like',
-          data: {
-            post_id: postId,
-            user_id: user?.id,
-            action: wasLiked ? 'unlike' : 'like',
-            like_count: wasLiked ? (post?.likes || 0) - 1 : (post?.likes || 0) + 1
-          }
-        })
-      } else {
-        console.log('WebSocket not connected, cannot send like update')
-      }
-
       setPosts(posts.map(p =>
         p.id === postId
-          ? { ...p, isLiked: !p.isLiked, likes: p.isLiked ? p.likes - 1 : p.likes + 1 }
+          ? { ...p, isLiked: !p.isLiked, likes: p.likes + (wasLiked ? -1 : 1) }
           : p
       ))
     } catch (err) {
       console.error('Error toggling like:', err)
       setPosts(posts.map(p =>
         p.id === postId
-          ? { ...p, isLiked: !p.isLiked, likes: p.isLiked ? p.likes + 1 : p.likes - 1 }
+          ? { ...p, isLiked: !p.isLiked, likes: p.likes + (p.isLiked ? -1 : 1) }
           : p
       ))
       if (err instanceof NetworkError) {
@@ -579,8 +581,6 @@ function DashboardPage() {
     return onlineUsers.some(u => u.username === username && u.is_online)
   }
 
-  
-
   const handleNotificationsToggle = () => {
     setShowNotifications(!showNotifications)
     if (!showNotifications) {
@@ -589,21 +589,86 @@ function DashboardPage() {
     }
   }
 
+  // Custom function to handle tab changes and track previous tab
+  const handleTabChange = (newTab: string) => {
+    if (newTab !== activeTab) {
+      setPreviousTab(activeTab)
+      setActiveTab(newTab)
+    }
+  }
+
   const handleChatToggle = () => {
-    setShowChat(!showChat)
-    if (!showChat) {
+    if (activeTab === 'chats') {
+      // If we're already on chats, go back to previous tab
+      setActiveTab(previousTab)
+    } else {
+      // Navigate to chats tab and fetch data
+      setPreviousTab(activeTab)
+      setActiveTab('chats')
       fetchConversations()
+      fetchGroups()
+    }
+  }
+
+  const handleSearchToggle = () => {
+    setShowSearchPage(!showSearchPage)
+  }
+
+  const handleStartDirectMessage = async (userId: number, userName: string) => {
+    try {
+      // Get existing conversations to check if one already exists
+      const conversationsData = await api.getConversations()
+      
+      // Find existing conversation with this user
+      const existingConversation = conversationsData.conversations.find(
+        conv => conv.type === 'private' && conv.participant?.id === userId
+      )
+      
+      if (existingConversation) {
+        // Open existing conversation
+        setOpenChatWindow({
+          conversationId: existingConversation.id,
+          type: 'private',
+          name: userName,
+          participantId: userId
+        })
+      } else {
+        // Create a new conversation
+        const newConversation = await api.createConversation(userId);
+        setOpenChatWindow({
+          conversationId: newConversation.id,
+          type: 'private',
+          name: userName,
+          participantId: userId
+        })
+      }
+      
+      // Close the create direct message modal
+      setShowCreateDirectMessage(false)
+      
+      // Refresh conversations list
+      fetchConversations()
+      
+      success(`Started conversation with ${userName}`)
+    } catch (err) {
+      console.error('Error starting direct message:', err)
+      if (err instanceof NetworkError) {
+        error('Failed to start conversation. Please try again.')
+      } else {
+        error('Unable to start conversation right now.')
+      }
     }
   }
 
   const renderContent = () => {
     switch (activeTab) {
-      case 'home':
+      case 'feed':
         return (
           <HomeFeed
             posts={posts}
             onPostLike={handleLikePost}
-            setActiveTab={setActiveTab}
+            onPostBookmark={handleBookmarkPost}
+            setActiveTab={handleTabChange}
             showCreatePost={showCreatePost}
             setShowCreatePost={setShowCreatePost}
             newPostContent={newPostContent}
@@ -617,6 +682,48 @@ function DashboardPage() {
             availableUsers={availableUsers}
             loadingUsers={loadingUsers}
             onCreatePost={handleCreatePost}
+            feedSubTab={feedSubTab}
+            setFeedSubTab={setFeedSubTab}
+          />
+        )
+      case 'chats':
+        return (
+          <ChatsSection
+            chats={chats}
+            groups={groups}
+            isLoadingChats={isLoadingChats}
+            isLoadingGroups={isLoadingGroups}
+            chatSubTab={chatSubTab}
+            setChatSubTab={setChatSubTab}
+            onChatClick={setOpenChatWindow}
+            isUserOnline={isUserOnline}
+            showCreateGroup={showCreateGroup}
+            setShowCreateDirectMessage={setShowCreateDirectMessage}
+            setShowCreateGroup={setShowCreateGroup}
+          />
+        )
+      case 'activity':
+        return (
+          <ActivitySection
+            activitySubTab={activitySubTab}
+            setActivitySubTab={setActivitySubTab}
+            posts={posts}
+            onPostLike={handleLikePost}
+            onPostBookmark={handleBookmarkPost}
+          />
+        )
+      case 'community':
+        return (
+          <CommunitySection
+            events={liveEvents}
+            onEventsUpdate={refetchEvents}
+            isLoadingEvents={eventsLoading}
+            notifications={notifications}
+            isLoadingNotifications={isLoadingNotifications}
+            showCreateEvent={showCreateEvent}
+            setShowCreateEvent={setShowCreateEvent}
+            onEventRespond={respondToEvent}
+            communitySubTab={communitySubTab}
           />
         )
       case 'profile':
@@ -629,18 +736,6 @@ function DashboardPage() {
             isLoadingFollowers={isLoadingFollowers}
           />
         )
-      case 'followers':
-        return (
-          <FollowersSection
-            followers={followers}
-            following={following}
-            isLoadingFollowers={isLoadingFollowers}
-          />
-        )
-      case 'groups': 
-        return <GroupsSection groups={groups} />
-      case 'events': 
-        return <EventsSection events={events} onEventsUpdate={fetchEvents} isLoading={isLoadingEvents} />
       case 'settings': 
         return (
           <SettingsSection
@@ -648,12 +743,15 @@ function DashboardPage() {
             testTokenExpiration={testTokenExpiration}
           />
         )
+      case 'search':
+        return <SearchPage onClose={() => setActiveTab(previousTab)} />
       default:
         return (
           <HomeFeed
             posts={posts}
             onPostLike={handleLikePost}
-            setActiveTab={setActiveTab}
+            onPostBookmark={handleBookmarkPost}
+            setActiveTab={handleTabChange}
             showCreatePost={showCreatePost}
             setShowCreatePost={setShowCreatePost}
             newPostContent={newPostContent}
@@ -667,6 +765,8 @@ function DashboardPage() {
             availableUsers={availableUsers}
             loadingUsers={loadingUsers}
             onCreatePost={handleCreatePost}
+            feedSubTab={feedSubTab}
+            setFeedSubTab={setFeedSubTab}
           />
         )
     }
@@ -687,12 +787,6 @@ function DashboardPage() {
           <div
             key={i}
             className="absolute animate-bounce floating-particle"
-            style={{
-              left: `${Math.random() * 100}%`,
-              top: `${Math.random() * 100}%`,
-              animationDelay: `${Math.random() * 3}s`,
-              animationDuration: `${3 + Math.random() * 2}s`
-            }}
           >
             <Sparkles className="w-2 h-2 text-white/30" />
           </div>
@@ -703,25 +797,71 @@ function DashboardPage() {
         isMobileMenuOpen={isMobileMenuOpen}
         setIsMobileMenuOpen={setIsMobileMenuOpen}
         activeTab={activeTab}
-        setActiveTab={setActiveTab}
-        fetchGroups={fetchGroups}
-        fetchEvents={fetchEvents}
-        fetchFollowers={fetchFollowers}
+        setActiveTab={handleTabChange}
+        feedSubTab={feedSubTab}
+        setFeedSubTab={setFeedSubTab}
+        activitySubTab={activitySubTab}
+        setActivitySubTab={setActivitySubTab}
+        communitySubTab={communitySubTab}
+        setCommunitySubTab={setCommunitySubTab}
+        fetchEvents={refetchEvents}
+        currentUser={currentUser}
+        logout={logout}
+        isCollapsed={isSidebarCollapsed}
+        setIsCollapsed={setIsSidebarCollapsed}
       />
 
       <TopBar
         isMobileMenuOpen={isMobileMenuOpen}
         setIsMobileMenuOpen={setIsMobileMenuOpen}
-        setShowNotifications={handleNotificationsToggle}
-        setShowChat={handleChatToggle}
+        activeTab={activeTab}
+        setActiveTab={handleTabChange}
         showNotifications={showNotifications}
-        showChat={showChat}
-        notifications={notifications}
-        currentUser={currentUser}
-        isOffline={isOffline}
-        isConnected={isConnected}
-        logout={logout}
-        setActiveTab={setActiveTab}
+        setShowNotifications={handleNotificationsToggle}
+        unreadCount={liveUnreadCount || unreadNotifications}
+        onChatClick={handleChatToggle}
+        onSearchClick={handleSearchToggle}
+        unreadChatsCount={chats.reduce((sum, chat) => sum + chat.unread, 0)}
+      />
+
+      <CreatePost
+        show={showCreatePost}
+        onClose={() => setShowCreatePost(false)}
+        newPostContent={newPostContent}
+        setNewPostContent={setNewPostContent}
+        newPostImage={newPostImage}
+        setNewPostImage={setNewPostImage}
+        postPrivacy={postPrivacy}
+        setPostPrivacy={setPostPrivacy}
+        selectedUsers={selectedUsers}
+        setSelectedUsers={setSelectedUsers}
+        availableUsers={availableUsers}
+        loadingUsers={loadingUsers}
+        onCreatePost={handleCreatePost}
+      />
+
+      <CreateGeneralEvent
+        show={showCreateEvent}
+        onClose={() => setShowCreateEvent(false)}
+        onEventCreated={() => {
+          refetchEvents()
+          setShowCreateEvent(false)
+          success('Event created successfully!')
+        }}
+      />
+
+      <CreateDirectMessage
+        show={showCreateDirectMessage}
+        onClose={() => setShowCreateDirectMessage(false)}
+        followers={followers}
+        isLoading={isLoadingFollowers}
+        onStartChat={(followerId: number) => {
+          const follower = followers.find(f => f.id === followerId)
+          if (follower) {
+            const userName = `${follower.first_name} ${follower.last_name}`.trim() || follower.nickname || follower.email
+            handleStartDirectMessage(followerId, userName)
+          }
+        }}
       />
 
       <CreateGroup
@@ -739,13 +879,7 @@ function DashboardPage() {
         onClose={() => setShowNotifications(false)}
       />
 
-      <ChatDropdown
-        show={showChat}
-        chats={chats}
-        onChatClick={setOpenChatWindow}
-        onClose={() => setShowChat(false)}
-        isUserOnline={isUserOnline}
-      />
+      {showSearchPage && <SearchPage onClose={() => setShowSearchPage(false)} />}
 
       {/* Chat Window */}
       {openChatWindow && (
@@ -753,29 +887,15 @@ function DashboardPage() {
           conversationId={openChatWindow!.conversationId}
           conversationType={openChatWindow!.type}
           participantName={openChatWindow!.name}
+          participantId={openChatWindow!.participantId}
           onClose={() => setOpenChatWindow(null)}
         />
       )}
 
       {/* Main Content */}
-      <div className="lg:ml-64 pt-14 lg:pt-16 p-3 lg:p-6 relative z-10">
-        <div className="max-w-7xl mx-auto">
-          <div className="flex flex-col lg:flex-row gap-6">
-            {/* Main Content Area */}
-            <div className="flex-1 min-w-0">
-              {renderContent()}
-            </div>
-            
-            {/* Right Sidebar - Users */}
-            <div className="lg:w-80 xl:w-96">
-              <UsersSidebar 
-                onUserClick={(user) => {
-                  // TODO: Navigate to user profile
-                  console.log('User clicked:', user)
-                }}
-              />
-            </div>
-          </div>
+      <div className={`main-content-layout p-2 lg:p-4 relative z-10 ${isSidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
+        <div className="max-w-6xl mx-auto">
+          {renderContent()}
         </div>
       </div>
     </div>

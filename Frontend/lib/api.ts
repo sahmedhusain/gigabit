@@ -96,6 +96,7 @@ export interface Group {
   members: number;
   isJoined: boolean;
   lastActivity: string;
+  timestamp?: string; // Add timestamp for sorting
 }
 
 export interface Event {
@@ -143,10 +144,12 @@ export interface Chat {
   name: string;
   lastMessage: string;
   time: string;
+  timestamp?: string; // Add timestamp for sorting
   unread: number;
   isOnline: boolean;
   isGroup: boolean;
   participantId?: number;
+  participantAvatar?: string; // Add participant avatar
 }
 
 // API Response types
@@ -251,6 +254,8 @@ export interface ConversationResponse {
   last_message: {
     content: string;
     created_at: string;
+    sender_id: number;
+    sender: User;
   };
   unread_count: number;
   updated_at: string;
@@ -721,9 +726,43 @@ export class ApiClient {
   }
 
   async createConversation(userId: number): Promise<ConversationResponse> {
+    // Instead of creating a separate conversation, we'll send an initial message
+    // This will automatically create the conversation in the backend
     return this.request<ConversationResponse>('/api/conversations', {
       method: 'POST',
       body: JSON.stringify({ user_id: userId }),
+    });
+  }
+
+  async sendMessage(data: { receiver_id?: number; group_id?: number; content: string; message_type: 'private' | 'group'; image_url?: string }): Promise<{ message: string; data: any }> {
+    return this.request<{ message: string; data: any }>('/api/messages', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async getPrivateMessages(userId: number, limit: number = 50, offset: number = 0): Promise<{ messages: any[]; count: number; limit: number; offset: number }> {
+    return this.request<{ messages: any[]; count: number; limit: number; offset: number }>(`/api/messages/private/${userId}?limit=${limit}&offset=${offset}`, {
+      method: 'GET',
+    });
+  }
+
+  async getGroupMessages(groupId: number, limit: number = 50, offset: number = 0): Promise<{ messages: any[]; count: number; limit: number; offset: number }> {
+    return this.request<{ messages: any[]; count: number; limit: number; offset: number }>(`/api/messages/group/${groupId}?limit=${limit}&offset=${offset}`, {
+      method: 'GET',
+    });
+  }
+
+  async markMessagesAsRead(messageIds: number[]): Promise<{ message: string; count: number }> {
+    return this.request<{ message: string; count: number }>('/api/messages/read', {
+      method: 'PUT',
+      body: JSON.stringify({ message_ids: messageIds }),
+    });
+  }
+
+  async getConversationMessages(conversationId: number, limit: number = 50, offset: number = 0): Promise<{ messages: any[]; count: number; limit: number; offset: number }> {
+    return this.request<{ messages: any[]; count: number; limit: number; offset: number }>(`/api/messages/conversation/${conversationId}?limit=${limit}&offset=${offset}`, {
+      method: 'GET',
     });
   }
 

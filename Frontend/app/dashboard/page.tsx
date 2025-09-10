@@ -142,6 +142,7 @@ function DashboardPage() {
       fetchFeedPosts()
       fetchUsers()
       fetchFollowers()
+      fetchConversations() // Add this to load conversations on initial load
       refetchEvents() // Add this to load events immediately
     }
   }, [user])
@@ -244,12 +245,22 @@ function DashboardPage() {
     }
   }, [])
 
-  // Handle offline/online status changes
+  // Update chat online status when online users change
   useEffect(() => {
-    if (isOffline) {
-      warning('You are currently offline. Some features may not work until connection is restored.', 0)
+    if (chats.length > 0) {
+      setChats(prevChats => 
+        prevChats.map(chat => {
+          if (chat.isGroup) return chat // Groups don't have online status
+          
+          const isOnline = chat.participantId 
+            ? onlineUsers.some(u => u.user_id === chat.participantId && u.is_online)
+            : false
+          
+          return { ...chat, isOnline }
+        })
+      )
     }
-  }, [isOffline, warning])
+  }, [onlineUsers, chats.length])
 
 
   const fetchFeedPosts = async () => {
@@ -337,7 +348,8 @@ function DashboardPage() {
         description: group.description ?? '',
         members: group.member_count ?? 0,
         isJoined: !!group.is_member,
-        lastActivity: formatTimeAgo(group.updated_at ?? group.updatedAt ?? new Date().toISOString())
+        lastActivity: formatTimeAgo(group.updated_at ?? group.updatedAt ?? new Date().toISOString()),
+        timestamp: group.updated_at ?? group.updatedAt ?? new Date().toISOString() // Add timestamp for sorting
       })))
     } catch (err) {
       console.error('Error fetching groups:', err)
@@ -355,18 +367,30 @@ function DashboardPage() {
     try {
       setIsLoadingChats(true)
       const data = await api.getConversations()
-      setChats(data.conversations.map(conversation => ({
-        id: conversation.id,
-        name: conversation.type === 'private'
+      setChats(data.conversations.map(conversation => {
+        const participantName = conversation.type === 'private'
           ? `${conversation.participant?.first_name || ''} ${conversation.participant?.last_name || ''}`.trim() || 'Unknown User'
-          : conversation.group?.title || 'Unknown Group',
-        lastMessage: conversation.last_message.content,
-        time: formatTimeAgo(conversation.updated_at),
-        unread: conversation.unread_count,
-        isOnline: false,
-        isGroup: conversation.type === 'group',
-        participantId: conversation.participant?.id
-      })))
+          : conversation.group?.title || 'Unknown Group'
+        
+        // Check if participant is online for private conversations
+        const isOnline = conversation.type === 'private' && conversation.participant?.id
+          ? onlineUsers.some(u => u.user_id === conversation.participant?.id && u.is_online)
+          : false
+        
+        return {
+          id: conversation.id,
+          name: participantName,
+          lastMessage: conversation.last_message.content,
+          time: formatTimeAgo(conversation.updated_at),
+          timestamp: conversation.updated_at, // Add timestamp for sorting
+          unread: conversation.unread_count,
+          isOnline: isOnline,
+          isGroup: conversation.type === 'group',
+          participantId: conversation.participant?.id,
+          participantAvatar: conversation.participant?.avatar, // Add participant avatar
+          lastMessageSenderId: conversation.last_message.sender_id // Add sender ID for "You:" prefix
+        }
+      }))
     } catch (err) {
       console.error('Error fetching conversations:', err)
       if (err instanceof NetworkError) {
@@ -577,8 +601,8 @@ function DashboardPage() {
     }
   }
 
-  const isUserOnline = (username: string): boolean => {
-    return onlineUsers.some(u => u.username === username && u.is_online)
+  const isUserOnline = (userId: number): boolean => {
+    return onlineUsers.some(u => u.user_id === userId && u.is_online)
   }
 
   const handleNotificationsToggle = () => {
@@ -687,7 +711,15 @@ function DashboardPage() {
           />
         )
       case 'chats':
-        return (
+        return openChatWindow ? (
+          <ChatWindow
+            conversationId={openChatWindow.conversationId}
+            conversationType={openChatWindow.type}
+            participantName={openChatWindow.name}
+            participantId={openChatWindow.participantId}
+            onClose={() => setOpenChatWindow(null)}
+          />
+        ) : (
           <ChatsSection
             chats={chats}
             groups={groups}
@@ -697,6 +729,7 @@ function DashboardPage() {
             setChatSubTab={setChatSubTab}
             onChatClick={setOpenChatWindow}
             isUserOnline={isUserOnline}
+            currentUser={user}
             showCreateGroup={showCreateGroup}
             setShowCreateDirectMessage={setShowCreateDirectMessage}
             setShowCreateGroup={setShowCreateGroup}
@@ -880,17 +913,6 @@ function DashboardPage() {
       />
 
       {showSearchPage && <SearchPage onClose={() => setShowSearchPage(false)} />}
-
-      {/* Chat Window */}
-      {openChatWindow && (
-        <ChatWindow
-          conversationId={openChatWindow!.conversationId}
-          conversationType={openChatWindow!.type}
-          participantName={openChatWindow!.name}
-          participantId={openChatWindow!.participantId}
-          onClose={() => setOpenChatWindow(null)}
-        />
-      )}
 
       {/* Main Content */}
       <div className={`main-content-layout p-2 lg:p-4 relative z-10 ${isSidebarCollapsed ? 'sidebar-collapsed' : ''}`}>

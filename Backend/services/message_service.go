@@ -46,6 +46,16 @@ func (s *MessageService) SendPrivateMessage(message *models.Message) error {
 	message.CreatedAt = now
 	message.UpdatedAt = now
 
+	// Create or update conversation
+	err = s.createOrUpdatePrivateConversation(message.SenderID, message.ReceiverID, uint(id))
+	if err != nil {
+		// Log error but don't fail the message send
+		fmt.Printf("Failed to update conversation: %v\n", err)
+	}
+
+	// Create notification for the receiver
+	s.createMessageNotification(message.SenderID, message.ReceiverID, message.ID)
+
 	return nil
 }
 
@@ -78,6 +88,13 @@ func (s *MessageService) SendGroupMessage(message *models.Message) error {
 	message.IsRead = false
 	message.CreatedAt = now
 	message.UpdatedAt = now
+
+	// Create or update group conversation
+	err = s.createOrUpdateGroupConversation(*message.GroupID, uint(id))
+	if err != nil {
+		// Log error but don't fail the message send
+		fmt.Printf("Failed to update group conversation: %v\n", err)
+	}
 
 	return nil
 }
@@ -189,6 +206,82 @@ func (s *MessageService) GetGroupMessages(groupID, userID uint, limit, offset in
 	return messages, nil
 }
 
+func (s *MessageService) createOrUpdatePrivateConversation(userID1, userID2, messageID uint) error {
+	// Ensure consistent ordering of participant IDs
+	var participant1ID, participant2ID uint
+	if userID1 < userID2 {
+		participant1ID = userID1
+		participant2ID = userID2
+	} else {
+		participant1ID = userID2
+		participant2ID = userID1
+	}
+
+	// Check if conversation already exists
+	var existingID uint
+	checkQuery := `
+		SELECT id FROM conversations
+		WHERE type = 'private' AND participant1_id = ? AND participant2_id = ?
+	`
+	err := s.db.QueryRow(checkQuery, participant1ID, participant2ID).Scan(&existingID)
+
+	if err == sql.ErrNoRows {
+		// Create new conversation
+		insertQuery := `
+			INSERT INTO conversations (type, participant1_id, participant2_id, last_message_id, unread_count1, unread_count2, created_at, updated_at)
+			VALUES ('private', ?, ?, ?, 0, 0, ?, ?)
+		`
+		now := time.Now()
+		_, err = s.db.Exec(insertQuery, participant1ID, participant2ID, messageID, now, now)
+		return err
+	} else if err != nil {
+		return err
+	} else {
+		// Update existing conversation
+		updateQuery := `
+			UPDATE conversations
+			SET last_message_id = ?, updated_at = ?
+			WHERE id = ?
+		`
+		now := time.Now()
+		_, err = s.db.Exec(updateQuery, messageID, now, existingID)
+		return err
+	}
+}
+
+func (s *MessageService) createOrUpdateGroupConversation(groupID, messageID uint) error {
+	// Check if conversation already exists
+	var existingID uint
+	checkQuery := `
+		SELECT id FROM conversations
+		WHERE type = 'group' AND group_id = ?
+	`
+	err := s.db.QueryRow(checkQuery, groupID).Scan(&existingID)
+
+	if err == sql.ErrNoRows {
+		// Create new conversation
+		insertQuery := `
+			INSERT INTO conversations (type, group_id, last_message_id, created_at, updated_at)
+			VALUES ('group', ?, ?, ?, ?)
+		`
+		now := time.Now()
+		_, err = s.db.Exec(insertQuery, groupID, messageID, now, now)
+		return err
+	} else if err != nil {
+		return err
+	} else {
+		// Update existing conversation
+		updateQuery := `
+			UPDATE conversations
+			SET last_message_id = ?, updated_at = ?
+			WHERE id = ?
+		`
+		now := time.Now()
+		_, err = s.db.Exec(updateQuery, messageID, now, existingID)
+		return err
+	}
+}
+
 func (s *MessageService) GetUserConversations(userID uint) ([]models.Conversation, error) {
 	conversations := make([]models.Conversation, 0)
 
@@ -211,15 +304,19 @@ func (s *MessageService) GetUserConversations(userID uint) ([]models.Conversatio
 
 func (s *MessageService) getPrivateConversations(userID uint) ([]models.Conversation, error) {
 	query := `
-		SELECT DISTINCT 
-			CASE WHEN m.sender_id = ? THEN m.receiver_id ELSE m.sender_id END as participant_id,
-			u.first_name, u.last_name, u.avatar, u.nickname
-		FROM messages m
-		JOIN users u ON (CASE WHEN m.sender_id = ? THEN m.receiver_id ELSE m.sender_id END) = u.id
-		WHERE (m.sender_id = ? OR m.receiver_id = ?) AND m.message_type = 'private'
+		SELECT c.id, c.participant1_id, c.participant2_id, c.last_message_id, c.unread_count1, c.unread_count2, c.updated_at,
+			   u1.first_name, u1.last_name, u1.avatar, u1.nickname,
+			   u2.first_name, u2.last_name, u2.avatar, u2.nickname,
+			   m.id, m.sender_id, m.receiver_id, m.content, m.image_url, m.message_type, m.is_read, m.created_at, m.updated_at
+		FROM conversations c
+		JOIN users u1 ON c.participant1_id = u1.id
+		JOIN users u2 ON c.participant2_id = u2.id
+		LEFT JOIN messages m ON c.last_message_id = m.id
+		WHERE c.type = 'private' AND (c.participant1_id = ? OR c.participant2_id = ?)
+		ORDER BY c.updated_at DESC
 	`
 
-	rows, err := s.db.Query(query, userID, userID, userID, userID)
+	rows, err := s.db.Query(query, userID, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -227,37 +324,50 @@ func (s *MessageService) getPrivateConversations(userID uint) ([]models.Conversa
 
 	var conversations []models.Conversation
 	for rows.Next() {
-		var participantID uint
-		var participant models.UserResponse
+		var convID uint
+		var participant1ID, participant2ID uint
+		var lastMessageID *uint
+		var unreadCount1, unreadCount2 int
+		var updatedAt time.Time
+		var participant1, participant2 models.UserResponse
+		var message models.MessageResponse
+		var sender models.UserResponse
 
-		err := rows.Scan(&participantID, &participant.FirstName, &participant.LastName,
-			&participant.Avatar, &participant.Nickname)
+		err := rows.Scan(
+			&convID, &participant1ID, &participant2ID, &lastMessageID, &unreadCount1, &unreadCount2, &updatedAt,
+			&participant1.FirstName, &participant1.LastName, &participant1.Avatar, &participant1.Nickname,
+			&participant2.FirstName, &participant2.LastName, &participant2.Avatar, &participant2.Nickname,
+			&message.ID, &message.SenderID, &message.ReceiverID, &message.Content, &message.ImageURL,
+			&message.MessageType, &message.IsRead, &message.CreatedAt, &message.UpdatedAt,
+		)
 		if err != nil {
 			return nil, err
 		}
 
-		participant.ID = participantID
+		participant1.ID = participant1ID
+		participant2.ID = participant2ID
+		sender.ID = message.SenderID
+		message.Sender = sender
 
-		// Get last message
-		lastMessage, err := s.getLastPrivateMessage(userID, participantID)
-		if err != nil {
-			continue
-		}
-
-		// Get unread count
-		unreadCount, err := s.getUnreadPrivateMessageCount(participantID, userID)
-		if err != nil {
-			unreadCount = 0
+		// Determine which participant is the other user
+		var participant *models.UserResponse
+		var unreadCount int
+		if participant1ID == userID {
+			participant = &participant2
+			unreadCount = unreadCount2
+		} else {
+			participant = &participant1
+			unreadCount = unreadCount1
 		}
 
 		conversation := models.Conversation{
-			ID:            fmt.Sprintf("private_%d", participantID),
+			ID:            fmt.Sprintf("private_%d", convID),
 			Type:          "private",
-			ParticipantID: participantID,
-			LastMessage:   *lastMessage,
+			ParticipantID: participant.ID,
+			LastMessage:   message,
 			UnreadCount:   unreadCount,
-			UpdatedAt:     lastMessage.CreatedAt,
-			Participant:   &participant,
+			UpdatedAt:     updatedAt,
+			Participant:   participant,
 		}
 
 		conversations = append(conversations, conversation)
@@ -268,10 +378,17 @@ func (s *MessageService) getPrivateConversations(userID uint) ([]models.Conversa
 
 func (s *MessageService) getGroupConversations(userID uint) ([]models.Conversation, error) {
 	query := `
-		SELECT g.id, g.name
-		FROM groups g
+		SELECT c.id, c.group_id, c.last_message_id, c.updated_at,
+			   g.name,
+			   m.id, m.sender_id, m.group_id as msg_group_id, m.content, m.image_url, m.message_type, m.is_read, m.created_at, m.updated_at,
+			   u.first_name, u.last_name, u.avatar, u.nickname
+		FROM conversations c
+		JOIN groups g ON c.group_id = g.id
 		JOIN group_members gm ON g.id = gm.group_id
-		WHERE gm.user_id = ? AND gm.status = 'member'
+		LEFT JOIN messages m ON c.last_message_id = m.id
+		LEFT JOIN users u ON m.sender_id = u.id
+		WHERE c.type = 'group' AND gm.user_id = ? AND gm.status = 'member'
+		ORDER BY c.updated_at DESC
 	`
 
 	rows, err := s.db.Query(query, userID)
@@ -282,10 +399,21 @@ func (s *MessageService) getGroupConversations(userID uint) ([]models.Conversati
 
 	var conversations []models.Conversation
 	for rows.Next() {
+		var convID uint
 		var groupID uint
+		var lastMessageID *uint
+		var updatedAt time.Time
 		var groupName string
+		var message models.MessageResponse
+		var sender models.UserResponse
 
-		err := rows.Scan(&groupID, &groupName)
+		err := rows.Scan(
+			&convID, &groupID, &lastMessageID, &updatedAt,
+			&groupName,
+			&message.ID, &message.SenderID, &message.GroupID, &message.Content, &message.ImageURL,
+			&message.MessageType, &message.IsRead, &message.CreatedAt, &message.UpdatedAt,
+			&sender.FirstName, &sender.LastName, &sender.Avatar, &sender.Nickname,
+		)
 		if err != nil {
 			return nil, err
 		}
@@ -295,25 +423,18 @@ func (s *MessageService) getGroupConversations(userID uint) ([]models.Conversati
 			Title: groupName,
 		}
 
-		// Get last message
-		lastMessage, err := s.getLastGroupMessage(groupID)
-		if err != nil {
-			continue
-		}
-
-		// Get unread count (for group messages, we'll count all unread messages)
-		unreadCount, err := s.getUnreadGroupMessageCount(groupID, userID)
-		if err != nil {
-			unreadCount = 0
+		if message.SenderID != 0 {
+			sender.ID = message.SenderID
+			message.Sender = sender
 		}
 
 		conversation := models.Conversation{
-			ID:          fmt.Sprintf("group_%d", groupID),
+			ID:          fmt.Sprintf("group_%d", convID),
 			Type:        "group",
 			GroupID:     groupID,
-			LastMessage: *lastMessage,
-			UnreadCount: unreadCount,
-			UpdatedAt:   lastMessage.CreatedAt,
+			LastMessage: message,
+			UnreadCount: 0, // TODO: Implement group unread count
+			UpdatedAt:   updatedAt,
 			Group:       &group,
 		}
 
@@ -463,4 +584,26 @@ func (s *MessageService) isUserGroupMember(groupID, userID uint) (bool, error) {
 	}
 
 	return count > 0, nil
+}
+
+func (s *MessageService) createMessageNotification(senderID, receiverID, messageID uint) error {
+	// Get sender info
+	senderQuery := `SELECT first_name, last_name FROM users WHERE id = ?`
+	var firstName, lastName string
+	err := s.db.QueryRow(senderQuery, senderID).Scan(&firstName, &lastName)
+	if err != nil {
+		return err
+	}
+
+	// Create notification
+	notificationQuery := `
+		INSERT INTO notifications (user_id, actor_id, type, entity_type, entity_id, title, message, is_read, created_at, updated_at)
+		VALUES (?, ?, 'new_message', 'message', ?, 'New Message', ?, false, ?, ?)
+	`
+
+	now := time.Now()
+	message := fmt.Sprintf("New message from %s %s", firstName, lastName)
+
+	_, err = s.db.Exec(notificationQuery, receiverID, senderID, messageID, message, now, now)
+	return err
 }

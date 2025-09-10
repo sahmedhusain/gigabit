@@ -9,6 +9,7 @@ package websocket
 
 import (
 	"database/sql"
+	"fmt"
 	"log"
 	"net/http"
 	"sync"
@@ -155,6 +156,8 @@ func (h *Hub) handleMessage(message Message) {
 		h.handleGroupMessage(message)
 	case MessageTypeNotification:
 		h.handleNotification(message)
+	case MessageTypeUserStatus:
+		h.handleUserStatus(message)
 	case MessageTypeTyping:
 		h.handleTypingIndicator(message)
 	case MessageTypePostUpdate:
@@ -237,6 +240,80 @@ func (h *Hub) handleGroupMessage(message Message) {
 			}
 		}
 	}
+}
+
+// handleUserStatus handles user status related messages
+func (h *Hub) handleUserStatus(message Message) {
+	if message.Data == nil {
+		return
+	}
+
+	data, ok := message.Data.(map[string]interface{})
+	if !ok {
+		return
+	}
+
+	action, ok := data["action"].(string)
+	if !ok {
+		return
+	}
+
+	switch action {
+	case "get_online_users":
+		h.handleGetOnlineUsers(message.From)
+	case "status_change":
+		h.handleStatusChange(message)
+	default:
+		log.Printf("Unknown user status action: %s", action)
+	}
+}
+
+// handleGetOnlineUsers sends the list of online users to the requesting client
+func (h *Hub) handleGetOnlineUsers(userID uint) {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+
+	onlineUsers := make([]map[string]interface{}, 0, len(h.clients))
+	for id := range h.clients {
+		// Get user info from database if available
+		var username string
+		if h.db != nil {
+			var firstName, lastName string
+			err := h.db.QueryRow("SELECT first_name, last_name FROM users WHERE id = ?", id).Scan(&firstName, &lastName)
+			if err == nil {
+				username = firstName + " " + lastName
+			}
+		}
+
+		if username == "" {
+			username = fmt.Sprintf("User %d", id)
+		}
+
+		onlineUsers = append(onlineUsers, map[string]interface{}{
+			"user_id":   id,
+			"username":  username,
+			"is_online": true,
+		})
+	}
+
+	responseMessage := Message{
+		Type: MessageTypeUserStatus,
+		From: 0, // System message
+		To:   userID,
+		Data: map[string]interface{}{
+			"online_users": onlineUsers,
+		},
+		Timestamp: time.Now().Unix(),
+	}
+
+	h.SendToUser(userID, responseMessage)
+}
+
+// handleStatusChange handles user status change requests
+func (h *Hub) handleStatusChange(message Message) {
+	// For now, we only handle online/offline status automatically
+	// Custom status changes can be implemented later
+	log.Printf("Status change request from user %d", message.From)
 }
 
 // handleNotification sends a notification to a specific user

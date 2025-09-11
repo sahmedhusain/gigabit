@@ -1,5 +1,6 @@
 'use client'
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { 
   Home, 
   User, 
@@ -15,8 +16,6 @@ import {
   Heart, 
   ChevronDown, 
   ChevronRight, 
-  PanelLeftClose, 
-  PanelLeftOpen, 
   Grid3X3, 
   UserCheck, 
   Bookmark,
@@ -94,14 +93,19 @@ export default function Sidebar({
   fetchEvents,
   currentUser,
   logout,
-  isCollapsed = false,
-  setIsCollapsed
+  isCollapsed: _isCollapsed = false,
+  setIsCollapsed: _setIsCollapsed
 }: SidebarProps) {
+  const router = useRouter()
   const [hoveredItem, setHoveredItem] = useState<string | null>(null)
   const [isProfileDropdownOpen, setProfileDropdownOpen] = useState(false)
   const [userStatus, setUserStatus] = useState('online')
   const [currentTime, setCurrentTime] = useState(new Date())
   const [showQuickActions, setShowQuickActions] = useState(false)
+  const [expandedSection, setExpandedSection] = useState<'feed' | 'activity' | 'community' | null>('feed')
+
+  // Disable collapse functionality entirely
+  const isCollapsed = false
 
   // Update time every minute
   useEffect(() => {
@@ -109,6 +113,15 @@ export default function Sidebar({
       setCurrentTime(new Date())
     }, 60000)
     return () => clearInterval(timer)
+  }, [])
+
+  // Set default selection to Feed -> All Posts on first mount
+  useEffect(() => {
+    if (!(activeTab === 'feed' && feedSubTab === 'all')) {
+      setActiveTab('feed')
+      setFeedSubTab('all')
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const statusOptions: StatusOption[] = [
@@ -153,6 +166,7 @@ export default function Sidebar({
 
   const menuSections = [
     {
+      id: 'feed' as const,
       title: 'Feed',
       icon: <Home className="w-4 h-4" />,
       description: 'Your personalized content',
@@ -199,6 +213,7 @@ export default function Sidebar({
       ]
     },
     {
+  id: 'activity' as const,
       title: 'Your Activity',
       icon: <Activity className="w-4 h-4" />,
       description: 'Track your engagement',
@@ -245,6 +260,7 @@ export default function Sidebar({
       ]
     },
     {
+  id: 'community' as const,
       title: 'Community',
       icon: <Globe className="w-4 h-4" />,
       description: 'Connect and discover',
@@ -319,39 +335,97 @@ export default function Sidebar({
 
       {/* Enhanced Sidebar */}
       <aside className={`
-        sidebar-layout bg-gradient-to-br from-slate-900/95 via-gray-900/95 to-zinc-900/95 backdrop-blur-xl border-r border-gray-700/30 shadow-2xl transform transition-all duration-300 ease-in-out
+        sidebar-layout w-[320px] min-w-[320px] max-w-[320px] bg-transparent transform transition-all duration-300 ease-in-out
         ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}
         lg:translate-x-0
-        ${isCollapsed ? 'collapsed' : ''}
       `}>
         <div className="flex flex-col h-full relative">
-          {/* Enhanced Navigation */}
-          <nav className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-600/30 scrollbar-track-transparent pt-4">
-            <div className={`p-4 space-y-4 ${isCollapsed ? 'lg:px-4' : ''}`}>
-              {menuSections.map((section, sectionIndex) => (
-                <div key={section.title} className="space-y-2">
-                  {/* Enhanced Section Header */}
-                  {!isCollapsed && (
-                    <div className="px-3 py-2">
-                      <div className="flex items-center space-x-2 mb-2">
-                        <div className="p-1.5 rounded-lg bg-white/10">
-                          {section.icon}
-                        </div>
-                        <div>
-                          <h3 className="text-white font-semibold text-sm">
-                            {section.title}
-                          </h3>
-                          <p className="text-white/60 text-xs">
-                            {section.description}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  )}
+          {/* Header: Logo card (non-scrolling) */}
+      <div className="p-4">
+            <div className="rounded-2xl">
+              <div className="p-4">
+                <button
+                  type="button"
+                  onClick={() => router.push('/')}
+      className="w-full group transition-all duration-300 text-center"
+                  aria-label="Go to homepage"
+                >
+          <div className="flex items-center justify-center h-14 box-border p-0 rounded-xl hover:bg-white/10 transition-all duration-300">
+                    <img
+                      src="/logo.png"
+                      alt="Gigabit Logo"
+                      className="h-full w-auto max-w-full rounded-xl object-contain drop-shadow-xl transition-all duration-300 group-hover:drop-shadow-2xl transform translate-y-[3px]"
+                    />
+                  </div>
+                </button>
+              </div>
+            </div>
+          </div>
 
-                  {/* Enhanced Section Items */}
-                  <div className="space-y-1">
-                    {section.items.map((item, itemIndex) => {
+          {/* Enhanced Navigation */}
+          <nav className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-600/30 scrollbar-track-transparent">
+            <div className={`p-4 space-y-4 ${isCollapsed ? 'lg:px-4' : ''}`}>
+              {menuSections.map((section) => {
+                const containerClass = section.id === 'feed'
+                  ? 'bg-gradient-to-br from-emerald-500/10 via-white/10 to-white/5 border-emerald-400/20'
+                  : section.id === 'activity'
+                  ? 'bg-gradient-to-br from-rose-500/10 via-white/10 to-white/5 border-rose-400/20'
+                  : 'bg-gradient-to-br from-purple-500/10 via-white/10 to-white/5 border-purple-400/20'
+                return (
+                  <div
+                    key={section.title}
+                    className={`sidebar-section backdrop-blur-xl rounded-2xl border shadow-xl ${containerClass}`}
+                  >
+                    <div className="p-4">
+                      {/* Section Header (clickable) */}
+                      {!isCollapsed && (
+                        <button
+                          type="button"
+                          className="w-full"
+                          onClick={() => {
+                            const willExpand = expandedSection !== section.id
+                            setExpandedSection(willExpand ? section.id : null)
+                            // Open first sub-tab by default
+                            if (section.id === 'feed') {
+                              setActiveTab('feed')
+                              setFeedSubTab('all')
+                            } else if (section.id === 'activity') {
+                              setActiveTab('activity')
+                              setActivitySubTab('liked')
+                            } else if (section.id === 'community') {
+                              const first = section.items?.[0]
+                              if (first?.id === 'discover') {
+                                setActiveTab('discover')
+                              } else {
+                                setActiveTab('community')
+                                setCommunitySubTab('events')
+                              }
+                            }
+                          }}
+                        >
+                          <div className="flex items-center justify-between mb-3 cursor-pointer">
+                            <div className="flex items-center space-x-2">
+                              <div className="p-1.5 rounded-lg bg-white/10">
+                                {section.icon}
+                              </div>
+                              <div className="text-left">
+                                <h3 className="text-white font-bold text-sm">
+                                  {section.title}
+                                </h3>
+                                <p className="text-white/60 text-xs">
+                                  {section.description}
+                                </p>
+                              </div>
+                            </div>
+                            <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${expandedSection === section.id ? 'rotate-180' : ''}`} />
+                          </div>
+                        </button>
+                      )}
+
+                      {/* Section Items */}
+                      {expandedSection === section.id && (
+                        <div className="space-y-1">
+                          {section.items.map((item) => {
                       const Icon = item.icon
                       const isActive = item.isActive
                       const isHovered = hoveredItem === item.id
@@ -365,29 +439,22 @@ export default function Sidebar({
                           }}
                           onMouseEnter={() => setHoveredItem(item.id)}
                           onMouseLeave={() => setHoveredItem(null)}
-                          className={`group relative overflow-hidden rounded-xl transition-all duration-300 ${
+                          className={`group relative overflow-hidden rounded-2xl transition-all duration-300 ${
                             isCollapsed ? 'w-auto mx-auto' : 'w-full'
                           } ${
                             isActive 
-                              ? `bg-gradient-to-r ${item.color} shadow-lg scale-[1.02] transform border border-white/20` 
+                              ? 'bg-gradient-to-br from-white/15 via-white/10 to-white/5 backdrop-blur-xl shadow-lg scale-[1.01] transform border border-white/20' 
                               : 'hover:bg-white/10 hover:scale-[1.01] hover:shadow-md border border-transparent hover:border-white/20'
                           }`}
                           title={isCollapsed ? item.label : undefined}
                         >
                           <div className={`flex items-center ${isCollapsed ? 'justify-center py-3 px-2' : 'p-4 space-x-4'}`}>
-                            <div className={`relative flex-shrink-0 transition-all duration-300 ${
-                              isActive && isCollapsed 
-                                ? `p-2 rounded-xl bg-gradient-to-r ${item.color} shadow-md` 
-                                : 'p-2 rounded-xl bg-white/10 group-hover:bg-white/20'
+                            <div className={`relative flex-shrink-0 transition-all duration-300 p-2 rounded-xl ${
+                              isActive ? 'bg-white/20' : 'bg-white/10 group-hover:bg-white/20'
                             }`}>
                               <Icon className={`w-5 h-5 transition-all duration-300 ${
                                 isActive ? 'text-white' : 'text-white/80 group-hover:text-white'
                               } ${isHovered ? 'scale-110' : ''}`} />
-                              
-                              {/* Active indicator for collapsed mode */}
-                              {isActive && isCollapsed && (
-                                <div className="absolute inset-0 bg-white/20 rounded-xl animate-pulse"></div>
-                              )}
                             </div>
                             
                             {!isCollapsed && (
@@ -417,49 +484,23 @@ export default function Sidebar({
                             )}
                           </div>
 
-                          {/* Enhanced active item effects */}
+                          {/* Active subtle overlay */}
                           {isActive && !isCollapsed && (
-                            <>
-                              <div className="absolute inset-0 bg-white/10 animate-pulse rounded-xl"></div>
-                              <div className="absolute left-0 top-1/2 transform -translate-y-1/2 w-1 h-8 bg-white rounded-r-full"></div>
-                            </>
+                            <div className="absolute inset-0 rounded-2xl pointer-events-none"></div>
                           )}
                         </button>
                       )
-                    })}
+                          })}
+                        </div>
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           </nav>
 
-          {/* Enhanced Footer Section */}
-          <div className="p-4 border-t border-gray-700/30">
-            <div className="flex items-center justify-center space-x-2">
-              <button
-                onClick={() => setIsCollapsed?.(!isCollapsed)}
-                className={`group p-2 rounded-xl transition-all duration-300 ${
-                  isCollapsed 
-                    ? 'bg-white/10 hover:bg-white/20' 
-                    : 'bg-gradient-to-r from-white/10 to-white/5 hover:from-white/20 hover:to-white/10 border border-white/20'
-                }`}
-                title={isCollapsed ? 'Expand Sidebar' : 'Collapse Sidebar'}
-              >
-                <div className="flex items-center space-x-2">
-                  {isCollapsed ? (
-                    <PanelLeftOpen className="w-4 h-4 text-white/80 group-hover:text-white transition-colors" />
-                  ) : (
-                    <>
-                      <PanelLeftClose className="w-4 h-4 text-white/80 group-hover:text-white transition-colors" />
-                      <span className="text-white/80 text-sm font-medium group-hover:text-white transition-colors">
-                        Collapse
-                      </span>
-                    </>
-                  )}
-                </div>
-              </button>
-            </div>
-          </div>
+          {/* Footer removed: collapse/uncollapse feature disabled */}
         </div>
 
         {/* Enhanced floating particles effect */}

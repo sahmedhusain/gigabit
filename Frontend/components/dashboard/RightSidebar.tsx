@@ -219,7 +219,7 @@ export default function RightSidebar({
     <div className="fixed-right-sidebar">
       <div className="space-y-4">
         {/* User Profile Dropdown Container */}
-        <div className="bg-gradient-to-br from-white/15 via-white/10 to-white/5 backdrop-blur-xl rounded-2xl border border-white/20 shadow-xl">
+  <div className="rounded-2xl">
           <div className="p-4">
             {/* User Profile Dropdown - Integrated */}
             <button

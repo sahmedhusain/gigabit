@@ -106,10 +106,12 @@ body {
 /* Layout fixes */
 .sidebar-layout {
   position: fixed;
-  top: 64px; /* Start below topbar */
+  top: 0; /* Start at top */
   left: 0;
-  height: calc(100vh - 64px); /* Adjust height to account for topbar */
-  width: 250px;
+  height: 100vh; /* Full height */
+  width: 320px; /* Match right sidebar width */
+  min-width: 320px; /* Enforce width */
+  max-width: 320px; /* Enforce width */
   z-index: 30;
   transition: width 0.3s ease-in-out;
 }
@@ -439,7 +441,7 @@ body {
 
 @media (min-width: 1024px) {
   .main-content-layout {
-    margin-left: 250px;
+  margin-left: 320px; /* Match left sidebar width */
     transition: margin-left 0.3s ease-in-out;
   }
   

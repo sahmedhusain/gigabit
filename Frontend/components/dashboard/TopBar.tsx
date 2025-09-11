@@ -1,8 +1,6 @@
 'use client'
 
 import { Menu, X, Bell, MessageCircle, Search, Users, Calendar, UserCheck, Hash, Filter, FileText, User, ChevronDown } from 'lucide-react'
-import { Typography } from '@mui/material'
-import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 
 
@@ -31,14 +29,9 @@ export default function TopBar({
   onSearchClick,
   unreadChatsCount = 3
 }: TopBarProps) {
-  const router = useRouter()
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedFilter, setSelectedFilter] = useState('all')
   const [showFilterDropdown, setShowFilterDropdown] = useState(false)
-
-  const handleLogoClick = () => {
-    router.push('/')
-  }
 
   const searchFilters = [
     { id: 'all', label: 'All', icon: Filter },
@@ -63,64 +56,20 @@ export default function TopBar({
   return (
         <header className="topbar-layout">
       <div className="flex items-center justify-between h-16 px-4">
-        {/* Left section: Menu button (mobile) + Logo */}
-        <div className="flex items-center space-x-4">
+  {/* Left section: Menu button (mobile) */}
+  <div className="flex items-center space-x-4 flex-1">
           <button
             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
             className="lg:hidden p-2 rounded-xl text-white/80 hover:text-white hover:bg-white/10 transition-all duration-200"
           >
             {isMobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
           </button>
-
-          <div 
-            onClick={handleLogoClick}
-            className="flex items-center space-x-3 transition-all duration-300 hover:scale-105 cursor-pointer"
-          >
-            <img
-              src="/logo.png"
-              alt="Gigabit Logo"
-              className="w-10 h-8 drop-shadow-xl hover:drop-shadow-2xl transition-all duration-300"
-            />
-            <Typography
-              variant="h6"
-              component="h1"
-              sx={{
-                fontWeight: '700',
-                color: 'white',
-                fontSize: { xs: '1.5rem', lg: '1.75rem' },
-                letterSpacing: '2px',
-                fontFamily: '"Courier New", "Consolas", "Monaco", "Menlo", monospace',
-                textTransform: 'capitalize',
-                position: 'relative',
-                display: 'flex',
-                alignItems: 'center',
-                lineHeight: 1.1,
-                marginTop: '1px',
-                minWidth: '120px',
-                textAlign: 'center',
-                '&::after': {
-                  content: '""',
-                  position: 'absolute',
-                  bottom: '-3px',
-                  left: '0',
-                  width: '100%',
-                  height: '3px',
-                  background: 'linear-gradient(90deg, #38bdf8, #06b6d4, #0891b2, #0e7490)',
-                  borderRadius: '2px',
-                  opacity: 0.95,
-                  boxShadow: '0 0 12px rgba(56, 189, 248, 0.5)',
-                }
-              }}
-            >
-              Gigabit
-            </Typography>
-          </div>
         </div>
 
         {/* Center Search Bar with adjacent buttons */}
-        <div className="flex justify-center items-center space-x-3">
+  <div className="flex justify-center items-center space-x-3">
           <div className="relative max-w-2xl w-full">
-            <div className="flex items-center bg-white/10 backdrop-blur-md border-2 border-white/30 rounded-2xl transition-all duration-300 focus-within:border-white/50 focus-within:bg-white/15">
+            <div className="flex items-center border-2 border-white/30 rounded-2xl transition-all duration-300 focus-within:border-white/50">
               <div className="flex items-center flex-1">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-white/60" />
                 <input
@@ -133,7 +82,7 @@ export default function TopBar({
               </div>
               
               {/* Filter Dropdown Button */}
-              <div className="relative">
+              <div>
                 <button
                   onClick={toggleFilterDropdown}
                   className="flex items-center space-x-2 px-3 py-2 text-white/70 hover:text-white transition-all duration-200 border-l border-white/20"
@@ -151,35 +100,34 @@ export default function TopBar({
                     )
                   })()}
                 </button>
-                
-                {/* Filter Dropdown */}
-                {showFilterDropdown && (
-                  <div className="absolute top-full right-0 mt-2 w-48 bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl border border-white/40 overflow-hidden z-50">
-                    <div className="p-2">
-                      <div className="text-xs font-semibold text-gray-600 mb-2 px-2">Search Filters</div>
-                      {searchFilters.map((filter) => {
-                        const IconComponent = filter.icon
-                        const isSelected = selectedFilter === filter.id
-                        return (
-                          <button
-                            key={filter.id}
-                            onClick={() => handleFilterSelect(filter.id)}
-                            className={`w-full flex items-center space-x-3 px-3 py-2 rounded-xl transition-all duration-200 ${
-                              isSelected
-                                ? 'bg-blue-100 text-blue-700 font-semibold'
-                                : 'text-gray-700 hover:bg-blue-50 hover:text-blue-600'
-                            }`}
-                          >
-                            <IconComponent className="w-4 h-4" />
-                            <span className="text-sm">{filter.label}</span>
-                          </button>
-                        )
-                      })}
-                    </div>
-                  </div>
-                )}
               </div>
             </div>
+            {/* Filter Dropdown (Full width, glass/blur) */}
+            {showFilterDropdown && (
+              <div className="absolute left-0 right-0 top-full mt-2 w-full bg-white/10 backdrop-blur-xl rounded-2xl shadow-2xl border border-white/20 overflow-hidden z-50">
+                <div className="p-2">
+                  <div className="text-xs font-semibold text-white/80 mb-2 px-2">Search Filters</div>
+                  {searchFilters.map((filter) => {
+                    const IconComponent = filter.icon
+                    const isSelected = selectedFilter === filter.id
+                    return (
+                      <button
+                        key={filter.id}
+                        onClick={() => handleFilterSelect(filter.id)}
+                        className={`w-full flex items-center space-x-3 px-3 py-2 rounded-xl transition-all duration-200 ${
+                          isSelected
+                            ? 'bg-white/20 text-white'
+                            : 'text-white/80 hover:bg-white/10 hover:text-white'
+                        }`}
+                      >
+                        <IconComponent className="w-4 h-4" />
+                        <span className="text-sm">{filter.label}</span>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Notifications Button - Right next to search */}
@@ -222,7 +170,7 @@ export default function TopBar({
         </div>
 
         {/* Right Side Actions */}
-        <div className="flex items-center space-x-4 justify-end">
+  <div className="flex items-center space-x-4 justify-end flex-1">
           <div className="flex items-center space-x-3 lg:space-x-4">
             
             

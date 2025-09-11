@@ -16,8 +16,7 @@ import {
   Sparkles,
   MapPin,
   Search,
-  ChevronDown,
-  ChevronUp,
+  
   Settings,
   LogOut,
   Shield,
@@ -274,7 +273,7 @@ export default function RightSidebar({
                   </div>
                 </div>
 
-                <ChevronDown className={`w-4 h-4 text-white/70 transition-transform duration-200 ${isProfileDropdownOpen ? 'rotate-180' : ''}`} />
+                {/* Chevron removed */}
               </div>
             </button>
 
@@ -354,7 +353,7 @@ export default function RightSidebar({
           <div className="p-4">
             {/* Header with collapse toggle */}
             <div 
-              className="flex items-center justify-between mb-4 cursor-pointer"
+              className={`flex items-center justify-between cursor-pointer ${expandedSection === 'calendar' ? 'mb-4' : 'mb-4 h-14'}`}
               onClick={() => toggleSection('calendar')}
             >
               <div>
@@ -367,10 +366,7 @@ export default function RightSidebar({
               </div>
               <div className="flex items-center space-x-2">
                 <Calendar className="w-5 h-5 text-blue-400" />
-                {expandedSection === 'calendar' ? 
-                  <ChevronUp className="w-4 h-4 text-gray-400" /> : 
-                  <ChevronDown className="w-4 h-4 text-gray-400" />
-                }
+                {/* Chevrons removed */}
               </div>
             </div>
 
@@ -573,7 +569,7 @@ export default function RightSidebar({
         }`}>
           <div className="p-4">
             <div 
-              className="flex items-center justify-between mb-4 cursor-pointer"
+              className={`flex items-center justify-between cursor-pointer ${expandedSection === 'following' ? 'mb-4' : 'mb-4 h-14'}`}
               onClick={() => toggleSection('following')}
             >
               <h3 className="text-white font-bold text-base flex items-center">
@@ -609,10 +605,7 @@ export default function RightSidebar({
                   }
                   return null;
                 })()}
-                {expandedSection === 'following' ? 
-                  <ChevronUp className="w-4 h-4 text-gray-400" /> : 
-                  <ChevronDown className="w-4 h-4 text-gray-400" />
-                }
+                {/* Chevrons removed */}
               </div>
             </div>
 
@@ -805,7 +798,7 @@ export default function RightSidebar({
         }`}>
           <div className="p-4">
             <div 
-              className="flex items-center justify-between mb-4 cursor-pointer"
+              className={`flex items-center justify-between cursor-pointer ${expandedSection === 'invitations' ? 'mb-4' : 'mb-4 h-14'}`}
               onClick={() => toggleSection('invitations')}
             >
               <h3 className="text-white font-bold text-base flex items-center">
@@ -826,10 +819,7 @@ export default function RightSidebar({
                     </span>
                   </div>
                 )}
-                {expandedSection === 'invitations' ? 
-                  <ChevronUp className="w-4 h-4 text-gray-400" /> : 
-                  <ChevronDown className="w-4 h-4 text-gray-400" />
-                }
+                {/* Chevrons removed */}
               </div>
             </div>
 

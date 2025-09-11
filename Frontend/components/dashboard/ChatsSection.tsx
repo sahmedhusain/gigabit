@@ -9,7 +9,6 @@ interface ChatsSectionProps {
   isLoadingChats: boolean
   isLoadingGroups: boolean
   chatSubTab: string
-  setChatSubTab: (tab: string) => void
   onChatClick: (chat: { conversationId: number; type: 'private' | 'group'; name: string; participantId?: number }) => void
   isUserOnline: (userId: number) => boolean
   currentUser: User | null
@@ -24,7 +23,6 @@ export default function ChatsSection({
   isLoadingChats,
   isLoadingGroups,
   chatSubTab,
-  setChatSubTab,
   onChatClick,
   isUserOnline,
   currentUser,
@@ -458,27 +456,7 @@ export default function ChatsSection({
         />
       </div>
 
-      {/* Tabs */}
-      <div className="flex space-x-1 bg-white/10 backdrop-blur-sm rounded-lg p-1 border border-white/20">
-        {[
-          { id: 'all', label: 'All', icon: MessageCircle },
-          { id: 'direct', label: 'Direct Messages', icon: MessageCircle },
-          { id: 'groups', label: 'Groups', icon: Users }
-        ].map(({ id, label, icon: Icon }) => (
-          <button
-            key={id}
-            onClick={() => setChatSubTab(id)}
-            className={`flex-1 flex items-center justify-center space-x-2 px-4 py-2 rounded-md transition-all ${
-              chatSubTab === id
-                ? 'bg-white text-emerald-600 shadow-lg'
-                : 'text-white/70 hover:text-white hover:bg-white/10'
-            }`}
-          >
-            <Icon className="w-4 h-4" />
-            <span className="font-medium">{label}</span>
-          </button>
-        ))}
-      </div>
+  {/* Tabs removed: selection handled via sidebar */}
 
       {/* Content */}
       <div className="min-h-96">

@@ -14,8 +14,6 @@ import {
   Bell, 
   LogOut, 
   Heart, 
-  ChevronDown, 
-  ChevronRight, 
   Grid3X3, 
   UserCheck, 
   Bookmark,
@@ -48,6 +46,11 @@ interface SidebarProps {
   setActivitySubTab: (subTab: string) => void
   communitySubTab: string
   setCommunitySubTab: (subTab: string) => void
+  chatSubTab: string
+  setChatSubTab: (subTab: string) => void
+  chatUnreadAll?: number
+  chatUnreadDirect?: number
+  chatUnreadGroups?: number
   fetchEvents: () => void
   currentUser: {
     id: number
@@ -90,6 +93,11 @@ export default function Sidebar({
   setActivitySubTab,
   communitySubTab,
   setCommunitySubTab,
+  chatSubTab,
+  setChatSubTab,
+  chatUnreadAll = 0,
+  chatUnreadDirect = 0,
+  chatUnreadGroups = 0,
   fetchEvents,
   currentUser,
   logout,
@@ -102,7 +110,7 @@ export default function Sidebar({
   const [userStatus, setUserStatus] = useState('online')
   const [currentTime, setCurrentTime] = useState(new Date())
   const [showQuickActions, setShowQuickActions] = useState(false)
-  const [expandedSection, setExpandedSection] = useState<'feed' | 'activity' | 'community' | null>('feed')
+  const [expandedSection, setExpandedSection] = useState<'feed' | 'chats' | 'activity' | 'community' | null>('feed')
 
   // Disable collapse functionality entirely
   const isCollapsed = false
@@ -213,6 +221,53 @@ export default function Sidebar({
       ]
     },
     {
+      id: 'chats' as const,
+      title: 'Chats',
+      icon: <MessageCircle className="w-4 h-4" />,
+      description: 'Messages and groups',
+      items: [
+        {
+          id: 'all',
+          label: 'All',
+          icon: Grid3X3,
+          description: 'All conversations',
+          color: 'from-blue-500 to-cyan-600',
+          count: undefined,
+          onClick: () => {
+            setActiveTab('chats')
+            setChatSubTab('all')
+          },
+          isActive: activeTab === 'chats' && (typeof chatSubTab !== 'undefined' ? chatSubTab === 'all' : false)
+        },
+        {
+          id: 'direct',
+          label: 'Direct Messages',
+          icon: MessageCircle,
+          description: 'Private conversations',
+          color: 'from-blue-500 to-cyan-600',
+          count: undefined,
+          onClick: () => {
+            setActiveTab('chats')
+            setChatSubTab('direct')
+          },
+          isActive: activeTab === 'chats' && (typeof chatSubTab !== 'undefined' ? chatSubTab === 'direct' : false)
+        },
+        {
+          id: 'groups',
+          label: 'Groups',
+          icon: Users,
+          description: 'Group chats',
+          color: 'from-blue-500 to-cyan-600',
+          count: undefined,
+          onClick: () => {
+            setActiveTab('chats')
+            setChatSubTab('groups')
+          },
+          isActive: activeTab === 'chats' && (typeof chatSubTab !== 'undefined' ? chatSubTab === 'groups' : false)
+        }
+      ]
+    },
+    {
   id: 'activity' as const,
       title: 'Your Activity',
       icon: <Activity className="w-4 h-4" />,
@@ -265,18 +320,6 @@ export default function Sidebar({
       icon: <Globe className="w-4 h-4" />,
       description: 'Connect and discover',
       items: [
-        {
-          id: 'discover',
-          label: 'Discover',
-          icon: Search,
-          description: 'Find new people to connect with',
-          color: 'from-purple-500 to-pink-600',
-          count: 'New',
-          onClick: () => {
-            setActiveTab('discover')
-          },
-          isActive: activeTab === 'discover'
-        },
         {
           id: 'events',
           label: 'Events',
@@ -368,6 +411,8 @@ export default function Sidebar({
               {menuSections.map((section) => {
                 const containerClass = section.id === 'feed'
                   ? 'bg-gradient-to-br from-emerald-500/10 via-white/10 to-white/5 border-emerald-400/20'
+                  : section.id === 'chats'
+                  ? 'bg-gradient-to-br from-blue-500/10 via-white/10 to-white/5 border-blue-400/20'
                   : section.id === 'activity'
                   ? 'bg-gradient-to-br from-rose-500/10 via-white/10 to-white/5 border-rose-400/20'
                   : 'bg-gradient-to-br from-purple-500/10 via-white/10 to-white/5 border-purple-400/20'
@@ -389,21 +434,19 @@ export default function Sidebar({
                             if (section.id === 'feed') {
                               setActiveTab('feed')
                               setFeedSubTab('all')
+                            } else if (section.id === 'chats') {
+                              setActiveTab('chats')
+                              setChatSubTab('all')
                             } else if (section.id === 'activity') {
                               setActiveTab('activity')
                               setActivitySubTab('liked')
                             } else if (section.id === 'community') {
-                              const first = section.items?.[0]
-                              if (first?.id === 'discover') {
-                                setActiveTab('discover')
-                              } else {
-                                setActiveTab('community')
-                                setCommunitySubTab('events')
-                              }
+                              setActiveTab('community')
+                              setCommunitySubTab('events')
                             }
                           }}
                         >
-                          <div className="flex items-center justify-between mb-3 cursor-pointer">
+                          <div className={`flex items-center justify-between cursor-pointer ${expandedSection === section.id ? 'mb-3' : 'mb-3 h-14'}`}>
                             <div className="flex items-center space-x-2">
                               <div className="p-1.5 rounded-lg bg-white/10">
                                 {section.icon}
@@ -417,7 +460,11 @@ export default function Sidebar({
                                 </p>
                               </div>
                             </div>
-                            <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${expandedSection === section.id ? 'rotate-180' : ''}`} />
+                            {section.id === 'chats' && expandedSection !== 'chats' && chatUnreadAll > 0 && (
+                              <span className="text-xs px-2 py-1 rounded-full font-medium bg-white/20 text-white">
+                                {chatUnreadAll}
+                              </span>
+                            )}
                           </div>
                         </button>
                       )}
@@ -459,27 +506,29 @@ export default function Sidebar({
                             
                             {!isCollapsed && (
                               <div className="flex-1 text-left">
-                                <div className="flex items-center justify-between">
+                                <div className={`flex items-center ${section.id === 'chats' ? 'justify-between' : ''}`}>
                                   <span className={`font-semibold text-sm transition-colors ${
                                     isActive ? 'text-white' : 'text-white/90 group-hover:text-white'
                                   }`}>
                                     {item.label}
                                   </span>
-                                  {item.count && (
-                                    <span className={`text-xs px-2 py-1 rounded-full font-medium ${
-                                      isActive 
-                                        ? 'bg-white/20 text-white' 
-                                        : 'bg-white/10 text-white/70 group-hover:bg-white/20 group-hover:text-white'
-                                    }`}>
-                                      {item.count}
-                                    </span>
-                                  )}
+                                  {section.id === 'chats' && (() => {
+                                    let count = 0
+                                    if (item.id === 'all') count = chatUnreadAll
+                                    else if (item.id === 'direct') count = chatUnreadDirect
+                                    else if (item.id === 'groups') count = chatUnreadGroups
+                                    return count > 0 ? (
+                                      <span className={`text-xs px-2 py-1 rounded-full font-medium ${
+                                        isActive 
+                                          ? 'bg-white/20 text-white' 
+                                          : 'bg-white/10 text-white/70 group-hover:bg-white/20 group-hover:text-white'
+                                      }`}>
+                                        {count}
+                                      </span>
+                                    ) : null
+                                  })()}
                                 </div>
-                                <p className={`text-xs mt-0.5 transition-colors ${
-                                  isActive ? 'text-white/80' : 'text-white/60 group-hover:text-white/80'
-                                }`}>
-                                  {item.description}
-                                </p>
+                                {/* Description removed for cleaner subtab items */}
                               </div>
                             )}
                           </div>

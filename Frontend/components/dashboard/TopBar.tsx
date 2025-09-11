@@ -1,6 +1,6 @@
 'use client'
 
-import { Menu, X, Bell, MessageCircle, Search, Users, Calendar, UserCheck, Hash, Filter, FileText, User, ChevronDown } from 'lucide-react'
+import { Menu, X, Bell, MessageCircle, Search, Users, Calendar, UserCheck, Hash, Filter, FileText, User, ChevronDown, Compass } from 'lucide-react'
 import { useState } from 'react'
 
 
@@ -12,9 +12,8 @@ interface TopBarProps {
   showNotifications: boolean
   setShowNotifications: () => void
   unreadCount: number
-  onChatClick: () => void
   onSearchClick: () => void
-  unreadChatsCount?: number
+  onDiscoverClick: () => void
 }
 
 export default function TopBar({
@@ -25,9 +24,8 @@ export default function TopBar({
   showNotifications,
   setShowNotifications,
   unreadCount,
-  onChatClick,
   onSearchClick,
-  unreadChatsCount = 3
+  onDiscoverClick,
 }: TopBarProps) {
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedFilter, setSelectedFilter] = useState('all')
@@ -130,17 +128,33 @@ export default function TopBar({
             )}
           </div>
 
+          {/* Discover Button - Between search and notifications */}
+          <button
+            onClick={onDiscoverClick}
+            className={`relative flex items-center rounded-2xl transition-all duration-300 transform hover:scale-105 hover:shadow-lg ${
+              activeTab === 'discover'
+                ? 'bg-gradient-to-r from-white to-blue-50 text-emerald-600 shadow-2xl border-2 border-white/40'
+                : 'text-white/90 hover:text-white hover:bg-white/20 backdrop-blur-md border-2 border-white/30 hover:border-white/50'
+            } ${activeTab === 'discover' ? 'px-3 py-2 space-x-2' : 'w-10 h-10 justify-center'}`}
+            type='button'
+            title="Discover"
+          >
+            <Compass className={`${activeTab === 'discover' ? 'w-4 h-4' : 'w-5 h-5'}`} />
+            <span className={`${activeTab === 'discover' ? 'inline' : 'hidden'} font-semibold text-sm`}>Discover</span>
+          </button>
+
           {/* Notifications Button - Right next to search */}
           <button
             onClick={setShowNotifications}
-            className={`relative p-2 rounded-2xl transition-all duration-300 transform hover:scale-105 hover:shadow-lg ${
+            className={`relative flex items-center rounded-2xl transition-all duration-300 transform hover:scale-105 hover:shadow-lg ${
               showNotifications
                 ? 'bg-gradient-to-r from-white to-blue-50 text-emerald-600 shadow-2xl border-2 border-white/40'
                 : 'text-white/90 hover:text-white hover:bg-white/20 backdrop-blur-md border-2 border-white/30 hover:border-white/50'
-            }`}
+            } ${showNotifications ? 'px-3 py-2 space-x-2' : 'w-10 h-10 justify-center'}`}
             aria-label="Notifications"
           >
-            <Bell className="w-4 h-4" />
+            <Bell className={`${showNotifications ? 'w-4 h-4' : 'w-5 h-5'}`} />
+            <span className={`${showNotifications ? 'inline' : 'hidden'} font-semibold text-sm`}>Notifications</span>
             {unreadCount > 0 && (
               <span className="absolute -top-2 -right-2 bg-gradient-to-r from-red-500 to-pink-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold shadow-xl border-2 border-white">
                 {unreadCount > 9 ? '9+' : unreadCount}
@@ -148,25 +162,6 @@ export default function TopBar({
             )}
           </button>
 
-          {/* Chats Button - Right next to notifications */}
-          <button
-            onClick={onChatClick}
-            className={`relative flex items-center space-x-2 px-3 py-2 rounded-2xl transition-all duration-300 transform hover:scale-105 hover:shadow-lg ${
-              activeTab === 'chats'
-                ? 'bg-gradient-to-r from-white to-blue-50 text-emerald-600 shadow-2xl border-2 border-white/40'
-                : 'text-white/90 hover:text-white hover:bg-white/20 backdrop-blur-md border-2 border-white/30 hover:border-white/50'
-            }`}
-            type='button'
-            title="Chats"
-          >
-            <MessageCircle className="w-4 h-4" />
-            <span className="hidden md:inline font-semibold text-sm">Chats</span>
-            {unreadChatsCount > 0 && (
-              <span className="absolute -top-2 -right-2 bg-gradient-to-r from-emerald-500 to-teal-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold shadow-xl border-2 border-white">
-                {unreadChatsCount > 9 ? '9+' : unreadChatsCount}
-              </span>
-            )}
-          </button>
         </div>
 
         {/* Right Side Actions */}

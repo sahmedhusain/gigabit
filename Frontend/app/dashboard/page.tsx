@@ -642,6 +642,17 @@ function DashboardPage() {
     }
   }
 
+  const handleDiscoverToggle = () => {
+    if (activeTab === 'discover') {
+      // If Discover is already open, go back to the previous tab
+      setActiveTab(previousTab)
+    } else {
+      // Open Discover and remember the previous tab
+      setPreviousTab(activeTab)
+      setActiveTab('discover')
+    }
+  }
+
   const handleSearchToggle = () => {
     setShowSearchPage(!showSearchPage)
   }
@@ -734,7 +745,6 @@ function DashboardPage() {
             isLoadingChats={isLoadingChats}
             isLoadingGroups={isLoadingGroups}
             chatSubTab={chatSubTab}
-            setChatSubTab={setChatSubTab}
             onChatClick={setOpenChatWindow}
             isUserOnline={isUserOnline}
             currentUser={user}
@@ -836,6 +846,11 @@ function DashboardPage() {
         ))}
       </div>
 
+      {(() => {
+        const chatUnreadAll = (chats || []).reduce((sum, c) => sum + (c.unread || 0), 0)
+        const chatUnreadDirect = (chats || []).filter(c => !c.isGroup).reduce((sum, c) => sum + (c.unread || 0), 0)
+        const chatUnreadGroups = (chats || []).filter(c => c.isGroup).reduce((sum, c) => sum + (c.unread || 0), 0)
+        return (
       <Sidebar
         isMobileMenuOpen={isMobileMenuOpen}
         setIsMobileMenuOpen={setIsMobileMenuOpen}
@@ -847,12 +862,19 @@ function DashboardPage() {
         setActivitySubTab={setActivitySubTab}
         communitySubTab={communitySubTab}
         setCommunitySubTab={setCommunitySubTab}
+  chatSubTab={chatSubTab}
+  setChatSubTab={setChatSubTab}
+        chatUnreadAll={chatUnreadAll}
+        chatUnreadDirect={chatUnreadDirect}
+        chatUnreadGroups={chatUnreadGroups}
         fetchEvents={refetchEvents}
         currentUser={currentUser}
         logout={logout}
         isCollapsed={isSidebarCollapsed}
         setIsCollapsed={setIsSidebarCollapsed}
       />
+        )
+      })()}
 
       <TopBar
         isMobileMenuOpen={isMobileMenuOpen}
@@ -862,9 +884,8 @@ function DashboardPage() {
         showNotifications={showNotifications}
         setShowNotifications={handleNotificationsToggle}
         unreadCount={liveUnreadCount || unreadNotifications}
-        onChatClick={handleChatToggle}
         onSearchClick={handleSearchToggle}
-        unreadChatsCount={chats.reduce((sum, chat) => sum + chat.unread, 0)}
+  onDiscoverClick={handleDiscoverToggle}
       />
 
       <CreatePost

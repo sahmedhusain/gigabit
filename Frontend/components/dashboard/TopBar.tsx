@@ -61,12 +61,21 @@ export default function TopBar({
   }
 
   return (
-    <header className="topbar-layout bg-gradient-to-r from-white/20 via-white/10 to-white/5 backdrop-blur-xl border-b border-white/40 shadow-2xl">
-      <div className="grid grid-cols-3 items-center h-full px-6 py-3 gap-4">
-        {/* Logo/Title - Hidden on mobile when sidebar is open */}
-        <div className={`flex items-center space-x-3 transition-all duration-300 hover:scale-105 cursor-pointer justify-start ${
-          isMobileMenuOpen ? 'lg:opacity-100 opacity-0' : 'opacity-100'
-        }`} onClick={handleLogoClick}>
+        <header className="topbar-layout">
+      <div className="flex items-center justify-between h-16 px-4">
+        {/* Left section: Menu button (mobile) + Logo */}
+        <div className="flex items-center space-x-4">
+          <button
+            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+            className="lg:hidden p-2 rounded-xl text-white/80 hover:text-white hover:bg-white/10 transition-all duration-200"
+          >
+            {isMobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+          </button>
+
+          <div 
+            onClick={handleLogoClick}
+            className="flex items-center space-x-3 transition-all duration-300 hover:scale-105 cursor-pointer"
+          >
             <img
               src="/logo.png"
               alt="Gigabit Logo"
@@ -106,9 +115,10 @@ export default function TopBar({
               Gigabit
             </Typography>
           </div>
+        </div>
 
-        {/* Center Search Bar */}
-        <div className="flex justify-center relative">
+        {/* Center Search Bar with adjacent buttons */}
+        <div className="flex justify-center items-center space-x-3">
           <div className="relative max-w-2xl w-full">
             <div className="flex items-center bg-white/10 backdrop-blur-md border-2 border-white/30 rounded-2xl transition-all duration-300 focus-within:border-white/50 focus-within:bg-white/15">
               <div className="flex items-center flex-1">
@@ -171,11 +181,8 @@ export default function TopBar({
               </div>
             </div>
           </div>
-        </div>
 
-        {/* Right Side Actions */}
-        <div className="flex items-center space-x-4 justify-end">
-          {/* Notifications Button - Icon Only */}
+          {/* Notifications Button - Right next to search */}
           <button
             onClick={setShowNotifications}
             className={`relative p-2 rounded-2xl transition-all duration-300 transform hover:scale-105 hover:shadow-lg ${
@@ -193,7 +200,7 @@ export default function TopBar({
             )}
           </button>
 
-          {/* Chats Button */}
+          {/* Chats Button - Right next to notifications */}
           <button
             onClick={onChatClick}
             className={`relative flex items-center space-x-2 px-3 py-2 rounded-2xl transition-all duration-300 transform hover:scale-105 hover:shadow-lg ${
@@ -212,7 +219,10 @@ export default function TopBar({
               </span>
             )}
           </button>
+        </div>
 
+        {/* Right Side Actions */}
+        <div className="flex items-center space-x-4 justify-end">
           <div className="flex items-center space-x-3 lg:space-x-4">
             
             

@@ -26,6 +26,7 @@ import { Sparkles } from 'lucide-react'
 // Import all dashboard components
 import TopBar from '@/components/dashboard/TopBar'
 import Sidebar from '@/components/dashboard/Sidebar'
+import RightSidebar from '@/components/dashboard/RightSidebar'
 import UsersSidebar from '@/components/dashboard/UsersSidebar'
 import CreatePost from '@/components/dashboard/CreatePost'
 import CreateGroup from '@/components/dashboard/CreateGroup'
@@ -38,6 +39,7 @@ import ChatsSection from '@/components/dashboard/ChatsSection'
 import ActivitySection from '@/components/dashboard/ActivitySection'
 import CommunitySection from '@/components/dashboard/CommunitySection'
 import SearchPage from '@/components/dashboard/SearchPage'
+import DiscoverPage from '@/components/dashboard/DiscoverPage'
 import {
   SettingsSection
 } from '@/components/dashboard/DashboardSections'
@@ -106,6 +108,12 @@ function DashboardPage() {
   const [followers, setFollowers] = useState<{ id: number; email: string; first_name: string; last_name: string; avatar?: string; nickname?: string; }[]>([])
   const [following, setFollowing] = useState<{ id: number; email: string; first_name: string; last_name: string; avatar?: string; nickname?: string; }[]>([])
   const [isLoadingFollowers, setIsLoadingFollowers] = useState(false)
+
+  // Data for trending topics (can be expanded later)
+  const trendingTopics = [
+    '#SocialNetwork', '#TechNews', '#WebDev', '#AI', '#Startups',
+    '#React', '#TypeScript', '#NodeJS', '#Python', '#DevOps'
+  ]
 
   // Current User Processing
   const currentUser = user ? {
@@ -778,6 +786,8 @@ function DashboardPage() {
         )
       case 'search':
         return <SearchPage onClose={() => setActiveTab(previousTab)} />
+      case 'discover':
+        return <DiscoverPage onClose={() => setActiveTab(previousTab)} />
       default:
         return (
           <HomeFeed
@@ -915,98 +925,31 @@ function DashboardPage() {
       {showSearchPage && <SearchPage onClose={() => setShowSearchPage(false)} />}
 
       {/* Main Content */}
-      <div className={`main-content-layout p-2 lg:p-4 relative z-10 ${isSidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
+      <div className={`main-content-layout p-2 lg:p-4 relative z-10 has-fixed-sidebar ${isSidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
         <div className="max-w-7xl mx-auto">
           <div className="flex flex-col lg:flex-row gap-6">
             {/* Main Content Area */}
             <div className="flex-1 min-w-0">
               {renderContent()}
             </div>
-            
-            {/* Right Sidebar */}
-            <div className="lg:w-80 xl:w-96 space-y-6">
-              {/* Online Users Section */}
-              <div className="bg-white/10 backdrop-blur-xl rounded-2xl p-4 border border-white/20">
-                <h3 className="text-white font-semibold mb-3 flex items-center">
-                  <div className="w-2 h-2 bg-green-400 rounded-full mr-2"></div>
-                  Online Users ({onlineUsers.length})
-                </h3>
-                <div className="space-y-2 max-h-48 overflow-y-auto">
-                  {onlineUsers.slice(0, 10).map((onlineUser, index) => (
-                    <div key={index} className="flex items-center space-x-3 p-2 rounded-lg hover:bg-white/10 transition-colors cursor-pointer">
-                      <div className="relative">
-                        <img
-                          src={(onlineUser as any).avatar || (onlineUser as any).profile_image || '/default-avatar.png'}
-                          alt={onlineUser.username}
-                          className="w-8 h-8 rounded-full border-2 border-green-400"
-                        />
-                        <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-green-400 rounded-full border-2 border-white"></div>
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-white text-sm font-medium truncate">
-                          {(onlineUser as any).display_name || (onlineUser as any).name || onlineUser.username || 'Unknown User'}
-                        </p>
-                        <p className="text-white/60 text-xs truncate">@{onlineUser.username}</p>
-                      </div>
-                    </div>
-                  ))}
-                  {onlineUsers.length === 0 && (
-                    <p className="text-white/60 text-sm text-center py-4">No users online</p>
-                  )}
-                </div>
-              </div>
-
-              {/* Trending Topics Section */}
-              <div className="bg-white/10 backdrop-blur-xl rounded-2xl p-4 border border-white/20">
-                <h3 className="text-white font-semibold mb-3 flex items-center">
-                  <span className="text-lg mr-2">🔥</span>
-                  Trending Topics
-                </h3>
-                <div className="space-y-2">
-                  {['#SocialNetwork', '#TechNews', '#WebDev', '#AI', '#Startups'].map((topic, index) => (
-                    <div key={topic} className="flex items-center justify-between p-2 rounded-lg hover:bg-white/10 transition-colors cursor-pointer">
-                      <span className="text-white/70 text-sm">{topic}</span>
-                      <span className="text-white/50 text-xs">{Math.floor(Math.random() * 1000) + 100} posts</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Recent Activity Section */}
-              <div className="bg-white/10 backdrop-blur-xl rounded-2xl p-4 border border-white/20">
-                <h3 className="text-white font-semibold mb-3 flex items-center">
-                  <span className="text-lg mr-2">⚡</span>
-                  Recent Activity
-                </h3>
-                <div className="space-y-3 max-h-48 overflow-y-auto">
-                  {liveNotifications.slice(0, 5).map((notification) => (
-                    <div key={notification.id} className="flex items-start space-x-3 p-2 rounded-lg hover:bg-white/10 transition-colors">
-                      <div className="w-2 h-2 bg-blue-400 rounded-full mt-2 flex-shrink-0"></div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-white/80 text-sm">
-                          <span className="font-medium">{(notification as any).actor?.first_name || 'Someone'}</span> {(notification as any).message || notification.type}
-                        </p>
-                        <p className="text-white/50 text-xs">{formatTimeAgo((notification as any).created_at || notification.created_at)}</p>
-                      </div>
-                    </div>
-                  ))}
-                  {liveNotifications.length === 0 && (
-                    <p className="text-white/60 text-sm text-center py-4">No recent activity</p>
-                  )}
-                </div>
-              </div>
-
-              {/* Users Sidebar Component */}
-              <UsersSidebar 
-                onUserClick={(user) => {
-                  // TODO: Navigate to user profile
-                  console.log('User clicked:', user)
-                }}
-              />
-            </div>
           </div>
         </div>
       </div>
+
+      {/* Fixed Right Sidebar */}
+      <RightSidebar
+        onlineUsers={onlineUsers}
+        followingUsers={following}
+        followersUsers={followers}
+        trendingTopics={trendingTopics}
+        onUserClick={(user) => {
+          // TODO: Navigate to user profile
+          console.log('User clicked:', user)
+        }}
+        currentUser={currentUser}
+        setActiveTab={handleTabChange}
+        logout={logout}
+      />
     </div>
   )
 }

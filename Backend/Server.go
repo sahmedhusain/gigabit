@@ -6,12 +6,13 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
+	"time"
+
 	"social/handlers"
 	"social/middleware"
 	customsqlite "social/pkg/db/sqlite"
 	"social/websocket"
-	"strings"
-	"time"
 )
 
 type Server struct {
@@ -100,7 +101,7 @@ func (s *Server) setupRoutes() {
 	uploadHandler := handlers.NewUploadHandler()
 	profileHandler := handlers.NewProfileHandler(s.DB.GetDB())
 	userHandler := handlers.NewUserHandler(s.DB.GetDB())
-	followHandler := handlers.NewFollowHandler(s.DB.GetDB())
+	followHandler := handlers.NewFollowHandler(s.DB.GetDB(), s.Hub)
 	postHandler := handlers.NewPostHandler(s.DB.GetDB(), s.Hub)
 	groupHandler := handlers.NewGroupHandler(s.DB.GetDB())
 	eventHandler := handlers.NewEventHandler(s.DB.GetDB())

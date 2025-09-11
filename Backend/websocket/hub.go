@@ -43,6 +43,7 @@ const (
 	MessageTypeUnfollow            = "unfollow"
 	MessageTypeFollowRequest       = "follow_request"
 	MessageTypeCancelFollowRequest = "cancel_follow_request"
+	MessageTypeFollowerCountUpdate = "follower_count_update"
 	MessageTypeGroupUpdate         = "group_update"
 	MessageTypeEventUpdate         = "event_update"
 	MessageTypeError               = "error"
@@ -909,6 +910,10 @@ func (h *Hub) handleFollow(message Message) {
 		Timestamp: time.Now().Unix(),
 	})
 
+	// Broadcast follower count updates
+	h.broadcastFollowerCountUpdate(followerID)
+	h.broadcastFollowerCountUpdate(targetUserID)
+
 	log.Printf("User %d now following user %d", followerID, targetUserID)
 }
 
@@ -966,6 +971,10 @@ func (h *Hub) handleUnfollow(message Message) {
 		},
 		Timestamp: time.Now().Unix(),
 	})
+
+	// Broadcast follower count updates
+	h.broadcastFollowerCountUpdate(followerID)
+	h.broadcastFollowerCountUpdate(targetUserID)
 
 	log.Printf("User %d unfollowed user %d", followerID, targetUserID)
 }
@@ -1030,6 +1039,9 @@ func (h *Hub) handleFollowRequest(message Message) {
 	if status == "accepted" {
 		// Update the follower's following list in memory
 		h.AddUserToFollowing(followerID, targetUserID)
+		// Broadcast follower count updates
+		h.broadcastFollowerCountUpdate(followerID)
+		h.broadcastFollowerCountUpdate(targetUserID)
 	}
 
 	// Get follower name for notification
@@ -1141,4 +1153,44 @@ func (h *Hub) sendErrorMessage(userID uint, errorMsg string) {
 		Content:   errorMsg,
 		Timestamp: time.Now().Unix(),
 	})
+}
+
+// broadcastFollowerCountUpdate broadcasts updated follower counts to a user's profile viewers
+func (h *Hub) broadcastFollowerCountUpdate(userID uint) {
+	if h.db == nil {
+		return
+	}
+
+	// Get updated follower counts from database
+	followersQuery := `SELECT COUNT(*) FROM follows WHERE following_id = ? AND status = 'accepted'`
+	followingQuery := `SELECT COUNT(*) FROM follows WHERE follower_id = ? AND status = 'accepted'`
+
+	var followersCount, followingCount int
+
+	err := h.db.QueryRow(followersQuery, userID).Scan(&followersCount)
+	if err != nil {
+		log.Printf("Failed to get followers count for user %d: %v", userID, err)
+		return
+	}
+
+	err = h.db.QueryRow(followingQuery, userID).Scan(&followingCount)
+	if err != nil {
+		log.Printf("Failed to get following count for user %d: %v", userID, err)
+		return
+	}
+
+	// Broadcast the count update to all connected clients
+	countUpdateMessage := Message{
+		Type:   MessageTypeFollowerCountUpdate,
+		From:   0, // System message
+		Action: "count_update",
+		Data: map[string]interface{}{
+			"user_id":         userID,
+			"followers_count": followersCount,
+			"following_count": followingCount,
+		},
+		Timestamp: time.Now().Unix(),
+	}
+
+	h.BroadcastMessage(countUpdateMessage)
 }

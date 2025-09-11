@@ -24,6 +24,7 @@ interface ProfileSectionProps {
   following: any[]
   posts: Post[]
   isLoadingFollowers: boolean
+  isOwnProfile?: boolean
 }
 
 export default function ProfileSection({
@@ -31,7 +32,8 @@ export default function ProfileSection({
   followers,
   following,
   posts,
-  isLoadingFollowers
+  isLoadingFollowers,
+  isOwnProfile = true
 }: ProfileSectionProps) {
   const router = useRouter()
   const { posts: realTimePosts, isConnected } = useRealTimePosts()
@@ -116,24 +118,28 @@ export default function ProfileSection({
             </div>
 
             <div className="flex flex-col sm:flex-row gap-3 lg:gap-4">
-              <button className="flex items-center justify-center px-4 lg:px-6 py-2 bg-gradient-to-r from-emerald-500 to-teal-600 rounded-xl text-white hover:from-emerald-600 hover:to-teal-700 transition-all duration-200 text-sm lg:text-base">
-                <Settings className="w-4 h-4 mr-2" />
-                Edit Profile
-              </button>
+              {isOwnProfile && (
+                <>
+                  <button className="flex items-center justify-center px-4 lg:px-6 py-2 bg-gradient-to-r from-emerald-500 to-teal-600 rounded-xl text-white hover:from-emerald-600 hover:to-teal-700 transition-all duration-200 text-sm lg:text-base">
+                    <Settings className="w-4 h-4 mr-2" />
+                    Edit Profile
+                  </button>
 
-              <button className={`flex items-center justify-center px-4 lg:px-6 py-2 border border-white/30 rounded-xl text-white hover:bg-white/10 transition-all duration-200 text-sm lg:text-base`}>
-                {currentUser?.isPrivate ? (
-                  <>
-                    <Lock className="w-4 h-4 mr-2" />
-                    Private Profile
-                  </>
-                ) : (
-                  <>
-                    <Globe className="w-4 h-4 mr-2" />
-                    Public Profile
-                  </>
-                )}
-              </button>
+                  <button className={`flex items-center justify-center px-4 lg:px-6 py-2 border border-white/30 rounded-xl text-white hover:bg-white/10 transition-all duration-200 text-sm lg:text-base`}>
+                    {currentUser?.isPrivate ? (
+                      <>
+                        <Lock className="w-4 h-4 mr-2" />
+                        Private Profile
+                      </>
+                    ) : (
+                      <>
+                        <Globe className="w-4 h-4 mr-2" />
+                        Public Profile
+                      </>
+                    )}
+                  </button>
+                </>
+              )}
             </div>
           </div>
         </div>

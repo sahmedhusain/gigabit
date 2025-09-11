@@ -389,8 +389,8 @@ func (s *Server) handlePostRoute(handler *handlers.PostHandler) http.HandlerFunc
 			default:
 				writeError(w, http.StatusNotFound, "Route not found")
 			}
-		} else if len(parts) >= 3 && parts[1] == "user" {
-			userID := parts[2]
+		} else if len(parts) >= 2 && parts[0] == "user" {
+			userID := parts[1]
 			if r.Method != http.MethodGet {
 				writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
 				return

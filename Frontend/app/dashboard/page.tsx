@@ -1,5 +1,6 @@
 'use client'
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import ProtectedRoute from '@/components/ProtectedRoute'
 import ChatWindow from '@/components/ChatWindow'
 import { useAuth } from '@/context/AuthContext'
@@ -43,6 +44,7 @@ import {
 } from '@/components/dashboard/DashboardSections'
 
 function DashboardPage() {
+  const router = useRouter()
   const { user, logout, checkAuth } = useAuth()
   const { isConnected, onlineUsers, addMessageListener, sendMessage } = useWebSocket()
   const { success, error, warning } = useToast()
@@ -977,8 +979,7 @@ function DashboardPage() {
               {/* Users Sidebar Component */}
               <UsersSidebar 
                 onUserClick={(user) => {
-                  // TODO: Navigate to user profile
-                  console.log('User clicked:', user)
+                  router.push(`/profile/${user.id}`)
                 }}
               />
             </div>

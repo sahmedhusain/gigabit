@@ -136,7 +136,7 @@ body {
   transition: margin-left 0.3s ease-in-out;
 }
 
-/* Fixed Right Sidebar */
+/* Ensure the entire sidebar allows overflow for the modal */
 .fixed-right-sidebar {
   position: fixed;
   top: 0;
@@ -147,7 +147,10 @@ body {
   transition: transform 0.3s ease-in-out;
   display: none; /* Hidden by default on mobile */
   max-height: 100vh;
-  overflow: hidden;
+  overflow: visible; /* Allow modal to overflow */
+  box-sizing: border-box;
+  /* Ensure no content overflows the sidebar except the modal */
+  contain: layout style paint;
 }
 
 /* Show sidebar on large screens */
@@ -158,7 +161,7 @@ body {
   }
 }
 
-/* Right sidebar inner container */
+/* Right sidebar inner container - Remove scrollability */
 .fixed-right-sidebar > div {
   height: 100vh;
   max-height: 100vh;
@@ -166,7 +169,8 @@ body {
   display: flex;
   flex-direction: column;
   gap: 16px;
-  overflow: hidden;
+  overflow: hidden; /* Prevent scrolling */
+  box-sizing: border-box;
 }
 
 /* Sidebar sections with flexible heights */
@@ -178,27 +182,29 @@ body {
 }
 
 .sidebar-section.expandable {
-  flex-grow: 1;
-  min-height: 300px;
-  max-height: calc(100vh - 200px);
-  overflow-y: auto;
+  flex: 0 0 auto; /* Don't grow, use fixed height */
+  min-height: 200px;
+  max-height: calc(100vh - 500px); /* Match specific section constraints */
+  overflow-y: auto; /* Allow internal scrolling only */
   display: flex;
   flex-direction: column;
 }
 
 .sidebar-section.collapsed {
-  flex-grow: 0;
-  flex-shrink: 1;
-  min-height: 80px;
-  max-height: 120px;
+  flex: 0 0 auto;
+  min-height: 60px; /* Reduced from 80px */
+  max-height: 80px; /* Reduced from 120px */
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: center; /* Center content vertically */
 }
 
-/* Optimize expanded section content */
-.sidebar-section.expandable > div {
+.sidebar-section.collapsed > div {
   flex: 1;
   display: flex;
   flex-direction: column;
+  justify-content: center;
   min-height: 0;
 }
 
@@ -206,35 +212,49 @@ body {
   flex: 1;
   overflow-y: auto;
   min-height: 0;
+  max-height: 100%;
+  padding-right: 4px; /* Add some padding for scrollbar */
 }
 
 /* Ensure sections fit properly within sidebar */
 .fixed-right-sidebar .space-y-4 > div {
   flex-shrink: 0;
   min-height: 0;
+  max-height: none; /* Allow sections to grow but be constrained by parent */
 }
 
-/* Custom scrollbar for sidebar sections */
-.sidebar-scroll {
-  scrollbar-width: thin;
-  scrollbar-color: rgba(52, 211, 153, 0.2) transparent;
+/* Add specific constraints for the space-y-4 container */
+.fixed-right-sidebar .space-y-4 {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  max-height: 100%;
+  gap: 16px;
+  /* Ensure no section overflows */
+  overflow: hidden;
+  box-sizing: border-box;
 }
 
-.sidebar-scroll::-webkit-scrollbar {
-  width: 6px;
+/* Specific constraints for calendar section when expanded - Contain modal within calendar */
+.sidebar-section:has(.calendar-content).expandable {
+  max-height: calc(100vh - 500px); /* More conservative for calendar to allow space for other sections */
+  flex: 0 0 auto;
+  overflow: visible; /* Allow modal to be visible within section */
+  position: relative; /* For proper modal positioning */
 }
 
-.sidebar-scroll::-webkit-scrollbar-thumb {
-  background-color: rgba(52, 211, 153, 0.2);
-  border-radius: 4px;
+/* Specific constraints for invitation section when expanded */
+.sidebar-section:has(.invitation-content).expandable {
+  max-height: calc(100vh - 500px); /* Same constraint for invitation section */
+  flex: 0 0 auto;
 }
 
-.sidebar-scroll::-webkit-scrollbar-thumb:hover {
-  background-color: rgba(52, 211, 153, 0.3);
-}
-
-.sidebar-scroll::-webkit-scrollbar-track {
-  background-color: transparent;
+/* Add class to invitation content for targeting */
+.invitation-content {
+  /* Specific styling for invitation content */
+  position: relative;
+  max-height: calc(100vh - 500px); /* Match section constraint */
+  overflow-y: auto; /* Allow internal scrolling */
 }
 
 /* Enhanced sidebar animations */
@@ -469,10 +489,42 @@ body {
   transition: all 0.2s ease-in-out;
 }
 
-/* Sidebar particle positions */
-.particle-1 { left: 10%; top: 20%; animation-delay: 0s; animation-duration: 3s; }
-.particle-2 { left: 25%; top: 32%; animation-delay: 0.5s; animation-duration: 3.5s; }
-.particle-3 { left: 40%; top: 44%; animation-delay: 1s; animation-duration: 4s; }
-.particle-4 { left: 55%; top: 56%; animation-delay: 1.5s; animation-duration: 4.5s; }
-.particle-5 { left: 70%; top: 68%; animation-delay: 2s; animation-duration: 5s; }
-.particle-6 { left: 85%; top: 80%; animation-delay: 2.5s; animation-duration: 5.5s; }
+/* Calendar content specific constraints - Allow overflow for slide-up modal */
+.calendar-content {
+  max-height: calc(100vh - 500px); /* Match section constraint */
+  overflow: visible; /* Allow slide-up modal to overflow */
+  position: relative; /* For proper positioning */
+}
+
+/* Specific constraints for calendar section when expanded - Allow overflow for slide-up */
+.sidebar-section:has(.calendar-content).expandable {
+  max-height: calc(100vh - 500px); /* More conservative for calendar to allow space for other sections */
+  flex: 0 0 auto;
+  overflow: visible; /* Allow slide-up modal to overflow */
+}
+
+/* Events slide-up animation - overflowing calendar */
+@keyframes slide-up {
+  from {
+    transform: translateY(100px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.animate-slide-up {
+  animation: slide-up 0.3s ease-out;
+}
+
+/* Events slide-up modal positioning - overflows calendar container */
+.events-overflow-modal {
+  position: fixed;
+  bottom: 30px;
+  right: 20px;
+  width: 250px;
+  max-width: calc(100vw - 40px);
+  z-index: 50;
+}

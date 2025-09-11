@@ -68,7 +68,6 @@ function DashboardPage() {
   const [previousTab, setPreviousTab] = useState('feed')
   const [feedSubTab, setFeedSubTab] = useState('all')
   const [activitySubTab, setActivitySubTab] = useState('liked')
-  const [communitySubTab, setCommunitySubTab] = useState('events')
   const [chatSubTab, setChatSubTab] = useState('all')
   const [showCreatePost, setShowCreatePost] = useState(false)
   const [showCreateGroup, setShowCreateGroup] = useState(false)
@@ -763,7 +762,7 @@ function DashboardPage() {
             onPostBookmark={handleBookmarkPost}
           />
         )
-      case 'community':
+      case 'events':
         return (
           <CommunitySection
             events={liveEvents}
@@ -774,7 +773,21 @@ function DashboardPage() {
             showCreateEvent={showCreateEvent}
             setShowCreateEvent={setShowCreateEvent}
             onEventRespond={respondToEvent}
-            communitySubTab={communitySubTab}
+            communitySubTab={'events'}
+          />
+        )
+      case 'activity-history':
+        return (
+          <CommunitySection
+            events={liveEvents}
+            onEventsUpdate={refetchEvents}
+            isLoadingEvents={eventsLoading}
+            notifications={notifications}
+            isLoadingNotifications={isLoadingNotifications}
+            showCreateEvent={showCreateEvent}
+            setShowCreateEvent={setShowCreateEvent}
+            onEventRespond={respondToEvent}
+            communitySubTab={'activity'}
           />
         )
       case 'profile':
@@ -860,10 +873,8 @@ function DashboardPage() {
         setFeedSubTab={setFeedSubTab}
         activitySubTab={activitySubTab}
         setActivitySubTab={setActivitySubTab}
-        communitySubTab={communitySubTab}
-        setCommunitySubTab={setCommunitySubTab}
-  chatSubTab={chatSubTab}
-  setChatSubTab={setChatSubTab}
+        chatSubTab={chatSubTab}
+        setChatSubTab={setChatSubTab}
         chatUnreadAll={chatUnreadAll}
         chatUnreadDirect={chatUnreadDirect}
         chatUnreadGroups={chatUnreadGroups}

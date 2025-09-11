@@ -44,8 +44,6 @@ interface SidebarProps {
   setFeedSubTab: (subTab: string) => void
   activitySubTab: string
   setActivitySubTab: (subTab: string) => void
-  communitySubTab: string
-  setCommunitySubTab: (subTab: string) => void
   chatSubTab: string
   setChatSubTab: (subTab: string) => void
   chatUnreadAll?: number
@@ -91,8 +89,6 @@ export default function Sidebar({
   setFeedSubTab,
   activitySubTab,
   setActivitySubTab,
-  communitySubTab,
-  setCommunitySubTab,
   chatSubTab,
   setChatSubTab,
   chatUnreadAll = 0,
@@ -110,7 +106,7 @@ export default function Sidebar({
   const [userStatus, setUserStatus] = useState('online')
   const [currentTime, setCurrentTime] = useState(new Date())
   const [showQuickActions, setShowQuickActions] = useState(false)
-  const [expandedSection, setExpandedSection] = useState<'feed' | 'chats' | 'activity' | 'community' | null>('feed')
+  const [expandedSection, setExpandedSection] = useState<'feed' | 'chats' | 'activity' | 'events' | 'activity-history' | null>('feed')
 
   // Disable collapse functionality entirely
   const isCollapsed = false
@@ -174,53 +170,6 @@ export default function Sidebar({
 
   const menuSections = [
     {
-      id: 'feed' as const,
-      title: 'Feed',
-      icon: <Home className="w-4 h-4" />,
-      description: 'Your personalized content',
-      items: [
-        {
-          id: 'all',
-          label: 'All Posts',
-          icon: Grid3X3,
-          description: 'See all public posts',
-          color: 'from-emerald-500 to-teal-600',
-          count: '2.1k',
-          onClick: () => {
-            setActiveTab('feed')
-            setFeedSubTab('all')
-          },
-          isActive: activeTab === 'feed' && feedSubTab === 'all'
-        },
-        {
-          id: 'following',
-          label: 'Following',
-          icon: UserCheck,
-          description: 'Posts from people you follow',
-          color: 'from-emerald-500 to-teal-600',
-          count: '342',
-          onClick: () => {
-            setActiveTab('feed')
-            setFeedSubTab('following')
-          },
-          isActive: activeTab === 'feed' && feedSubTab === 'following'
-        },
-        {
-          id: 'friends',
-          label: 'Friends',
-          icon: Users,
-          description: 'Posts from your friends',
-          color: 'from-emerald-500 to-teal-600',
-          count: '89',
-          onClick: () => {
-            setActiveTab('feed')
-            setFeedSubTab('friends')
-          },
-          isActive: activeTab === 'feed' && feedSubTab === 'friends'
-        }
-      ]
-    },
-    {
       id: 'chats' as const,
       title: 'Chats',
       icon: <MessageCircle className="w-4 h-4" />,
@@ -268,7 +217,54 @@ export default function Sidebar({
       ]
     },
     {
-  id: 'activity' as const,
+      id: 'feed' as const,
+      title: 'Feed',
+      icon: <Home className="w-4 h-4" />,
+      description: 'Your personalized content',
+      items: [
+        {
+          id: 'all',
+          label: 'All Posts',
+          icon: Grid3X3,
+          description: 'See all public posts',
+          color: 'from-emerald-500 to-teal-600',
+          count: '2.1k',
+          onClick: () => {
+            setActiveTab('feed')
+            setFeedSubTab('all')
+          },
+          isActive: activeTab === 'feed' && feedSubTab === 'all'
+        },
+        {
+          id: 'following',
+          label: 'Following',
+          icon: UserCheck,
+          description: 'Posts from people you follow',
+          color: 'from-emerald-500 to-teal-600',
+          count: '342',
+          onClick: () => {
+            setActiveTab('feed')
+            setFeedSubTab('following')
+          },
+          isActive: activeTab === 'feed' && feedSubTab === 'following'
+        },
+        {
+          id: 'friends',
+          label: 'Friends',
+          icon: Users,
+          description: 'Posts from your friends',
+          color: 'from-emerald-500 to-teal-600',
+          count: '89',
+          onClick: () => {
+            setActiveTab('feed')
+            setFeedSubTab('friends')
+          },
+          isActive: activeTab === 'feed' && feedSubTab === 'friends'
+        }
+      ]
+    },
+    {
+      id: 'activity' as const,
       title: 'Your Activity',
       icon: <Activity className="w-4 h-4" />,
       description: 'Track your engagement',
@@ -315,37 +311,43 @@ export default function Sidebar({
       ]
     },
     {
-  id: 'community' as const,
-      title: 'Community',
-      icon: <Globe className="w-4 h-4" />,
-      description: 'Connect and discover',
+      id: 'events' as const,
+      title: 'Events',
+      icon: <Calendar className="w-4 h-4" />,
+      description: 'Upcoming events',
       items: [
         {
           id: 'events',
-          label: 'Events',
+          label: 'All Events',
           icon: Calendar,
-          description: 'Upcoming events',
+          description: 'Browse all events',
           color: 'from-purple-500 to-violet-600',
           count: '5',
           onClick: () => {
-            setActiveTab('community')
-            setCommunitySubTab('events')
+            setActiveTab('events')
             fetchEvents()
           },
-          isActive: activeTab === 'community' && communitySubTab === 'events'
-        },
+          isActive: activeTab === 'events'
+        }
+      ]
+    },
+    {
+      id: 'activity-history' as const,
+      title: 'Activity History',
+      icon: <BarChart3 className="w-4 h-4" />,
+      description: 'Your recent activity',
+      items: [
         {
           id: 'activity-history',
           label: 'Activity History',
           icon: BarChart3,
-          description: 'Your recent activity',
+          description: 'View your recent activity',
           color: 'from-indigo-500 to-purple-600',
           count: '12',
           onClick: () => {
-            setActiveTab('community')
-            setCommunitySubTab('activity')
+            setActiveTab('activity-history')
           },
-          isActive: activeTab === 'community' && communitySubTab === 'activity'
+          isActive: activeTab === 'activity-history'
         }
       ]
     }
@@ -409,13 +411,15 @@ export default function Sidebar({
           <nav className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-600/30 scrollbar-track-transparent">
             <div className={`p-4 space-y-4 ${isCollapsed ? 'lg:px-4' : ''}`}>
               {menuSections.map((section) => {
-                const containerClass = section.id === 'feed'
-                  ? 'bg-gradient-to-br from-emerald-500/10 via-white/10 to-white/5 border-emerald-400/20'
-                  : section.id === 'chats'
+                const containerClass = section.id === 'chats'
                   ? 'bg-gradient-to-br from-blue-500/10 via-white/10 to-white/5 border-blue-400/20'
+                  : section.id === 'feed'
+                  ? 'bg-gradient-to-br from-emerald-500/10 via-white/10 to-white/5 border-emerald-400/20'
                   : section.id === 'activity'
                   ? 'bg-gradient-to-br from-rose-500/10 via-white/10 to-white/5 border-rose-400/20'
-                  : 'bg-gradient-to-br from-purple-500/10 via-white/10 to-white/5 border-purple-400/20'
+                  : section.id === 'events'
+                  ? 'bg-gradient-to-br from-purple-500/10 via-white/10 to-white/5 border-purple-400/20'
+                  : 'bg-gradient-to-br from-indigo-500/10 via-white/10 to-white/5 border-indigo-400/20'
                 return (
                   <div
                     key={section.title}
@@ -431,18 +435,20 @@ export default function Sidebar({
                             const willExpand = expandedSection !== section.id
                             setExpandedSection(willExpand ? section.id : null)
                             // Open first sub-tab by default
-                            if (section.id === 'feed') {
-                              setActiveTab('feed')
-                              setFeedSubTab('all')
-                            } else if (section.id === 'chats') {
+                            if (section.id === 'chats') {
                               setActiveTab('chats')
                               setChatSubTab('all')
+                            } else if (section.id === 'feed') {
+                              setActiveTab('feed')
+                              setFeedSubTab('all')
                             } else if (section.id === 'activity') {
                               setActiveTab('activity')
                               setActivitySubTab('liked')
-                            } else if (section.id === 'community') {
-                              setActiveTab('community')
-                              setCommunitySubTab('events')
+                            } else if (section.id === 'events') {
+                              setActiveTab('events')
+                              fetchEvents()
+                            } else if (section.id === 'activity-history') {
+                              setActiveTab('activity-history')
                             }
                           }}
                         >

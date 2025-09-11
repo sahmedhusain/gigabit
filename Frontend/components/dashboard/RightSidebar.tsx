@@ -76,6 +76,8 @@ export default function RightSidebar({
   // Calendar state
   const [selectedDate, setSelectedDate] = useState(new Date())
   const [calendarDate, setCalendarDate] = useState(new Date())
+  const [showEventsSlideUp, setShowEventsSlideUp] = useState(false)
+  const [slideUpDate, setSlideUpDate] = useState<Date | null>(null)
 
   // Update time every minute and handle client-side hydration
   useEffect(() => {
@@ -148,6 +150,24 @@ export default function RightSidebar({
   const getEventsForDate = (date: Date) => {
     const dateKey = date.toISOString().split('T')[0]
     return demoEvents[dateKey] || []
+  }
+
+  // Handle date click to show events slide-up
+  const handleDateClick = (date: Date) => {
+    const eventsForDate = getEventsForDate(date)
+    if (eventsForDate.length > 0) {
+      setSlideUpDate(date)
+      setShowEventsSlideUp(true)
+    } else {
+      // Just update selected date for navigation, don't show slide-up
+      setSelectedDate(date)
+    }
+  }
+
+  // Close events slide-up
+  const closeEventsSlideUp = () => {
+    setShowEventsSlideUp(false)
+    setSlideUpDate(null)
   }
 
   // Check if date has events
@@ -353,7 +373,7 @@ export default function RightSidebar({
           <div className="p-4">
             {/* Header with collapse toggle */}
             <div 
-              className={`flex items-center justify-between cursor-pointer ${expandedSection === 'calendar' ? 'mb-4' : 'mb-4 h-14'}`}
+              className={`flex items-center justify-between cursor-pointer ${expandedSection === 'calendar' ? 'mb-4' : 'mb-2 h-16'}`}
               onClick={() => toggleSection('calendar')}
             >
               <div>
@@ -412,7 +432,7 @@ export default function RightSidebar({
             </div>
 
             {expandedSection === 'calendar' && (
-              <div className="section-content flex flex-col flex-1 min-h-0">
+              <div className="section-content calendar-content flex flex-col flex-1 min-h-0">
                 {/* Calendar Header with Navigation */}
                 <div className="flex items-center justify-between mb-3 pt-2 border-t border-white/10">
                   <h3 className="text-white font-bold text-base flex items-center">
@@ -472,7 +492,7 @@ export default function RightSidebar({
                         days.push(
                           <button
                             key={i}
-                            onClick={(e) => { e.stopPropagation(); setSelectedDate(new Date(currentDate)); }}
+                            onClick={(e) => { e.stopPropagation(); handleDateClick(new Date(currentDate)); }}
                             className={`
                               relative text-center text-xs py-2 rounded-lg transition-all duration-200 cursor-pointer aspect-square flex items-center justify-center
                               ${isCurrentMonth 
@@ -498,66 +518,67 @@ export default function RightSidebar({
                   </div>
                 </div>
                 
-                {/* Events for Selected Date - Expandable area */}
-                {(() => {
-                  const selectedEvents = getEventsForDate(selectedDate);
-                  if (selectedEvents.length === 0) {
-                    return (
-                      <div className="flex-1 flex items-center justify-center pt-4 border-t border-white/10">
-                        <div className="text-center">
-                          <Calendar className="w-8 h-8 text-white/20 mx-auto mb-2" />
-                          <p className="text-white/40 text-sm">No events</p>
-                          <p className="text-white/30 text-xs">
+                {/* Events Slide-Up Modal - Overflowing calendar container */}
+                {showEventsSlideUp && slideUpDate && (
+                  <div className="events-overflow-modal transform transition-all duration-300 ease-out animate-slide-up">
+                    <div className="bg-gradient-to-br from-slate-800 via-slate-900 to-gray-900 rounded-2xl shadow-2xl border border-slate-600/30 overflow-hidden backdrop-blur-sm">
+                      {/* Overlay for extra depth */}
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-white/5 rounded-2xl"></div>
+                      {/* Content wrapper */}
+                      <div className="relative z-10">
+                      {/* Header */}
+                      <div className="flex items-center justify-between p-4 border-b border-white/20">
+                        <div>
+                          <h3 className="text-white font-bold text-base">
                             {(() => {
                               const isSameDay = (date1: Date, date2: Date) => {
-                                return date1.getDate() === date2.getDate() && 
-                                       date1.getMonth() === date2.getMonth() && 
+                                return date1.getDate() === date2.getDate() &&
+                                       date1.getMonth() === date2.getMonth() &&
                                        date1.getFullYear() === date2.getFullYear();
                               };
-                              
-                              return isSameDay(selectedDate, new Date()) 
-                                ? "for today" 
-                                : `for ${selectedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
+
+                              return isSameDay(slideUpDate, new Date())
+                                ? "Today's Events"
+                                : `Events for ${slideUpDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
                             })()}
+                          </h3>
+                          <p className="text-white/80 text-xs mt-1">
+                            {slideUpDate.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
                           </p>
                         </div>
+                        <button
+                          onClick={closeEventsSlideUp}
+                          className="p-2 rounded-lg hover:bg-white/15 transition-colors"
+                          title="Close events"
+                        >
+                          <X className="w-5 h-5 text-white/80" />
+                        </button>
                       </div>
-                    );
-                  }
-                  
-                  return (
-                    <div className="flex-1 flex flex-col pt-4 border-t border-white/10 min-h-0">
-                      <div className="text-white/70 text-xs font-medium mb-3">
+
+                      {/* Events List */}
+                      <div className="max-h-60 overflow-y-auto p-4 space-y-3">
                         {(() => {
-                          const isSameDay = (date1: Date, date2: Date) => {
-                            return date1.getDate() === date2.getDate() && 
-                                   date1.getMonth() === date2.getMonth() && 
-                                   date1.getFullYear() === date2.getFullYear();
-                          };
-                          
-                          return isSameDay(selectedDate, new Date()) 
-                            ? "Today's Events" 
-                            : `Events for ${selectedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
+                          const eventsForDate = getEventsForDate(slideUpDate);
+                          return eventsForDate.map((event) => (
+                            <div key={event.id} className="bg-white/15 rounded-lg p-3 border border-white/20 hover:bg-white/25 transition-colors">
+                              <div className="flex items-start justify-between mb-2">
+                                <span className="text-sm text-white font-medium flex-1">{event.title}</span>
+                                <span className="text-xs text-white/70 ml-2 flex-shrink-0">{event.time}</span>
+                              </div>
+                              <div className="flex items-center space-x-2">
+                                <div className={`w-2 h-2 ${event.color} rounded-full`}></div>
+                                <span className="text-xs text-white/80 capitalize">{event.color.replace('bg-', '').replace('-400', '')} event</span>
+                              </div>
+                            </div>
+                          ));
                         })()}
                       </div>
-                      
-                      <div className="flex-1 overflow-y-auto space-y-3">
-                        {selectedEvents.map((event) => (
-                          <div key={event.id} className="bg-white/5 rounded-lg p-3 border border-white/10 hover:bg-white/10 transition-colors">
-                            <div className="flex items-start justify-between mb-1">
-                              <span className="text-sm text-white font-medium flex-1">{event.title}</span>
-                              <span className="text-xs text-white/50 ml-2">{event.time}</span>
-                            </div>
-                            <div className="flex items-center space-x-2">
-                              <div className={`w-2 h-2 ${event.color} rounded-full`}></div>
-                              <span className="text-xs text-white/60 capitalize">{event.color.replace('bg-', '').replace('-400', '')} event</span>
-                            </div>
-                          </div>
-                        ))}
                       </div>
                     </div>
-                  );
-                })()}
+                  </div>
+                )}
+                
+                {/* Calendar is now non-scrollable - events shown in slide-up modal */}
               </div>
             )}
           </div>
@@ -569,7 +590,7 @@ export default function RightSidebar({
         }`}>
           <div className="p-4">
             <div 
-              className={`flex items-center justify-between cursor-pointer ${expandedSection === 'following' ? 'mb-4' : 'mb-4 h-14'}`}
+              className={`flex items-center justify-between cursor-pointer ${expandedSection === 'following' ? 'mb-4' : 'mb-2 h-12'}`}
               onClick={() => toggleSection('following')}
             >
               <h3 className="text-white font-bold text-base flex items-center">
@@ -798,7 +819,7 @@ export default function RightSidebar({
         }`}>
           <div className="p-4">
             <div 
-              className={`flex items-center justify-between cursor-pointer ${expandedSection === 'invitations' ? 'mb-4' : 'mb-4 h-14'}`}
+              className={`flex items-center justify-between cursor-pointer ${expandedSection === 'invitations' ? 'mb-4' : 'mb-2 h-12'}`}
               onClick={() => toggleSection('invitations')}
             >
               <h3 className="text-white font-bold text-base flex items-center">
@@ -825,7 +846,7 @@ export default function RightSidebar({
 
             {/* Expanded State */}
             {expandedSection === 'invitations' && (
-              <div className="section-content flex-1 flex flex-col min-h-0">
+              <div className="section-content invitation-content flex-1 flex flex-col min-h-0">
                 <div className="flex-1 overflow-y-auto">
                   <div className="space-y-3">
                     {mockInvitations.length > 0 ? (

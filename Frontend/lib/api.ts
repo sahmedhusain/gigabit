@@ -588,6 +588,13 @@ export class ApiClient {
     return { data: (response.groups || []).filter(g => g.is_member) };
   }
 
+  async getAllGroups(limit: number = 20, offset: number = 0): Promise<{ groups: GroupResponse[], count: number, limit: number, offset: number }> {
+    const response = await this.request<{ groups: GroupResponse[], count: number, limit: number, offset: number }>(`/api/groups?limit=${limit}&offset=${offset}`, {
+      method: 'GET',
+    });
+    return response;
+  }
+
   async getGroup(groupId: number): Promise<GroupResponse> {
     return this.request<GroupResponse>(`/api/groups/${groupId}`, {
       method: 'GET',

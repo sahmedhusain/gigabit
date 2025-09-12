@@ -408,7 +408,7 @@ export default function Sidebar({
           </div>
 
           {/* Enhanced Navigation */}
-          <nav className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-600/30 scrollbar-track-transparent">
+          <nav className="flex-1 overflow-y-auto scrollbar-thin">
             <div className={`p-4 space-y-4 ${isCollapsed ? 'lg:px-4' : ''}`}>
               {menuSections.map((section) => {
                 const containerClass = section.id === 'chats'

@@ -308,9 +308,9 @@ export default function CommunitySection({
   }
 
   return (
-    <div className="space-y-6">
+    <div className="h-full flex flex-col">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex-shrink-0 flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-white mb-2">
             {communitySubTab === 'events' && 'Events'}
@@ -333,7 +333,7 @@ export default function CommunitySection({
       </div>
 
       {/* Content */}
-      <div className="min-h-96">
+      <div className="flex-1 overflow-y-auto">
         {renderContent()}
       </div>
     </div>

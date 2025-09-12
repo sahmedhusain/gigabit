@@ -174,9 +174,9 @@ export default function ActivitySection({
   }
 
   return (
-    <div className="space-y-6">
+    <div className="h-full flex flex-col">
       {/* Header */}
-      <div>
+      <div className="flex-shrink-0 mb-6">
         <h1 className="text-2xl font-bold text-white mb-2">
           {activitySubTab === 'liked' && 'Liked Posts'}
           {activitySubTab === 'commented' && 'Commented Posts'}
@@ -190,7 +190,7 @@ export default function ActivitySection({
       </div>
 
       {/* Content */}
-      <div className="min-h-96">
+      <div className="flex-1 overflow-y-auto">
         {renderContent()}
       </div>
     </div>

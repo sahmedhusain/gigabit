@@ -419,9 +419,9 @@ export default function ChatsSection({
   }
 
   return (
-    <div className="space-y-6">
+    <div className="h-full flex flex-col">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex-shrink-0 flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-white mb-2">Chats</h1>
           <p className="text-white/70">Connect with friends and groups</p>
@@ -445,7 +445,7 @@ export default function ChatsSection({
       </div>
 
       {/* Search Bar */}
-      <div className="relative">
+      <div className="flex-shrink-0 relative mb-6">
         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-white/60 w-5 h-5" />
         <input
           type="text"
@@ -456,10 +456,8 @@ export default function ChatsSection({
         />
       </div>
 
-  {/* Tabs removed: selection handled via sidebar */}
-
       {/* Content */}
-      <div className="min-h-96">
+      <div className="flex-1 overflow-y-auto">
         {renderContent()}
       </div>
     </div>

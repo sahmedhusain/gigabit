@@ -9,8 +9,7 @@ interface TopBarProps {
   setIsMobileMenuOpen: (open: boolean) => void
   activeTab: string
   setActiveTab: (tab: string) => void
-  showNotifications: boolean
-  setShowNotifications: () => void
+  onNotificationsClick: () => void
   unreadCount: number
   onSearchClick: () => void
   onDiscoverClick: () => void
@@ -21,8 +20,7 @@ export default function TopBar({
   setIsMobileMenuOpen,
   activeTab,
   setActiveTab,
-  showNotifications,
-  setShowNotifications,
+  onNotificationsClick,
   unreadCount,
   onSearchClick,
   onDiscoverClick,
@@ -145,16 +143,16 @@ export default function TopBar({
 
           {/* Notifications Button - Right next to search */}
           <button
-            onClick={setShowNotifications}
+            onClick={onNotificationsClick}
             className={`relative flex items-center rounded-2xl transition-all duration-300 transform hover:scale-105 hover:shadow-lg ${
-              showNotifications
+              activeTab === 'notifications'
                 ? 'bg-gradient-to-r from-white to-blue-50 text-emerald-600 shadow-2xl border-2 border-white/40'
                 : 'text-white/90 hover:text-white hover:bg-white/20 backdrop-blur-md border-2 border-white/30 hover:border-white/50'
-            } ${showNotifications ? 'px-3 py-2 space-x-2' : 'w-10 h-10 justify-center'}`}
+            } ${activeTab === 'notifications' ? 'px-3 py-2 space-x-2' : 'w-10 h-10 justify-center'}`}
             aria-label="Notifications"
           >
-            <Bell className={`${showNotifications ? 'w-4 h-4' : 'w-5 h-5'}`} />
-            <span className={`${showNotifications ? 'inline' : 'hidden'} font-semibold text-sm`}>Notifications</span>
+            <Bell className={`${activeTab === 'notifications' ? 'w-4 h-4' : 'w-5 h-5'}`} />
+            <span className={`${activeTab === 'notifications' ? 'inline' : 'hidden'} font-semibold text-sm`}>Notifications</span>
             {unreadCount > 0 && (
               <span className="absolute -top-2 -right-2 bg-gradient-to-r from-red-500 to-pink-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold shadow-xl border-2 border-white">
                 {unreadCount > 9 ? '9+' : unreadCount}

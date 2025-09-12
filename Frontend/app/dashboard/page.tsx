@@ -32,7 +32,6 @@ import CreatePost from '@/components/dashboard/CreatePost'
 import CreateGroup from '@/components/dashboard/CreateGroup'
 import CreateDirectMessage from '@/components/dashboard/CreateDirectMessage'
 import CreateGeneralEvent from '@/components/dashboard/CreateGeneralEvent'
-import NotificationsDropdown from '@/components/dashboard/NotificationsDropdown'
 import HomeFeed from '@/components/dashboard/HomeFeed'
 import ProfileSection from '@/components/dashboard/ProfileSection'
 import ChatsSection from '@/components/dashboard/ChatsSection'
@@ -40,6 +39,7 @@ import ActivitySection from '@/components/dashboard/ActivitySection'
 import CommunitySection from '@/components/dashboard/CommunitySection'
 import SearchPage from '@/components/dashboard/SearchPage'
 import DiscoverPage from '@/components/dashboard/DiscoverPage'
+import NotificationsPage from '@/components/dashboard/NotificationsPage'
 import {
   SettingsSection
 } from '@/components/dashboard/DashboardSections'
@@ -73,7 +73,6 @@ function DashboardPage() {
   const [showCreateGroup, setShowCreateGroup] = useState(false)
   const [showCreateEvent, setShowCreateEvent] = useState(false)
   const [showCreateDirectMessage, setShowCreateDirectMessage] = useState(false)
-  const [showNotifications, setShowNotifications] = useState(false)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [showSearchPage, setShowSearchPage] = useState(false)
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
@@ -613,9 +612,13 @@ function DashboardPage() {
   }
 
   const handleNotificationsToggle = () => {
-    setShowNotifications(!showNotifications)
-    if (!showNotifications) {
-      fetchNotifications()
+    if (activeTab === 'notifications') {
+      // If we're already on notifications, go back to previous tab
+      setActiveTab(previousTab)
+    } else {
+      // Navigate to notifications tab
+      setPreviousTab(activeTab)
+      setActiveTab('notifications')
       setUnreadNotifications(0)
     }
   }
@@ -811,6 +814,8 @@ function DashboardPage() {
         return <SearchPage onClose={() => setActiveTab(previousTab)} />
       case 'discover':
         return <DiscoverPage onClose={() => setActiveTab(previousTab)} />
+      case 'notifications':
+        return <NotificationsPage />
       default:
         return (
           <HomeFeed
@@ -892,11 +897,10 @@ function DashboardPage() {
         setIsMobileMenuOpen={setIsMobileMenuOpen}
         activeTab={activeTab}
         setActiveTab={handleTabChange}
-        showNotifications={showNotifications}
-        setShowNotifications={handleNotificationsToggle}
+        onNotificationsClick={handleNotificationsToggle}
         unreadCount={liveUnreadCount || unreadNotifications}
         onSearchClick={handleSearchToggle}
-  onDiscoverClick={handleDiscoverToggle}
+        onDiscoverClick={handleDiscoverToggle}
       />
 
       <CreatePost
@@ -949,19 +953,14 @@ function DashboardPage() {
         }}
       />
 
-      <NotificationsDropdown
-        show={showNotifications}
-        onClose={() => setShowNotifications(false)}
-      />
-
       {showSearchPage && <SearchPage onClose={() => setShowSearchPage(false)} />}
 
       {/* Main Content */}
       <div className={`main-content-layout p-2 lg:p-4 relative z-10 has-fixed-sidebar ${isSidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
-        <div className="max-w-7xl mx-auto">
-          <div className="flex flex-col lg:flex-row gap-6">
+        <div className="max-w-7xl mx-auto h-full">
+          <div className="flex flex-col lg:flex-row gap-6 h-full">
             {/* Main Content Area */}
-            <div className="flex-1 min-w-0">
+            <div className="flex-1 min-w-0 h-full">
               {renderContent()}
             </div>
           </div>

@@ -20,17 +20,18 @@ const theme = createTheme({
         body: {
           scrollbarWidth: 'thin',
           '&::-webkit-scrollbar': {
-            width: '8px',
+            width: '4px',
           },
           '&::-webkit-scrollbar-track': {
-            background: '#f1f1f1',
+            background: 'transparent',
           },
           '&::-webkit-scrollbar-thumb': {
-            background: '#888',
-            borderRadius: '4px',
+            background: 'rgba(255, 255, 255, 0.15)',
+            borderRadius: '8px',
+            transition: 'background 0.2s ease',
           },
           '&::-webkit-scrollbar-thumb:hover': {
-            background: '#555',
+            background: 'rgba(255, 255, 255, 0.25)',
           },
         },
       },

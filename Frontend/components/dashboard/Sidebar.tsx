@@ -563,13 +563,7 @@ export default function Sidebar({
           {[...Array(6)].map((_, i) => (
             <div
               key={i}
-              className={`absolute animate-float floating-particle`}
-              style={{
-                left: `${10 + (i % 3) * 30}%`,
-                top: `${20 + (i % 4) * 20}%`,
-                animationDelay: `${i * 0.5}s`,
-                animationDuration: `${4 + i}s`
-              }}
+              className={`absolute animate-float floating-particle particle-${i + 1}`}
             >
               <Sparkles className="w-1 h-1 text-white/10" />
             </div>

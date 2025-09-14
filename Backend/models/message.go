@@ -48,7 +48,6 @@ type CreateMessageRequest struct {
 
 type Conversation struct {
 	ID            string                `json:"id"`
-	Type          string                `json:"type"`                     // "private" or "group"
 	ParticipantID uint                  `json:"participant_id,omitempty"` // For private chats
 	GroupID       uint                  `json:"group_id,omitempty"`       // For group chats
 	LastMessage   MessageResponse       `json:"last_message"`
@@ -58,18 +57,23 @@ type Conversation struct {
 	Group         *GroupMessageResponse `json:"group,omitempty"`
 }
 
-// DBConversation represents the database structure for conversations
-type DBConversation struct {
+type PrivateConversation struct {
 	ID             uint      `json:"id"`
-	Type           string    `json:"type"`
-	Participant1ID *uint     `json:"participant1_id,omitempty"`
-	Participant2ID *uint     `json:"participant2_id,omitempty"`
-	GroupID        *uint     `json:"group_id,omitempty"`
+	Participant1ID uint      `json:"participant1_id"`
+	Participant2ID uint      `json:"participant2_id"`
 	LastMessageID  *uint     `json:"last_message_id,omitempty"`
 	UnreadCount1   int       `json:"unread_count1"`
 	UnreadCount2   int       `json:"unread_count2"`
 	CreatedAt      time.Time `json:"created_at"`
 	UpdatedAt      time.Time `json:"updated_at"`
+}
+
+type GroupConversation struct {
+	ID            uint      `json:"id"`
+	GroupID       uint      `json:"group_id"`
+	LastMessageID *uint     `json:"last_message_id,omitempty"`
+	CreatedAt     time.Time `json:"created_at"`
+	UpdatedAt     time.Time `json:"updated_at"`
 }
 
 type MarkReadRequest struct {

@@ -765,6 +765,18 @@ export class ApiClient {
     });
   }
 
+  async getProfile(userId: number): Promise<User> {
+    return this.request<User>(`/api/profile/${userId}`, {
+      method: 'GET',
+    });
+  }
+
+  async getUserPosts(userId: number, limit: number = 20, offset: number = 0): Promise<{ posts: Post[], count: number, limit: number, offset: number }> {
+    return this.request<{ posts: Post[], count: number, limit: number, offset: number }>(`/api/posts/user/${userId}?limit=${limit}&offset=${offset}`, {
+      method: 'GET',
+    });
+  }
+
   // Validation helpers
   static validateEmail(email: string): boolean {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;

@@ -1,7 +1,7 @@
 'use client'
 import { User, Settings, Lock, Globe } from 'lucide-react'
 import { Post } from '@/lib/api'
-import { useRealTimePosts, useFollowers, useConnectionStatus } from '@/hooks'
+import { useRealTimePosts, useFollowers, useConnectionStatus, useFollowerCounts } from '@/hooks'
 import { getAvatarUrl } from '@/utils/avatarUtils'
 import { useRouter } from 'next/navigation'
 
@@ -24,6 +24,7 @@ interface ProfileSectionProps {
   following: any[]
   posts: Post[]
   isLoadingFollowers: boolean
+  isOwnProfile?: boolean
 }
 
 export default function ProfileSection({
@@ -31,17 +32,26 @@ export default function ProfileSection({
   followers,
   following,
   posts,
-  isLoadingFollowers
+  isLoadingFollowers,
+  isOwnProfile = true
 }: ProfileSectionProps) {
   const router = useRouter()
   const { posts: realTimePosts, isConnected } = useRealTimePosts()
   const { followers: liveFollowers, following: liveFollowing } = useFollowers()
   const { isConnected: connectionStatus } = useConnectionStatus()
+  const { followerCounts, isConnected: countsConnected } = useFollowerCounts(
+    followers?.length || 0,
+    following?.length || 0
+  )
 
   // Use real-time data when connected, fallback to provided data
   const displayPosts = isConnected ? realTimePosts.filter(p => p.user_id === currentUser?.id) : posts
   const displayFollowers = isConnected ? liveFollowers : followers
   const displayFollowing = isConnected ? liveFollowing : following
+
+  // Use real-time counts when connected, fallback to list lengths
+  const followersCount = countsConnected ? followerCounts.followers_count : (displayFollowers?.length ?? 0)
+  const followingCount = countsConnected ? followerCounts.following_count : (displayFollowing?.length ?? 0)
 
   const handlePostClick = (postId: number) => {
     router.push(`/post/${postId}`)
@@ -80,7 +90,7 @@ export default function ProfileSection({
             <div className="flex justify-center lg:justify-start space-x-6 lg:space-x-8 mb-4 lg:mb-6">
               <div className="text-center">
                 <div className="text-xl lg:text-2xl font-bold text-white">
-                  {displayFollowers?.length ?? 0}
+                  {followersCount}
                   {connectionStatus && (
                     <span className="ml-1 text-xs text-emerald-400">●</span>
                   )}
@@ -89,7 +99,7 @@ export default function ProfileSection({
               </div>
               <div className="text-center">
                 <div className="text-xl lg:text-2xl font-bold text-white">
-                  {displayFollowing?.length ?? 0}
+                  {followingCount}
                   {connectionStatus && (
                     <span className="ml-1 text-xs text-emerald-400">●</span>
                   )}
@@ -108,24 +118,28 @@ export default function ProfileSection({
             </div>
 
             <div className="flex flex-col sm:flex-row gap-3 lg:gap-4">
-              <button className="flex items-center justify-center px-4 lg:px-6 py-2 bg-gradient-to-r from-emerald-500 to-teal-600 rounded-xl text-white hover:from-emerald-600 hover:to-teal-700 transition-all duration-200 text-sm lg:text-base">
-                <Settings className="w-4 h-4 mr-2" />
-                Edit Profile
-              </button>
+              {isOwnProfile && (
+                <>
+                  <button className="flex items-center justify-center px-4 lg:px-6 py-2 bg-gradient-to-r from-emerald-500 to-teal-600 rounded-xl text-white hover:from-emerald-600 hover:to-teal-700 transition-all duration-200 text-sm lg:text-base">
+                    <Settings className="w-4 h-4 mr-2" />
+                    Edit Profile
+                  </button>
 
-              <button className={`flex items-center justify-center px-4 lg:px-6 py-2 border border-white/30 rounded-xl text-white hover:bg-white/10 transition-all duration-200 text-sm lg:text-base`}>
-                {currentUser?.isPrivate ? (
-                  <>
-                    <Lock className="w-4 h-4 mr-2" />
-                    Private Profile
-                  </>
-                ) : (
-                  <>
-                    <Globe className="w-4 h-4 mr-2" />
-                    Public Profile
-                  </>
-                )}
-              </button>
+                  <button className={`flex items-center justify-center px-4 lg:px-6 py-2 border border-white/30 rounded-xl text-white hover:bg-white/10 transition-all duration-200 text-sm lg:text-base`}>
+                    {currentUser?.isPrivate ? (
+                      <>
+                        <Lock className="w-4 h-4 mr-2" />
+                        Private Profile
+                      </>
+                    ) : (
+                      <>
+                        <Globe className="w-4 h-4 mr-2" />
+                        Public Profile
+                      </>
+                    )}
+                  </button>
+                </>
+              )}
             </div>
           </div>
         </div>

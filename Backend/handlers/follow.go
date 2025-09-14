@@ -3,22 +3,28 @@ package handlers
 import (
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"net/http"
-	"social/models"
-	"social/services"
 	"strconv"
 	"strings"
+	"time"
+
+	"social/models"
+	"social/services"
+	"social/websocket"
 )
 
 type FollowHandler struct {
 	followService *services.FollowService
 	userService   *services.UserService
+	hub           *websocket.Hub
 }
 
-func NewFollowHandler(db *sql.DB) *FollowHandler {
+func NewFollowHandler(db *sql.DB, hub *websocket.Hub) *FollowHandler {
 	return &FollowHandler{
 		followService: services.NewFollowService(db),
 		userService:   services.NewUserService(db),
+		hub:           hub,
 	}
 }
 
@@ -85,6 +91,16 @@ func (h *FollowHandler) SendFollowRequest(w http.ResponseWriter, r *http.Request
 	message := "Follow request sent"
 	if !targetUser.IsPrivate {
 		message = "Now following user"
+		// Broadcast follower count updates for accepted follows
+		if h.hub != nil {
+			h.hub.BroadcastMessage(websocket.Message{
+				Type:      websocket.MessageTypeFollowerCountUpdate,
+				From:      0, // System message
+				Action:    "count_update",
+				Data:      h.getFollowerCounts(currentUserID, uint(targetUserID)),
+				Timestamp: time.Now().Unix(),
+			})
+		}
 	}
 
 	writeJSON(w, http.StatusCreated, map[string]interface{}{
@@ -146,6 +162,17 @@ func (h *FollowHandler) RespondToFollowRequest(w http.ResponseWriter, r *http.Re
 		return
 	}
 
+	// Broadcast follower count updates if request was accepted
+	if req.Action == "accept" && h.hub != nil {
+		h.hub.BroadcastMessage(websocket.Message{
+			Type:      websocket.MessageTypeFollowerCountUpdate,
+			From:      0, // System message
+			Action:    "count_update",
+			Data:      h.getFollowerCounts(uint(followerID), currentUserID),
+			Timestamp: time.Now().Unix(),
+		})
+	}
+
 	writeJSON(w, http.StatusOK, map[string]interface{}{
 		"message": "Follow request " + req.Action + "ed",
 		"status":  followRequest.Status,
@@ -179,6 +206,17 @@ func (h *FollowHandler) Unfollow(w http.ResponseWriter, r *http.Request) {
 	if err := h.followService.DeleteFollowRequest(followRequest.ID); err != nil {
 		writeError(w, http.StatusInternalServerError, "Failed to unfollow user")
 		return
+	}
+
+	// Broadcast follower count updates
+	if h.hub != nil {
+		h.hub.BroadcastMessage(websocket.Message{
+			Type:      websocket.MessageTypeFollowerCountUpdate,
+			From:      0, // System message
+			Action:    "count_update",
+			Data:      h.getFollowerCounts(currentUserID, uint(targetUserID)),
+			Timestamp: time.Now().Unix(),
+		})
 	}
 
 	writeJSON(w, http.StatusOK, map[string]interface{}{"message": "Successfully unfollowed user"})
@@ -291,4 +329,24 @@ func (h *FollowHandler) GetFollowRequests(w http.ResponseWriter, r *http.Request
 		"requests": requests,
 		"count":    len(requests),
 	})
+}
+
+// getFollowerCounts returns follower counts for multiple users
+func (h *FollowHandler) getFollowerCounts(userIDs ...uint) map[string]interface{} {
+	counts := make(map[string]interface{})
+
+	for _, userID := range userIDs {
+		followersCount, followingCount, err := h.followService.GetFollowCounts(userID)
+		if err != nil {
+			continue // Skip on error
+		}
+
+		counts[fmt.Sprintf("user_%d", userID)] = map[string]interface{}{
+			"user_id":         userID,
+			"followers_count": followersCount,
+			"following_count": followingCount,
+		}
+	}
+
+	return counts
 }

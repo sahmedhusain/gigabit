@@ -2,7 +2,7 @@
 import React, { useState, useRef } from 'react'
 import { X, Send, Smile, Paperclip, Image, Check, CheckCheck, Clock } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
-import { useRealTimeMessages, useTypingIndicator, useConnectionStatus } from '@/hooks'
+import { useRealTimeMessages, useTypingIndicator, useConnectionStatus, useOnlineStatus } from '@/hooks'
 
 interface Message {
   id: number | string
@@ -51,8 +51,12 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
     messages,
     sendMessage: sendRealTimeMessage,
     isConnected: messagesConnected,
-    isLoading
+    isLoading,
+    fetchConversationMessages
   } = useRealTimeMessages()
+
+  // Use the conversationId directly for message loading
+  const effectiveConversationId = conversationId
 
   // Typing indicator integration
   const {
@@ -63,6 +67,14 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
 
   // Connection status monitoring
   const { isConnected, connectionQuality } = useConnectionStatus()
+  const { isUserOnline } = useOnlineStatus()
+
+  // Load conversation messages when component mounts or conversation changes
+  React.useEffect(() => {
+    if (conversationId && conversationType) {
+      fetchConversationMessages(conversationId, conversationType, participantId)
+    }
+  }, [conversationId, conversationType, participantId, fetchConversationMessages])
 
   // Scroll to bottom when new messages arrive
   const scrollToBottom = () => {
@@ -177,7 +189,8 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
   }
 
   const renderSimpleMessageContent = (message: any) => {
-    return <div className="text-sm">{message.content}</div>
+    console.log('Message content:', message.content, 'Type:', typeof message.content)
+    return <div className="text-sm">{message.content || 'No content'}</div>
   }
 
   const formatTime = (dateString: string) => {
@@ -186,64 +199,93 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
   }
 
   return (
-    <div className="fixed bottom-4 right-4 w-80 h-96 bg-gradient-to-r from-white/10 to-white/5 backdrop-blur-xl rounded-2xl border border-white/20 shadow-2xl z-50 flex flex-col">
+    <div className="h-full flex flex-col bg-white/5 backdrop-blur-xl rounded-2xl border border-white/20 overflow-hidden">
       {/* Header */}
-      <div className="p-4 border-b border-white/20 flex items-center justify-between">
-        <div>
-          <h3 className="text-white font-semibold">{participantName}</h3>
-          <div className="flex items-center space-x-2">
-            <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`}></div>
-            <span className="text-xs text-white/60">{isConnected ? 'Online' : 'Offline'}</span>
+      <div className="bg-white/10 backdrop-blur-xl border-b border-white/20 p-4 flex items-center justify-between flex-shrink-0">
+        <div className="flex items-center space-x-4">
+          <div>
+            <h1 className="text-white text-xl font-bold">{participantName}</h1>
+            <div className="flex items-center space-x-2 mt-1">
+              <div className={`w-2 h-2 rounded-full ${
+                conversationType === 'private' && participantId 
+                  ? (isUserOnline(participantId) ? 'bg-green-500' : 'bg-gray-500') 
+                  : (isConnected ? 'bg-green-500' : 'bg-red-500')
+              }`}></div>
+              <span className="text-xs text-white/60">
+                {conversationType === 'private' && participantId 
+                  ? (isUserOnline(participantId) ? 'Online' : 'Offline') 
+                  : (isConnected ? 'Connected' : 'Disconnected')
+                }
+                {connectionQuality && ` • ${connectionQuality}`}
+              </span>
+            </div>
           </div>
         </div>
         <button
           onClick={onClose}
-          className="p-2 text-white/70 hover:text-white hover:bg-white/10 rounded-xl transition-all duration-200"
+          className="p-3 text-white/70 hover:text-white hover:bg-white/10 rounded-xl transition-all duration-200"
           title="Close chat"
         >
-          <X className="w-5 h-5" />
+          <X className="w-6 h-6" />
         </button>
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-3">
+      <div className="flex-1 overflow-y-auto p-6 space-y-4 min-h-0">
           {isLoading ? (
             <div className="flex items-center justify-center h-full">
-              <div className="text-white/60">Loading messages...</div>
+              <div className="text-white/60 text-lg">Loading messages...</div>
             </div>
           ) : (
             <>
-              {Array.from(messages.get(conversationId) || []).map((message) => (
-                <div
-                  key={message.id}
-                  className={`flex ${message.sender_id === user?.id ? 'justify-end' : 'justify-start'}`}
-                >
-                  <div
-                    className={`max-w-xs px-3 py-2 rounded-2xl ${
-                      message.sender_id === user?.id
-                        ? 'bg-gradient-to-r from-emerald-500 to-teal-600 text-white'
-                        : 'bg-white/10 text-white border border-white/20'
-                    }`}
-                  >
-                    {conversationType === 'group' && message.sender_id !== user?.id && (
-                      <div className="text-xs text-white/60 mb-1 font-medium">
-                        {message.sender.first_name} {message.sender.last_name}
-                      </div>
-                    )}
-                    {renderSimpleMessageContent(message)}
-                    <div className={`flex items-center justify-between mt-1 ${
-                      message.sender_id === user?.id ? 'text-white/80' : 'text-white/60'
-                    }`}>
-                      <span className="text-xs">{formatTime(message.created_at)}</span>
-                      {message.sender_id === user?.id && renderMessageStatus('sent')}
+              {Array.from(messages.get(conversationId) || []).length === 0 ? (
+                <div className="flex items-center justify-center h-full">
+                  <div className="text-center">
+                    <div className="text-white/40 text-6xl mb-4">💬</div>
+                    <div className="text-white/60 text-lg">No messages yet</div>
+                    <div className="text-white/40 text-sm mt-2">Start the conversation!</div>
+                    <div className="text-white/30 text-xs mt-4">
+                      Conversation ID: {conversationId}<br/>
+                      Messages count: {Array.from(messages.get(conversationId) || []).length}
                     </div>
                   </div>
                 </div>
-              ))}
+              ) : (
+                Array.from(messages.get(conversationId) || []).map((message) => {
+                  console.log('Rendering message:', message)
+                  return (
+                  <div
+                    key={message.id}
+                    className={`flex ${message.sender_id === user?.id ? 'justify-end' : 'justify-start'}`}
+                  >
+                    <div
+                      className={`max-w-md px-4 py-3 rounded-2xl shadow-lg ${
+                        message.sender_id === user?.id
+                          ? 'bg-gradient-to-r from-emerald-500 to-teal-600 text-white'
+                          : 'bg-white/10 text-white border border-white/20'
+                      }`}
+                    >
+                      {conversationType === 'group' && message.sender_id !== user?.id && (
+                        <div className="text-xs text-white/60 mb-2 font-medium">
+                          {message.sender.first_name} {message.sender.last_name}
+                        </div>
+                      )}
+                      {renderSimpleMessageContent(message)}
+                      <div className={`flex items-center justify-between mt-2 ${
+                        message.sender_id === user?.id ? 'text-white/80' : 'text-white/60'
+                      }`}>
+                        <span className="text-xs">{formatTime(message.created_at)}</span>
+                        {message.sender_id === user?.id && renderMessageStatus('sent')}
+                      </div>
+                    </div>
+                  </div>
+                  )
+                })
+              )}
               {typingUsers.length > 0 && (
                 <div className="flex justify-start">
-                  <div className="bg-white/10 border border-white/20 rounded-2xl px-3 py-2">
-                    <div className="flex items-center space-x-2">
+                  <div className="bg-white/10 border border-white/20 rounded-2xl px-4 py-3 shadow-lg">
+                    <div className="flex items-center space-x-3">
                       <div className="flex space-x-1">
                         <div className="w-2 h-2 bg-white/60 rounded-full animate-pulse"></div>
                         <div className="w-2 h-2 bg-white/60 rounded-full animate-pulse delay-75"></div>
@@ -264,25 +306,25 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
       </div>
 
       {/* Input */}
-      <div className="p-4 border-t border-white/20">
+      <div className="bg-white/5 backdrop-blur-xl border-t border-white/20 p-6 flex-shrink-0">
         {/* Selected File Display */}
         {selectedFile && (
-          <div className="mb-3 p-2 bg-white/10 rounded-lg border border-white/20">
+          <div className="mb-4 p-3 bg-white/10 rounded-lg border border-white/20">
             <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-                {selectedFile?.type.startsWith('image/') ? (
-                  <Image className="w-4 h-4 text-white/70" />
+              <div className="flex items-center space-x-3">
+                {selectedFile.type.startsWith('image/') ? (
+                  <Image className="w-5 h-5 text-white/70" />
                 ) : (
-                  <Paperclip className="w-4 h-4 text-white/70" />
+                  <Paperclip className="w-5 h-5 text-white/70" />
                 )}
-                <span className="text-white/80 text-sm truncate">{selectedFile?.name}</span>
+                <span className="text-white/80 text-sm truncate">{selectedFile.name}</span>
                 <span className="text-white/50 text-xs">
                   ({((selectedFile as File).size / 1024 / 1024).toFixed(1)}MB)
                 </span>
               </div>
               <button
                 onClick={removeSelectedFile}
-                className="p-1 text-white/60 hover:text-white transition-colors"
+                className="p-2 text-white/60 hover:text-white transition-colors"
                 title="Remove file"
               >
                 <X className="w-4 h-4" />
@@ -291,7 +333,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
           </div>
         )}
 
-        <div className="flex items-center space-x-2">
+        <div className="flex items-end space-x-4">
           {/* File Input */}
           <input
             ref={fileInputRef}
@@ -303,15 +345,14 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
           />
           <button
             onClick={() => fileInputRef.current?.click()}
-            className="p-2 text-white/60 hover:text-white transition-colors"
+            className="p-3 text-white/60 hover:text-white hover:bg-white/10 rounded-xl transition-colors"
             title="Attach file"
           >
-            <Paperclip className="w-4 h-4" />
+            <Paperclip className="w-5 h-5" />
           </button>
 
           <div className="flex-1 relative">
-            <input
-              type="text"
+            <textarea
               value={newMessage}
               onChange={(e) => {
                 setNewMessage(e.target.value)
@@ -319,39 +360,40 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
               }}
               onKeyPress={handleKeyPress}
               placeholder={`Message ${conversationType === 'group' ? `#${participantName}` : participantName}...`}
-              className="w-full bg-white/10 border border-white/20 rounded-xl px-3 py-2 pr-20 text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-emerald-400/50 text-sm"
+              className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 pr-24 text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-emerald-400/50 resize-none min-h-[44px] max-h-32 text-sm overflow-y-auto"
+              rows={1}
             />
             
             {/* Emoji Picker Button */}
             <button
               onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-              className="absolute right-8 top-1/2 transform -translate-y-1/2 p-1 text-white/60 hover:text-white transition-colors"
+              className="absolute right-16 top-1/2 transform -translate-y-1/2 p-2 text-white/60 hover:text-white transition-colors"
               title="Add emoji"
             >
-              <Smile className="w-4 h-4" />
+              <Smile className="w-5 h-5" />
             </button>
           </div>
 
           <button
             onClick={handleSendMessage}
             disabled={(!newMessage.trim() && !selectedFile) || !isConnected || isUploading}
-            className="p-2 bg-gradient-to-r from-emerald-500 to-teal-600 rounded-xl text-white hover:from-emerald-600 hover:to-teal-700 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="p-3 bg-gradient-to-r from-emerald-500 to-teal-600 rounded-xl text-white hover:from-emerald-600 hover:to-teal-700 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
             title="Send message"
           >
-            {isUploading ? <Clock className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+            {isUploading ? <Clock className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
           </button>
         </div>
 
         {/* Emoji Picker */}
         {showEmojiPicker && (
-          <div className="absolute bottom-full right-0 mb-2 z-50">
-            <div className="bg-white/95 backdrop-blur-xl rounded-xl border border-white/20 shadow-xl p-2">
-              <div className="grid grid-cols-8 gap-1 max-w-xs">
+          <div className="absolute bottom-full right-6 mb-4 z-50">
+            <div className="bg-white/95 backdrop-blur-xl rounded-xl border border-white/20 shadow-xl p-3">
+              <div className="grid grid-cols-8 gap-2 max-w-sm">
                 {['😀', '😂', '❤️', '👍', '👎', '🔥', '💯', '🎉', '🤔', '😢', '😮', '🙌', '👏', '💪', '🤝', '✨'].map((emoji) => (
                   <button
                     key={emoji}
                     onClick={() => handleEmojiClick(emoji)}
-                    className="w-8 h-8 hover:bg-gray-100 rounded-lg flex items-center justify-center text-lg transition-colors"
+                    className="w-10 h-10 hover:bg-gray-100 rounded-lg flex items-center justify-center text-xl transition-colors"
                   >
                     {emoji}
                   </button>
@@ -362,8 +404,8 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
         )}
 
         {(newMessage.length > 0 || selectedFile) && (
-          <div className="text-xs text-white/50 mt-1 text-right">
-            Press Enter to send
+          <div className="text-xs text-white/50 mt-3 text-right">
+            Press Enter to send • Shift+Enter for new line
           </div>
         )}
       </div>

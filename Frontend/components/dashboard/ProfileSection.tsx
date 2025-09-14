@@ -58,9 +58,9 @@ export default function ProfileSection({
   }
 
   return (
-    <div className="space-y-4 lg:space-y-6">
+    <div className="h-full flex flex-col">
       {/* Profile Header */}
-      <div className="bg-gradient-to-r from-white/10 to-white/5 backdrop-blur-xl rounded-2xl lg:rounded-3xl border border-white/20 p-4 lg:p-8">
+      <div className="flex-shrink-0 bg-gradient-to-r from-white/10 to-white/5 backdrop-blur-xl rounded-2xl lg:rounded-3xl border border-white/20 p-4 lg:p-8 mb-4 lg:mb-6">
         <div className="flex flex-col items-center space-y-4 lg:flex-row lg:items-start lg:space-y-0 lg:space-x-8">
           <div className="w-24 h-24 lg:w-32 lg:h-32 bg-gradient-to-r from-emerald-500 to-teal-600 rounded-full flex items-center justify-center overflow-hidden">
             {getAvatarUrl(currentUser?.avatar) ? (
@@ -145,128 +145,133 @@ export default function ProfileSection({
         </div>
       </div>
 
-      {/* Personal Information Section */}
-      <div className="bg-gradient-to-r from-white/10 to-white/5 backdrop-blur-xl rounded-2xl lg:rounded-3xl border border-white/20 p-4 lg:p-6">
-        <h3 className="text-lg lg:text-xl font-semibold text-white mb-4 lg:mb-6">Personal Information</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 lg:gap-6">
-          <div className="space-y-4">
-            <div>
-              <label className="text-sm text-white/60 font-medium">Full Name</label>
-              <p className="text-white text-base lg:text-lg">{currentUser?.name || 'Not provided'}</p>
-            </div>
-            <div>
-              <label className="text-sm text-white/60 font-medium">Email</label>
-              <p className="text-white text-base lg:text-lg">{currentUser?.email || 'Not provided'}</p>
-            </div>
-            <div>
-              <label className="text-sm text-white/60 font-medium">Username</label>
-              <p className="text-white text-base lg:text-lg">@{currentUser?.username || 'Not provided'}</p>
-            </div>
-            <div>
-              <label className="text-sm text-white/60 font-medium">Nickname</label>
-              <p className="text-white text-base lg:text-lg">{currentUser?.nickname || 'Not provided'}</p>
-            </div>
-          </div>
-          <div className="space-y-4">
-            <div>
-              <label className="text-sm text-white/60 font-medium">Date of Birth</label>
-              <p className="text-white text-base lg:text-lg">
-                {currentUser?.dateOfBirth 
-                  ? new Date(currentUser.dateOfBirth).toLocaleDateString('en-US', {
-                      year: 'numeric',
-                      month: 'long',
-                      day: 'numeric'
-                    })
-                  : 'Not provided'
-                }
-              </p>
-            </div>
-            <div>
-              <label className="text-sm text-white/60 font-medium">About Me</label>
-              <p className="text-white text-base lg:text-lg">
-                {currentUser?.aboutMe || 'No description provided'}
-              </p>
-            </div>
-            <div>
-              <label className="text-sm text-white/60 font-medium">Member Since</label>
-              <p className="text-white text-base lg:text-lg">
-                {currentUser?.memberSince 
-                  ? new Date(currentUser.memberSince).toLocaleDateString('en-US', {
-                      year: 'numeric',
-                      month: 'long'
-                    })
-                  : 'Not available'
-                }
-              </p>
-            </div>
-            <div>
-              <label className="text-sm text-white/60 font-medium">Profile Privacy</label>
-              <p className="text-white text-base lg:text-lg flex items-center">
-                {currentUser?.isPrivate ? (
-                  <>
-                    <Lock className="w-4 h-4 mr-2 text-red-400" />
-                    Private Profile
-                  </>
-                ) : (
-                  <>
-                    <Globe className="w-4 h-4 mr-2 text-green-400" />
-                    Public Profile
-                  </>
-                )}
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Profile Content */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:gap-6">
-        <div className="lg:col-span-2">
+      {/* Scrollable Content */}
+      <div className="flex-1 overflow-y-auto">
+        <div className="space-y-4 lg:space-y-6">
+          {/* Personal Information Section */}
           <div className="bg-gradient-to-r from-white/10 to-white/5 backdrop-blur-xl rounded-2xl lg:rounded-3xl border border-white/20 p-4 lg:p-6">
-            <div className="flex items-center justify-between mb-3 lg:mb-4">
-              <h3 className="text-lg lg:text-xl font-semibold text-white">My Posts</h3>
-              {!connectionStatus && (
-                <span className="text-xs text-red-400">Offline</span>
-              )}
+            <h3 className="text-lg lg:text-xl font-semibold text-white mb-4 lg:mb-6">Personal Information</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 lg:gap-6">
+              <div className="space-y-4">
+                <div>
+                  <label className="text-sm text-white/60 font-medium">Full Name</label>
+                  <p className="text-white text-base lg:text-lg">{currentUser?.name || 'Not provided'}</p>
+                </div>
+                <div>
+                  <label className="text-sm text-white/60 font-medium">Email</label>
+                  <p className="text-white text-base lg:text-lg">{currentUser?.email || 'Not provided'}</p>
+                </div>
+                <div>
+                  <label className="text-sm text-white/60 font-medium">Username</label>
+                  <p className="text-white text-base lg:text-lg">@{currentUser?.username || 'Not provided'}</p>
+                </div>
+                <div>
+                  <label className="text-sm text-white/60 font-medium">Nickname</label>
+                  <p className="text-white text-base lg:text-lg">{currentUser?.nickname || 'Not provided'}</p>
+                </div>
+              </div>
+              <div className="space-y-4">
+                <div>
+                  <label className="text-sm text-white/60 font-medium">Date of Birth</label>
+                  <p className="text-white text-base lg:text-lg">
+                    {currentUser?.dateOfBirth 
+                      ? new Date(currentUser.dateOfBirth).toLocaleDateString('en-US', {
+                          year: 'numeric',
+                          month: 'long',
+                          day: 'numeric'
+                        })
+                      : 'Not provided'
+                    }
+                  </p>
+                </div>
+                <div>
+                  <label className="text-sm text-white/60 font-medium">About Me</label>
+                  <p className="text-white text-base lg:text-lg">
+                    {currentUser?.aboutMe || 'No description provided'}
+                  </p>
+                </div>
+                <div>
+                  <label className="text-sm text-white/60 font-medium">Member Since</label>
+                  <p className="text-white text-base lg:text-lg">
+                    {currentUser?.memberSince 
+                      ? new Date(currentUser.memberSince).toLocaleDateString('en-US', {
+                          year: 'numeric',
+                          month: 'long'
+                        })
+                      : 'Not available'
+                    }
+                  </p>
+                </div>
+                <div>
+                  <label className="text-sm text-white/60 font-medium">Profile Privacy</label>
+                  <p className="text-white text-base lg:text-lg flex items-center">
+                    {currentUser?.isPrivate ? (
+                      <>
+                        <Lock className="w-4 h-4 mr-2 text-red-400" />
+                        Private Profile
+                      </>
+                    ) : (
+                      <>
+                        <Globe className="w-4 h-4 mr-2 text-green-400" />
+                        Public Profile
+                      </>
+                    )}
+                  </p>
+                </div>
+              </div>
             </div>
-            <div className="space-y-3 lg:space-y-4">
-              {displayPosts.slice(0, 2).map((post) => (
-                <div 
-                  key={post.id} 
-                  className="bg-white/5 rounded-xl lg:rounded-2xl p-3 lg:p-4 cursor-pointer hover:bg-white/10 transition-colors"
-                  onClick={() => handlePostClick(post.id)}
-                >
-                  <p className="text-white mb-2 lg:mb-3 text-sm lg:text-base">{post.content}</p>
-                  <div className="flex items-center justify-between text-xs lg:text-sm text-white/60">
-                    <span>Just now</span>
-                    <div className="flex space-x-3 lg:space-x-4">
-                      <span>{(post as any).like_count || (post as any).likes || 0} likes</span>
-                      <span>{Array.isArray((post as any).comments) ? (post as any).comments.length : ((post as any).comment_count || (post as any).comments || 0)} comments</span>
+          </div>
+
+          {/* Profile Content */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:gap-6">
+            <div className="lg:col-span-2">
+              <div className="bg-gradient-to-r from-white/10 to-white/5 backdrop-blur-xl rounded-2xl lg:rounded-3xl border border-white/20 p-4 lg:p-6">
+                <div className="flex items-center justify-between mb-3 lg:mb-4">
+                  <h3 className="text-lg lg:text-xl font-semibold text-white">My Posts</h3>
+                  {!connectionStatus && (
+                    <span className="text-xs text-red-400">Offline</span>
+                  )}
+                </div>
+                <div className="space-y-3 lg:space-y-4">
+                  {displayPosts.slice(0, 2).map((post) => (
+                    <div 
+                      key={post.id} 
+                      className="bg-white/5 rounded-xl lg:rounded-2xl p-3 lg:p-4 cursor-pointer hover:bg-white/10 transition-colors"
+                      onClick={() => handlePostClick(post.id)}
+                    >
+                      <p className="text-white mb-2 lg:mb-3 text-sm lg:text-base">{post.content}</p>
+                      <div className="flex items-center justify-between text-xs lg:text-sm text-white/60">
+                        <span>Just now</span>
+                        <div className="flex space-x-3 lg:space-x-4">
+                          <span>{(post as any).like_count || (post as any).likes || 0} likes</span>
+                          <span>{Array.isArray((post as any).comments) ? (post as any).comments.length : ((post as any).comment_count || (post as any).comments || 0)} comments</span>
+                        </div>
+                      </div>
                     </div>
+                  ))}
+                  {displayPosts.length === 0 && (
+                    <div className="text-white/60 text-center py-8">
+                      <p className="text-sm">No posts yet</p>
+                    </div>
+                  )}
+                  {!connectionStatus && displayPosts.length > 0 && (
+                    <div className="text-center py-2">
+                      <p className="text-xs text-white/50">Posts may not be up to date while offline</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-4 lg:space-y-6">
+              {/* Activity */}
+              <div className="bg-gradient-to-r from-white/10 to-white/5 backdrop-blur-xl rounded-2xl lg:rounded-3xl border border-white/20 p-4 lg:p-6">
+                <h3 className="text-base lg:text-lg font-semibold text-white mb-3 lg:mb-4">Recent Activity</h3>
+                <div className="space-y-2 lg:space-y-3">
+                  <div className="text-white/60 text-xs lg:text-sm text-center py-4">
+                    No recent activity
                   </div>
                 </div>
-              ))}
-              {displayPosts.length === 0 && (
-                <div className="text-white/60 text-center py-8">
-                  <p className="text-sm">No posts yet</p>
-                </div>
-              )}
-              {!connectionStatus && displayPosts.length > 0 && (
-                <div className="text-center py-2">
-                  <p className="text-xs text-white/50">Posts may not be up to date while offline</p>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-
-        <div className="space-y-4 lg:space-y-6">
-          {/* Activity */}
-          <div className="bg-gradient-to-r from-white/10 to-white/5 backdrop-blur-xl rounded-2xl lg:rounded-3xl border border-white/20 p-4 lg:p-6">
-            <h3 className="text-base lg:text-lg font-semibold text-white mb-3 lg:mb-4">Recent Activity</h3>
-            <div className="space-y-2 lg:space-y-3">
-              <div className="text-white/60 text-xs lg:text-sm text-center py-4">
-                No recent activity
               </div>
             </div>
           </div>

@@ -27,18 +27,20 @@ import { Sparkles } from 'lucide-react'
 // Import all dashboard components
 import TopBar from '@/components/dashboard/TopBar'
 import Sidebar from '@/components/dashboard/Sidebar'
+import RightSidebar from '@/components/dashboard/RightSidebar'
 import UsersSidebar from '@/components/dashboard/UsersSidebar'
 import CreatePost from '@/components/dashboard/CreatePost'
 import CreateGroup from '@/components/dashboard/CreateGroup'
 import CreateDirectMessage from '@/components/dashboard/CreateDirectMessage'
 import CreateGeneralEvent from '@/components/dashboard/CreateGeneralEvent'
-import NotificationsDropdown from '@/components/dashboard/NotificationsDropdown'
 import HomeFeed from '@/components/dashboard/HomeFeed'
 import ProfileSection from '@/components/dashboard/ProfileSection'
 import ChatsSection from '@/components/dashboard/ChatsSection'
 import ActivitySection from '@/components/dashboard/ActivitySection'
 import CommunitySection from '@/components/dashboard/CommunitySection'
 import SearchPage from '@/components/dashboard/SearchPage'
+import DiscoverPage from '@/components/dashboard/DiscoverPage'
+import NotificationsPage from '@/components/dashboard/NotificationsPage'
 import {
   SettingsSection
 } from '@/components/dashboard/DashboardSections'
@@ -68,13 +70,11 @@ function DashboardPage() {
   const [previousTab, setPreviousTab] = useState('feed')
   const [feedSubTab, setFeedSubTab] = useState('all')
   const [activitySubTab, setActivitySubTab] = useState('liked')
-  const [communitySubTab, setCommunitySubTab] = useState('events')
   const [chatSubTab, setChatSubTab] = useState('all')
   const [showCreatePost, setShowCreatePost] = useState(false)
   const [showCreateGroup, setShowCreateGroup] = useState(false)
   const [showCreateEvent, setShowCreateEvent] = useState(false)
   const [showCreateDirectMessage, setShowCreateDirectMessage] = useState(false)
-  const [showNotifications, setShowNotifications] = useState(false)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [showSearchPage, setShowSearchPage] = useState(false)
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
@@ -108,6 +108,12 @@ function DashboardPage() {
   const [followers, setFollowers] = useState<{ id: number; email: string; first_name: string; last_name: string; avatar?: string; nickname?: string; }[]>([])
   const [following, setFollowing] = useState<{ id: number; email: string; first_name: string; last_name: string; avatar?: string; nickname?: string; }[]>([])
   const [isLoadingFollowers, setIsLoadingFollowers] = useState(false)
+
+  // Data for trending topics (can be expanded later)
+  const trendingTopics = [
+    '#SocialNetwork', '#TechNews', '#WebDev', '#AI', '#Startups',
+    '#React', '#TypeScript', '#NodeJS', '#Python', '#DevOps'
+  ]
 
   // Current User Processing
   const currentUser = user ? {
@@ -144,6 +150,7 @@ function DashboardPage() {
       fetchFeedPosts()
       fetchUsers()
       fetchFollowers()
+      fetchConversations() // Add this to load conversations on initial load
       refetchEvents() // Add this to load events immediately
     }
   }, [user])
@@ -246,12 +253,22 @@ function DashboardPage() {
     }
   }, [])
 
-  // Handle offline/online status changes
+  // Update chat online status when online users change
   useEffect(() => {
-    if (isOffline) {
-      warning('You are currently offline. Some features may not work until connection is restored.', 0)
+    if (chats.length > 0) {
+      setChats(prevChats => 
+        prevChats.map(chat => {
+          if (chat.isGroup) return chat // Groups don't have online status
+          
+          const isOnline = chat.participantId 
+            ? onlineUsers.some(u => u.user_id === chat.participantId && u.is_online)
+            : false
+          
+          return { ...chat, isOnline }
+        })
+      )
     }
-  }, [isOffline, warning])
+  }, [onlineUsers, chats.length])
 
 
   const fetchFeedPosts = async () => {
@@ -339,7 +356,8 @@ function DashboardPage() {
         description: group.description ?? '',
         members: group.member_count ?? 0,
         isJoined: !!group.is_member,
-        lastActivity: formatTimeAgo(group.updated_at ?? group.updatedAt ?? new Date().toISOString())
+        lastActivity: formatTimeAgo(group.updated_at ?? group.updatedAt ?? new Date().toISOString()),
+        timestamp: group.updated_at ?? group.updatedAt ?? new Date().toISOString() // Add timestamp for sorting
       })))
     } catch (err) {
       console.error('Error fetching groups:', err)
@@ -357,18 +375,30 @@ function DashboardPage() {
     try {
       setIsLoadingChats(true)
       const data = await api.getConversations()
-      setChats(data.conversations.map(conversation => ({
-        id: conversation.id,
-        name: conversation.type === 'private'
+      setChats(data.conversations.map(conversation => {
+        const participantName = conversation.type === 'private'
           ? `${conversation.participant?.first_name || ''} ${conversation.participant?.last_name || ''}`.trim() || 'Unknown User'
-          : conversation.group?.title || 'Unknown Group',
-        lastMessage: conversation.last_message.content,
-        time: formatTimeAgo(conversation.updated_at),
-        unread: conversation.unread_count,
-        isOnline: false,
-        isGroup: conversation.type === 'group',
-        participantId: conversation.participant?.id
-      })))
+          : conversation.group?.title || 'Unknown Group'
+        
+        // Check if participant is online for private conversations
+        const isOnline = conversation.type === 'private' && conversation.participant?.id
+          ? onlineUsers.some(u => u.user_id === conversation.participant?.id && u.is_online)
+          : false
+        
+        return {
+          id: conversation.id,
+          name: participantName,
+          lastMessage: conversation.last_message.content,
+          time: formatTimeAgo(conversation.updated_at),
+          timestamp: conversation.updated_at, // Add timestamp for sorting
+          unread: conversation.unread_count,
+          isOnline: isOnline,
+          isGroup: conversation.type === 'group',
+          participantId: conversation.participant?.id,
+          participantAvatar: conversation.participant?.avatar, // Add participant avatar
+          lastMessageSenderId: conversation.last_message.sender_id // Add sender ID for "You:" prefix
+        }
+      }))
     } catch (err) {
       console.error('Error fetching conversations:', err)
       if (err instanceof NetworkError) {
@@ -579,14 +609,18 @@ function DashboardPage() {
     }
   }
 
-  const isUserOnline = (username: string): boolean => {
-    return onlineUsers.some(u => u.username === username && u.is_online)
+  const isUserOnline = (userId: number): boolean => {
+    return onlineUsers.some(u => u.user_id === userId && u.is_online)
   }
 
   const handleNotificationsToggle = () => {
-    setShowNotifications(!showNotifications)
-    if (!showNotifications) {
-      fetchNotifications()
+    if (activeTab === 'notifications') {
+      // If we're already on notifications, go back to previous tab
+      setActiveTab(previousTab)
+    } else {
+      // Navigate to notifications tab
+      setPreviousTab(activeTab)
+      setActiveTab('notifications')
       setUnreadNotifications(0)
     }
   }
@@ -609,6 +643,17 @@ function DashboardPage() {
       setActiveTab('chats')
       fetchConversations()
       fetchGroups()
+    }
+  }
+
+  const handleDiscoverToggle = () => {
+    if (activeTab === 'discover') {
+      // If Discover is already open, go back to the previous tab
+      setActiveTab(previousTab)
+    } else {
+      // Open Discover and remember the previous tab
+      setPreviousTab(activeTab)
+      setActiveTab('discover')
     }
   }
 
@@ -689,16 +734,24 @@ function DashboardPage() {
           />
         )
       case 'chats':
-        return (
+        return openChatWindow ? (
+          <ChatWindow
+            conversationId={openChatWindow.conversationId}
+            conversationType={openChatWindow.type}
+            participantName={openChatWindow.name}
+            participantId={openChatWindow.participantId}
+            onClose={() => setOpenChatWindow(null)}
+          />
+        ) : (
           <ChatsSection
             chats={chats}
             groups={groups}
             isLoadingChats={isLoadingChats}
             isLoadingGroups={isLoadingGroups}
             chatSubTab={chatSubTab}
-            setChatSubTab={setChatSubTab}
             onChatClick={setOpenChatWindow}
             isUserOnline={isUserOnline}
+            currentUser={user}
             showCreateGroup={showCreateGroup}
             setShowCreateDirectMessage={setShowCreateDirectMessage}
             setShowCreateGroup={setShowCreateGroup}
@@ -714,7 +767,7 @@ function DashboardPage() {
             onPostBookmark={handleBookmarkPost}
           />
         )
-      case 'community':
+      case 'events':
         return (
           <CommunitySection
             events={liveEvents}
@@ -725,7 +778,21 @@ function DashboardPage() {
             showCreateEvent={showCreateEvent}
             setShowCreateEvent={setShowCreateEvent}
             onEventRespond={respondToEvent}
-            communitySubTab={communitySubTab}
+            communitySubTab={'events'}
+          />
+        )
+      case 'activity-history':
+        return (
+          <CommunitySection
+            events={liveEvents}
+            onEventsUpdate={refetchEvents}
+            isLoadingEvents={eventsLoading}
+            notifications={notifications}
+            isLoadingNotifications={isLoadingNotifications}
+            showCreateEvent={showCreateEvent}
+            setShowCreateEvent={setShowCreateEvent}
+            onEventRespond={respondToEvent}
+            communitySubTab={'activity'}
           />
         )
       case 'profile':
@@ -747,6 +814,10 @@ function DashboardPage() {
         )
       case 'search':
         return <SearchPage onClose={() => setActiveTab(previousTab)} />
+      case 'discover':
+        return <DiscoverPage onClose={() => setActiveTab(previousTab)} />
+      case 'notifications':
+        return <NotificationsPage />
       default:
         return (
           <HomeFeed
@@ -795,6 +866,11 @@ function DashboardPage() {
         ))}
       </div>
 
+      {(() => {
+        const chatUnreadAll = (chats || []).reduce((sum, c) => sum + (c.unread || 0), 0)
+        const chatUnreadDirect = (chats || []).filter(c => !c.isGroup).reduce((sum, c) => sum + (c.unread || 0), 0)
+        const chatUnreadGroups = (chats || []).filter(c => c.isGroup).reduce((sum, c) => sum + (c.unread || 0), 0)
+        return (
       <Sidebar
         isMobileMenuOpen={isMobileMenuOpen}
         setIsMobileMenuOpen={setIsMobileMenuOpen}
@@ -804,26 +880,29 @@ function DashboardPage() {
         setFeedSubTab={setFeedSubTab}
         activitySubTab={activitySubTab}
         setActivitySubTab={setActivitySubTab}
-        communitySubTab={communitySubTab}
-        setCommunitySubTab={setCommunitySubTab}
+        chatSubTab={chatSubTab}
+        setChatSubTab={setChatSubTab}
+        chatUnreadAll={chatUnreadAll}
+        chatUnreadDirect={chatUnreadDirect}
+        chatUnreadGroups={chatUnreadGroups}
         fetchEvents={refetchEvents}
         currentUser={currentUser}
         logout={logout}
         isCollapsed={isSidebarCollapsed}
         setIsCollapsed={setIsSidebarCollapsed}
       />
+        )
+      })()}
 
       <TopBar
         isMobileMenuOpen={isMobileMenuOpen}
         setIsMobileMenuOpen={setIsMobileMenuOpen}
         activeTab={activeTab}
         setActiveTab={handleTabChange}
-        showNotifications={showNotifications}
-        setShowNotifications={handleNotificationsToggle}
+        onNotificationsClick={handleNotificationsToggle}
         unreadCount={liveUnreadCount || unreadNotifications}
-        onChatClick={handleChatToggle}
         onSearchClick={handleSearchToggle}
-        unreadChatsCount={chats.reduce((sum, chat) => sum + chat.unread, 0)}
+        onDiscoverClick={handleDiscoverToggle}
       />
 
       <CreatePost
@@ -876,116 +955,34 @@ function DashboardPage() {
         }}
       />
 
-      <NotificationsDropdown
-        show={showNotifications}
-        onClose={() => setShowNotifications(false)}
-      />
-
       {showSearchPage && <SearchPage onClose={() => setShowSearchPage(false)} />}
 
-      {/* Chat Window */}
-      {openChatWindow && (
-        <ChatWindow
-          conversationId={openChatWindow!.conversationId}
-          conversationType={openChatWindow!.type}
-          participantName={openChatWindow!.name}
-          participantId={openChatWindow!.participantId}
-          onClose={() => setOpenChatWindow(null)}
-        />
-      )}
-
       {/* Main Content */}
-      <div className={`main-content-layout p-2 lg:p-4 relative z-10 ${isSidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
-        <div className="max-w-7xl mx-auto">
-          <div className="flex flex-col lg:flex-row gap-6">
+      <div className={`main-content-layout p-2 lg:p-4 relative z-10 has-fixed-sidebar ${isSidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
+        <div className="max-w-7xl mx-auto h-full">
+          <div className="flex flex-col lg:flex-row gap-6 h-full">
             {/* Main Content Area */}
-            <div className="flex-1 min-w-0">
+            <div className="flex-1 min-w-0 h-full">
               {renderContent()}
-            </div>
-            
-            {/* Right Sidebar */}
-            <div className="lg:w-80 xl:w-96 space-y-6">
-              {/* Online Users Section */}
-              <div className="bg-white/10 backdrop-blur-xl rounded-2xl p-4 border border-white/20">
-                <h3 className="text-white font-semibold mb-3 flex items-center">
-                  <div className="w-2 h-2 bg-green-400 rounded-full mr-2"></div>
-                  Online Users ({onlineUsers.length})
-                </h3>
-                <div className="space-y-2 max-h-48 overflow-y-auto">
-                  {onlineUsers.slice(0, 10).map((onlineUser, index) => (
-                    <div key={index} className="flex items-center space-x-3 p-2 rounded-lg hover:bg-white/10 transition-colors cursor-pointer">
-                      <div className="relative">
-                        <img
-                          src={(onlineUser as any).avatar || (onlineUser as any).profile_image || '/default-avatar.png'}
-                          alt={onlineUser.username}
-                          className="w-8 h-8 rounded-full border-2 border-green-400"
-                        />
-                        <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-green-400 rounded-full border-2 border-white"></div>
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-white text-sm font-medium truncate">
-                          {(onlineUser as any).display_name || (onlineUser as any).name || onlineUser.username || 'Unknown User'}
-                        </p>
-                        <p className="text-white/60 text-xs truncate">@{onlineUser.username}</p>
-                      </div>
-                    </div>
-                  ))}
-                  {onlineUsers.length === 0 && (
-                    <p className="text-white/60 text-sm text-center py-4">No users online</p>
-                  )}
-                </div>
-              </div>
-
-              {/* Trending Topics Section */}
-              <div className="bg-white/10 backdrop-blur-xl rounded-2xl p-4 border border-white/20">
-                <h3 className="text-white font-semibold mb-3 flex items-center">
-                  <span className="text-lg mr-2">🔥</span>
-                  Trending Topics
-                </h3>
-                <div className="space-y-2">
-                  {['#SocialNetwork', '#TechNews', '#WebDev', '#AI', '#Startups'].map((topic, index) => (
-                    <div key={topic} className="flex items-center justify-between p-2 rounded-lg hover:bg-white/10 transition-colors cursor-pointer">
-                      <span className="text-white/70 text-sm">{topic}</span>
-                      <span className="text-white/50 text-xs">{Math.floor(Math.random() * 1000) + 100} posts</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Recent Activity Section */}
-              <div className="bg-white/10 backdrop-blur-xl rounded-2xl p-4 border border-white/20">
-                <h3 className="text-white font-semibold mb-3 flex items-center">
-                  <span className="text-lg mr-2">⚡</span>
-                  Recent Activity
-                </h3>
-                <div className="space-y-3 max-h-48 overflow-y-auto">
-                  {liveNotifications.slice(0, 5).map((notification) => (
-                    <div key={notification.id} className="flex items-start space-x-3 p-2 rounded-lg hover:bg-white/10 transition-colors">
-                      <div className="w-2 h-2 bg-blue-400 rounded-full mt-2 flex-shrink-0"></div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-white/80 text-sm">
-                          <span className="font-medium">{(notification as any).actor?.first_name || 'Someone'}</span> {(notification as any).message || notification.type}
-                        </p>
-                        <p className="text-white/50 text-xs">{formatTimeAgo((notification as any).created_at || notification.created_at)}</p>
-                      </div>
-                    </div>
-                  ))}
-                  {liveNotifications.length === 0 && (
-                    <p className="text-white/60 text-sm text-center py-4">No recent activity</p>
-                  )}
-                </div>
-              </div>
-
-              {/* Users Sidebar Component */}
-              <UsersSidebar 
-                onUserClick={(user) => {
-                  router.push(`/profile/${user.id}`)
-                }}
-              />
             </div>
           </div>
         </div>
       </div>
+
+      {/* Fixed Right Sidebar */}
+      <RightSidebar
+        onlineUsers={onlineUsers}
+        followingUsers={following}
+        followersUsers={followers}
+        trendingTopics={trendingTopics}
+        onUserClick={(user) => {
+          // TODO: Navigate to user profile
+          console.log('User clicked:', user)
+        }}
+        currentUser={currentUser}
+        setActiveTab={handleTabChange}
+        logout={logout}
+      />
     </div>
   )
 }

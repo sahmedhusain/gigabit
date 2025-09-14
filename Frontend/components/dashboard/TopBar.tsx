@@ -1,8 +1,6 @@
 'use client'
 
-import { Menu, X, Bell, MessageCircle, Search, Users, Calendar, UserCheck, Hash, Filter, FileText, User, ChevronDown } from 'lucide-react'
-import { Typography } from '@mui/material'
-import { useRouter } from 'next/navigation'
+import { Menu, X, Bell, MessageCircle, Search, Users, Calendar, UserCheck, Hash, Filter, FileText, User, ChevronDown, Compass } from 'lucide-react'
 import { useState } from 'react'
 
 
@@ -11,12 +9,10 @@ interface TopBarProps {
   setIsMobileMenuOpen: (open: boolean) => void
   activeTab: string
   setActiveTab: (tab: string) => void
-  showNotifications: boolean
-  setShowNotifications: () => void
+  onNotificationsClick: () => void
   unreadCount: number
-  onChatClick: () => void
   onSearchClick: () => void
-  unreadChatsCount?: number
+  onDiscoverClick: () => void
 }
 
 export default function TopBar({
@@ -24,21 +20,14 @@ export default function TopBar({
   setIsMobileMenuOpen,
   activeTab,
   setActiveTab,
-  showNotifications,
-  setShowNotifications,
+  onNotificationsClick,
   unreadCount,
-  onChatClick,
   onSearchClick,
-  unreadChatsCount = 3
+  onDiscoverClick,
 }: TopBarProps) {
-  const router = useRouter()
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedFilter, setSelectedFilter] = useState('all')
   const [showFilterDropdown, setShowFilterDropdown] = useState(false)
-
-  const handleLogoClick = () => {
-    router.push('/')
-  }
 
   const searchFilters = [
     { id: 'all', label: 'All', icon: Filter },
@@ -61,56 +50,22 @@ export default function TopBar({
   }
 
   return (
-    <header className="topbar-layout bg-gradient-to-r from-white/20 via-white/10 to-white/5 backdrop-blur-xl border-b border-white/40 shadow-2xl">
-      <div className="grid grid-cols-3 items-center h-full px-6 py-3 gap-4">
-        {/* Logo/Title - Hidden on mobile when sidebar is open */}
-        <div className={`flex items-center space-x-3 transition-all duration-300 hover:scale-105 cursor-pointer justify-start ${
-          isMobileMenuOpen ? 'lg:opacity-100 opacity-0' : 'opacity-100'
-        }`} onClick={handleLogoClick}>
-            <img
-              src="/logo.png"
-              alt="Gigabit Logo"
-              className="w-10 h-8 drop-shadow-xl hover:drop-shadow-2xl transition-all duration-300"
-            />
-            <Typography
-              variant="h6"
-              component="h1"
-              sx={{
-                fontWeight: '700',
-                color: 'white',
-                fontSize: { xs: '1.5rem', lg: '1.75rem' },
-                letterSpacing: '2px',
-                fontFamily: '"Courier New", "Consolas", "Monaco", "Menlo", monospace',
-                textTransform: 'capitalize',
-                position: 'relative',
-                display: 'flex',
-                alignItems: 'center',
-                lineHeight: 1.1,
-                marginTop: '1px',
-                minWidth: '120px',
-                textAlign: 'center',
-                '&::after': {
-                  content: '""',
-                  position: 'absolute',
-                  bottom: '-3px',
-                  left: '0',
-                  width: '100%',
-                  height: '3px',
-                  background: 'linear-gradient(90deg, #38bdf8, #06b6d4, #0891b2, #0e7490)',
-                  borderRadius: '2px',
-                  opacity: 0.95,
-                  boxShadow: '0 0 12px rgba(56, 189, 248, 0.5)',
-                }
-              }}
-            >
-              Gigabit
-            </Typography>
-          </div>
+        <header className="topbar-layout">
+      <div className="flex items-center justify-between h-16 px-4">
+  {/* Left section: Menu button (mobile) */}
+  <div className="flex items-center space-x-4 flex-1">
+          <button
+            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+            className="lg:hidden p-2 rounded-xl text-white/80 hover:text-white hover:bg-white/10 transition-all duration-200"
+          >
+            {isMobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+          </button>
+        </div>
 
-        {/* Center Search Bar */}
-        <div className="flex justify-center relative">
+        {/* Center Search Bar with adjacent buttons */}
+  <div className="flex justify-center items-center space-x-3">
           <div className="relative max-w-2xl w-full">
-            <div className="flex items-center bg-white/10 backdrop-blur-md border-2 border-white/30 rounded-2xl transition-all duration-300 focus-within:border-white/50 focus-within:bg-white/15">
+            <div className="flex items-center border-2 border-white/30 rounded-2xl transition-all duration-300 focus-within:border-white/50">
               <div className="flex items-center flex-1">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-white/60" />
                 <input
@@ -123,7 +78,7 @@ export default function TopBar({
               </div>
               
               {/* Filter Dropdown Button */}
-              <div className="relative">
+              <div>
                 <button
                   onClick={toggleFilterDropdown}
                   className="flex items-center space-x-2 px-3 py-2 text-white/70 hover:text-white transition-all duration-200 border-l border-white/20"
@@ -141,51 +96,63 @@ export default function TopBar({
                     )
                   })()}
                 </button>
-                
-                {/* Filter Dropdown */}
-                {showFilterDropdown && (
-                  <div className="absolute top-full right-0 mt-2 w-48 bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl border border-white/40 overflow-hidden z-50">
-                    <div className="p-2">
-                      <div className="text-xs font-semibold text-gray-600 mb-2 px-2">Search Filters</div>
-                      {searchFilters.map((filter) => {
-                        const IconComponent = filter.icon
-                        const isSelected = selectedFilter === filter.id
-                        return (
-                          <button
-                            key={filter.id}
-                            onClick={() => handleFilterSelect(filter.id)}
-                            className={`w-full flex items-center space-x-3 px-3 py-2 rounded-xl transition-all duration-200 ${
-                              isSelected
-                                ? 'bg-blue-100 text-blue-700 font-semibold'
-                                : 'text-gray-700 hover:bg-blue-50 hover:text-blue-600'
-                            }`}
-                          >
-                            <IconComponent className="w-4 h-4" />
-                            <span className="text-sm">{filter.label}</span>
-                          </button>
-                        )
-                      })}
-                    </div>
-                  </div>
-                )}
               </div>
             </div>
+            {/* Filter Dropdown (Full width, glass/blur) */}
+            {showFilterDropdown && (
+              <div className="absolute left-0 right-0 top-full mt-2 w-full bg-white/10 backdrop-blur-xl rounded-2xl shadow-2xl border border-white/20 overflow-hidden z-50">
+                <div className="p-2">
+                  <div className="text-xs font-semibold text-white/80 mb-2 px-2">Search Filters</div>
+                  {searchFilters.map((filter) => {
+                    const IconComponent = filter.icon
+                    const isSelected = selectedFilter === filter.id
+                    return (
+                      <button
+                        key={filter.id}
+                        onClick={() => handleFilterSelect(filter.id)}
+                        className={`w-full flex items-center space-x-3 px-3 py-2 rounded-xl transition-all duration-200 ${
+                          isSelected
+                            ? 'bg-white/20 text-white'
+                            : 'text-white/80 hover:bg-white/10 hover:text-white'
+                        }`}
+                      >
+                        <IconComponent className="w-4 h-4" />
+                        <span className="text-sm">{filter.label}</span>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
           </div>
-        </div>
 
-        {/* Right Side Actions */}
-        <div className="flex items-center space-x-4 justify-end">
-          {/* Notifications Button - Icon Only */}
+          {/* Discover Button - Between search and notifications */}
           <button
-            onClick={setShowNotifications}
-            className={`relative p-2 rounded-2xl transition-all duration-300 transform hover:scale-105 hover:shadow-lg ${
-              showNotifications
+            onClick={onDiscoverClick}
+            className={`relative flex items-center rounded-2xl transition-all duration-300 transform hover:scale-105 hover:shadow-lg ${
+              activeTab === 'discover'
                 ? 'bg-gradient-to-r from-white to-blue-50 text-emerald-600 shadow-2xl border-2 border-white/40'
                 : 'text-white/90 hover:text-white hover:bg-white/20 backdrop-blur-md border-2 border-white/30 hover:border-white/50'
-            }`}
+            } ${activeTab === 'discover' ? 'px-3 py-2 space-x-2' : 'w-10 h-10 justify-center'}`}
+            type='button'
+            title="Discover"
+          >
+            <Compass className={`${activeTab === 'discover' ? 'w-4 h-4' : 'w-5 h-5'}`} />
+            <span className={`${activeTab === 'discover' ? 'inline' : 'hidden'} font-semibold text-sm`}>Discover</span>
+          </button>
+
+          {/* Notifications Button - Right next to search */}
+          <button
+            onClick={onNotificationsClick}
+            className={`relative flex items-center rounded-2xl transition-all duration-300 transform hover:scale-105 hover:shadow-lg ${
+              activeTab === 'notifications'
+                ? 'bg-gradient-to-r from-white to-blue-50 text-emerald-600 shadow-2xl border-2 border-white/40'
+                : 'text-white/90 hover:text-white hover:bg-white/20 backdrop-blur-md border-2 border-white/30 hover:border-white/50'
+            } ${activeTab === 'notifications' ? 'px-3 py-2 space-x-2' : 'w-10 h-10 justify-center'}`}
             aria-label="Notifications"
           >
-            <Bell className="w-4 h-4" />
+            <Bell className={`${activeTab === 'notifications' ? 'w-4 h-4' : 'w-5 h-5'}`} />
+            <span className={`${activeTab === 'notifications' ? 'inline' : 'hidden'} font-semibold text-sm`}>Notifications</span>
             {unreadCount > 0 && (
               <span className="absolute -top-2 -right-2 bg-gradient-to-r from-red-500 to-pink-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold shadow-xl border-2 border-white">
                 {unreadCount > 9 ? '9+' : unreadCount}
@@ -193,26 +160,10 @@ export default function TopBar({
             )}
           </button>
 
-          {/* Chats Button */}
-          <button
-            onClick={onChatClick}
-            className={`relative flex items-center space-x-2 px-3 py-2 rounded-2xl transition-all duration-300 transform hover:scale-105 hover:shadow-lg ${
-              activeTab === 'chats'
-                ? 'bg-gradient-to-r from-white to-blue-50 text-emerald-600 shadow-2xl border-2 border-white/40'
-                : 'text-white/90 hover:text-white hover:bg-white/20 backdrop-blur-md border-2 border-white/30 hover:border-white/50'
-            }`}
-            type='button'
-            title="Chats"
-          >
-            <MessageCircle className="w-4 h-4" />
-            <span className="hidden md:inline font-semibold text-sm">Chats</span>
-            {unreadChatsCount > 0 && (
-              <span className="absolute -top-2 -right-2 bg-gradient-to-r from-emerald-500 to-teal-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold shadow-xl border-2 border-white">
-                {unreadChatsCount > 9 ? '9+' : unreadChatsCount}
-              </span>
-            )}
-          </button>
+        </div>
 
+        {/* Right Side Actions */}
+  <div className="flex items-center space-x-4 justify-end flex-1">
           <div className="flex items-center space-x-3 lg:space-x-4">
             
             

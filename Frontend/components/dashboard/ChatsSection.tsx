@@ -1,227 +1,142 @@
 'use client'
 import { useState } from 'react'
+import useSWR from 'swr'
 import { MessageCircle, Users, Plus, Search, MessageSquarePlus } from 'lucide-react'
-import { Chat, Group } from '@/lib/api'
+import { api } from '@/lib/api'
+import { ChatItem as ChatItemType } from '@/types/chat'
+import ChatItem from '@/components/chat/ChatItem'
+import ChatSkeleton from '@/components/chat/ChatSkeleton'
+import { User } from '@/lib/api'
 
 interface ChatsSectionProps {
-  chats: (Chat & { participantId?: number })[]
-  groups: Group[]
-  isLoadingChats: boolean
-  isLoadingGroups: boolean
   chatSubTab: string
-  setChatSubTab: (tab: string) => void
-  onChatClick: (chat: { conversationId: number; type: 'private' | 'group'; name: string; participantId?: number }) => void
-  isUserOnline: (username: string) => boolean
+  onChatClick: (chat: { conversationId: string; type: 'private' | 'group'; name: string; participantId?: number }) => void
+  isUserOnline: (userId: number) => boolean
+  currentUser: User | null
   showCreateGroup: boolean
   setShowCreateDirectMessage: (show: boolean) => void
   setShowCreateGroup: (show: boolean) => void
 }
 
+const fetcher = () => api.getChats().then(data => data.chats)
+
 export default function ChatsSection({
-  chats,
-  groups,
-  isLoadingChats,
-  isLoadingGroups,
   chatSubTab,
-  setChatSubTab,
   onChatClick,
   isUserOnline,
+  currentUser,
   setShowCreateDirectMessage,
   showCreateGroup,
   setShowCreateGroup
 }: ChatsSectionProps) {
   const [searchQuery, setSearchQuery] = useState('')
+  const { data: chats, error, isLoading } = useSWR('chats', fetcher, { refreshInterval: 5000 })
 
-  const filteredChats = chats.filter(chat =>
-    chat.name.toLowerCase().includes(searchQuery.toLowerCase())
-  )
-
-  const filteredGroups = groups.filter(group =>
-    group.name.toLowerCase().includes(searchQuery.toLowerCase())
-  )
-
-  const directMessages = filteredChats.filter(chat => !chat.isGroup)
-  const groupChats = filteredChats.filter(chat => chat.isGroup)
-
-  const renderChatList = (chatList: (Chat & { participantId?: number })[]) => (
-    <div className="space-y-2">
-      {chatList.map((chat) => (
-        <div
-          key={chat.id}
-          onClick={() => onChatClick({
-            conversationId: chat.id,
-            type: chat.isGroup ? 'group' : 'private',
-            name: chat.name,
-            participantId: chat.participantId
-          })}
-          className="flex items-center space-x-3 p-4 bg-white/10 backdrop-blur-sm rounded-lg hover:bg-white/20 transition-all cursor-pointer border border-white/20"
-        >
-          <div className="relative">
-            <div className="w-12 h-12 bg-gradient-to-r from-emerald-400 to-teal-500 rounded-full flex items-center justify-center text-white font-bold">
-              {chat.isGroup ? <Users className="w-6 h-6" /> : chat.name[0]?.toUpperCase()}
-            </div>
-            {!chat.isGroup && (
-              <div className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-white ${
-                isUserOnline(chat.name) ? 'bg-green-500' : 'bg-gray-400'
-              }`} />
-            )}
-          </div>
-          
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center justify-between">
-              <h3 className="text-white font-medium truncate">{chat.name}</h3>
-              <span className="text-white/60 text-sm">{chat.time}</span>
-            </div>
-            <p className="text-white/70 text-sm truncate">{chat.lastMessage}</p>
-          </div>
-          
-          {chat.unread > 0 && (
-            <div className="bg-emerald-500 text-white text-xs rounded-full w-6 h-6 flex items-center justify-center">
-              {chat.unread}
-            </div>
-          )}
-        </div>
-      ))}
-      
-      {chatList.length === 0 && !isLoadingChats && (
-        <div className="text-center py-12">
-          <MessageCircle className="w-16 h-16 text-white/30 mx-auto mb-4" />
-          <p className="text-white/60">
-            {chatSubTab === 'direct' ? 'No direct messages yet' : 
-             chatSubTab === 'groups' ? 'No group chats yet' : 'No conversations yet'}
-          </p>
-        </div>
-      )}
-    </div>
-  )
-
-  const renderGroupList = () => (
-    <div className="space-y-2">
-      {filteredGroups.map((group) => (
-        <div
-          key={group.id}
-          className="flex items-center space-x-3 p-4 bg-white/10 backdrop-blur-sm rounded-lg hover:bg-white/20 transition-all cursor-pointer border border-white/20"
-        >
-          <div className="w-12 h-12 bg-gradient-to-r from-purple-400 to-pink-500 rounded-full flex items-center justify-center text-white font-bold">
-            <Users className="w-6 h-6" />
-          </div>
-          
-          <div className="flex-1">
-            <div className="flex items-center justify-between">
-              <h3 className="text-white font-medium">{group.name}</h3>
-              <span className="text-white/60 text-sm">{group.lastActivity}</span>
-            </div>
-            <p className="text-white/70 text-sm">{group.members} members</p>
-          </div>
-          
-          <div className={`px-3 py-1 rounded-full text-xs ${
-            group.isJoined 
-              ? 'bg-emerald-500 text-white' 
-              : 'bg-white/20 text-white/80'
-          }`}>
-            {group.isJoined ? 'Joined' : 'Join'}
-          </div>
-        </div>
-      ))}
-      
-      {filteredGroups.length === 0 && !isLoadingGroups && (
-        <div className="text-center py-12">
-          <Users className="w-16 h-16 text-white/30 mx-auto mb-4" />
-          <p className="text-white/60">No groups found</p>
-        </div>
-      )}
-    </div>
-  )
+  const filteredChats = chats?.filter(chat => {
+    const matchesSearch = chat.name.toLowerCase().includes(searchQuery.toLowerCase())
+    if (chatSubTab === 'all') return matchesSearch
+    return chat.type === chatSubTab && matchesSearch
+  }) || []
 
   const renderContent = () => {
-    if (isLoadingChats || isLoadingGroups) {
+    if (isLoading) {
       return (
-        <div className="flex items-center justify-center py-12">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
+        <div className="space-y-4">
+          {[...Array(5)].map((_, i) => <ChatSkeleton key={i} />)}
         </div>
       )
     }
 
-    switch (chatSubTab) {
-      case 'direct':
-        return renderChatList(directMessages)
-      case 'groups':
-        return renderGroupList()
-      default:
-        return (
-          <>
-            {renderChatList(filteredChats)}
-            {filteredChats.length > 0 && filteredGroups.length > 0 && (
-              <div className="border-t border-white/20 my-6" />
-            )}
-            {renderGroupList()}
-          </>
-        )
+    if (error) {
+      return (
+        <div className="text-center py-12">
+          <MessageCircle className="w-16 h-16 text-red-500/70 mx-auto mb-4" />
+          <p className="text-white/60">Failed to load chats. Please try again later.</p>
+        </div>
+      )
     }
+
+    if (filteredChats.length === 0) {
+      return (
+        <div className="text-center py-12">
+          <MessageCircle className="w-16 h-16 text-white/30 mx-auto mb-4" />
+          <h2 className="text-xl font-semibold text-white">No conversations yet</h2>
+          <p className="text-white/60 mt-2">Start a new conversation to see it here.</p>
+          <button
+            onClick={() => {
+              // TODO: Implement a modal to select a user to chat with
+              setShowCreateDirectMessage(true);
+            }}
+            className="mt-4 bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-2 px-4 rounded-lg transition-all flex items-center space-x-2 mx-auto"
+          >
+            <MessageSquarePlus className="w-5 h-5" />
+            <span>Start a Chat</span>
+          </button>
+        </div>
+      )
+    }
+
+    return (
+      <div className="space-y-4">
+        {filteredChats.map((chat) => (
+          <ChatItem
+            key={chat.id}
+            item={chat}
+            isUserOnline={isUserOnline}
+            onClick={() => onChatClick({
+              conversationId: chat.id,
+              type: chat.type,
+              name: chat.name,
+              participantId: chat.type === 'private' ? parseInt(chat.id.replace('private_', '')) : undefined
+            })}
+          />
+        ))}
+      </div>
+    )
   }
 
   return (
-    <div className="space-y-6">
+    <div className="h-full flex flex-col">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex-shrink-0 flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-white mb-2">Chats</h1>
-          <p className="text-white/70">Connect with friends and groups</p>
+          <h1 className="text-3xl font-bold text-white">Chats</h1>
         </div>
         <div className="flex items-center space-x-2">
           <button
-            onClick={() => setShowCreateDirectMessage(true)}
+            onClick={() => {
+              // TODO: Implement a modal to select a user to chat with
+              setShowCreateDirectMessage(true);
+            }}
             className="bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-lg transition-all flex items-center space-x-2 border border-white/20"
           >
-            <MessageSquarePlus className="w-4 h-4" />
+            <MessageSquarePlus className="w-5 h-5" />
             <span>New Message</span>
           </button>
           <button
             onClick={() => setShowCreateGroup(true)}
             className="bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white px-4 py-2 rounded-lg transition-all flex items-center space-x-2"
           >
-            <Plus className="w-4 h-4" />
+            <Plus className="w-5 h-5" />
             <span>New Group</span>
           </button>
         </div>
       </div>
 
       {/* Search Bar */}
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-white/60 w-5 h-5" />
+      <div className="flex-shrink-0 relative mb-6">
+        <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-white/60 w-5 h-5" />
         <input
           type="text"
           placeholder="Search conversations..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          className="w-full pl-10 pr-4 py-3 bg-white/10 backdrop-blur-sm rounded-lg border border-white/20 text-white placeholder-white/60 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+          className="w-full pl-12 pr-4 py-3 bg-white/10 backdrop-blur-sm rounded-lg border border-white/20 text-white placeholder-white/60 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
         />
       </div>
 
-      {/* Tabs */}
-      <div className="flex space-x-1 bg-white/10 backdrop-blur-sm rounded-lg p-1 border border-white/20">
-        {[
-          { id: 'all', label: 'All', icon: MessageCircle },
-          { id: 'direct', label: 'Direct Messages', icon: MessageCircle },
-          { id: 'groups', label: 'Groups', icon: Users }
-        ].map(({ id, label, icon: Icon }) => (
-          <button
-            key={id}
-            onClick={() => setChatSubTab(id)}
-            className={`flex-1 flex items-center justify-center space-x-2 px-4 py-2 rounded-md transition-all ${
-              chatSubTab === id
-                ? 'bg-white text-emerald-600 shadow-lg'
-                : 'text-white/70 hover:text-white hover:bg-white/10'
-            }`}
-          >
-            <Icon className="w-4 h-4" />
-            <span className="font-medium">{label}</span>
-          </button>
-        ))}
-      </div>
-
       {/* Content */}
-      <div className="min-h-96">
+      <div className="flex-1 overflow-y-auto pr-2 -mr-2">
         {renderContent()}
       </div>
     </div>

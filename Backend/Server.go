@@ -109,6 +109,7 @@ func (s *Server) setupRoutes() {
 	notificationHandler := handlers.NewNotificationHandler(s.DB.GetDB(), s.Hub)
 	bookmarkHandler := handlers.NewBookmarkHandler(s.DB.GetDB(), s.Hub)
 	wsHandler := handlers.NewWebSocketHandler(s.Hub)
+	chatHandler := handlers.NewChatHandler(s.DB.GetDB())
 
 	// Health check
 	s.router.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
@@ -163,6 +164,7 @@ func (s *Server) setupRoutes() {
 	s.router.HandleFunc("/api/messages", s.handleMessagesRoute(messageHandler))
 	s.router.HandleFunc("/api/messages/", s.handleMessageRoute(messageHandler))
 	s.router.HandleFunc("/api/conversations", s.handleRoute(messageHandler.GetConversations, true))
+	s.router.HandleFunc("/api/chats", s.handleRoute(chatHandler.GetUnifiedChats, true))
 
 	// Notification routes
 	s.router.HandleFunc("/api/notifications", s.handleNotificationsRoute(notificationHandler))

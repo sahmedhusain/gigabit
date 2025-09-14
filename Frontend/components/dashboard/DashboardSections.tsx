@@ -317,41 +317,49 @@ export function SettingsSection({ currentUser, testTokenExpiration }: SettingsSe
   const { isConnected } = useConnectionStatus()
   
   return (
-    <div className="space-y-4 lg:space-y-6">
-      <div className="bg-white/5 rounded-2xl p-4 lg:p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-bold text-white">Settings</h2>
-          <div className={`text-xs px-2 py-1 rounded ${isConnected ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
-            {isConnected ? 'Online' : 'Offline'}
-          </div>
+    <div className="h-full flex flex-col">
+      {/* Header */}
+      <div className="flex-shrink-0 flex items-center justify-between mb-6">
+        <div>
+          <h1 className="text-2xl font-bold text-white mb-2">Settings</h1>
+          <p className="text-white/70">Manage your account preferences</p>
         </div>
-        <div className="space-y-3">
-          <div className={`p-3 rounded-md transition-colors ${
-            isConnected ? 'bg-white/3 text-white hover:bg-white/5 cursor-pointer' : 'bg-gray-700 text-gray-400 cursor-not-allowed'
-          }`}>
-            Privacy & Security {!isConnected && '(Offline)'}
-          </div>
-          <div className={`p-3 rounded-md transition-colors ${
-            isConnected ? 'bg-white/3 text-white hover:bg-white/5 cursor-pointer' : 'bg-gray-700 text-gray-400 cursor-not-allowed'
-          }`}>
-            Notifications {!isConnected && '(Offline)'}
-          </div>
-          <div className="p-3 bg-white/3 rounded-md text-white">
-            <button 
-              onClick={testTokenExpiration} 
-              disabled={!isConnected}
-              className={`transition-colors ${
-                isConnected ? 'text-yellow-300 hover:text-yellow-200' : 'text-gray-500 cursor-not-allowed'
-              }`}
-            >
-              Test Token Expiration {!isConnected && '(Offline)'}
-            </button>
-          </div>
-          {!isConnected && (
-            <div className="p-2 bg-red-500/20 border border-red-500/30 rounded-md">
-              <p className="text-red-400 text-sm">Some settings require an internet connection</p>
+        <div className={`text-xs px-2 py-1 rounded ${isConnected ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
+          {isConnected ? 'Online' : 'Offline'}
+        </div>
+      </div>
+
+      {/* Content */}
+      <div className="flex-1 overflow-y-auto">
+        <div className="bg-white/5 rounded-2xl p-4 lg:p-6">
+          <div className="space-y-3">
+            <div className={`p-3 rounded-md transition-colors ${
+              isConnected ? 'bg-white/3 text-white hover:bg-white/5 cursor-pointer' : 'bg-gray-700 text-gray-400 cursor-not-allowed'
+            }`}>
+              Privacy & Security {!isConnected && '(Offline)'}
             </div>
-          )}
+            <div className={`p-3 rounded-md transition-colors ${
+              isConnected ? 'bg-white/3 text-white hover:bg-white/5 cursor-pointer' : 'bg-gray-700 text-gray-400 cursor-not-allowed'
+            }`}>
+              Notifications {!isConnected && '(Offline)'}
+            </div>
+            <div className="p-3 bg-white/3 rounded-md text-white">
+              <button 
+                onClick={testTokenExpiration} 
+                disabled={!isConnected}
+                className={`transition-colors ${
+                  isConnected ? 'text-yellow-300 hover:text-yellow-200' : 'text-gray-500 cursor-not-allowed'
+                }`}
+              >
+                Test Token Expiration {!isConnected && '(Offline)'}
+              </button>
+            </div>
+            {!isConnected && (
+              <div className="p-2 bg-red-500/20 border border-red-500/30 rounded-md">
+                <p className="text-red-400 text-sm">Some settings require an internet connection</p>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>

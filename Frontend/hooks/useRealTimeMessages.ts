@@ -27,7 +27,7 @@ export function useRealTimeMessages() {
   const [unreadCounts, setUnreadCounts] = useState<Map<number, number>>(new Map())
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  
+
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   // WebSocket subscription for real-time message updates
@@ -35,11 +35,19 @@ export function useRealTimeMessages() {
     messageTypes: ['private_message', 'group_message'],
     onMessage: (message) => {
       if (message.type === 'private_message' || message.type === 'group_message') {
+        // Determine conversation ID based on message type
+        let conversationId: number
+
+        if (message.type === 'group_message') {
+          conversationId = message.group_id || 0
+        } else {
+          // For private messages, generate conversation ID from sender and receiver
+          conversationId = getPrivateConversationId(message.from || 0, user?.id || 0)
+        }
+
         const newMessage: Message = {
           id: Date.now(), // Temporary ID - should be replaced with real ID from server
-          conversation_id: message.type === 'group_message' 
-            ? message.group_id || 0 
-            : getPrivateConversationId(message.from || 0, user?.id || 0),
+          conversation_id: conversationId,
           sender_id: message.from || 0,
           content: message.content || '',
           message_type: 'text',
@@ -53,11 +61,13 @@ export function useRealTimeMessages() {
           }
         }
 
+        console.log('Received WebSocket message:', { message, conversationId })
+
         // Add message to conversation
         setMessages(prev => {
-          const conversationMessages = prev.get(newMessage.conversation_id) || []
+          const conversationMessages = prev.get(conversationId) || []
           const updated = new Map(prev)
-          updated.set(newMessage.conversation_id, [...conversationMessages, newMessage])
+          updated.set(conversationId, [...conversationMessages, newMessage])
           return updated
         })
 
@@ -65,20 +75,34 @@ export function useRealTimeMessages() {
         if (message.from !== user?.id) {
           setUnreadCounts(prev => {
             const updated = new Map(prev)
-            const currentCount = updated.get(newMessage.conversation_id) || 0
-            updated.set(newMessage.conversation_id, currentCount + 1)
+            const currentCount = updated.get(conversationId) || 0
+            updated.set(conversationId, currentCount + 1)
             return updated
           })
         }
 
         // Update conversation last message
-        setConversations(prev => prev.map(conv => 
-          conv.id === newMessage.conversation_id
+        setConversations(prev => prev.map(conv =>
+          conv.id === conversationId
             ? {
                 ...conv,
                 last_message: {
                   content: newMessage.content,
-                  created_at: newMessage.created_at
+                  created_at: newMessage.created_at,
+                  sender_id: newMessage.sender_id,
+                  sender: {
+                    id: newMessage.sender.id,
+                    email: '', // We don't have this info in WebSocket
+                    first_name: newMessage.sender.first_name,
+                    last_name: newMessage.sender.last_name,
+                    date_of_birth: '', // We don't have this info in WebSocket
+                    avatar: newMessage.sender.avatar,
+                    nickname: '', // We don't have this info in WebSocket
+                    about_me: '', // We don't have this info in WebSocket
+                    is_private: false, // Default value
+                    created_at: '', // We don't have this info in WebSocket
+                    updated_at: '' // We don't have this info in WebSocket
+                  }
                 },
                 unread_count: message.from !== user?.id ? conv.unread_count + 1 : conv.unread_count
               }
@@ -97,20 +121,80 @@ export function useRealTimeMessages() {
     try {
       setIsLoading(true)
       setError(null)
-      
+
       const response = await api.getConversations()
       setConversations(response.conversations || [])
-      
+
       // Initialize unread counts
       const unreadMap = new Map<number, number>()
       response.conversations.forEach(conv => {
         unreadMap.set(conv.id, conv.unread_count)
       })
       setUnreadCounts(unreadMap)
-      
+
     } catch (err: any) {
       console.error('Failed to fetch conversations:', err)
       setError(err.message || 'Failed to fetch conversations')
+    } finally {
+      setIsLoading(false)
+    }
+  }, [])
+
+  const fetchConversationMessages = useCallback(async (conversationId: number, conversationType: 'private' | 'group', participantId?: number) => {
+    try {
+      setIsLoading(true)
+      setError(null)
+
+      console.log('Fetching messages for:', { conversationId, conversationType, participantId })
+
+      let response: { messages: any[]; count: number; limit: number; offset: number }
+
+      // Try to get messages by conversation ID first (works for both private and group)
+      try {
+        console.log('Trying to fetch messages by conversation ID:', conversationId)
+        response = await api.getConversationMessages(conversationId)
+      } catch (convError) {
+        console.log('Conversation ID endpoint failed, trying type-specific endpoints')
+        // Fallback to type-specific endpoints
+        if (conversationType === 'group') {
+          response = await api.getGroupMessages(conversationId)
+        } else if (participantId) {
+          response = await api.getPrivateMessages(participantId)
+        } else {
+          throw new Error('Cannot fetch private messages: no participant ID')
+        }
+      }
+
+      console.log('API response:', response)
+
+      // Transform API messages to our Message format
+      const transformedMessages: Message[] = response.messages.map(msg => ({
+        id: msg.id,
+        conversation_id: conversationId,
+        sender_id: msg.sender_id,
+        content: msg.content,
+        message_type: msg.message_type || 'text',
+        created_at: msg.created_at,
+        is_read: msg.is_read || false,
+        sender: msg.sender || {
+          id: msg.sender_id,
+          first_name: msg.sender?.first_name || 'Unknown',
+          last_name: msg.sender?.last_name || 'User',
+          avatar: msg.sender?.avatar || ''
+        }
+      }))
+
+      // Update messages map
+      setMessages(prev => {
+        const updated = new Map(prev)
+        updated.set(conversationId, transformedMessages)
+        console.log(`Loaded ${transformedMessages.length} messages for conversation ${conversationId}`)
+        return updated
+      })
+
+    } catch (err: any) {
+      console.error('Failed to fetch conversation messages:', err)
+      setError(err.message || 'Failed to fetch messages')
     } finally {
       setIsLoading(false)
     }
@@ -168,8 +252,24 @@ export function useRealTimeMessages() {
 
       send(wsMessage)
 
-      // TODO: Also send to backend API for persistence
-      // await api.sendMessage(conversationId, { content, message_type: messageType })
+      // Also send to backend API for persistence
+      try {
+        const apiData: any = {
+          content,
+          message_type: groupId ? 'group' : 'private'
+        }
+
+        if (groupId) {
+          apiData.group_id = groupId
+        } else if (recipientId) {
+          apiData.receiver_id = recipientId
+        }
+
+        await api.sendMessage(apiData)
+      } catch (apiError) {
+        console.error('Failed to persist message to backend:', apiError)
+        // Don't throw here as WebSocket might have succeeded
+      }
 
     } catch (err: any) {
       console.error('Failed to send message:', err)
@@ -177,7 +277,7 @@ export function useRealTimeMessages() {
       setMessages(prev => {
         const conversationMessages = prev.get(conversationId) || []
         const updated = new Map(prev)
-        updated.set(conversationId, conversationMessages.filter(msg => 
+        updated.set(conversationId, conversationMessages.filter(msg =>
           msg.id !== Date.now() // Remove the optimistic message
         ))
         return updated
@@ -249,6 +349,7 @@ export function useRealTimeMessages() {
     getConversationMessages,
     getUnreadCount,
     scrollToBottom,
-    refreshConversations: fetchConversations
+    refreshConversations: fetchConversations,
+    fetchConversationMessages
   }
 }

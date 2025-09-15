@@ -74,6 +74,25 @@ func (s *UserService) GetUserByEmail(email string) (*models.User, error) {
 	return user, nil
 }
 
+func (s *UserService) GetUserByNickname(nickname string) (*models.User, error) {
+	query := `
+		SELECT id, email, password, first_name, last_name, date_of_birth, avatar, nickname, about_me, is_private, created_at, updated_at
+		FROM users WHERE nickname = ?
+	`
+
+	user := &models.User{}
+	row := s.db.QueryRow(query, nickname)
+
+	err := row.Scan(&user.ID, &user.Email, &user.Password, &user.FirstName, &user.LastName,
+		&user.DateOfBirth, &user.Avatar, &user.Nickname, &user.AboutMe, &user.IsPrivate,
+		&user.CreatedAt, &user.UpdatedAt)
+
+	if err != nil {
+		return nil, err
+	}
+	return user, nil
+}
+
 func (s *UserService) GetUserByID(id uint) (*models.User, error) {
 	query := `
 		SELECT id, email, password, first_name, last_name, date_of_birth, avatar, nickname, about_me, is_private, created_at, updated_at

@@ -3,12 +3,15 @@ package handlers
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"log"
 	"net/http"
+	"regexp"
+	"time"
+
 	"social/models"
 	"social/services"
 	"social/utils"
-	"time"
 )
 
 type AuthHandler struct {
@@ -41,10 +44,44 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		log.Printf("Avatar starts with: %s", req.Avatar[:min(50, len(req.Avatar))])
 	}
 
-	// Check if user already exists
+	// Basic validation
+	if len(req.FirstName) < 3 {
+		writeError(w, http.StatusBadRequest, "First name must be at least 3 characters long")
+		return
+	}
+
+	if len(req.FirstName) > 16 {
+		writeError(w, http.StatusBadRequest, "First name is too long")
+		return
+	}
+
+	if len(req.LastName) < 3 {
+		writeError(w, http.StatusBadRequest, "Last name must be at least 3 characters long")
+		return
+	}
+
+	if len(req.LastName) > 16 {
+		writeError(w, http.StatusBadRequest, "Last name is too long")
+		return
+	}
+
+	// Validate email format
+	emailRegex := regexp.MustCompile(`^[a-zA-Z0-9!#$%&'*+/=?^_` + "`" + `{|}~]+(\.[a-zA-Z0-9!#$%&'*+/=?^_` + "`" + `{|}~]+)*@[a-zA-Z0-9-]+(\.[a-zA-Z0-9-]+)*\.[a-zA-Z]{2,}$`)
+	if !emailRegex.MatchString(req.Email) {
+		writeError(w, http.StatusBadRequest, "Please enter a valid email address")
+		return
+	}
+
+	// Check if email already exists
 	existingUser, err := h.userService.GetUserByEmail(req.Email)
 	if err == nil && existingUser != nil {
 		writeError(w, http.StatusConflict, "User with this email already exists")
+		return
+	}
+
+	err = validatePassword(req.Password)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
@@ -52,6 +89,29 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 	hashedPassword, err := utils.HashPassword(req.Password)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "Failed to hash password")
+		return
+	}
+
+	err = validateDoB(req.DateOfBirth)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	if len(req.Nickname) > 16 {
+		writeError(w, http.StatusBadRequest, "Nickname is too long")
+		return
+	}
+
+	if len(req.AboutMe) > 128 {
+		writeError(w, http.StatusBadRequest, "Your bio is too long")
+		return
+	}
+
+	// Check if nickname already exists
+	existingUser, err = h.userService.GetUserByNickname(req.Nickname)
+	if err == nil && existingUser != nil {
+		writeError(w, http.StatusConflict, "User with this nickname already exists")
 		return
 	}
 
@@ -136,6 +196,12 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	emailRegex := regexp.MustCompile(`^[^\s@]+@[^\s@]+\.[^\s@]+$`)
+	if !emailRegex.MatchString(req.Email) {
+		writeError(w, http.StatusBadRequest, "Please enter a valid email address")
+		return
+	}
+
 	// Find user by email
 	user, err := h.userService.GetUserByEmail(req.Email)
 	if err != nil {
@@ -192,6 +258,78 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, response)
+}
+
+func validatePassword(password string) error {
+	upper := regexp.MustCompile(`[A-Z]`)
+	lower := regexp.MustCompile(`[a-z]`)
+	number := regexp.MustCompile(`[0-9]`)
+	space := regexp.MustCompile(`\s`)
+	var errMessages []string
+
+	if len(password) < 8 || len(password) > 32 {
+		errMessages = append(errMessages, "be between 8 and 32 characters long")
+	}
+
+	if !upper.MatchString(password) {
+		errMessages = append(errMessages, "contain at least one uppercase letter")
+	}
+
+	if !lower.MatchString(password) {
+		errMessages = append(errMessages, "contain at least one lowercase letter")
+	}
+
+	if !number.MatchString(password) {
+		errMessages = append(errMessages, "contain at least one number")
+	}
+
+	if space.MatchString(password) {
+		errMessages = append(errMessages, "not contain spaces")
+	}
+
+	log.Println("Password validation errors:", errMessages)
+
+	if len(errMessages) > 0 {
+		return errors.New("Password must " + joinWithCommas(errMessages))
+	}
+
+	return nil
+}
+
+func validateDoB(dobStr string) error {
+	log.Println("Date of birth format:", dobStr)
+	parsedDob, err := time.Parse("2006-01-02", dobStr)
+	if err != nil {
+		return errors.New("Date of birth must be in YYYY-MM-DD format")
+	}
+	today := time.Now()
+	hundredYearsAgo := today.AddDate(-100, 0, 0)
+
+	if parsedDob.After(today) {
+		return errors.New("Date of birth cannot be in the future")
+	}
+
+	if parsedDob.Before(hundredYearsAgo) {
+		return errors.New("Date of birth is too far in the past")
+	}
+
+	return nil
+}
+
+func joinWithCommas(messages []string) string {
+	if len(messages) == 1 {
+		return messages[0]
+	}
+
+	result := ""
+	for i, msg := range messages {
+		if i == len(messages)-1 {
+			result += "and " + msg
+		} else {
+			result += msg + ", "
+		}
+	}
+	return result
 }
 
 func (h *AuthHandler) GetMe(w http.ResponseWriter, r *http.Request) {

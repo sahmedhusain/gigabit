@@ -20,6 +20,7 @@ export default function ProfilePage() {
   const [following, setFollowing] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isOwnProfile, setIsOwnProfile] = useState(false)
+  const [isFollowing, setIsFollowing] = useState(false)
 
   const userId = params.id as string
 
@@ -41,32 +42,31 @@ export default function ProfilePage() {
       setIsLoading(true)
       console.log('Fetching profile for user:', userIdNum)
       
-      // Fetch user profile data - handle posts failure gracefully
-      const [profileResponse, postsResponse, followersResponse, followingResponse] = await Promise.allSettled([
-        api.getProfile(userIdNum),
-        api.getUserPosts(userIdNum),
-        api.getFollowers(userIdNum).catch(() => ({ followers: [] })), // Handle private profiles
-        api.getFollowing(userIdNum).catch(() => ({ following: [] }))  // Handle private profiles
-      ])
-
-      console.log('Profile response:', profileResponse)
-      
-      // Handle profile response
-      if (profileResponse.status === 'fulfilled' && profileResponse.value) {
-        setProfileUser(profileResponse.value)
+      // First try to get basic profile info
+      try {
+        const profileData = await api.getProfile(userIdNum)
+        setProfileUser(profileData)
         
-        // Handle posts response (can fail)
+        // Try to get additional data - these may fail for private profiles
+        const [postsResponse, followersResponse, followingResponse] = await Promise.allSettled([
+          api.getUserPosts(userIdNum),
+          api.getFollowers(userIdNum),
+          api.getFollowing(userIdNum)
+        ])
+
+        // Handle posts response (can fail for private profiles)
         if (postsResponse.status === 'fulfilled') {
           setUserPosts(postsResponse.value.posts || [])
         } else {
           console.warn('Failed to load user posts:', postsResponse.reason)
-          setUserPosts([]) // Set empty array if posts fail
+          setUserPosts([])
         }
         
         // Handle followers response
         if (followersResponse.status === 'fulfilled') {
           setFollowers(followersResponse.value.followers || [])
         } else {
+          console.warn('Failed to load followers:', followersResponse.reason)
           setFollowers([])
         }
         
@@ -74,21 +74,61 @@ export default function ProfilePage() {
         if (followingResponse.status === 'fulfilled') {
           setFollowing(followingResponse.value.following || [])
         } else {
+          console.warn('Failed to load following:', followingResponse.reason)
           setFollowing([])
         }
-      } else {
-        // Profile fetch failed
-        throw new Error('Failed to fetch user profile')
+
+        // Check if current user is following this profile user
+        if (followersResponse.status === 'fulfilled') {
+          const isCurrentUserFollowing = followersResponse.value.followers?.some(
+            (follower: any) => follower.id === currentUser?.id
+          )
+          setIsFollowing(isCurrentUserFollowing || false)
+        }      } catch (profileError: any) {
+        console.error('Profile fetch failed:', profileError)
+        
+        // Check if it's a private profile error
+        if (profileError?.status === 403) {
+          console.log('Private profile detected, trying to get basic user info')
+          
+          // Try to get basic user info from the users list
+          try {
+            const usersResponse = await api.getUsers()
+            const targetUser = usersResponse.users.find((u: any) => u.id === userIdNum)
+            
+            if (targetUser) {
+              // Create a basic user object for private profile display
+              const basicUser = {
+                ...targetUser,
+                is_private: true // Ensure it's marked as private
+              }
+              setProfileUser(basicUser)
+              console.log('Got basic user info for private profile:', basicUser)
+              
+              // Don't try to fetch posts/followers/following for private profiles
+              setUserPosts([])
+              setFollowers([])
+              setFollowing([])
+            } else {
+              error('User not found.')
+              return
+            }
+          } catch (usersError) {
+            console.error('Failed to get basic user info:', usersError)
+            error('This profile is private and you do not have permission to view it.')
+            return
+          }
+        } else if (profileError?.status === 404) {
+          error('User not found.')
+          return
+        } else {
+          error('Failed to load user profile.')
+          return
+        }
       }
     } catch (err: any) {
       console.error('Error fetching user profile:', err)
-      if (err.status === 403) {
-        error('This profile is private and you do not have permission to view it.')
-      } else if (err.status === 404) {
-        error('User not found.')
-      } else {
-        error('Failed to load user profile.')
-      }
+      error('Failed to load user profile.')
     } finally {
       setIsLoading(false)
     }
@@ -144,6 +184,7 @@ export default function ProfilePage() {
             posts={userPosts}
             isOwnProfile={isOwnProfile}
             isLoadingFollowers={isLoading}
+            isFollowing={isFollowing}
           />
         </div>
       </div>
@@ -159,6 +200,7 @@ interface UserProfileSectionProps {
   posts: Post[]
   isOwnProfile: boolean
   isLoadingFollowers: boolean
+  isFollowing: boolean
 }
 
 function UserProfileSection({
@@ -167,7 +209,8 @@ function UserProfileSection({
   following,
   posts,
   isOwnProfile,
-  isLoadingFollowers
+  isLoadingFollowers,
+  isFollowing
 }: UserProfileSectionProps) {
   // Transform the User data to match ProfileSection expectations
   const transformedUser = {
@@ -185,6 +228,9 @@ function UserProfileSection({
     memberSince: profileUser.created_at
   }
 
+  // Determine if we should show privacy overlay
+  const shouldShowPrivacyOverlay = profileUser.is_private && !isOwnProfile
+
   return (
     <ProfileSection
       currentUser={transformedUser}
@@ -193,6 +239,8 @@ function UserProfileSection({
       posts={posts}
       isLoadingFollowers={isLoadingFollowers}
       isOwnProfile={isOwnProfile}
+      showPrivacyOverlay={shouldShowPrivacyOverlay}
+      isFollowing={isFollowing} // Pass the actual follow status
     />
   )
 }

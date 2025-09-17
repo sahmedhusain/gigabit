@@ -315,8 +315,14 @@ export default function DiscoverPage({ onClose }: DiscoverPageProps) {
   const handleUserClick = (userId: number) => {
     if (!currentUser) return
     
-    // Navigate to the user's profile page
-    router.push(`/profile/${userId}`)
+    // Check if clicking on own profile
+    if (userId === currentUser.id) {
+      // Navigate to own profile route
+      router.push(`/profile/${userId}`) // or router.push('/dashboard') to go to dashboard profile tab
+    } else {
+      // Navigate to other user's profile page
+      router.push(`/profile/${userId}`)
+    }
   }
 
   const handleJoinGroup = async (groupId: number) => {

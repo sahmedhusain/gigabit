@@ -7,6 +7,45 @@ import { getAvatarOptions } from '@/utils/avatarUtils'
 
 import { Eye, EyeOff, Mail, Lock, User, Calendar, Camera, Edit3, ArrowRight, Sparkles, Upload, Chrome, Apple as AppleIcon, GithubIcon } from 'lucide-react'
 
+function validatePassword(password: string) {
+
+  const upper = /[A-Z]/
+  const lower = /[a-z]/
+  const number = /[0-9]/
+  const space = /\s/
+
+  const errors = []
+
+  if (password.length < 8 || password.length > 32) {
+    errors.push("be between 8 and 32 characters long")
+  }
+
+  if (!upper.test(password)) {
+    errors.push("contain at least one uppercase letter")
+  }
+
+  if (!lower.test(password)) {
+    errors.push("contain at least one lowercase letter")
+  }
+
+  if (!number.test(password)) {
+    errors.push("contain at least one number")
+  }
+
+  if (space.test(password)) {
+    errors.push("not contain any spaces")
+  }
+
+  // combine errors into a single message
+  if (errors.length > 0) {
+    const lastError = errors.pop() // for adding 'and' before the last error
+    return "Password must " + (errors.length ? errors.join(", ") + ", and " + lastError : lastError)
+  }
+
+  return null
+}
+
+
 export default function RegisterPage() {
   const router = useRouter()
   const { register } = useAuth()
@@ -29,7 +68,7 @@ export default function RegisterPage() {
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     setFormData({
       ...formData,
-      [e.target.name]: e.target.value.trim()
+      [e.target.name]: e.target.value
     })
   }
 
@@ -52,15 +91,39 @@ export default function RegisterPage() {
         throw new Error('Please fill in all required fields')
       }
 
+      if (formData.firstName.length < 3) {
+        throw new Error('First name must be at least 3 characters long')
+      }
+
+      if (formData.firstName.length > 16) {
+        throw new Error('First name is too long')
+      }
+
+      if (formData.lastName.length < 3) {
+        throw new Error('Last name must be at least 3 characters long')
+      }
+
+      if (formData.lastName.length > 16) {
+        throw new Error('Last name is too long')
+      }
+      
       // Validate email format
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+      const emailRegex = /^[a-zA-Z0-9!#$%&'*+/=?^_`{|}~]+(\.[a-zA-Z0-9!#$%&'*+/=?^_`{|}~]+)*@[a-zA-Z0-9-]+(\.[a-zA-Z0-9-]+)*\.[a-zA-Z]{2,}$/;
       if (!emailRegex.test(formData.email)) {
         throw new Error('Please enter a valid email address')
       }
 
-      // Validate password length
-      if (formData.password.length < 6) {
-        throw new Error('Password must be at least 6 characters long')
+      var returnValue = validatePassword(formData.password)
+      if (returnValue) {
+        throw new Error(returnValue)
+      }
+      
+      if (formData.nickname.length > 16) {
+        throw new Error('Nickname is too long')
+      }
+
+      if (formData.aboutMe.length > 128) {
+        throw new Error('Your bio is too long')
       }
 
       console.log("Form data before sending:", {
@@ -70,14 +133,14 @@ export default function RegisterPage() {
 
       // Call register function from auth context
       await register({
-        email: formData.email,
-        password: formData.password,
-        firstName: formData.firstName,
-        lastName: formData.lastName,
-        dateOfBirth: formData.dateOfBirth,
+        email: formData.email.trim(),
+        password: formData.password.trim(),
+        firstName: formData.firstName.trim(),
+        lastName: formData.lastName.trim(),
+        dateOfBirth: formData.dateOfBirth.trim(),
         nickname: formData.nickname,
         aboutMe: formData.aboutMe,
-        avatar: formData.avatar,
+        avatar: formData.avatar.trim(),
       })
 
       // Redirect to dashboard on success

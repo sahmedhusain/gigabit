@@ -41,8 +41,8 @@ export default function ProfilePage() {
       setIsLoading(true)
       console.log('Fetching profile for user:', userIdNum)
       
-      // Fetch user profile data
-      const [profileResponse, postsResponse, followersResponse, followingResponse] = await Promise.all([
+      // Fetch user profile data - handle posts failure gracefully
+      const [profileResponse, postsResponse, followersResponse, followingResponse] = await Promise.allSettled([
         api.getProfile(userIdNum),
         api.getUserPosts(userIdNum),
         api.getFollowers(userIdNum).catch(() => ({ followers: [] })), // Handle private profiles
@@ -51,11 +51,34 @@ export default function ProfilePage() {
 
       console.log('Profile response:', profileResponse)
       
-      if (profileResponse) {
-        setProfileUser(profileResponse)
-        setUserPosts(postsResponse.posts || [])
-        setFollowers(followersResponse.followers || [])
-        setFollowing(followingResponse.following || [])
+      // Handle profile response
+      if (profileResponse.status === 'fulfilled' && profileResponse.value) {
+        setProfileUser(profileResponse.value)
+        
+        // Handle posts response (can fail)
+        if (postsResponse.status === 'fulfilled') {
+          setUserPosts(postsResponse.value.posts || [])
+        } else {
+          console.warn('Failed to load user posts:', postsResponse.reason)
+          setUserPosts([]) // Set empty array if posts fail
+        }
+        
+        // Handle followers response
+        if (followersResponse.status === 'fulfilled') {
+          setFollowers(followersResponse.value.followers || [])
+        } else {
+          setFollowers([])
+        }
+        
+        // Handle following response
+        if (followingResponse.status === 'fulfilled') {
+          setFollowing(followingResponse.value.following || [])
+        } else {
+          setFollowing([])
+        }
+      } else {
+        // Profile fetch failed
+        throw new Error('Failed to fetch user profile')
       }
     } catch (err: any) {
       console.error('Error fetching user profile:', err)

@@ -1,5 +1,6 @@
 'use client'
 import React, { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { 
   Search, 
   User, 
@@ -65,6 +66,7 @@ export default function DiscoverPage({ onClose }: DiscoverPageProps) {
   const { user: currentUser } = useAuth()
   const { success, error, warning } = useToast()
   const { isConnected } = useConnectionStatus()
+  const router = useRouter()
   
   // Tab state
   const [activeTab, setActiveTab] = useState<DiscoverTab>('users')
@@ -308,6 +310,19 @@ export default function DiscoverPage({ onClose }: DiscoverPageProps) {
           : user
       )
     )
+  }
+
+  const handleUserClick = (userId: number) => {
+    if (!currentUser) return
+    
+    // Check if clicking on own profile
+    if (userId === currentUser.id) {
+      // Navigate to own profile route
+      router.push(`/profile/${userId}`) // or router.push('/dashboard') to go to dashboard profile tab
+    } else {
+      // Navigate to other user's profile page
+      router.push(`/profile/${userId}`)
+    }
   }
 
   const handleJoinGroup = async (groupId: number) => {
@@ -603,11 +618,15 @@ export default function DiscoverPage({ onClose }: DiscoverPageProps) {
         : 'space-y-3'
       }>
         {displayUsers.map((user) => (
-          <div key={user.id} className={`group ${
-            viewMode === 'grid' 
-              ? 'bg-white/5 backdrop-blur-xl rounded-xl border border-white/10 p-6 hover:bg-white/10 transition-all duration-300 text-center'
-              : 'bg-white/5 backdrop-blur-xl rounded-xl border border-white/10 p-4 hover:bg-white/10 transition-all duration-300'
-          }`}>
+          <div 
+            key={user.id} 
+            className={`group cursor-pointer ${
+              viewMode === 'grid' 
+                ? 'bg-white/5 backdrop-blur-xl rounded-xl border border-white/10 p-6 hover:bg-white/10 transition-all duration-300 text-center'
+                : 'bg-white/5 backdrop-blur-xl rounded-xl border border-white/10 p-4 hover:bg-white/10 transition-all duration-300'
+            }`}
+            onClick={() => handleUserClick(user.id)}
+          >
             {viewMode === 'grid' ? (
               // Grid View
               <>
@@ -659,19 +678,24 @@ export default function DiscoverPage({ onClose }: DiscoverPageProps) {
                 </div>
 
                 <div className="flex justify-center space-x-2">
-                  <FollowHandler
-                    targetUser={user}
-                    currentFollowStatus={user.followStatus}
-                    onStatusChange={(newStatus) => handleFollowStatusChange(user.id, newStatus)}
-                    disabled={!isConnected}
-                    size="sm"
-                  />
+                  <div onClick={(e) => e.stopPropagation()}>
+                    <FollowHandler
+                      targetUser={user}
+                      currentFollowStatus={user.followStatus}
+                      onStatusChange={(newStatus) => handleFollowStatusChange(user.id, newStatus)}
+                      disabled={!isConnected}
+                      size="sm"
+                    />
+                  </div>
                   {user.followStatus.isFollowing && (
                     <button
                       className="p-2 text-white/60 hover:text-white hover:bg-white/10 rounded-lg transition-all duration-200"
                       title="Send message"
                       disabled={!isConnected}
-                      onClick={() => warning('Messaging feature coming soon!')}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        warning('Messaging feature coming soon!')
+                      }}
                     >
                       <MessageCircle className="w-4 h-4" />
                     </button>
@@ -731,19 +755,24 @@ export default function DiscoverPage({ onClose }: DiscoverPageProps) {
                 </div>
                 
                 <div className="flex items-center space-x-2 flex-shrink-0">
-                  <FollowHandler
-                    targetUser={user}
-                    currentFollowStatus={user.followStatus}
-                    onStatusChange={(newStatus) => handleFollowStatusChange(user.id, newStatus)}
-                    disabled={!isConnected}
-                    size="sm"
-                  />
+                  <div onClick={(e) => e.stopPropagation()}>
+                    <FollowHandler
+                      targetUser={user}
+                      currentFollowStatus={user.followStatus}
+                      onStatusChange={(newStatus) => handleFollowStatusChange(user.id, newStatus)}
+                      disabled={!isConnected}
+                      size="sm"
+                    />
+                  </div>
                   {user.followStatus.isFollowing && (
                     <button
                       className="p-2 text-white/60 hover:text-white hover:bg-white/10 rounded-lg transition-all duration-200"
                       title="Send message"
                       disabled={!isConnected}
-                      onClick={() => warning('Messaging feature coming soon!')}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        warning('Messaging feature coming soon!')
+                      }}
                     >
                       <MessageCircle className="w-4 h-4" />
                     </button>

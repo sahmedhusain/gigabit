@@ -25,6 +25,8 @@ interface ProfileSectionProps {
   posts: Post[]
   isLoadingFollowers: boolean
   isOwnProfile?: boolean
+  showPrivacyOverlay?: boolean
+  isFollowing?: boolean
 }
 
 export default function ProfileSection({
@@ -33,7 +35,9 @@ export default function ProfileSection({
   following,
   posts,
   isLoadingFollowers,
-  isOwnProfile = true
+  isOwnProfile = true,
+  showPrivacyOverlay = false,
+  isFollowing = false
 }: ProfileSectionProps) {
   const router = useRouter()
   const { posts: realTimePosts, isConnected } = useRealTimePosts()
@@ -146,12 +150,25 @@ export default function ProfileSection({
       </div>
 
       {/* Scrollable Content */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto relative">
+        {/* Privacy Overlay for Private Profiles */}
+        {showPrivacyOverlay && !isOwnProfile && !isFollowing && (
+          <div className="absolute inset-0 bg-gray-900 rounded-2xl lg:rounded-3xl flex items-center justify-center z-10">
+            <div className="text-center p-6">
+              <Lock className="w-12 h-12 text-white/70 mx-auto mb-4" />
+              <h4 className="text-xl font-semibold text-white mb-2">Private Profile</h4>
+              <p className="text-white/70 mb-4">This user's profile is private. Follow them to see their details.</p>
+              <button className="px-6 py-2 bg-gradient-to-r from-emerald-500 to-teal-600 rounded-xl text-white hover:from-emerald-600 hover:to-teal-700 transition-all duration-200">
+                Follow to View
+              </button>
+            </div>
+          </div>
+        )}
+
         <div className="space-y-4 lg:space-y-6">
           {/* Personal Information Section */}
           <div className="bg-gradient-to-r from-white/10 to-white/5 backdrop-blur-xl rounded-2xl lg:rounded-3xl border border-white/20 p-4 lg:p-6">
             <h3 className="text-lg lg:text-xl font-semibold text-white mb-4 lg:mb-6">Personal Information</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 lg:gap-6">
               <div className="space-y-4">
                 <div>
                   <label className="text-sm text-white/60 font-medium">Full Name</label>
@@ -277,6 +294,5 @@ export default function ProfileSection({
           </div>
         </div>
       </div>
-    </div>
   )
 }

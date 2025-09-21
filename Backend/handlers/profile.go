@@ -20,45 +20,43 @@ func NewProfileHandler(db *sql.DB) *ProfileHandler {
 	}
 }
 
-func (h *ProfileHandler) GetProfile(w http.ResponseWriter, r *http.Request, userIDParam string) {
-	if r.Method != http.MethodGet {
-		writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
-		return
-	}
-
-	targetUserID, err := strconv.ParseUint(userIDParam, 10, 32)
+func (h *ProfileHandler) GetProfile(w http.ResponseWriter, r *http.Request, userIDStr string) {
+	
+	//covert string to int
+	userID, err := strconv.Atoi(userIDStr)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, "Invalid user ID")
 		return
 	}
 
-	// Get current user ID from context (from auth middleware)
-	currentUserID := r.Context().Value("user_id")
-	if currentUserID == nil {
-		writeError(w, http.StatusUnauthorized, "User not authenticated")
+	//get the requesting user id from context for privacy check
+	requestingUserID, exists := r.Context().Value("user_id").(uint)
+	if !exists {
+		writeError(w, http.StatusUnauthorized, "User not authorized")
 		return
 	}
 
-	// Get target user
-	targetUser, err := h.userService.GetUserByID(uint(targetUserID))
+	//get the user profile
+	user, err := h.userService.GetUserByID(uint(userID))
 	if err != nil {
 		writeError(w, http.StatusNotFound, "User not found")
 		return
 	}
 
-	// Check if current user can view this profile
-	canView, err := h.userService.CanViewProfile(currentUserID.(uint), uint(targetUserID))
+	//check if the requesting user can view this profile (private account)
+	canView, err := h.userService.CanViewProfile(requestingUserID, uint(userID))
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "Failed to check profile permissions")
+		writeError(w, http.StatusInternalServerError, "Failed to check profile privacy")
 		return
 	}
 
 	if !canView {
-		writeError(w, http.StatusForbidden, "Cannot view this private profile")
+		writeError(w, http.StatusForbidden, "Cannot view this profile")
 		return
 	}
 
-	writeJSON(w, http.StatusOK, targetUser.ToResponse())
+	writeJSON(w, http.StatusOK, user)
+
 }
 
 func (h *ProfileHandler) UpdateProfile(w http.ResponseWriter, r *http.Request) {

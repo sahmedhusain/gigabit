@@ -216,6 +216,7 @@ LIMIT ? OFFSET ?
 
 rows, err := s.db.Query(query, currentUserID, currentUserID, currentUserID, currentUserID, currentUserID, limit, offset)
 if err != nil {
+log.Printf("Error getting feed posts: %v", err)
 return nil, err
 }
 defer rows.Close()

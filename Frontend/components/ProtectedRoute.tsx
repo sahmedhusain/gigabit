@@ -1,5 +1,5 @@
 'use client'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
 
@@ -10,15 +10,19 @@ interface ProtectedRouteProps {
 export default function ProtectedRoute({ children }: ProtectedRouteProps) {
   const { isAuthenticated, isLoading } = useAuth()
   const router = useRouter()
+  const [isMounted, setIsMounted] = useState(false)
 
   useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
+    setIsMounted(true)
+  }, [])
+
+  useEffect(() => {
+    if (isMounted && !isLoading && !isAuthenticated) {
       router.push('/login')
     }
-  }, [isAuthenticated, isLoading, router])
+  }, [isAuthenticated, isLoading, router, isMounted])
 
-  // Show loading spinner while checking authentication
-  if (isLoading) {
+  if (isLoading || !isMounted) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-emerald-900 via-teal-900 to-cyan-800">
         <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-white"></div>
@@ -26,7 +30,6 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
     )
   }
 
-  // If not authenticated, don't render children (redirect will happen in useEffect)
   if (!isAuthenticated) {
     return null
   }

@@ -1,4 +1,3 @@
--- +migrate Up
 CREATE TABLE IF NOT EXISTS bookmarks (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER NOT NULL,
@@ -9,6 +8,3 @@ CREATE TABLE IF NOT EXISTS bookmarks (
     FOREIGN KEY (post_id) REFERENCES posts(id) ON DELETE CASCADE,
     UNIQUE(user_id, post_id)
 );
-
--- +migrate Down
-DROP TABLE IF EXISTS bookmarks;

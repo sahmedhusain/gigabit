@@ -220,6 +220,29 @@ export function EventsSection({ events }: EventsSectionProps) {
   // Use live events if available, fallback to props
   const displayEvents = liveEvents && liveEvents.length > 0 ? liveEvents : events
 
+  // Local state for user responses per event
+  const [responses, setResponses] = React.useState<{ [eventId: number]: 'no_response' | 'going' | 'not_going' }>(
+    () => {
+      const initial: { [eventId: number]: 'no_response' | 'going' | 'not_going' } = {}
+      displayEvents.forEach(e => {
+        initial[e.id] = e.user_response === 'going' ? 'going' : e.user_response === 'not_going' ? 'not_going' : 'no_response'
+      })
+      return initial
+    }
+  )
+
+  // Cycle response state
+  const handleToggleResponse = (eventId: number) => {
+    setResponses(prev => {
+      const current = prev[eventId]
+      let next: 'no_response' | 'going' | 'not_going'
+      if (current === 'no_response') next = 'going'
+      else if (current === 'going') next = 'not_going'
+      else next = 'no_response'
+      return { ...prev, [eventId]: next }
+    })
+  }
+
   return (
     <div className="space-y-4 lg:space-y-6">
       <div className="bg-gradient-to-r from-white/10 to-white/5 backdrop-blur-xl rounded-2xl lg:rounded-3xl border border-white/20 p-4 lg:p-6">
@@ -272,27 +295,16 @@ export function EventsSection({ events }: EventsSectionProps) {
                     <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
                       <button 
                         disabled={!isConnected}
+                        onClick={() => handleToggleResponse(event.id)}
                         className={`px-3 lg:px-4 py-2 rounded-lg lg:rounded-xl transition-all duration-200 text-xs lg:text-sm ${
-                          event.user_response === 'going' 
+                          responses[event.id] === 'going' 
                             ? 'bg-emerald-500 text-white' 
                             : isConnected
                               ? 'border border-white/30 text-white hover:bg-white/10'
                               : 'border border-gray-600 text-gray-400 cursor-not-allowed'
                         }`}
                       >
-                        Going ({event.going_count})
-                      </button>
-                      <button 
-                        disabled={!isConnected}
-                        className={`px-3 lg:px-4 py-2 rounded-lg lg:rounded-xl transition-all duration-200 text-xs lg:text-sm ${
-                          event.user_response === 'not_going' 
-                            ? 'bg-red-500 text-white' 
-                            : isConnected
-                              ? 'border border-white/30 text-white hover:bg-white/10'
-                              : 'border border-gray-600 text-gray-400 cursor-not-allowed'
-                        }`}
-                      >
-                        Not Going ({event.not_going_count})
+                        {responses[event.id] === 'no_response' ? 'No Response' : responses[event.id] === 'going' ? `Going (${event.going_count})` : `Not Going (${event.not_going_count})`}
                       </button>
                     </div>
                   </div>

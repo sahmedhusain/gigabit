@@ -830,6 +830,18 @@ export class ApiClient {
     });
   }
 
+  async getUserLikedPosts(limit: number = 20, offset: number = 0): Promise<{ posts: PostResponse[], count: number, limit: number, offset: number }> {
+    return this.request<{ posts: PostResponse[], count: number, limit: number, offset: number }>(`/api/posts/liked?limit=${limit}&offset=${offset}`, {
+      method: 'GET',
+    });
+  }
+
+  async getUserCommentedPosts(limit: number = 20, offset: number = 0): Promise<{ posts: PostResponse[], count: number, limit: number, offset: number }> {
+    return this.request<{ posts: PostResponse[], count: number, limit: number, offset: number }>(`/api/posts/commented?limit=${limit}&offset=${offset}`, {
+      method: 'GET',
+    });
+  }
+
   // Validation helpers
   static validateEmail(email: string): boolean {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;

@@ -106,7 +106,12 @@ export default function Sidebar({
   const [userStatus, setUserStatus] = useState('online')
   const [currentTime, setCurrentTime] = useState(new Date())
   const [showQuickActions, setShowQuickActions] = useState(false)
-  const [expandedSection, setExpandedSection] = useState<'feed' | 'chats' | 'activity' | 'events' | 'activity-history' | null>('feed')
+  const [expandedSection, setExpandedSection] = useState<'feed' | 'chats' | 'activity' | 'events' | 'activity-history' | null>(
+    activeTab === 'events' ? 'events' : 
+    activeTab === 'chats' ? 'chats' : 
+    activeTab === 'activity' ? 'activity' : 
+    'feed'
+  )
 
   // Disable collapse functionality entirely
   const isCollapsed = false
@@ -119,14 +124,7 @@ export default function Sidebar({
     return () => clearInterval(timer)
   }, [])
 
-  // Set default selection to Feed -> All Posts on first mount
-  useEffect(() => {
-    if (!(activeTab === 'feed' && feedSubTab === 'all')) {
-      setActiveTab('feed')
-      setFeedSubTab('all')
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  // Removed automatic default setting to prevent interference with other pages
 
   const statusOptions: StatusOption[] = [
     { id: 'online', label: 'Online', color: 'bg-green-500', icon: <Dot className="w-3 h-3 animate-pulse" /> },
@@ -149,7 +147,7 @@ export default function Sidebar({
       icon: <MessageCircle className="w-4 h-4" />,
       color: 'from-blue-500 to-cyan-600',
       count: 3,
-      onClick: () => setActiveTab('chats')
+      onClick: () => router.push('/chats')
     },
     {
       id: 'notifications',
@@ -157,14 +155,14 @@ export default function Sidebar({
       icon: <Bell className="w-4 h-4" />,
       color: 'from-purple-500 to-pink-600',
       count: 7,
-      onClick: () => console.log('Open notifications')
+      onClick: () => router.push('/notifications')
     },
     {
       id: 'explore',
       label: 'Explore',
       icon: <Compass className="w-4 h-4" />,
       color: 'from-orange-500 to-red-600',
-      onClick: () => setActiveTab('search')
+      onClick: () => router.push('/search')
     }
   ]
 
@@ -183,8 +181,7 @@ export default function Sidebar({
           color: 'from-blue-500 to-cyan-600',
           count: undefined,
           onClick: () => {
-            setActiveTab('chats')
-            setChatSubTab('all')
+            router.push('/chats?filter=all')
           },
           isActive: activeTab === 'chats' && (typeof chatSubTab !== 'undefined' ? chatSubTab === 'all' : false)
         },
@@ -196,8 +193,7 @@ export default function Sidebar({
           color: 'from-blue-500 to-cyan-600',
           count: undefined,
           onClick: () => {
-            setActiveTab('chats')
-            setChatSubTab('direct')
+            router.push('/chats?filter=private')
           },
           isActive: activeTab === 'chats' && (typeof chatSubTab !== 'undefined' ? chatSubTab === 'direct' : false)
         },
@@ -209,8 +205,7 @@ export default function Sidebar({
           color: 'from-blue-500 to-cyan-600',
           count: undefined,
           onClick: () => {
-            setActiveTab('chats')
-            setChatSubTab('groups')
+            router.push('/chats?filter=group')
           },
           isActive: activeTab === 'chats' && (typeof chatSubTab !== 'undefined' ? chatSubTab === 'groups' : false)
         }
@@ -230,8 +225,7 @@ export default function Sidebar({
           color: 'from-emerald-500 to-teal-600',
           count: '2.1k',
           onClick: () => {
-            setActiveTab('feed')
-            setFeedSubTab('all')
+            router.push('/feed?filter=all')
           },
           isActive: activeTab === 'feed' && feedSubTab === 'all'
         },
@@ -243,8 +237,7 @@ export default function Sidebar({
           color: 'from-emerald-500 to-teal-600',
           count: '342',
           onClick: () => {
-            setActiveTab('feed')
-            setFeedSubTab('following')
+            router.push('/feed?filter=following')
           },
           isActive: activeTab === 'feed' && feedSubTab === 'following'
         },
@@ -256,8 +249,7 @@ export default function Sidebar({
           color: 'from-emerald-500 to-teal-600',
           count: '89',
           onClick: () => {
-            setActiveTab('feed')
-            setFeedSubTab('friends')
+            router.push('/feed?filter=friends')
           },
           isActive: activeTab === 'feed' && feedSubTab === 'friends'
         }
@@ -277,8 +269,7 @@ export default function Sidebar({
           color: 'from-rose-500 to-pink-600',
           count: '156',
           onClick: () => {
-            setActiveTab('activity')
-            setActivitySubTab('liked')
+            router.push('/activity?filter=liked')
           },
           isActive: activeTab === 'activity' && activitySubTab === 'liked'
         },
@@ -290,8 +281,7 @@ export default function Sidebar({
           color: 'from-blue-500 to-cyan-600',
           count: '78',
           onClick: () => {
-            setActiveTab('activity')
-            setActivitySubTab('commented')
+            router.push('/activity?filter=commented')
           },
           isActive: activeTab === 'activity' && activitySubTab === 'commented'
         },
@@ -303,8 +293,7 @@ export default function Sidebar({
           color: 'from-amber-500 to-orange-600',
           count: '23',
           onClick: () => {
-            setActiveTab('activity')
-            setActivitySubTab('saved')
+            router.push('/activity?filter=saved')
           },
           isActive: activeTab === 'activity' && activitySubTab === 'saved'
         }
@@ -324,8 +313,7 @@ export default function Sidebar({
           color: 'from-purple-500 to-violet-600',
           count: '5',
           onClick: () => {
-            setActiveTab('events')
-            fetchEvents()
+            router.push('/events')
           },
           isActive: activeTab === 'events'
         }
@@ -434,19 +422,15 @@ export default function Sidebar({
                           onClick={() => {
                             const willExpand = expandedSection !== section.id
                             setExpandedSection(willExpand ? section.id : null)
-                            // Open first sub-tab by default
+                            // Navigate to first sub-route by default
                             if (section.id === 'chats') {
-                              setActiveTab('chats')
-                              setChatSubTab('all')
+                              router.push('/chats?filter=all')
                             } else if (section.id === 'feed') {
-                              setActiveTab('feed')
-                              setFeedSubTab('all')
+                              router.push('/feed?filter=all')
                             } else if (section.id === 'activity') {
-                              setActiveTab('activity')
-                              setActivitySubTab('liked')
+                              router.push('/activity?filter=liked')
                             } else if (section.id === 'events') {
-                              setActiveTab('events')
-                              fetchEvents()
+                              router.push('/events')
                             } else if (section.id === 'activity-history') {
                               setActiveTab('activity-history')
                             }

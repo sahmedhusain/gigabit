@@ -5,10 +5,9 @@ import ProtectedRoute from '@/components/ProtectedRoute'
 import { useAuth } from '@/context/AuthContext'
 import { useWebSocket } from '@/context/WebSocketContext'
 import { useToast } from '@/context/ToastContext'
-import { useNotifications, useRealTimeEvents } from '@/hooks'
+import { useNotifications } from '@/hooks'
 import {
   api,
-  Event,
   NetworkError
 } from '@/lib/api'
 
@@ -16,29 +15,21 @@ import {
 import TopBar from '@/components/dashboard/TopBar'
 import Sidebar from '@/components/dashboard/Sidebar'
 import RightSidebar from '@/components/dashboard/RightSidebar'
-import CommunitySection from '@/components/dashboard/CommunitySection'
-import CreateGeneralEvent from '@/components/dashboard/CreateGeneralEvent'
+import SearchPage from '@/components/dashboard/SearchPage'
 
-function EventsPage() {
+function SearchPageRoute() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { user } = useAuth()
-  const { isConnected, onlineUsers, addMessageListener } = useWebSocket()
+  const { isConnected, onlineUsers } = useWebSocket()
   const { success, error } = useToast()
   const { items: liveNotifications, unread: liveUnreadCount } = useNotifications()
-  const { 
-    events: liveEvents, 
-    loading: eventsLoading, 
-    respond: respondToEvent,
-    refetch: refetchEvents 
-  } = useRealTimeEvents()
 
-  // Get event ID from URL params for deep linking
-  const eventId = searchParams.get('event')
+  // Get search query from URL params
+  const query = searchParams.get('q') || ''
   
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
-  const [showCreateEvent, setShowCreateEvent] = useState(false)
   const [followers, setFollowers] = useState<{ id: number; email: string; first_name: string; last_name: string; avatar?: string; nickname?: string; }[]>([])
   const [following, setFollowing] = useState<{ id: number; email: string; first_name: string; last_name: string; avatar?: string; nickname?: string; }[]>([])
 
@@ -66,21 +57,20 @@ function EventsPage() {
     '#React', '#TypeScript', '#NodeJS', '#Python', '#DevOps'
   ]
 
-  // Update URL when event ID changes
+  // Update URL when search query changes
   useEffect(() => {
-    if (eventId) {
-      const newUrl = `/events?event=${eventId}`
+    if (query) {
+      const newUrl = `/search?q=${encodeURIComponent(query)}`
       router.replace(newUrl)
     }
-  }, [eventId, router])
+  }, [query, router])
 
   // Fetch data when component loads
   useEffect(() => {
     if (user) {
-      refetchEvents()
       fetchFollowers()
     }
-  }, [user, refetchEvents])
+  }, [user])
 
   const fetchFollowers = async () => {
     if (!user) return
@@ -114,6 +104,10 @@ function EventsPage() {
     router.push('/discover')
   }
 
+  const handleClose = () => {
+    router.back()
+  }
+
   return (
     <div className="min-h-screen relative overflow-hidden bg-gradient-to-br from-emerald-900 via-teal-900 to-cyan-800">
       {/* Animated Background Elements */}
@@ -126,7 +120,7 @@ function EventsPage() {
       <Sidebar
         isMobileMenuOpen={isMobileMenuOpen}
         setIsMobileMenuOpen={setIsMobileMenuOpen}
-        activeTab="events"
+        activeTab="search"
         setActiveTab={handleTabChange}
         feedSubTab="all"
         setFeedSubTab={() => {}}
@@ -137,7 +131,7 @@ function EventsPage() {
         chatUnreadAll={0}
         chatUnreadDirect={0}
         chatUnreadGroups={0}
-        fetchEvents={refetchEvents}
+        fetchEvents={() => {}}
         currentUser={currentUser}
         logout={() => router.push('/login')}
         isCollapsed={isSidebarCollapsed}
@@ -147,22 +141,12 @@ function EventsPage() {
       <TopBar
         isMobileMenuOpen={isMobileMenuOpen}
         setIsMobileMenuOpen={setIsMobileMenuOpen}
-        activeTab="events"
+        activeTab="search"
         setActiveTab={handleTabChange}
         onNotificationsClick={handleNotificationsToggle}
         unreadCount={liveUnreadCount || 0}
         onSearchClick={handleSearchToggle}
         onDiscoverClick={handleDiscoverToggle}
-      />
-
-      <CreateGeneralEvent
-        show={showCreateEvent}
-        onClose={() => setShowCreateEvent(false)}
-        onEventCreated={() => {
-          refetchEvents()
-          setShowCreateEvent(false)
-          success('Event created successfully!')
-        }}
       />
 
       {/* Main Content */}
@@ -171,17 +155,7 @@ function EventsPage() {
           <div className="flex flex-col lg:flex-row gap-6 h-full">
             {/* Main Content Area */}
             <div className="flex-1 min-w-0 h-full">
-              <CommunitySection
-                events={liveEvents}
-                onEventsUpdate={refetchEvents}
-                isLoadingEvents={eventsLoading}
-                notifications={[]}
-                isLoadingNotifications={false}
-                showCreateEvent={showCreateEvent}
-                setShowCreateEvent={setShowCreateEvent}
-                onEventRespond={respondToEvent}
-                communitySubTab={'events'}
-              />
+              <SearchPage onClose={handleClose} />
             </div>
           </div>
         </div>
@@ -205,12 +179,12 @@ function EventsPage() {
 }
 
 // Wrap the entire component with ProtectedRoute
-function ProtectedEventsPage() {
+function ProtectedSearchPage() {
   return (
     <ProtectedRoute>
-      <EventsPage />
+      <SearchPageRoute />
     </ProtectedRoute>
   )
 }
 
-export default ProtectedEventsPage
+export default ProtectedSearchPage

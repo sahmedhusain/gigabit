@@ -75,38 +75,38 @@ func (s *PostService) AddPostPrivacyUsers(postID uint, userIDs []uint) error {
 }
 
 func (s *PostService) GetPostByID(postID uint, currentUserID uint) (*models.PostResponse, error) {
-	query := `
-		SELECT p.id, p.user_id, p.content, p.image_url, p.privacy, p.created_at, p.updated_at,
-			   u.first_name, u.last_name, u.avatar, u.nickname,
-			   COUNT(DISTINCT l.id) as like_count,
-			   COUNT(DISTINCT c.id) as comment_count,
-			   CASE WHEN ul.id IS NOT NULL THEN 1 ELSE 0 END as is_liked,
-			   CASE WHEN b.id IS NOT NULL THEN 1 ELSE 0 END as is_bookmarked
-		FROM posts p
-		JOIN users u ON p.user_id = u.id
-		LEFT JOIN likes l ON p.id = l.post_id
-		LEFT JOIN comments c ON p.id = c.post_id
-		LEFT JOIN likes ul ON p.id = ul.post_id AND ul.user_id = ?
-		LEFT JOIN bookmarks b ON p.id = b.post_id AND b.user_id = ?
-		WHERE p.id = ?
-		GROUP BY p.id, u.id
-	`
+query := `
+SELECT p.id, p.user_id, p.content, p.image_url, p.privacy, p.created_at, p.updated_at,
+       u.first_name, u.last_name, u.avatar, u.nickname,
+       COUNT(DISTINCT l.id) as like_count,
+       COUNT(DISTINCT c.id) as comment_count,
+       CASE WHEN ul.id IS NOT NULL THEN 1 ELSE 0 END as is_liked,
+       CASE WHEN b.id IS NOT NULL THEN 1 ELSE 0 END as is_bookmarked
+FROM posts p
+JOIN users u ON p.user_id = u.id
+LEFT JOIN likes l ON p.id = l.post_id
+LEFT JOIN comments c ON p.id = c.post_id
+LEFT JOIN likes ul ON p.id = ul.post_id AND ul.user_id = ?
+LEFT JOIN bookmarks b ON p.id = b.post_id AND b.user_id = ?
+WHERE p.id = ?
+GROUP BY p.id, u.id
+`
 
-	var post models.PostResponse
-	var user models.UserResponse
+var post models.PostResponse
+var user models.UserResponse
 
-	err := s.db.QueryRow(query, currentUserID, currentUserID, postID).Scan(
-		&post.ID, &post.UserID, &post.Content, &post.ImageURL, &post.Privacy,
-		&post.CreatedAt, &post.UpdatedAt,
-		&user.FirstName, &user.LastName, &user.Avatar, &user.Nickname,
-		&post.LikeCount, &post.CommentCount, &post.IsLiked, &post.IsBookmarked,
-	)
-	if err != nil {
-		return nil, err
-	}
+err := s.db.QueryRow(query, currentUserID, currentUserID, postID).Scan(
+&post.ID, &post.UserID, &post.Content, &post.ImageURL, &post.Privacy,
+&post.CreatedAt, &post.UpdatedAt,
+&user.FirstName, &user.LastName, &user.Avatar, &user.Nickname,
+&post.LikeCount, &post.CommentCount, &post.IsLiked, &post.IsBookmarked,
+)
+if err != nil {
+return nil, err
+}
 
-	user.ID = post.UserID
-	post.User = user
+user.ID = post.UserID
+post.User = user
 
 	// Check if current user can view this post
 	canView, err := s.CanViewPost(postID, currentUserID)
@@ -129,118 +129,118 @@ func (s *PostService) GetPostByID(postID uint, currentUserID uint) (*models.Post
 }
 
 func (s *PostService) GetUserPosts(userID uint, currentUserID uint, limit, offset int) ([]models.PostResponse, error) {
-	query := `
-		SELECT p.id, p.user_id, p.content, p.image_url, p.privacy, p.created_at, p.updated_at,
-			   u.first_name, u.last_name, u.avatar, u.nickname,
-			   COUNT(DISTINCT l.id) as like_count,
-			   COUNT(DISTINCT c.id) as comment_count,
-			   CASE WHEN ul.id IS NOT NULL THEN 1 ELSE 0 END as is_liked,
-			   CASE WHEN b.id IS NOT NULL THEN 1 ELSE 0 END as is_bookmarked
-		FROM posts p
-		JOIN users u ON p.user_id = u.id
-		LEFT JOIN likes l ON p.id = l.post_id
-		LEFT JOIN comments c ON p.id = c.post_id
-		LEFT JOIN likes ul ON p.id = ul.post_id AND ul.user_id = ?
-		LEFT JOIN bookmarks b ON p.id = b.post_id AND b.user_id = ?
-		WHERE p.user_id = ?
-		GROUP BY p.id, u.id
-		ORDER BY p.created_at DESC
-		LIMIT ? OFFSET ?
-	`
+query := `
+SELECT p.id, p.user_id, p.content, p.image_url, p.privacy, p.created_at, p.updated_at,
+   u.first_name, u.last_name, u.avatar, u.nickname,
+   COUNT(DISTINCT l.id) as like_count,
+   COUNT(DISTINCT c.id) as comment_count,
+   CASE WHEN ul.id IS NOT NULL THEN 1 ELSE 0 END as is_liked,
+   CASE WHEN b.id IS NOT NULL THEN 1 ELSE 0 END as is_bookmarked
+FROM posts p
+JOIN users u ON p.user_id = u.id
+LEFT JOIN likes l ON p.id = l.post_id
+LEFT JOIN comments c ON p.id = c.post_id
+LEFT JOIN likes ul ON p.id = ul.post_id AND ul.user_id = ?
+LEFT JOIN bookmarks b ON p.id = b.post_id AND b.user_id = ?
+WHERE p.user_id = ?
+GROUP BY p.id, u.id
+ORDER BY p.created_at DESC
+LIMIT ? OFFSET ?
+`
 
-	rows, err := s.db.Query(query, currentUserID, currentUserID, userID, limit, offset)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
+rows, err := s.db.Query(query, currentUserID, currentUserID, userID, limit, offset)
+if err != nil {
+return nil, err
+}
+defer rows.Close()
 
-	var posts []models.PostResponse
-	for rows.Next() {
-		var post models.PostResponse
-		var user models.UserResponse
+var posts []models.PostResponse
+for rows.Next() {
+var post models.PostResponse
+var user models.UserResponse
 
-		err := rows.Scan(
-			&post.ID, &post.UserID, &post.Content, &post.ImageURL, &post.Privacy,
-			&post.CreatedAt, &post.UpdatedAt,
-			&user.FirstName, &user.LastName, &user.Avatar, &user.Nickname,
-			&post.LikeCount, &post.CommentCount, &post.IsLiked, &post.IsBookmarked,
-		)
-		if err != nil {
-			return nil, err
-		}
+err := rows.Scan(
+&post.ID, &post.UserID, &post.Content, &post.ImageURL, &post.Privacy,
+&post.CreatedAt, &post.UpdatedAt,
+&user.FirstName, &user.LastName, &user.Avatar, &user.Nickname,
+&post.LikeCount, &post.CommentCount, &post.IsLiked, &post.IsBookmarked,
+)
+if err != nil {
+return nil, err
+}
 
-		// Check if current user can view this post
-		canView, err := s.CanViewPost(post.ID, currentUserID)
-		if err != nil || !canView {
-			continue
-		}
+// Check if current user can view this post
+canView, err := s.CanViewPost(post.ID, currentUserID)
+if err != nil || !canView {
+continue
+}
 
-		user.ID = post.UserID
-		post.User = user
-		posts = append(posts, post)
-	}
+user.ID = post.UserID
+post.User = user
+posts = append(posts, post)
+}
 
-	return posts, nil
+return posts, nil
 }
 
 func (s *PostService) GetFeedPosts(currentUserID uint, limit, offset int) ([]models.PostResponse, error) {
-	query := `
-		SELECT DISTINCT p.id, p.user_id, p.content, p.image_url, p.privacy, p.created_at, p.updated_at,
-			   u.first_name, u.last_name, u.avatar, u.nickname,
-			   COUNT(DISTINCT l.id) as like_count,
-			   COUNT(DISTINCT c.id) as comment_count,
-			   CASE WHEN ul.id IS NOT NULL THEN 1 ELSE 0 END as is_liked,
-			   CASE WHEN b.id IS NOT NULL THEN 1 ELSE 0 END as is_bookmarked
-		FROM posts p
-		JOIN users u ON p.user_id = u.id
-		LEFT JOIN likes l ON p.id = l.post_id
-		LEFT JOIN comments c ON p.id = c.post_id
-		LEFT JOIN likes ul ON p.id = ul.post_id AND ul.user_id = ?
-		LEFT JOIN bookmarks b ON p.id = b.post_id AND b.user_id = ?
-		LEFT JOIN follows f ON p.user_id = f.following_id AND f.follower_id = ? AND f.status = 'accepted'
-		LEFT JOIN post_privacy pp ON p.id = pp.post_id
-		WHERE (
-			-- User's own posts
-			p.user_id = ?
-			-- Public posts
-			OR p.privacy = 'public'
-			-- Almost private posts from followed users
-			OR (p.privacy = 'followers' AND f.id IS NOT NULL)
-			-- Private posts specifically shared with user
-			OR (p.privacy = 'private' AND pp.user_id = ?)
-		)
-		GROUP BY p.id, u.id
-		ORDER BY p.created_at DESC
-		LIMIT ? OFFSET ?
-	`
+query := `
+SELECT DISTINCT p.id, p.user_id, p.content, p.image_url, p.privacy, p.created_at, p.updated_at,
+   u.first_name, u.last_name, u.avatar, u.nickname,
+   COUNT(DISTINCT l.id) as like_count,
+   COUNT(DISTINCT c.id) as comment_count,
+   CASE WHEN ul.id IS NOT NULL THEN 1 ELSE 0 END as is_liked,
+   CASE WHEN b.id IS NOT NULL THEN 1 ELSE 0 END as is_bookmarked
+FROM posts p
+JOIN users u ON p.user_id = u.id
+LEFT JOIN likes l ON p.id = l.post_id
+LEFT JOIN comments c ON p.id = c.post_id
+LEFT JOIN likes ul ON p.id = ul.post_id AND ul.user_id = ?
+LEFT JOIN bookmarks b ON p.id = b.post_id AND b.user_id = ?
+LEFT JOIN follows f ON p.user_id = f.following_id AND f.follower_id = ? AND f.status = 'accepted'
+LEFT JOIN post_privacy pp ON p.id = pp.post_id
+WHERE (
+-- User's own posts
+p.user_id = ?
+-- Public posts
+OR p.privacy = 'public'
+-- Almost private posts from followed users
+OR (p.privacy = 'followers' AND f.id IS NOT NULL)
+-- Private posts specifically shared with user
+OR (p.privacy = 'private' AND pp.user_id = ?)
+)
+GROUP BY p.id, u.id
+ORDER BY p.created_at DESC
+LIMIT ? OFFSET ?
+`
 
-	rows, err := s.db.Query(query, currentUserID, currentUserID, currentUserID, currentUserID, currentUserID, limit, offset)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
+rows, err := s.db.Query(query, currentUserID, currentUserID, currentUserID, currentUserID, currentUserID, limit, offset)
+if err != nil {
+return nil, err
+}
+defer rows.Close()
 
-	var posts []models.PostResponse
-	for rows.Next() {
-		var post models.PostResponse
-		var user models.UserResponse
+var posts []models.PostResponse
+for rows.Next() {
+var post models.PostResponse
+var user models.UserResponse
 
-		err := rows.Scan(
-			&post.ID, &post.UserID, &post.Content, &post.ImageURL, &post.Privacy,
-			&post.CreatedAt, &post.UpdatedAt,
-			&user.FirstName, &user.LastName, &user.Avatar, &user.Nickname,
-			&post.LikeCount, &post.CommentCount, &post.IsLiked, &post.IsBookmarked,
-		)
-		if err != nil {
-			return nil, err
-		}
+err := rows.Scan(
+&post.ID, &post.UserID, &post.Content, &post.ImageURL, &post.Privacy,
+&post.CreatedAt, &post.UpdatedAt,
+&user.FirstName, &user.LastName, &user.Avatar, &user.Nickname,
+&post.LikeCount, &post.CommentCount, &post.IsLiked, &post.IsBookmarked,
+)
+if err != nil {
+return nil, err
+}
 
-		user.ID = post.UserID
-		post.User = user
-		posts = append(posts, post)
-	}
+user.ID = post.UserID
+post.User = user
+posts = append(posts, post)
+}
 
-	return posts, nil
+return posts, nil
 }
 
 func (s *PostService) UpdatePost(postID uint, userID uint, updateReq *models.UpdatePostRequest) error {
@@ -348,16 +348,115 @@ func (s *PostService) isFollowing(followerID, followingID uint) (bool, error) {
 }
 
 func (s *PostService) isInPostPrivacyList(postID, userID uint) (bool, error) {
-	query := `
-		SELECT COUNT(*) FROM post_privacy 
-		WHERE post_id = ? AND user_id = ?
-	`
+query := `
+SELECT COUNT(*) FROM post_privacy 
+WHERE post_id = ? AND user_id = ?
+`
 
-	var count int
-	err := s.db.QueryRow(query, postID, userID).Scan(&count)
-	if err != nil {
-		return false, err
-	}
+var count int
+err := s.db.QueryRow(query, postID, userID).Scan(&count)
+if err != nil {
+return false, err
+}
 
-	return count > 0, nil
+return count > 0, nil
+}
+
+// GetUserLikedPosts returns posts that the user has liked
+func (s *PostService) GetUserLikedPosts(userID uint, limit, offset int) ([]models.PostResponse, error) {
+query := `
+SELECT DISTINCT p.id, p.user_id, p.content, p.image_url, p.privacy, p.created_at, p.updated_at,
+       u.first_name, u.last_name, u.avatar, u.nickname,
+       COUNT(DISTINCT l2.id) as like_count,
+       COUNT(DISTINCT c.id) as comment_count,
+       1 as is_liked,
+       CASE WHEN b.id IS NOT NULL THEN 1 ELSE 0 END as is_bookmarked
+FROM posts p
+JOIN users u ON p.user_id = u.id
+JOIN likes ul ON p.id = ul.post_id AND ul.user_id = ?
+LEFT JOIN likes l2 ON p.id = l2.post_id
+LEFT JOIN comments c ON p.id = c.post_id
+LEFT JOIN bookmarks b ON p.id = b.post_id AND b.user_id = ?
+GROUP BY p.id, u.id
+ORDER BY ul.created_at DESC
+LIMIT ? OFFSET ?
+`
+
+rows, err := s.db.Query(query, userID, userID, limit, offset)
+if err != nil {
+return nil, err
+}
+defer rows.Close()
+
+var posts []models.PostResponse
+for rows.Next() {
+var post models.PostResponse
+var user models.UserResponse
+
+err := rows.Scan(
+&post.ID, &post.UserID, &post.Content, &post.ImageURL, &post.Privacy,
+&post.CreatedAt, &post.UpdatedAt,
+&user.FirstName, &user.LastName, &user.Avatar, &user.Nickname,
+&post.LikeCount, &post.CommentCount, &post.IsLiked, &post.IsBookmarked,
+)
+if err != nil {
+return nil, err
+}
+
+user.ID = post.UserID
+post.User = user
+posts = append(posts, post)
+}
+
+return posts, nil
+}
+
+// GetUserCommentedPosts returns posts that the user has commented on
+func (s *PostService) GetUserCommentedPosts(userID uint, limit, offset int) ([]models.PostResponse, error) {
+query := `
+SELECT DISTINCT p.id, p.user_id, p.content, p.image_url, p.privacy, p.created_at, p.updated_at,
+       u.first_name, u.last_name, u.avatar, u.nickname,
+       COUNT(DISTINCT l.id) as like_count,
+       COUNT(DISTINCT c2.id) as comment_count,
+       CASE WHEN ul.id IS NOT NULL THEN 1 ELSE 0 END as is_liked,
+       CASE WHEN b.id IS NOT NULL THEN 1 ELSE 0 END as is_bookmarked
+FROM posts p
+JOIN users u ON p.user_id = u.id
+JOIN comments uc ON p.id = uc.post_id AND uc.user_id = ?
+LEFT JOIN likes l ON p.id = l.post_id
+LEFT JOIN comments c2 ON p.id = c2.post_id
+LEFT JOIN likes ul ON p.id = ul.post_id AND ul.user_id = ?
+LEFT JOIN bookmarks b ON p.id = b.post_id AND b.user_id = ?
+GROUP BY p.id, u.id
+ORDER BY uc.created_at DESC
+LIMIT ? OFFSET ?
+`
+
+rows, err := s.db.Query(query, userID, userID, userID, limit, offset)
+if err != nil {
+return nil, err
+}
+defer rows.Close()
+
+var posts []models.PostResponse
+for rows.Next() {
+var post models.PostResponse
+var user models.UserResponse
+
+err := rows.Scan(
+&post.ID, &post.UserID, &post.Content, &post.ImageURL, &post.Privacy,
+&post.CreatedAt, &post.UpdatedAt,
+&user.FirstName, &user.LastName, &user.Avatar, &user.Nickname,
+&post.LikeCount, &post.CommentCount, &post.IsLiked, &post.IsBookmarked,
+)
+if err != nil {
+return nil, err
+}
+
+user.ID = post.UserID
+post.User = user
+posts = append(posts, post)
+}
+
+return posts, nil
 }

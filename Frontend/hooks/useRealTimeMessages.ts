@@ -34,40 +34,62 @@ export function useRealTimeMessages() {
   const { send, isConnected } = useWebSocketSubscription({
     messageTypes: ['private_message', 'group_message'],
     onMessage: (message) => {
+      console.log('WebSocket message received:', message)
+      
       if (message.type === 'private_message' || message.type === 'group_message') {
-        // Determine conversation ID based on message type
+        // For private messages, use the participant ID as conversation ID
         let conversationId: number
 
         if (message.type === 'group_message') {
           conversationId = message.group_id || 0
         } else {
-          // For private messages, generate conversation ID from sender and receiver
-          conversationId = getPrivateConversationId(message.from || 0, user?.id || 0)
+          // For private messages, use the other participant's ID as conversation ID
+          // If I'm the sender, use the receiver ID; if I'm the receiver, use the sender ID
+          if (message.from === user?.id) {
+            conversationId = message.to || 0
+          } else {
+            conversationId = message.from || 0
+          }
         }
 
         const newMessage: Message = {
-          id: Date.now(), // Temporary ID - should be replaced with real ID from server
+          id: (message as any).id || Date.now(), // Use real ID if available
           conversation_id: conversationId,
           sender_id: message.from || 0,
           content: message.content || '',
           message_type: 'text',
-          created_at: new Date(message.timestamp).toISOString(),
+          created_at: message.timestamp ? new Date(message.timestamp).toISOString() : new Date().toISOString(),
           is_read: false,
           sender: {
             id: message.from || 0,
-            first_name: 'Unknown',
-            last_name: 'User',
-            avatar: ''
+            first_name: (message as any).sender_name || 'Unknown',
+            last_name: '',
+            avatar: (message as any).sender_avatar || ''
           }
         }
 
-        console.log('Received WebSocket message:', { message, conversationId })
+        console.log('Processing WebSocket message:', { message, conversationId, newMessage })
 
-        // Add message to conversation
+        // Add message to conversation (append to end for newest messages at bottom)
         setMessages(prev => {
           const conversationMessages = prev.get(conversationId) || []
           const updated = new Map(prev)
-          updated.set(conversationId, [...conversationMessages, newMessage])
+          
+          // Check if message already exists to prevent duplicates (by content and sender for better matching)
+          const messageExists = conversationMessages.some(msg => 
+            (msg.id === newMessage.id) || 
+            (msg.content === newMessage.content && 
+             msg.sender_id === newMessage.sender_id && 
+             Math.abs(new Date(msg.created_at).getTime() - new Date(newMessage.created_at).getTime()) < 5000) // Within 5 seconds
+          )
+          
+          if (!messageExists) {
+            updated.set(conversationId, [...conversationMessages, newMessage])
+            console.log(`Added new message to conversation ${conversationId}:`, newMessage.content)
+          } else {
+            console.log(`Duplicate message prevented for conversation ${conversationId}:`, newMessage.content)
+          }
+          
           return updated
         })
 
@@ -81,33 +103,10 @@ export function useRealTimeMessages() {
           })
         }
 
-        // Update conversation last message
-        setConversations(prev => prev.map(conv =>
-          conv.id === conversationId
-            ? {
-                ...conv,
-                last_message: {
-                  content: newMessage.content,
-                  created_at: newMessage.created_at,
-                  sender_id: newMessage.sender_id,
-                  sender: {
-                    id: newMessage.sender.id,
-                    email: '', // We don't have this info in WebSocket
-                    first_name: newMessage.sender.first_name,
-                    last_name: newMessage.sender.last_name,
-                    date_of_birth: '', // We don't have this info in WebSocket
-                    avatar: newMessage.sender.avatar,
-                    nickname: '', // We don't have this info in WebSocket
-                    about_me: '', // We don't have this info in WebSocket
-                    is_private: false, // Default value
-                    created_at: '', // We don't have this info in WebSocket
-                    updated_at: '' // We don't have this info in WebSocket
-                  }
-                },
-                unread_count: message.from !== user?.id ? conv.unread_count + 1 : conv.unread_count
-              }
-            : conv
-        ))
+        // Refresh conversations to update last message and timestamps
+        setTimeout(() => {
+          fetchConversations()
+        }, 500)
       }
     }
   })
@@ -149,40 +148,37 @@ export function useRealTimeMessages() {
 
       let response: { messages: any[]; count: number; limit: number; offset: number }
 
-      // Try to get messages by conversation ID first (works for both private and group)
-      try {
-        console.log('Trying to fetch messages by conversation ID:', conversationId)
-        response = await api.getConversationMessages(conversationId)
-      } catch (convError) {
-        console.log('Conversation ID endpoint failed, trying type-specific endpoints')
-        // Fallback to type-specific endpoints
-        if (conversationType === 'group') {
-          response = await api.getGroupMessages(conversationId)
-        } else if (participantId) {
-          response = await api.getPrivateMessages(participantId)
-        } else {
-          throw new Error('Cannot fetch private messages: no participant ID')
-        }
+      // Use type-specific endpoints directly
+      if (conversationType === 'group') {
+        console.log('Fetching group messages for group ID:', conversationId)
+        response = await api.getGroupMessages(conversationId)
+      } else if (participantId) {
+        console.log('Fetching private messages with participant ID:', participantId)
+        response = await api.getPrivateMessages(participantId)
+      } else {
+        throw new Error('Cannot fetch private messages: no participant ID')
       }
 
       console.log('API response:', response)
 
-      // Transform API messages to our Message format
-      const transformedMessages: Message[] = response.messages.map(msg => ({
-        id: msg.id,
-        conversation_id: conversationId,
-        sender_id: msg.sender_id,
-        content: msg.content,
-        message_type: msg.message_type || 'text',
-        created_at: msg.created_at,
-        is_read: msg.is_read || false,
-        sender: msg.sender || {
-          id: msg.sender_id,
-          first_name: msg.sender?.first_name || 'Unknown',
-          last_name: msg.sender?.last_name || 'User',
-          avatar: msg.sender?.avatar || ''
-        }
-      }))
+      // Transform API messages to our Message format and reverse order (oldest first)
+      const transformedMessages: Message[] = response.messages
+        .map(msg => ({
+          id: msg.id,
+          conversation_id: conversationId,
+          sender_id: msg.sender_id,
+          content: msg.content,
+          message_type: msg.message_type || 'text',
+          created_at: msg.created_at,
+          is_read: msg.is_read || false,
+          sender: msg.sender || {
+            id: msg.sender_id,
+            first_name: msg.sender?.first_name || 'Unknown',
+            last_name: msg.sender?.last_name || 'User',
+            avatar: msg.sender?.avatar || ''
+          }
+        }))
+        .reverse() // Reverse to show oldest first, newest last
 
       // Update messages map
       setMessages(prev => {

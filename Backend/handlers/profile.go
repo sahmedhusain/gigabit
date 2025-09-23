@@ -21,7 +21,7 @@ func NewProfileHandler(db *sql.DB) *ProfileHandler {
 }
 
 func (h *ProfileHandler) GetProfile(w http.ResponseWriter, r *http.Request, userIDStr string) {
-	
+
 	//covert string to int
 	userID, err := strconv.Atoi(userIDStr)
 	if err != nil {
@@ -163,14 +163,29 @@ func (h *ProfileHandler) TogglePrivacy(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Parse the request body to get the desired privacy setting
+	var request struct {
+		IsPrivate *bool `json:"is_private,omitempty"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+		writeError(w, http.StatusBadRequest, "Invalid request body")
+		return
+	}
+
 	user, err := h.userService.GetUserByID(userID.(uint))
 	if err != nil {
 		writeError(w, http.StatusNotFound, "User not found")
 		return
 	}
 
-	// Toggle privacy setting
-	user.IsPrivate = !user.IsPrivate
+	// If is_private is provided in request, use that value, otherwise toggle
+	if request.IsPrivate != nil {
+		user.IsPrivate = *request.IsPrivate
+	} else {
+		// Toggle privacy setting (backward compatibility)
+		user.IsPrivate = !user.IsPrivate
+	}
 
 	if err := h.userService.UpdateUser(user); err != nil {
 		writeError(w, http.StatusInternalServerError, "Failed to update privacy setting")
@@ -180,6 +195,7 @@ func (h *ProfileHandler) TogglePrivacy(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]interface{}{
 		"message":    "Privacy setting updated successfully",
 		"is_private": user.IsPrivate,
+		"user":       user.ToResponse(),
 	})
 }
 

@@ -60,12 +60,58 @@ export default function ProfileSection({
     getFollowStatusFromAPI(isFollowing)
   )
 
+  // Add privacy toggle state
+  const [showPrivacyConfirm, setShowPrivacyConfirm] = useState(false)
+  const [isUpdatingPrivacy, setIsUpdatingPrivacy] = useState(false)
+  const [currentPrivacySetting, setCurrentPrivacySetting] = useState(currentUser?.isPrivate || false)
+  const { success, error } = useToast()
+
   // Handle follow status changes
   const handleFollowStatusChange = (newStatus: FollowStatus) => {
     setFollowStatus(newStatus)
   }
 
-  // Use real-time data when connected, fallback to provided data
+  // Handle privacy toggle
+  const handlePrivacyToggle = () => {
+    if (currentPrivacySetting) {
+      // If currently private, show confirmation to make public
+      setShowPrivacyConfirm(true)
+    } else {
+      // If currently public, directly make private (no confirmation needed)
+      updatePrivacySetting(true)
+    }
+  }
+
+  const updatePrivacySetting = async (makePrivate: boolean) => {
+    if (!currentUser) return
+
+    setIsUpdatingPrivacy(true)
+    try {
+      // Call the API to update privacy setting
+      const response = await api.updateUserPrivacy(currentUser.id, makePrivate)
+
+      success(`Profile is now ${makePrivate ? 'private' : 'public'}`)
+
+      // Update the local privacy state to trigger re-render
+      setCurrentPrivacySetting(makePrivate)
+
+      // Update the current user object in place
+      if (currentUser) {
+        currentUser.isPrivate = makePrivate
+        // Also update the alternate property name if it exists
+        if ('is_private' in currentUser) {
+          (currentUser as any).is_private = makePrivate
+        }
+      }
+
+    } catch (err: any) {
+      console.error('Failed to update privacy setting:', err)
+      error('Failed to update privacy setting. Please try again.')
+    } finally {
+      setIsUpdatingPrivacy(false)
+      setShowPrivacyConfirm(false)
+    }
+  }  // Use real-time data when connected, fallback to provided data
   const displayPosts = isConnected ? realTimePosts.filter(p => p.user_id === currentUser?.id) : posts
   const displayFollowers = isConnected ? liveFollowers : followers
   const displayFollowing = isConnected ? liveFollowing : following
@@ -179,26 +225,29 @@ export default function ProfileSection({
 
             <div className="flex flex-col sm:flex-row gap-3 lg:gap-4">
               {isOwnProfile && (
-                <>
-                  <button className="flex items-center justify-center px-4 lg:px-6 py-2 bg-gradient-to-r from-emerald-500 to-teal-600 rounded-xl text-white hover:from-emerald-600 hover:to-teal-700 transition-all duration-200 text-sm lg:text-base">
-                    <Settings className="w-4 h-4 mr-2" />
-                    Edit Profile
-                  </button>
-
-                  <button className={`flex items-center justify-center px-4 lg:px-6 py-2 border border-white/30 rounded-xl text-white hover:bg-white/10 transition-all duration-200 text-sm lg:text-base`}>
-                    {currentUser?.isPrivate ? (
-                      <>
-                        <Lock className="w-4 h-4 mr-2" />
-                        Private Profile
-                      </>
-                    ) : (
-                      <>
-                        <Globe className="w-4 h-4 mr-2" />
-                        Public Profile
-                      </>
-                    )}
-                  </button>
-                </>
+                <button
+                  onClick={handlePrivacyToggle}
+                  disabled={isUpdatingPrivacy}
+                  className={`flex items-center justify-center px-4 lg:px-6 py-2 border border-white/30 rounded-xl text-white hover:bg-white/10 transition-all duration-200 text-sm lg:text-base ${isUpdatingPrivacy ? 'opacity-50 cursor-not-allowed' : ''
+                    }`}
+                >
+                  {isUpdatingPrivacy ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                      Updating...
+                    </>
+                  ) : currentPrivacySetting ? (
+                    <>
+                      <Lock className="w-4 h-4 mr-2" />
+                      Private Profile
+                    </>
+                  ) : (
+                    <>
+                      <Globe className="w-4 h-4 mr-2" />
+                      Public Profile
+                    </>
+                  )}
+                </button>
               )}
             </div>
           </div>
@@ -236,100 +285,23 @@ export default function ProfileSection({
             <div className="text-center p-6">
               <Lock className="w-12 h-12 text-white/70 mx-auto mb-4" />
               <h4 className="text-xl font-semibold text-white mb-2">Private Profile</h4>
-              <p className="text-white/70 mb-4">This user's profile is private. Follow them to see their details.</p>
-              <button className="px-6 py-2 bg-gradient-to-r from-emerald-500 to-teal-600 rounded-xl text-white hover:from-emerald-600 hover:to-teal-700 transition-all duration-200">
-                Follow to View
-              </button>
+              <p className="text-white/70">This user's profile is private. Follow them to see their details.</p>
             </div>
           </div>
         )}
-
-        <div className="space-y-4 lg:space-y-6">
-          {/* Personal Information Section */}
-          <div className="bg-gradient-to-r from-white/10 to-white/5 backdrop-blur-xl rounded-2xl lg:rounded-3xl border border-white/20 p-4 lg:p-6">
-            <h3 className="text-lg lg:text-xl font-semibold text-white mb-4 lg:mb-6">Personal Information</h3>
-            <div className="space-y-4">
-              <div>
-                <label className="text-sm text-white/60 font-medium">Full Name</label>
-                <p className="text-white text-base lg:text-lg">{currentUser?.name || 'Not provided'}</p>
-              </div>
-              <div>
-                <label className="text-sm text-white/60 font-medium">Email</label>
-                <p className="text-white text-base lg:text-lg">{currentUser?.email || 'Not provided'}</p>
-              </div>
-              <div>
-                <label className="text-sm text-white/60 font-medium">Username</label>
-                <p className="text-white text-base lg:text-lg">@{currentUser?.username || 'Not provided'}</p>
-              </div>
-              <div>
-                <label className="text-sm text-white/60 font-medium">Nickname</label>
-                <p className="text-white text-base lg:text-lg">{currentUser?.nickname || 'Not provided'}</p>
-              </div>
-            </div>
-            <div className="space-y-4">
-              <div>
-                <label className="text-sm text-white/60 font-medium">Date of Birth</label>
-                <p className="text-white text-base lg:text-lg">
-                  {currentUser?.dateOfBirth
-                    ? new Date(currentUser.dateOfBirth).toLocaleDateString('en-US', {
-                      year: 'numeric',
-                      month: 'long',
-                      day: 'numeric'
-                    })
-                    : 'Not provided'
-                  }
-                </p>
-              </div>
-              <div>
-                <label className="text-sm text-white/60 font-medium">About Me</label>
-                <p className="text-white text-base lg:text-lg">
-                  {currentUser?.aboutMe || 'No description provided'}
-                </p>
-              </div>
-              <div>
-                <label className="text-sm text-white/60 font-medium">Member Since</label>
-                <p className="text-white text-base lg:text-lg">
-                  {currentUser?.memberSince
-                    ? new Date(currentUser.memberSince).toLocaleDateString('en-US', {
-                      year: 'numeric',
-                      month: 'long'
-                    })
-                    : 'Not available'
-                  }
-                </p>
-              </div>
-              <div>
-                <label className="text-sm text-white/60 font-medium">Profile Privacy</label>
-                <p className="text-white text-base lg:text-lg flex items-center">
-                  {currentUser?.isPrivate ? (
-                    <>
-                      <Lock className="w-4 h-4 mr-2 text-red-400" />
-                      Private Profile
-                    </>
-                  ) : (
-                    <>
-                      <Globe className="w-4 h-4 mr-2 text-green-400" />
-                      Public Profile
-                    </>
-                  )}
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
 
         {/* Profile Content */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:gap-6">
           <div className="lg:col-span-2">
             <div className="bg-gradient-to-r from-white/10 to-white/5 backdrop-blur-xl rounded-2xl lg:rounded-3xl border border-white/20 p-4 lg:p-6">
               <div className="flex items-center justify-between mb-3 lg:mb-4">
-                <h3 className="text-lg lg:text-xl font-semibold text-white">My Posts</h3>
+                <h3 className="text-lg lg:text-xl font-semibold text-white">Posts</h3>
                 {!connectionStatus && (
                   <span className="text-xs text-red-400">Offline</span>
                 )}
               </div>
               <div className="space-y-3 lg:space-y-4">
-                {displayPosts.slice(0, 2).map((post) => (
+                {displayPosts.map((post) => (
                   <div
                     key={post.id}
                     className="bg-white/5 rounded-xl lg:rounded-2xl p-3 lg:p-4 cursor-pointer hover:bg-white/10 transition-colors"
@@ -372,6 +344,34 @@ export default function ProfileSection({
           </div>
         </div>
       </div>
+
+      {/* Privacy Confirmation Modal */}
+      {showPrivacyConfirm && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-gradient-to-r from-white/10 to-white/5 backdrop-blur-xl rounded-2xl border border-white/20 p-6 max-w-md mx-4">
+            <h3 className="text-xl font-semibold text-white mb-4">Make Profile Public?</h3>
+            <p className="text-white/70 mb-6">
+              Are you sure you want to make your account public? Anyone will be able to see your profile and posts.
+            </p>
+            <div className="flex space-x-3">
+              <button
+                onClick={() => setShowPrivacyConfirm(false)}
+                className="flex-1 px-4 py-2 border border-white/30 rounded-xl text-white hover:bg-white/10 transition-all duration-200"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => updatePrivacySetting(false)}
+                disabled={isUpdatingPrivacy}
+                className={`flex-1 px-4 py-2 bg-gradient-to-r from-emerald-500 to-teal-600 rounded-xl text-white hover:from-emerald-600 hover:to-teal-700 transition-all duration-200 ${isUpdatingPrivacy ? 'opacity-50 cursor-not-allowed' : ''
+                  }`}
+              >
+                {isUpdatingPrivacy ? 'Updating...' : 'Make Public'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

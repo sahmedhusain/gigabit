@@ -71,6 +71,7 @@ function DashboardPage() {
   const [feedSubTab, setFeedSubTab] = useState('all')
   const [activitySubTab, setActivitySubTab] = useState('liked')
   const [chatSubTab, setChatSubTab] = useState('all')
+  const [eventsSubTab, setEventsSubTab] = useState('all')
   const [showCreatePost, setShowCreatePost] = useState(false)
   const [showCreateGroup, setShowCreateGroup] = useState(false)
   const [showCreateEvent, setShowCreateEvent] = useState(false)
@@ -779,6 +780,7 @@ function DashboardPage() {
             setShowCreateEvent={setShowCreateEvent}
             onEventRespond={respondToEvent}
             communitySubTab={'events'}
+            eventsSubTab={eventsSubTab}
           />
         )
       case 'activity-history':
@@ -882,6 +884,8 @@ function DashboardPage() {
         setActivitySubTab={setActivitySubTab}
         chatSubTab={chatSubTab}
         setChatSubTab={setChatSubTab}
+        eventsSubTab={eventsSubTab}
+        setEventsSubTab={setEventsSubTab}
         chatUnreadAll={chatUnreadAll}
         chatUnreadDirect={chatUnreadDirect}
         chatUnreadGroups={chatUnreadGroups}

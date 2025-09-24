@@ -3,12 +3,10 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { 
   Home, 
-  User, 
   MessageCircle, 
   Activity, 
   Users, 
   Calendar, 
-  Settings, 
   X, 
   Sparkles, 
   Bell, 
@@ -28,11 +26,12 @@ import {
   Award,
   Target,
   Layers,
-  BarChart3,
   Compass,
   Filter,
   RefreshCw,
-  Dot
+  Dot,
+  CheckCircle,
+  XCircle
 } from 'lucide-react'
 
 interface SidebarProps {
@@ -46,6 +45,8 @@ interface SidebarProps {
   setActivitySubTab: (subTab: string) => void
   chatSubTab: string
   setChatSubTab: (subTab: string) => void
+  eventsSubTab: string
+  setEventsSubTab: (subTab: string) => void
   chatUnreadAll?: number
   chatUnreadDirect?: number
   chatUnreadGroups?: number
@@ -91,6 +92,8 @@ export default function Sidebar({
   setActivitySubTab,
   chatSubTab,
   setChatSubTab,
+  eventsSubTab,
+  setEventsSubTab,
   chatUnreadAll = 0,
   chatUnreadDirect = 0,
   chatUnreadGroups = 0,
@@ -106,10 +109,10 @@ export default function Sidebar({
   const [userStatus, setUserStatus] = useState('online')
   const [currentTime, setCurrentTime] = useState(new Date())
   const [showQuickActions, setShowQuickActions] = useState(false)
-  const [expandedSection, setExpandedSection] = useState<'feed' | 'chats' | 'activity' | 'events' | 'activity-history' | null>(
+  const [expandedSection, setExpandedSection] = useState<'feed' | 'chats' | 'activity' | 'events' | null>(
     activeTab === 'events' ? 'events' : 
     activeTab === 'chats' ? 'chats' : 
-    activeTab === 'activity' ? 'activity' : 
+    activeTab === 'activity' ? 'activity' :
     'feed'
   )
 
@@ -181,21 +184,21 @@ export default function Sidebar({
           color: 'from-blue-500 to-cyan-600',
           count: undefined,
           onClick: () => {
-            router.push('/chats?filter=all')
+            router.push('/chats/all')
           },
           isActive: activeTab === 'chats' && (typeof chatSubTab !== 'undefined' ? chatSubTab === 'all' : false)
         },
         {
-          id: 'direct',
+          id: 'private',
           label: 'Direct Messages',
           icon: MessageCircle,
           description: 'Private conversations',
           color: 'from-blue-500 to-cyan-600',
           count: undefined,
           onClick: () => {
-            router.push('/chats?filter=private')
+            router.push('/chats/private')
           },
-          isActive: activeTab === 'chats' && (typeof chatSubTab !== 'undefined' ? chatSubTab === 'direct' : false)
+          isActive: activeTab === 'chats' && (typeof chatSubTab !== 'undefined' ? chatSubTab === 'private' : false)
         },
         {
           id: 'groups',
@@ -205,7 +208,7 @@ export default function Sidebar({
           color: 'from-blue-500 to-cyan-600',
           count: undefined,
           onClick: () => {
-            router.push('/chats?filter=group')
+            router.push('/chats/groups')
           },
           isActive: activeTab === 'chats' && (typeof chatSubTab !== 'undefined' ? chatSubTab === 'groups' : false)
         }
@@ -225,7 +228,7 @@ export default function Sidebar({
           color: 'from-emerald-500 to-teal-600',
           count: '2.1k',
           onClick: () => {
-            router.push('/feed?filter=all')
+            router.push('/feed/all')
           },
           isActive: activeTab === 'feed' && feedSubTab === 'all'
         },
@@ -237,7 +240,7 @@ export default function Sidebar({
           color: 'from-emerald-500 to-teal-600',
           count: '342',
           onClick: () => {
-            router.push('/feed?filter=following')
+            router.push('/feed/following')
           },
           isActive: activeTab === 'feed' && feedSubTab === 'following'
         },
@@ -249,7 +252,7 @@ export default function Sidebar({
           color: 'from-emerald-500 to-teal-600',
           count: '89',
           onClick: () => {
-            router.push('/feed?filter=friends')
+            router.push('/feed/friends')
           },
           isActive: activeTab === 'feed' && feedSubTab === 'friends'
         }
@@ -269,7 +272,7 @@ export default function Sidebar({
           color: 'from-rose-500 to-pink-600',
           count: '156',
           onClick: () => {
-            router.push('/activity?filter=liked')
+            router.push('/activity/liked')
           },
           isActive: activeTab === 'activity' && activitySubTab === 'liked'
         },
@@ -281,7 +284,7 @@ export default function Sidebar({
           color: 'from-blue-500 to-cyan-600',
           count: '78',
           onClick: () => {
-            router.push('/activity?filter=commented')
+            router.push('/activity/commented')
           },
           isActive: activeTab === 'activity' && activitySubTab === 'commented'
         },
@@ -293,7 +296,7 @@ export default function Sidebar({
           color: 'from-amber-500 to-orange-600',
           count: '23',
           onClick: () => {
-            router.push('/activity?filter=saved')
+            router.push('/activity/saved')
           },
           isActive: activeTab === 'activity' && activitySubTab === 'saved'
         }
@@ -306,36 +309,40 @@ export default function Sidebar({
       description: 'Upcoming events',
       items: [
         {
-          id: 'events',
+          id: 'all',
           label: 'All Events',
           icon: Calendar,
           description: 'Browse all events',
           color: 'from-purple-500 to-violet-600',
           count: '5',
           onClick: () => {
-            router.push('/events')
+            router.push('/events/all')
           },
-          isActive: activeTab === 'events'
-        }
-      ]
-    },
-    {
-      id: 'activity-history' as const,
-      title: 'Activity History',
-      icon: <BarChart3 className="w-4 h-4" />,
-      description: 'Your recent activity',
-      items: [
+          isActive: activeTab === 'events' && eventsSubTab === 'all'
+        },
         {
-          id: 'activity-history',
-          label: 'Activity History',
-          icon: BarChart3,
-          description: 'View your recent activity',
-          color: 'from-indigo-500 to-purple-600',
-          count: '12',
+          id: 'going',
+          label: 'Going',
+          icon: CheckCircle,
+          description: 'Events you\'re attending',
+          color: 'from-purple-500 to-violet-600',
+          count: undefined,
           onClick: () => {
-            setActiveTab('activity-history')
+            router.push('/events/going')
           },
-          isActive: activeTab === 'activity-history'
+          isActive: activeTab === 'events' && eventsSubTab === 'going'
+        },
+        {
+          id: 'not-going',
+          label: 'Not Going',
+          icon: XCircle,
+          description: 'Events you\'re not attending',
+          color: 'from-purple-500 to-violet-600',
+          count: undefined,
+          onClick: () => {
+            router.push('/events/not-going')
+          },
+          isActive: activeTab === 'events' && eventsSubTab === 'not-going'
         }
       ]
     }
@@ -424,15 +431,13 @@ export default function Sidebar({
                             setExpandedSection(willExpand ? section.id : null)
                             // Navigate to first sub-route by default
                             if (section.id === 'chats') {
-                              router.push('/chats?filter=all')
+                              router.push('/chats/all')
                             } else if (section.id === 'feed') {
-                              router.push('/feed?filter=all')
+                              router.push('/feed/all')
                             } else if (section.id === 'activity') {
-                              router.push('/activity?filter=liked')
+                              router.push('/activity/liked')
                             } else if (section.id === 'events') {
-                              router.push('/events')
-                            } else if (section.id === 'activity-history') {
-                              setActiveTab('activity-history')
+                              router.push('/events/all')
                             }
                           }}
                         >
@@ -505,7 +510,7 @@ export default function Sidebar({
                                   {section.id === 'chats' && (() => {
                                     let count = 0
                                     if (item.id === 'all') count = chatUnreadAll
-                                    else if (item.id === 'direct') count = chatUnreadDirect
+                                    else if (item.id === 'private') count = chatUnreadDirect
                                     else if (item.id === 'groups') count = chatUnreadGroups
                                     return count > 0 ? (
                                       <span className={`text-xs px-2 py-1 rounded-full font-medium ${

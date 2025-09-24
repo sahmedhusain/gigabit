@@ -19,7 +19,7 @@ import RightSidebar from '@/components/dashboard/RightSidebar'
 import CommunitySection from '@/components/dashboard/CommunitySection'
 import CreateGeneralEvent from '@/components/dashboard/CreateGeneralEvent'
 
-function EventsPage() {
+function EventsNotGoingPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { user } = useAuth()
@@ -39,7 +39,6 @@ function EventsPage() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
   const [showCreateEvent, setShowCreateEvent] = useState(false)
-  const [eventsSubTab, setEventsSubTab] = useState('all')
   const [followers, setFollowers] = useState<{ id: number; email: string; first_name: string; last_name: string; avatar?: string; nickname?: string; }[]>([])
   const [following, setFollowing] = useState<{ id: number; email: string; first_name: string; last_name: string; avatar?: string; nickname?: string; }[]>([])
 
@@ -70,7 +69,7 @@ function EventsPage() {
   // Update URL when event ID changes
   useEffect(() => {
     if (eventId) {
-      const newUrl = `/events?event=${eventId}`
+      const newUrl = `/events/not-going?event=${eventId}`
       router.replace(newUrl)
     }
   }, [eventId, router])
@@ -135,8 +134,8 @@ function EventsPage() {
         setActivitySubTab={() => {}}
         chatSubTab="all"
         setChatSubTab={() => {}}
-        eventsSubTab={eventsSubTab}
-        setEventsSubTab={setEventsSubTab}
+        eventsSubTab="not-going"
+        setEventsSubTab={() => {}}
         chatUnreadAll={0}
         chatUnreadDirect={0}
         chatUnreadGroups={0}
@@ -184,7 +183,7 @@ function EventsPage() {
                 setShowCreateEvent={setShowCreateEvent}
                 onEventRespond={respondToEvent}
                 communitySubTab={'events'}
-                eventsSubTab={eventsSubTab}
+                eventsSubTab="not-going"
               />
             </div>
           </div>
@@ -209,12 +208,12 @@ function EventsPage() {
 }
 
 // Wrap the entire component with ProtectedRoute
-function ProtectedEventsPage() {
+function ProtectedEventsNotGoingPage() {
   return (
     <ProtectedRoute>
-      <EventsPage />
+      <EventsNotGoingPage />
     </ProtectedRoute>
   )
 }
 
-export default ProtectedEventsPage
+export default ProtectedEventsNotGoingPage

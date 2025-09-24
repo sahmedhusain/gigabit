@@ -38,8 +38,8 @@ export default function LoginPage() {
       // Call login function from auth context
       await login(formData.email, formData.password)
 
-      // Redirect to dashboard on success
-      router.push('/dashboard')
+      // Redirect to feed on success
+      router.push('/feed/all')
     } catch (err: any) {
       setError(err.message || 'Login failed. Please try again.')
     } finally {

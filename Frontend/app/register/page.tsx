@@ -143,8 +143,8 @@ export default function RegisterPage() {
         avatar: formData.avatar.trim(),
       })
 
-      // Redirect to dashboard on success
-      router.push('/dashboard')
+      // Redirect to feed on success
+      router.push('/feed/all')
     } catch (err: any) {
       setError(err.message || 'Registration failed. Please try again.')
     } finally {

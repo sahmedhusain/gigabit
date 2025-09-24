@@ -18,28 +18,28 @@ export class ApiErrorHandler {
       // Handle specific error cases
       switch (status) {
         case 400:
-          window.location.href = '/error-pages/400';
+          window.location.href = '/error/400';
           break;
         case 401:
           // Token expiration is handled in api.ts
           if (code !== 'TOKEN_EXPIRED' && code !== 'SESSION_EXPIRED') {
-            window.location.href = '/error-pages/401';
+            window.location.href = '/error/401';
           }
           break;
         case 403:
-          window.location.href = '/error-pages/403';
+          window.location.href = '/error/403';
           break;
         case 404:
           window.location.href = '/not-found';
           break;
         case 500:
-          window.location.href = '/error-pages/500';
+          window.location.href = '/error/500';
           break;
         case 502:
-          window.location.href = '/error-pages/502';
+          window.location.href = '/error/502';
           break;
         case 503:
-          window.location.href = '/error-pages/503';
+          window.location.href = '/error/503';
           break;
         default:
           console.error('Unhandled API error:', apiError);
@@ -47,11 +47,11 @@ export class ApiErrorHandler {
     } else if (error.request) {
       // Network error
       console.error('Network error:', error.request);
-      window.location.href = '/error-pages/503';
+      window.location.href = '/error/503';
     } else {
       // Something else happened
       console.error('Unexpected error:', error.message);
-      window.location.href = '/error-pages/500';
+      window.location.href = '/error/500';
     }
   }
 

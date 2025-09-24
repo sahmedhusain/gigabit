@@ -1,40 +1,39 @@
 'use client'
-import { useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect } from 'react'
+import { useRouter, useParams } from 'next/navigation'
 import ProtectedRoute from '@/components/ProtectedRoute'
+import { useAuth } from '@/context/AuthContext'
+import { useWebSocket } from '@/context/WebSocketContext'
+import { useToast } from '@/context/ToastContext'
+import { useRealTimePosts, useNotifications } from '@/hooks'
+import {
+  api,
+  ApiClient,
+  Post,
+  getToken,
+  CreatePostRequest,
+  NetworkError,
+  ValidationError,
+  AuthenticationError
+} from '@/lib/api'
 
-function FeedPage() {
+// Import dashboard components
+import TopBar from '@/components/dashboard/TopBar'
+import Sidebar from '@/components/dashboard/Sidebar'
+import RightSidebar from '@/components/dashboard/RightSidebar'
+import CreatePost from '@/components/dashboard/CreatePost'
+import HomeFeed from '@/components/dashboard/HomeFeed'
+
+function FeedFilterPage() {
   const router = useRouter()
-
-  useEffect(() => {
-    router.replace('/feed/all')
-  }, [router])
-
-  return null
-}
-
-// Wrap the entire component with ProtectedRoute
-function ProtectedFeedPage() {
-  return (
-    <ProtectedRoute>
-      <FeedPage />
-    </ProtectedRoute>
-  )
-}
-
-export default ProtectedFeedPage
-
-function FeedPage() {
-  const router = useRouter()
-  const searchParams = useSearchParams()
+  const params = useParams()
+  const filter = params.filter as string
   const { user } = useAuth()
   const { isConnected, onlineUsers, addMessageListener } = useWebSocket()
   const { success, error } = useToast()
   const { items: liveNotifications, unread: liveUnreadCount } = useNotifications()
 
-  // Get filter from URL params
-  const filterParam = searchParams.get('filter') || 'all'
-  const [feedSubTab, setFeedSubTab] = useState(filterParam)
+  const [feedSubTab, setFeedSubTab] = useState(filter || 'all')
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
   const [showCreatePost, setShowCreatePost] = useState(false)
@@ -79,9 +78,10 @@ function FeedPage() {
 
   // Update URL when filter changes
   useEffect(() => {
-    const newUrl = feedSubTab === 'all' ? '/feed' : `/feed?filter=${feedSubTab}`
-    router.replace(newUrl)
-  }, [feedSubTab, router])
+    if (feedSubTab !== filter) {
+      router.replace(`/feed/${feedSubTab}`)
+    }
+  }, [feedSubTab, filter, router])
 
   // Fetch data when component loads
   useEffect(() => {
@@ -90,7 +90,7 @@ function FeedPage() {
       fetchUsers()
       fetchFollowers()
     }
-  }, [user])
+  }, [user, feedSubTab])
 
   // WebSocket real-time notifications
   useEffect(() => {
@@ -131,8 +131,21 @@ function FeedPage() {
     try {
       setIsLoadingPosts(true)
       console.log('Fetching feed posts...')
-      const response = await api.getFeed(20, 0)
-      console.log('Feed API response:', response)
+      let response: any
+
+      switch (feedSubTab) {
+        case 'following':
+          // Fetch posts from users the current user is following
+          response = await api.getFeed(20, 0) // This should be filtered on backend
+          break
+        case 'friends':
+          // Fetch posts from friends (mutual follows)
+          response = await api.getFeed(20, 0) // This should be filtered on backend
+          break
+        default: // 'all'
+          response = await api.getFeed(20, 0)
+      }
+
       const postsArr = Array.isArray(response.data) ? response.data : [];
       
       if (!postsArr.length) {
@@ -457,12 +470,12 @@ function FeedPage() {
 }
 
 // Wrap the entire component with ProtectedRoute
-function ProtectedFeedPage() {
+function ProtectedFeedFilterPage() {
   return (
     <ProtectedRoute>
-      <FeedPage />
+      <FeedFilterPage />
     </ProtectedRoute>
   )
 }
 
-export default ProtectedFeedPage
+export default ProtectedFeedFilterPage

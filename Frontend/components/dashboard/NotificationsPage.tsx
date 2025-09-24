@@ -1,5 +1,6 @@
 'use client'
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { 
   Bell, 
   Heart, 
@@ -36,11 +37,11 @@ function formatTimeAgo(dateString: string) {
 }
 
 interface NotificationFilters {
-  type: 'all' | 'unread' | 'likes' | 'comments' | 'follows' | 'events' | 'messages' | 'groups'
   timeframe: 'all' | 'today' | 'week' | 'month'
 }
 
 export default function NotificationsPage() {
+  const router = useRouter()
   const {
     items: notifications,
     unread,
@@ -54,7 +55,6 @@ export default function NotificationsPage() {
 
   const [searchTerm, setSearchTerm] = useState('')
   const [filters, setFilters] = useState<NotificationFilters>({
-    type: 'all',
     timeframe: 'all'
   })
   const [selectedNotifications, setSelectedNotifications] = useState<Set<number>>(new Set())
@@ -62,25 +62,6 @@ export default function NotificationsPage() {
   // Filter and search notifications
   const filteredNotifications = useMemo(() => {
     let filtered = notifications
-
-    // Filter by type
-    if (filters.type !== 'all') {
-      if (filters.type === 'unread') {
-        filtered = filtered.filter(n => !n.is_read)
-      } else if (filters.type === 'likes') {
-        filtered = filtered.filter(n => n.type === 'like')
-      } else if (filters.type === 'comments') {
-        filtered = filtered.filter(n => n.type === 'comment')
-      } else if (filters.type === 'follows') {
-        filtered = filtered.filter(n => n.type === 'follow')
-      } else if (filters.type === 'events') {
-        filtered = filtered.filter(n => n.type.includes('event'))
-      } else if (filters.type === 'messages') {
-        filtered = filtered.filter(n => n.type === 'message')
-      } else if (filters.type === 'groups') {
-        filtered = filtered.filter(n => n.type.includes('group'))
-      }
-    }
 
     // Filter by timeframe
     if (filters.timeframe !== 'all') {
@@ -131,30 +112,6 @@ export default function NotificationsPage() {
     }
   }
 
-  // Get type count for filter tabs
-  const getTypeCount = (type: string) => {
-    switch (type) {
-      case 'all':
-        return notifications.length
-      case 'unread':
-        return unread
-      case 'likes':
-        return notifications.filter(n => n.type === 'like').length
-      case 'comments':
-        return notifications.filter(n => n.type === 'comment').length
-      case 'follows':
-        return notifications.filter(n => n.type === 'follow').length
-      case 'events':
-        return notifications.filter(n => n.type.includes('event')).length
-      case 'messages':
-        return notifications.filter(n => n.type === 'message').length
-      case 'groups':
-        return notifications.filter(n => n.type.includes('group')).length
-      default:
-        return 0
-    }
-  }
-
   // Bulk actions
   const handleSelectAll = () => {
     if (selectedNotifications.size === filteredNotifications.length) {
@@ -174,17 +131,6 @@ export default function NotificationsPage() {
     setSelectedNotifications(new Set())
   }
 
-  const filterTabs = [
-    { id: 'all', label: 'All', icon: <Bell className="w-4 h-4" /> },
-    { id: 'unread', label: 'Unread', icon: <BellRing className="w-4 h-4" /> },
-    { id: 'likes', label: 'Likes', icon: <Heart className="w-4 h-4" /> },
-    { id: 'comments', label: 'Comments', icon: <MessageCircle className="w-4 h-4" /> },
-    { id: 'follows', label: 'Follows', icon: <UserPlus className="w-4 h-4" /> },
-    { id: 'events', label: 'Events', icon: <Calendar className="w-4 h-4" /> },
-    { id: 'messages', label: 'Messages', icon: <Mail className="w-4 h-4" /> },
-    { id: 'groups', label: 'Groups', icon: <Users className="w-4 h-4" /> }
-  ]
-
   if (loading) {
     return (
       <div className="flex-1 min-w-0 max-h-screen overflow-hidden">
@@ -201,17 +147,6 @@ export default function NotificationsPage() {
                   Stay updated with your latest activities
                 </p>
               </div>
-            </div>
-
-            {/* Tab Navigation Skeleton */}
-            <div className="flex flex-wrap gap-2 mt-6">
-              {[...Array(8)].map((_, i) => (
-                <div key={i} className="flex items-center space-x-2 px-4 py-3 rounded-lg bg-white/5 animate-pulse">
-                  <div className="w-4 h-4 bg-white/20 rounded"></div>
-                  <div className="w-16 h-4 bg-white/20 rounded"></div>
-                  <div className="w-6 h-5 bg-white/20 rounded-full"></div>
-                </div>
-              ))}
             </div>
 
             {/* Search Bar Skeleton */}
@@ -275,31 +210,6 @@ export default function NotificationsPage() {
                 </button>
               )}
             </div>
-          </div>
-
-          {/* Filter Tabs */}
-          <div className="flex flex-wrap gap-2 mt-6">
-            {filterTabs.map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setFilters(prev => ({ ...prev, type: tab.id as any }))}
-                className={`flex items-center space-x-2 px-4 py-3 rounded-lg transition-all duration-300 ${
-                  filters.type === tab.id
-                    ? 'bg-gradient-to-r from-emerald-500/20 to-teal-500/20 text-emerald-400 border border-emerald-500/30'
-                    : 'bg-white/10 hover:bg-white/20 text-white/70 hover:text-white border border-white/20'
-                }`}
-              >
-                {tab.icon}
-                <span className="font-medium">{tab.label}</span>
-                <div className={`px-2 py-1 rounded-full text-xs font-bold transition-colors ${
-                  filters.type === tab.id 
-                    ? 'bg-emerald-500/20 text-emerald-300' 
-                    : 'bg-white/10 text-white/50'
-                }`}>
-                  {getTypeCount(tab.id)}
-                </div>
-              </button>
-            ))}
           </div>
 
           {/* Search and Filters */}
@@ -399,9 +309,7 @@ export default function NotificationsPage() {
               <p className="text-white/70 mb-6 max-w-md mx-auto">
                 {searchTerm 
                   ? `No notifications found matching "${searchTerm}"`
-                  : filters.type === 'unread'
-                    ? "You're all caught up! No unread notifications."
-                    : 'No notifications match the selected filters'
+                  : 'No notifications match the selected filters'
                 }
               </p>
               {searchTerm && (

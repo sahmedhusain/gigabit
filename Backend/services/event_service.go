@@ -17,13 +17,13 @@ func NewEventService(db *sql.DB) *EventService {
 
 func (s *EventService) CreateEvent(event *models.Event) error {
 	query := `
-INSERT INTO events (group_id, creator_id, title, description, event_date, created_at, updated_at)
-VALUES (?, ?, ?, ?, ?, ?, ?)
+INSERT INTO events (group_id, creator_id, title, description, event_date, location, created_at, updated_at)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 `
 
 	now := time.Now()
 	result, err := s.db.Exec(query, event.GroupID, event.CreatorID, event.Title,
-		event.Description, event.EventTime, now, now)
+		event.Description, event.EventTime, event.Location, now, now)
 	if err != nil {
 		return err
 	}
@@ -42,7 +42,7 @@ VALUES (?, ?, ?, ?, ?, ?, ?)
 
 func (s *EventService) GetEventByID(eventID, currentUserID uint) (*models.EventResponse, error) {
 	query := `
-SELECT e.id, e.group_id, e.creator_id, e.title, e.description, e.event_date, 
+SELECT e.id, e.group_id, e.creator_id, e.title, e.description, e.event_date, e.location,
    e.created_at, e.updated_at,
    u.first_name, u.last_name, u.avatar, u.nickname,
    g.name as group_title
@@ -60,7 +60,7 @@ WHERE e.id = ?
 
 	err := s.db.QueryRow(query, eventID).Scan(
 		&event.ID, &event.GroupID, &event.CreatorID, &event.Title, &event.Description,
-		&event.EventTime, &event.CreatedAt, &event.UpdatedAt,
+		&event.EventTime, &event.Location, &event.CreatedAt, &event.UpdatedAt,
 		&creator.FirstName, &creator.LastName, &avatar, &nickname,
 		&group.Title,
 	)
@@ -104,7 +104,7 @@ func (s *EventService) GetGroupEvents(groupID, currentUserID uint, limit, offset
 	}
 
 	query := `
-SELECT e.id, e.group_id, e.creator_id, e.title, e.description, e.event_date,
+SELECT e.id, e.group_id, e.creator_id, e.title, e.description, e.event_date, e.location,
    e.created_at, e.updated_at,
    u.first_name, u.last_name, u.avatar, u.nickname,
    g.name as group_title
@@ -132,7 +132,7 @@ LIMIT ? OFFSET ?
 
 		err := rows.Scan(
 			&event.ID, &event.GroupID, &event.CreatorID, &event.Title, &event.Description,
-			&event.EventTime, &event.CreatedAt, &event.UpdatedAt,
+			&event.EventTime, &event.Location, &event.CreatedAt, &event.UpdatedAt,
 			&creator.FirstName, &creator.LastName, &avatar, &nickname,
 			&group.Title,
 		)
@@ -185,12 +185,12 @@ func (s *EventService) UpdateEvent(eventID, userID uint, updateReq *models.Updat
 	}
 
 	query := `
-		UPDATE events SET title = ?, description = ?, event_date = ?, updated_at = ?
+		UPDATE events SET title = ?, description = ?, event_date = ?, location = ?, updated_at = ?
 		WHERE id = ? AND creator_id = ?
 	`
 
 	now := time.Now()
-	_, err = s.db.Exec(query, updateReq.Title, updateReq.Description, updateReq.EventTime,
+	_, err = s.db.Exec(query, updateReq.Title, updateReq.Description, updateReq.EventTime, updateReq.Location,
 		now, eventID, userID)
 	return err
 }
@@ -304,7 +304,7 @@ func (s *EventService) GetEventResponses(eventID, currentUserID uint) ([]models.
 func (s *EventService) GetUserEvents(userID uint, limit, offset int) ([]models.EventResponse, error) {
 	// Get events from groups the user is a member of
 	query := `
-SELECT DISTINCT e.id, e.group_id, e.creator_id, e.title, e.description, e.event_date,
+SELECT DISTINCT e.id, e.group_id, e.creator_id, e.title, e.description, e.event_date, e.location,
    e.created_at, e.updated_at,
    u.first_name, u.last_name, u.avatar, u.nickname,
    g.name as group_title
@@ -333,7 +333,7 @@ LIMIT ? OFFSET ?
 
 		err := rows.Scan(
 			&event.ID, &event.GroupID, &event.CreatorID, &event.Title, &event.Description,
-			&event.EventTime, &event.CreatedAt, &event.UpdatedAt,
+			&event.EventTime, &event.Location, &event.CreatedAt, &event.UpdatedAt,
 			&creator.FirstName, &creator.LastName, &avatar, &nickname,
 			&group.Title,
 		)

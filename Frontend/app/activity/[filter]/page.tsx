@@ -1,51 +1,40 @@
 'use client'
-import { useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect } from 'react'
+import { useRouter, useParams } from 'next/navigation'
 import ProtectedRoute from '@/components/ProtectedRoute'
+import { useAuth } from '@/context/AuthContext'
+import { useWebSocket } from '@/context/WebSocketContext'
+import { useToast } from '@/context/ToastContext'
+import { useRealTimePosts, useNotifications } from '@/hooks'
+import {
+  api,
+  ApiClient,
+  Post,
+  getToken,
+  CreatePostRequest,
+  NetworkError,
+  ValidationError,
+  AuthenticationError
+} from '@/lib/api'
 
-function FeedPage() {
+// Import dashboard components
+import TopBar from '@/components/dashboard/TopBar'
+import Sidebar from '@/components/dashboard/Sidebar'
+import RightSidebar from '@/components/dashboard/RightSidebar'
+import ActivitySection from '@/components/dashboard/ActivitySection'
+
+function ActivityFilterPage() {
   const router = useRouter()
-
-  useEffect(() => {
-    router.replace('/feed/all')
-  }, [router])
-
-  return null
-}
-
-// Wrap the entire component with ProtectedRoute
-function ProtectedFeedPage() {
-  return (
-    <ProtectedRoute>
-      <FeedPage />
-    </ProtectedRoute>
-  )
-}
-
-export default ProtectedFeedPage
-
-function FeedPage() {
-  const router = useRouter()
-  const searchParams = useSearchParams()
+  const params = useParams()
+  const filter = params.filter as string
   const { user } = useAuth()
   const { isConnected, onlineUsers, addMessageListener } = useWebSocket()
   const { success, error } = useToast()
   const { items: liveNotifications, unread: liveUnreadCount } = useNotifications()
 
-  // Get filter from URL params
-  const filterParam = searchParams.get('filter') || 'all'
-  const [feedSubTab, setFeedSubTab] = useState(filterParam)
+  const [activitySubTab, setActivitySubTab] = useState(filter || 'liked')
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
-  const [showCreatePost, setShowCreatePost] = useState(false)
-
-  // Post Creation State
-  const [newPostContent, setNewPostContent] = useState('')
-  const [newPostImage, setNewPostImage] = useState<File | null>(null)
-  const [postPrivacy, setPostPrivacy] = useState('public')
-  const [selectedUsers, setSelectedUsers] = useState<number[]>([])
-  const [availableUsers, setAvailableUsers] = useState<{ id: number; email: string; first_name: string; last_name: string; avatar?: string; nickname?: string; display_name?: string; }[]>([])
-  const [loadingUsers, setLoadingUsers] = useState(false)
 
   // Data State
   const [posts, setPosts] = useState<Post[]>([])
@@ -79,18 +68,18 @@ function FeedPage() {
 
   // Update URL when filter changes
   useEffect(() => {
-    const newUrl = feedSubTab === 'all' ? '/feed' : `/feed?filter=${feedSubTab}`
-    router.replace(newUrl)
-  }, [feedSubTab, router])
+    if (activitySubTab !== filter) {
+      router.replace(`/activity/${activitySubTab}`)
+    }
+  }, [activitySubTab, filter, router])
 
   // Fetch data when component loads
   useEffect(() => {
     if (user) {
-      fetchFeedPosts()
-      fetchUsers()
+      fetchActivityPosts()
       fetchFollowers()
     }
-  }, [user])
+  }, [user, activitySubTab])
 
   // WebSocket real-time notifications
   useEffect(() => {
@@ -100,7 +89,7 @@ function FeedPage() {
       switch (message.type) {
         case 'post_update':
           console.log('Post update received:', message.data)
-          fetchFeedPosts()
+          fetchActivityPosts()
           break
 
         case 'like':
@@ -127,12 +116,29 @@ function FeedPage() {
     return removeListener
   }, [isConnected, addMessageListener, user?.id])
 
-  const fetchFeedPosts = async () => {
+  const fetchActivityPosts = async () => {
     try {
       setIsLoadingPosts(true)
-      console.log('Fetching feed posts...')
-      const response = await api.getFeed(20, 0)
-      console.log('Feed API response:', response)
+      console.log('Fetching activity posts...')
+      let response: any
+
+      switch (activitySubTab) {
+        case 'liked':
+          // Fetch posts liked by the user
+          response = await api.getUserLikedPosts()
+          break
+        case 'commented':
+          // Fetch posts commented by the user
+          response = await api.getUserCommentedPosts()
+          break
+        case 'saved':
+          // Fetch saved/bookmarked posts
+          response = await api.getUserBookmarks()
+          break
+        default:
+          response = await api.getUserLikedPosts()
+      }
+
       const postsArr = Array.isArray(response.data) ? response.data : [];
       
       if (!postsArr.length) {
@@ -176,18 +182,6 @@ function FeedPage() {
     }
   }
 
-  const fetchUsers = async () => {
-    try {
-      setLoadingUsers(true)
-      const data = await api.getUsers()
-      setAvailableUsers(data.users || [])
-    } catch (err) {
-      console.error('Error fetching users:', err)
-    } finally {
-      setLoadingUsers(false)
-    }
-  }
-
   const fetchFollowers = async () => {
     if (!user) return
 
@@ -215,69 +209,6 @@ function FeedPage() {
     if (diffInSeconds < 604800) return `${Math.floor(diffInSeconds / 86400)}d ago`
 
     return date.toLocaleDateString()
-  }
-
-  const handleCreatePost = async () => {
-    const validation = ApiClient.validatePostContent(newPostContent)
-    if (!validation.isValid) {
-      error(validation.error || 'Invalid post content')
-      return
-    }
-
-    try {
-      let imageUrl = '';
-
-      if (newPostImage) {
-        const formData = new FormData();
-        formData.append('image', newPostImage);
-        const token = getToken();
-
-        const uploadResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/api/uploads`, {
-          method: 'POST',
-          body: formData,
-          headers: {
-            ...(token && { Authorization: `Bearer ${token}` }),
-          },
-          credentials: 'include'
-        })
-
-        if (uploadResponse.ok) {
-          const uploadData = await uploadResponse.json();
-          imageUrl = `/api/images/${uploadData.filename}`;
-        } else {
-          const errorData = await uploadResponse.json();
-          throw new Error(errorData.error || 'Failed to upload image');
-        }
-      }
-
-      const postData: CreatePostRequest = {
-        content: newPostContent,
-        privacy: postPrivacy === 'followers' ? 'almost_private' : postPrivacy,
-        image_url: imageUrl
-      }
-
-      if (postPrivacy === 'private' && selectedUsers.length > 0) {
-        postData.specific_user_ids = selectedUsers
-      }
-
-      await api.createPost(postData)
-      setNewPostContent('')
-      setNewPostImage(null)
-      setPostPrivacy('public')
-      setSelectedUsers([])
-      setShowCreatePost(false)
-      success('Post created successfully!')
-      fetchFeedPosts()
-    } catch (err) {
-      console.error('Error creating post:', err)
-      if (err instanceof ValidationError) {
-        error(err.message)
-      } else if (err instanceof NetworkError) {
-        error('Failed to create post. Please try again.')
-      } else {
-        error('Unable to create post right now.')
-      }
-    }
   }
 
   const handleLikePost = async (postId: number) => {
@@ -339,7 +270,7 @@ function FeedPage() {
   }
 
   const handleNotificationsToggle = () => {
-    router.push('/notifications')
+    router.push('/notifications/all')
   }
 
   const handleSearchToggle = () => {
@@ -362,12 +293,12 @@ function FeedPage() {
       <Sidebar
         isMobileMenuOpen={isMobileMenuOpen}
         setIsMobileMenuOpen={setIsMobileMenuOpen}
-        activeTab="feed"
+        activeTab="activity"
         setActiveTab={handleTabChange}
-        feedSubTab={feedSubTab}
-        setFeedSubTab={setFeedSubTab}
-        activitySubTab="liked"
-        setActivitySubTab={() => {}}
+        feedSubTab="all"
+        setFeedSubTab={() => {}}
+        activitySubTab={activitySubTab}
+        setActivitySubTab={setActivitySubTab}
         chatSubTab="all"
         setChatSubTab={() => {}}
         chatUnreadAll={0}
@@ -383,28 +314,12 @@ function FeedPage() {
       <TopBar
         isMobileMenuOpen={isMobileMenuOpen}
         setIsMobileMenuOpen={setIsMobileMenuOpen}
-        activeTab="feed"
+        activeTab="activity"
         setActiveTab={handleTabChange}
         onNotificationsClick={handleNotificationsToggle}
         unreadCount={liveUnreadCount || 0}
         onSearchClick={handleSearchToggle}
         onDiscoverClick={handleDiscoverToggle}
-      />
-
-      <CreatePost
-        show={showCreatePost}
-        onClose={() => setShowCreatePost(false)}
-        newPostContent={newPostContent}
-        setNewPostContent={setNewPostContent}
-        newPostImage={newPostImage}
-        setNewPostImage={setNewPostImage}
-        postPrivacy={postPrivacy}
-        setPostPrivacy={setPostPrivacy}
-        selectedUsers={selectedUsers}
-        setSelectedUsers={setSelectedUsers}
-        availableUsers={availableUsers}
-        loadingUsers={loadingUsers}
-        onCreatePost={handleCreatePost}
       />
 
       {/* Main Content */}
@@ -413,26 +328,12 @@ function FeedPage() {
           <div className="flex flex-col lg:flex-row gap-6 h-full">
             {/* Main Content Area */}
             <div className="flex-1 min-w-0 h-full">
-              <HomeFeed
+              <ActivitySection
                 posts={posts}
                 onPostLike={handleLikePost}
                 onPostBookmark={handleBookmarkPost}
-                setActiveTab={handleTabChange}
-                showCreatePost={showCreatePost}
-                setShowCreatePost={setShowCreatePost}
-                newPostContent={newPostContent}
-                setNewPostContent={setNewPostContent}
-                newPostImage={newPostImage}
-                setNewPostImage={setNewPostImage}
-                postPrivacy={postPrivacy}
-                setPostPrivacy={setPostPrivacy}
-                selectedUsers={selectedUsers}
-                setSelectedUsers={setSelectedUsers}
-                availableUsers={availableUsers}
-                loadingUsers={loadingUsers}
-                onCreatePost={handleCreatePost}
-                feedSubTab={feedSubTab}
-                setFeedSubTab={setFeedSubTab}
+                activitySubTab={activitySubTab}
+                setActivitySubTab={setActivitySubTab}
               />
             </div>
           </div>
@@ -457,12 +358,12 @@ function FeedPage() {
 }
 
 // Wrap the entire component with ProtectedRoute
-function ProtectedFeedPage() {
+function ProtectedActivityFilterPage() {
   return (
     <ProtectedRoute>
-      <FeedPage />
+      <ActivityFilterPage />
     </ProtectedRoute>
   )
 }
 
-export default ProtectedFeedPage
+export default ProtectedActivityFilterPage

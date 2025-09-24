@@ -1,19 +1,30 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { ArrowLeft } from 'lucide-react'
 import ProtectedRoute from '@/components/ProtectedRoute'
 import ProfileSection from '@/components/dashboard/ProfileSection'
 import { useAuth } from '@/context/AuthContext'
 import { useToast } from '@/context/ToastContext'
+import { useWebSocket } from '@/context/WebSocketContext'
+import { useNotifications } from '@/hooks'
 import { api, User, Post } from '@/lib/api'
+
+// Import dashboard components
+import TopBar from '@/components/dashboard/TopBar'
+import Sidebar from '@/components/dashboard/Sidebar'
+import RightSidebar from '@/components/dashboard/RightSidebar'
 
 export default function ProfilePage() {
   const params = useParams()
   const router = useRouter()
   const { user: currentUser } = useAuth()
   const { error } = useToast()
-  
+  const { isConnected, onlineUsers } = useWebSocket()
+  const { items: liveNotifications, unread: liveUnreadCount } = useNotifications()
+
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
+
   const [profileUser, setProfileUser] = useState<User | null>(null)
   const [userPosts, setUserPosts] = useState<Post[]>([])
   const [followers, setFollowers] = useState<any[]>([])
@@ -24,12 +35,36 @@ export default function ProfilePage() {
 
   const userId = params.id as string
 
+  // Current User Processing for sidebars
+  const currentUserData = currentUser ? {
+    id: currentUser.id,
+    name: `${currentUser.first_name} ${currentUser.last_name}`,
+    username: currentUser.nickname || currentUser.email.split('@')[0],
+    avatar: currentUser.avatar,
+    isPrivate: currentUser.is_private,
+    email: currentUser.email,
+    firstName: currentUser.first_name,
+    lastName: currentUser.last_name,
+    dateOfBirth: currentUser.date_of_birth,
+    nickname: currentUser.nickname,
+    aboutMe: currentUser.about_me,
+    memberSince: currentUser.created_at,
+    followers: 0,
+    following: 0
+  } : null
+
+  // Trending topics
+  const trendingTopics = [
+    '#SocialNetwork', '#TechNews', '#WebDev', '#AI', '#Startups',
+    '#React', '#TypeScript', '#NodeJS', '#Python', '#DevOps'
+  ]
+
   useEffect(() => {
     if (userId && currentUser) {
       const userIdNum = parseInt(userId)
       if (isNaN(userIdNum)) {
         error('Invalid user ID')
-        router.push('/dashboard')
+        router.push('/feed/all')
         return
       }
       setIsOwnProfile(userIdNum === currentUser.id)
@@ -41,12 +76,12 @@ export default function ProfilePage() {
     try {
       setIsLoading(true)
       console.log('Fetching profile for user:', userIdNum)
-      
+
       // First try to get basic profile info
       try {
         const profileData = await api.getProfile(userIdNum)
         setProfileUser(profileData)
-        
+
         // Try to get additional data - these may fail for private profiles
         const [postsResponse, followersResponse, followingResponse] = await Promise.allSettled([
           api.getUserPosts(userIdNum),
@@ -61,7 +96,7 @@ export default function ProfilePage() {
           console.warn('Failed to load user posts:', postsResponse.reason)
           setUserPosts([])
         }
-        
+
         // Handle followers response
         if (followersResponse.status === 'fulfilled') {
           setFollowers(followersResponse.value.followers || [])
@@ -69,7 +104,7 @@ export default function ProfilePage() {
           console.warn('Failed to load followers:', followersResponse.reason)
           setFollowers([])
         }
-        
+
         // Handle following response
         if (followingResponse.status === 'fulfilled') {
           setFollowing(followingResponse.value.following || [])
@@ -86,16 +121,16 @@ export default function ProfilePage() {
           setIsFollowing(isCurrentUserFollowing || false)
         }      } catch (profileError: any) {
         console.error('Profile fetch failed:', profileError)
-        
+
         // Check if it's a private profile error
         if (profileError?.status === 403) {
           console.log('Private profile detected, trying to get basic user info')
-          
+
           // Try to get basic user info from the users list
           try {
             const usersResponse = await api.getUsers()
             const targetUser = usersResponse.users.find((u: any) => u.id === userIdNum)
-            
+
             if (targetUser) {
               // Create a basic user object for private profile display
               const basicUser = {
@@ -104,7 +139,7 @@ export default function ProfilePage() {
               }
               setProfileUser(basicUser)
               console.log('Got basic user info for private profile:', basicUser)
-              
+
               // Don't try to fetch posts/followers/following for private profiles
               setUserPosts([])
               setFollowers([])
@@ -134,14 +169,36 @@ export default function ProfilePage() {
     }
   }
 
-  const handleBackClick = () => {
-    router.back()
+  const handleTabChange = (newTab: string) => {
+    router.push(`/${newTab}`)
+  }
+
+  const handleNotificationsToggle = () => {
+    router.push('/notifications')
+  }
+
+  const handleSearchToggle = () => {
+    router.push('/search')
+  }
+
+  const handleDiscoverToggle = () => {
+    router.push('/discover')
+  }
+
+  if (!currentUser) {
+    return (
+      <ProtectedRoute>
+        <div className="min-h-screen bg-gradient-to-br from-emerald-900 via-teal-900 to-cyan-800 flex items-center justify-center">
+          <div className="text-white text-xl">Loading...</div>
+        </div>
+      </ProtectedRoute>
+    )
   }
 
   if (isLoading) {
     return (
       <ProtectedRoute>
-        <div className="min-h-screen bg-gradient-to-br from-gray-900 via-blue-900 to-purple-900 flex items-center justify-center">
+        <div className="min-h-screen bg-gradient-to-br from-emerald-900 via-teal-900 to-cyan-800 flex items-center justify-center">
           <div className="text-white text-xl">Loading profile...</div>
         </div>
       </ProtectedRoute>
@@ -151,7 +208,7 @@ export default function ProfilePage() {
   if (!profileUser) {
     return (
       <ProtectedRoute>
-        <div className="min-h-screen bg-gradient-to-br from-gray-900 via-blue-900 to-purple-900 flex items-center justify-center">
+        <div className="min-h-screen bg-gradient-to-br from-emerald-900 via-teal-900 to-cyan-800 flex items-center justify-center">
           <div className="text-white text-xl">Profile not found</div>
         </div>
       </ProtectedRoute>
@@ -160,87 +217,94 @@ export default function ProfilePage() {
 
   return (
     <ProtectedRoute>
-      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-blue-900 to-purple-900">
-        <div className="container mx-auto px-4 py-8 max-w-6xl">
-          {/* Header with Back Button */}
-          <div className="flex items-center mb-6">
-            <button
-              onClick={handleBackClick}
-              className="flex items-center text-white hover:text-emerald-300 transition-colors mr-4"
-            >
-              <ArrowLeft className="w-5 h-5 mr-2" />
-              Back
-            </button>
-            <h1 className="text-2xl font-bold text-white">
-              {isOwnProfile ? 'My Profile' : `${profileUser.first_name} ${profileUser.last_name}'s Profile`}
-            </h1>
-          </div>
-
-          {/* Profile Content - Use ProfileSection but without edit buttons for other users */}
-          <UserProfileSection
-            profileUser={profileUser}
-            followers={followers}
-            following={following}
-            posts={userPosts}
-            isOwnProfile={isOwnProfile}
-            isLoadingFollowers={isLoading}
-            isFollowing={isFollowing}
-          />
+      <div className="min-h-screen relative overflow-hidden bg-gradient-to-br from-emerald-900 via-teal-900 to-cyan-800">
+        {/* Animated Background Elements */}
+        <div className="absolute inset-0">
+          <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-emerald-500/20 rounded-full blur-3xl animate-pulse"></div>
+          <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-teal-500/20 rounded-full blur-3xl animate-pulse delay-1000"></div>
+          <div className="absolute top-3/4 left-1/2 w-64 h-64 bg-cyan-500/20 rounded-full blur-3xl animate-pulse delay-2000"></div>
         </div>
+
+        <Sidebar
+          isMobileMenuOpen={isMobileMenuOpen}
+          setIsMobileMenuOpen={setIsMobileMenuOpen}
+          activeTab="profile"
+          setActiveTab={handleTabChange}
+          feedSubTab="all"
+          setFeedSubTab={() => {}}
+          activitySubTab="liked"
+          setActivitySubTab={() => {}}
+          chatSubTab="all"
+          setChatSubTab={() => {}}
+          chatUnreadAll={0}
+          chatUnreadDirect={0}
+          chatUnreadGroups={0}
+          fetchEvents={() => {}}
+          currentUser={currentUserData}
+          logout={() => router.push('/login')}
+          isCollapsed={isSidebarCollapsed}
+          setIsCollapsed={setIsSidebarCollapsed}
+        />
+
+        <TopBar
+          isMobileMenuOpen={isMobileMenuOpen}
+          setIsMobileMenuOpen={setIsMobileMenuOpen}
+          activeTab="profile"
+          setActiveTab={handleTabChange}
+          onNotificationsClick={handleNotificationsToggle}
+          unreadCount={liveUnreadCount || 0}
+          onSearchClick={handleSearchToggle}
+          onDiscoverClick={handleDiscoverToggle}
+        />
+
+        {/* Main Content */}
+        <div className={`main-content-layout p-2 lg:p-4 relative z-10 has-fixed-sidebar ${isSidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
+          <div className="max-w-7xl mx-auto h-full">
+            <div className="flex flex-col lg:flex-row gap-6 h-full">
+              {/* Main Content Area */}
+              <div className="flex-1 min-w-0 h-full">
+                <ProfileSection
+                  currentUser={profileUser ? {
+                    id: profileUser.id,
+                    name: `${profileUser.first_name} ${profileUser.last_name}`,
+                    username: profileUser.nickname || profileUser.email.split('@')[0],
+                    avatar: profileUser.avatar,
+                    isPrivate: profileUser.is_private,
+                    email: profileUser.email,
+                    firstName: profileUser.first_name,
+                    lastName: profileUser.last_name,
+                    dateOfBirth: profileUser.date_of_birth,
+                    nickname: profileUser.nickname,
+                    aboutMe: profileUser.about_me,
+                    memberSince: profileUser.created_at
+                  } : null}
+                  followers={followers}
+                  following={following}
+                  posts={userPosts}
+                  isLoadingFollowers={isLoading}
+                  isOwnProfile={isOwnProfile}
+                  showPrivacyOverlay={profileUser.is_private && !isOwnProfile}
+                  isFollowing={isFollowing}
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Fixed Right Sidebar */}
+        <RightSidebar
+          onlineUsers={onlineUsers}
+          followingUsers={following}
+          followersUsers={followers}
+          trendingTopics={trendingTopics}
+          onUserClick={(user) => {
+            router.push(`/profile/${user.id}`)
+          }}
+          currentUser={currentUserData}
+          setActiveTab={handleTabChange}
+          logout={() => router.push('/login')}
+        />
       </div>
     </ProtectedRoute>
-  )
-}
-
-// Custom ProfileSection for user profiles (excludes edit buttons for other users)
-interface UserProfileSectionProps {
-  profileUser: User
-  followers: any[]
-  following: any[]
-  posts: Post[]
-  isOwnProfile: boolean
-  isLoadingFollowers: boolean
-  isFollowing: boolean
-}
-
-function UserProfileSection({
-  profileUser,
-  followers,
-  following,
-  posts,
-  isOwnProfile,
-  isLoadingFollowers,
-  isFollowing
-}: UserProfileSectionProps) {
-  // Transform the User data to match ProfileSection expectations
-  const transformedUser = {
-    id: profileUser.id,
-    name: `${profileUser.first_name} ${profileUser.last_name}`,
-    username: profileUser.nickname || `user${profileUser.id}`,
-    avatar: profileUser.avatar,
-    isPrivate: profileUser.is_private,
-    email: profileUser.email,
-    firstName: profileUser.first_name,
-    lastName: profileUser.last_name,
-    dateOfBirth: profileUser.date_of_birth,
-    nickname: profileUser.nickname || '',
-    aboutMe: profileUser.about_me || '',
-    memberSince: profileUser.created_at
-  }
-
-  // Determine if we should show privacy overlay
-  const shouldShowPrivacyOverlay = profileUser.is_private && !isOwnProfile
-
-  return (
-    <ProfileSection
-      currentUser={transformedUser}
-      followers={followers}
-      following={following}
-      posts={posts}
-      isLoadingFollowers={isLoadingFollowers}
-      isOwnProfile={isOwnProfile}
-      showPrivacyOverlay={shouldShowPrivacyOverlay}
-      isFollowing={isFollowing} // Pass the actual follow status
-    />
   )
 }

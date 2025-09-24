@@ -60,6 +60,7 @@ func (h *EventHandler) CreateEvent(w http.ResponseWriter, r *http.Request, group
 		Title:       req.Title,
 		Description: req.Description,
 		EventTime:   req.EventTime,
+		Location:    req.Location,
 	}
 
 	if err := h.eventService.CreateEvent(event); err != nil {

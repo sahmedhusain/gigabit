@@ -1,37 +1,34 @@
-'use client'
-import { useState, useEffect } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
-import ProtectedRoute from '@/components/ProtectedRoute'
-import { useAuth } from '@/context/AuthContext'
-import { useWebSocket } from '@/context/WebSocketContext'
-import { useToast } from '@/context/ToastContext'
-import { useNotifications } from '@/hooks'
+'use client';
+
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import ProtectedRoute from '@/components/ProtectedRoute';
+import { useAuth } from '@/context/AuthContext';
+import { useWebSocket } from '@/context/WebSocketContext';
+import { useToast } from '@/context/ToastContext';
+import { useNotifications } from '@/hooks';
 import {
   api,
   NetworkError
-} from '@/lib/api'
+} from '@/lib/api';
 
 // Import dashboard components
-import TopBar from '@/components/dashboard/TopBar'
-import Sidebar from '@/components/dashboard/Sidebar'
-import RightSidebar from '@/components/dashboard/RightSidebar'
-import NotificationsPage from '@/components/dashboard/NotificationsPage'
+import TopBar from '@/components/dashboard/TopBar';
+import Sidebar from '@/components/dashboard/Sidebar';
+import RightSidebar from '@/components/dashboard/RightSidebar';
+import NotificationsPage from '@/components/dashboard/NotificationsPage';
 
-function NotificationsPageRoute() {
-  const router = useRouter()
-  const searchParams = useSearchParams()
-  const { user } = useAuth()
-  const { isConnected, onlineUsers } = useWebSocket()
-  const { success, error } = useToast()
-  const { items: liveNotifications, unread: liveUnreadCount } = useNotifications()
+function NotificationsPageComponent() {
+  const router = useRouter();
+  const { user } = useAuth();
+  const { isConnected, onlineUsers } = useWebSocket();
+  const { success, error } = useToast();
+  const { items: liveNotifications, unread: liveUnreadCount } = useNotifications();
 
-  // Get filter from URL params
-  const filter = searchParams.get('filter') || 'all'
-  
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
-  const [followers, setFollowers] = useState<{ id: number; email: string; first_name: string; last_name: string; avatar?: string; nickname?: string; }[]>([])
-  const [following, setFollowing] = useState<{ id: number; email: string; first_name: string; last_name: string; avatar?: string; nickname?: string; }[]>([])
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [followers, setFollowers] = useState<{ id: number; email: string; first_name: string; last_name: string; avatar?: string; nickname?: string; }[]>([]);
+  const [following, setFollowing] = useState<{ id: number; email: string; first_name: string; last_name: string; avatar?: string; nickname?: string; }[]>([]);
 
   // Current User Processing
   const currentUser = user ? {
@@ -49,64 +46,56 @@ function NotificationsPageRoute() {
     memberSince: user.created_at,
     followers: 0,
     following: 0
-  } : null
+  } : null;
 
   // Trending topics
   const trendingTopics = [
     '#SocialNetwork', '#TechNews', '#WebDev', '#AI', '#Startups',
     '#React', '#TypeScript', '#NodeJS', '#Python', '#DevOps'
-  ]
-
-  // Update URL when filter changes
-  useEffect(() => {
-    if (filter && filter !== 'all') {
-      const newUrl = `/notifications?filter=${filter}`
-      router.replace(newUrl)
-    }
-  }, [filter, router])
+  ];
 
   // Fetch data when component loads
   useEffect(() => {
     if (user) {
-      fetchFollowers()
+      fetchFollowers();
     }
-  }, [user])
+  }, [user]);
 
   const fetchFollowers = async () => {
-    if (!user) return
+    if (!user) return;
 
     try {
       const [followersData, followingData] = await Promise.all([
         api.getFollowers(user.id),
         api.getFollowing(user.id)
-      ])
+      ]);
 
-      setFollowers(Array.isArray(followersData?.followers) ? followersData.followers : [])
-      setFollowing(Array.isArray(followingData?.following) ? followingData.following : [])
+      setFollowers(Array.isArray(followersData?.followers) ? followersData.followers : []);
+      setFollowing(Array.isArray(followingData?.following) ? followingData.following : []);
     } catch (err) {
-      console.error('Error fetching followers:', err)
+      console.error('Error fetching followers:', err);
     }
-  }
+  };
 
   const handleTabChange = (newTab: string) => {
-    router.push(`/${newTab}`)
-  }
+    router.push(`/${newTab}`);
+  };
 
   const handleNotificationsToggle = () => {
-    router.push('/notifications')
-  }
+    router.push('/notifications');
+  };
 
   const handleSearchToggle = () => {
-    router.push('/search')
-  }
+    router.push('/search');
+  };
 
   const handleDiscoverToggle = () => {
-    router.push('/discover')
-  }
+    router.push('/discover');
+  };
 
   const handleClose = () => {
-    router.back()
-  }
+    router.back();
+  };
 
   return (
     <div className="min-h-screen relative overflow-hidden bg-gradient-to-br from-emerald-900 via-teal-900 to-cyan-800">
@@ -128,6 +117,8 @@ function NotificationsPageRoute() {
         setActivitySubTab={() => {}}
         chatSubTab="all"
         setChatSubTab={() => {}}
+        eventsSubTab="all"
+        setEventsSubTab={() => {}}
         chatUnreadAll={0}
         chatUnreadDirect={0}
         chatUnreadGroups={0}
@@ -168,23 +159,23 @@ function NotificationsPageRoute() {
         followersUsers={followers}
         trendingTopics={trendingTopics}
         onUserClick={(user) => {
-          router.push(`/profile/${user.id}`)
+          router.push(`/profile/${user.id}`);
         }}
         currentUser={currentUser}
         setActiveTab={handleTabChange}
         logout={() => router.push('/login')}
       />
     </div>
-  )
+  );
 }
 
 // Wrap the entire component with ProtectedRoute
 function ProtectedNotificationsPage() {
   return (
     <ProtectedRoute>
-      <NotificationsPageRoute />
+      <NotificationsPageComponent />
     </ProtectedRoute>
-  )
+  );
 }
 
-export default ProtectedNotificationsPage
+export default ProtectedNotificationsPage;

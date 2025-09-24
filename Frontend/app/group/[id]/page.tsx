@@ -165,7 +165,7 @@ function GroupDetailsPage() {
       })
 
       success('Successfully left the group')
-      router.push('/dashboard')
+      router.push('/feed/all')
     } catch (err) {
       console.error('Error leaving group:', err)
       error('Failed to leave group')
@@ -225,9 +225,9 @@ function GroupDetailsPage() {
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
               <button
-                onClick={() => router.push('/dashboard')}
+                onClick={() => router.push('/feed/all')}
                 className="p-2 text-white/70 hover:text-white hover:bg-white/10 rounded-xl transition-all duration-200"
-                title="Back to Dashboard"
+                title="Back to Feed"
               >
                 <ArrowLeft className="w-5 h-5" />
               </button>

@@ -1,7 +1,7 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { ArrowLeft, User, Heart, MessageSquare, MoreHorizontal, Send, Image as ImageIcon, Bookmark } from 'lucide-react'
+import { User, Heart, MessageSquare, MoreHorizontal, Send, Image as ImageIcon, Bookmark, Check } from 'lucide-react'
 import ProtectedRoute from '@/components/ProtectedRoute'
 import { useAuth } from '@/context/AuthContext'
 import { useWebSocket } from '@/context/WebSocketContext'
@@ -10,26 +10,36 @@ import { useConnectionStatus, useOptimisticUpdate, useOnlineStatus } from '@/hoo
 import { api, APIPost, Comment as CommentType, NetworkError, ValidationError } from '@/lib/api'
 import { getAvatarUrl } from '@/utils/avatarUtils'
 
+// Import layout components
+import TopBar from '@/components/dashboard/TopBar'
+import Sidebar from '@/components/dashboard/Sidebar'
+import RightSidebar from '@/components/dashboard/RightSidebar'
+
 interface CommentWithUser extends CommentType {
     timeAgo: string
 }
 
 function PostDetailPage() {
-    const { id } = useParams()
-    const router = useRouter()
-    const { user } = useAuth()
-    const { sendMessage, addMessageListener, isConnected } = useWebSocket()
-    const { success, error } = useToast()
-    const { isConnected: connectionStatus } = useConnectionStatus()
-    const { onlineUsers } = useOnlineStatus()
+  const { id } = useParams()
+  const router = useRouter()
+  const { user } = useAuth()
+  const { sendMessage, addMessageListener, isConnected } = useWebSocket()
+  const { success, error } = useToast()
+  const { isConnected: connectionStatus } = useConnectionStatus()
+  const { onlineUsers } = useOnlineStatus()
 
-    // State
-    const [post, setPost] = useState<APIPost | null>(null)
-    const [comments, setComments] = useState<CommentWithUser[]>([])
-    const [isLoadingPost, setIsLoadingPost] = useState(true)
-    const [isLoadingComments, setIsLoadingComments] = useState(false)
-    const [newComment, setNewComment] = useState('')
-    const [isSubmittingComment, setIsSubmittingComment] = useState(false)
+  // Layout state
+  const [activeTab, setActiveTab] = useState('feed')
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
+
+  // State
+  const [post, setPost] = useState<APIPost | null>(null)
+  const [comments, setComments] = useState<CommentWithUser[]>([])
+  const [isLoadingPost, setIsLoadingPost] = useState(true)
+  const [isLoadingComments, setIsLoadingComments] = useState(false)
+  const [newComment, setNewComment] = useState('')
+  const [isSubmittingComment, setIsSubmittingComment] = useState(false)
 
     // Real-time optimistic updates for likes
     const { performUpdate: performOptimisticUpdate, isLoading: likePending } = useOptimisticUpdate(
@@ -39,10 +49,32 @@ function PostDetailPage() {
         }
     )
 
-    // Check if post author is online
-    const isAuthorOnline = post ? onlineUsers.some(u => u.user_id === post.user.id && u.is_online) : false
+  // Current User Processing
+  const currentUser = user ? {
+    id: user.id,
+    name: `${user.first_name} ${user.last_name}`,
+    username: user.nickname || user.email.split('@')[0],
+    avatar: user.avatar,
+    isPrivate: user.is_private,
+    email: user.email,
+    firstName: user.first_name,
+    lastName: user.last_name,
+    dateOfBirth: user.date_of_birth,
+    nickname: user.nickname,
+    aboutMe: user.about_me,
+    memberSince: user.created_at,
+    followers: 0,
+    following: 0
+  } : null
 
-    // Format time ago
+  // Dummy data for layout components
+  const trendingTopics = [
+    '#SocialNetwork', '#TechNews', '#WebDev', '#AI', '#Startups',
+    '#React', '#TypeScript', '#NodeJS', '#Python', '#DevOps'
+  ]
+
+  const followers: { id: number; email: string; first_name: string; last_name: string; avatar?: string; nickname?: string; }[] = []
+  const following: { id: number; email: string; first_name: string; last_name: string; avatar?: string; nickname?: string; }[] = []    // Format time ago
     const formatTimeAgo = (dateString: string) => {
         const date = new Date(dateString)
         const now = new Date()
@@ -79,7 +111,7 @@ function PostDetailPage() {
                 error('Failed to load post. Please try again.')
             } else {
                 error('Post not found.')
-                router.push('/dashboard')
+                router.push('/feed/all')
             }
         } finally {
             setIsLoadingPost(false)
@@ -252,298 +284,471 @@ function PostDetailPage() {
         fetchPost()
     }, [id])
 
-    if (isLoadingPost) {
-        return (
-            <div className="min-h-screen bg-gradient-to-br from-emerald-900 via-teal-900 to-cyan-800 flex items-center justify-center">
-                <div className="text-center">
+  if (isLoadingPost) {
+    return (
+      <div className="min-h-screen relative overflow-hidden bg-gradient-to-br from-emerald-900 via-teal-900 to-cyan-800">
+        {/* Animated Background Elements */}
+        <div className="absolute inset-0">
+          <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-emerald-500/20 rounded-full blur-3xl animate-pulse"></div>
+          <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-teal-500/20 rounded-full blur-3xl animate-pulse delay-1000"></div>
+          <div className="absolute top-3/4 left-1/2 w-64 h-64 bg-cyan-500/20 rounded-full blur-3xl animate-pulse delay-2000"></div>
+        </div>
+
+        <Sidebar
+          isMobileMenuOpen={isMobileMenuOpen}
+          setIsMobileMenuOpen={setIsMobileMenuOpen}
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
+          feedSubTab="all"
+          setFeedSubTab={() => {}}
+          activitySubTab="liked"
+          setActivitySubTab={() => {}}
+          chatSubTab="all"
+          setChatSubTab={() => {}}
+          eventsSubTab="all"
+          setEventsSubTab={() => {}}
+          chatUnreadAll={0}
+          chatUnreadDirect={0}
+          chatUnreadGroups={0}
+          fetchEvents={() => {}}
+          currentUser={currentUser}
+          logout={() => {}}
+          isCollapsed={isSidebarCollapsed}
+          setIsCollapsed={setIsSidebarCollapsed}
+        />
+
+        <TopBar
+          isMobileMenuOpen={isMobileMenuOpen}
+          setIsMobileMenuOpen={setIsMobileMenuOpen}
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
+          onNotificationsClick={() => {}}
+          unreadCount={0}
+          onSearchClick={() => {}}
+          onDiscoverClick={() => {}}
+        />
+
+        {/* Main Content */}
+        <div className={`main-content-layout p-2 lg:p-4 relative z-10 has-fixed-sidebar ${isSidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
+          <div className="max-w-7xl mx-auto h-full">
+            <div className="flex flex-col lg:flex-row gap-6 h-full">
+              {/* Main Content Area */}
+              <div className="flex-1 min-w-0 h-full">
+                <div className="min-h-screen bg-gradient-to-br from-emerald-900 via-teal-900 to-cyan-800 flex items-center justify-center">
+                  <div className="text-center">
                     <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-400 mx-auto"></div>
                     <p className="mt-4 text-white">Loading post...</p>
+                  </div>
                 </div>
+              </div>
             </div>
-        )
-    }
+          </div>
+        </div>
 
-    if (!post) {
-        return (
-            <div className="min-h-screen bg-gradient-to-br from-emerald-900 via-teal-900 to-cyan-800 flex items-center justify-center">
-                <div className="text-center">
+        {/* Fixed Right Sidebar */}
+        <RightSidebar
+          onlineUsers={onlineUsers}
+          followingUsers={following}
+          followersUsers={followers}
+          trendingTopics={trendingTopics}
+          onUserClick={(user) => {}}
+          currentUser={currentUser}
+          setActiveTab={setActiveTab}
+          logout={() => {}}
+        />
+      </div>
+    )
+  }
+
+  if (!post) {
+    return (
+      <div className="min-h-screen relative overflow-hidden bg-gradient-to-br from-emerald-900 via-teal-900 to-cyan-800">
+        {/* Animated Background Elements */}
+        <div className="absolute inset-0">
+          <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-emerald-500/20 rounded-full blur-3xl animate-pulse"></div>
+          <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-teal-500/20 rounded-full blur-3xl animate-pulse delay-1000"></div>
+          <div className="absolute top-3/4 left-1/2 w-64 h-64 bg-cyan-500/20 rounded-full blur-3xl animate-pulse delay-2000"></div>
+        </div>
+
+        <Sidebar
+          isMobileMenuOpen={isMobileMenuOpen}
+          setIsMobileMenuOpen={setIsMobileMenuOpen}
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
+          feedSubTab="all"
+          setFeedSubTab={() => {}}
+          activitySubTab="liked"
+          setActivitySubTab={() => {}}
+          chatSubTab="all"
+          setChatSubTab={() => {}}
+          eventsSubTab="all"
+          setEventsSubTab={() => {}}
+          chatUnreadAll={0}
+          chatUnreadDirect={0}
+          chatUnreadGroups={0}
+          fetchEvents={() => {}}
+          currentUser={currentUser}
+          logout={() => {}}
+          isCollapsed={isSidebarCollapsed}
+          setIsCollapsed={setIsSidebarCollapsed}
+        />
+
+        <TopBar
+          isMobileMenuOpen={isMobileMenuOpen}
+          setIsMobileMenuOpen={setIsMobileMenuOpen}
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
+          onNotificationsClick={() => {}}
+          unreadCount={0}
+          onSearchClick={() => {}}
+          onDiscoverClick={() => {}}
+        />
+
+        {/* Main Content */}
+        <div className={`main-content-layout p-2 lg:p-4 relative z-10 has-fixed-sidebar ${isSidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
+          <div className="max-w-7xl mx-auto h-full">
+            <div className="flex flex-col lg:flex-row gap-6 h-full">
+              {/* Main Content Area */}
+              <div className="flex-1 min-w-0 h-full">
+                <div className="min-h-screen bg-gradient-to-br from-emerald-900 via-teal-900 to-cyan-800 flex items-center justify-center">
+                  <div className="text-center">
                     <h1 className="text-2xl font-bold text-white mb-4">Post Not Found</h1>
                     <button
-                        onClick={() => router.push('/dashboard')}
-                        className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg transition-colors"
+                      onClick={() => router.push('/feed/all')}
+                      className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg transition-colors"
                     >
-                        Back to Dashboard
+                      Back to Dashboard
                     </button>
+                  </div>
                 </div>
+              </div>
             </div>
-        )
-    }
+          </div>
+        </div>
 
-    return (
-        <div className="min-h-screen bg-gradient-to-br from-emerald-900 via-teal-900 to-cyan-800">
-            <div className="container mx-auto px-4 py-6 max-w-4xl">
-                {/* Header */}
-                <div className="flex items-center justify-between mb-6">
-                    <div className="flex items-center">
-                        <button
-                        title="Back"
-                            onClick={() => router.back()}
-                            className="p-2 text-white/70 hover:text-white hover:bg-white/10 rounded-lg transition-all duration-200 mr-4"
-                        >
-                            <ArrowLeft className="w-5 h-5" />
-                        </button>
-                        <h1 className="text-xl font-semibold text-white">Post Details</h1>
-                    </div>
-                    
-                    {/* Connection Status */}
-                    <div className="flex items-center space-x-2">
-                        <div className={`flex items-center space-x-1 text-xs ${connectionStatus ? 'text-green-400' : 'text-red-400'}`}>
-                            <div className={`w-2 h-2 rounded-full ${connectionStatus ? 'bg-green-400' : 'bg-red-400'}`}></div>
-                            <span>{connectionStatus ? 'Connected' : 'Offline'}</span>
-                        </div>
-                    </div>
-                </div>
+        {/* Fixed Right Sidebar */}
+        <RightSidebar
+          onlineUsers={onlineUsers}
+          followingUsers={following}
+          followersUsers={followers}
+          trendingTopics={trendingTopics}
+          onUserClick={(user) => {}}
+          currentUser={currentUser}
+          setActiveTab={setActiveTab}
+          logout={() => {}}
+        />
+      </div>
+    )
+  }
 
-                {/* Post Card */}
-                <div className="bg-gradient-to-r from-white/10 to-white/5 backdrop-blur-xl rounded-2xl border border-white/20 p-6 mb-6">
-                    {/* Post Header */}
-                    <div className="flex items-center justify-between mb-4">
-                        <div className="flex items-center space-x-3 flex-1">
-                            <div className="w-10 h-10 bg-gradient-to-r from-emerald-500 to-teal-600 rounded-full flex items-center justify-center overflow-hidden">
-                                {getAvatarUrl(post.user.avatar) ? (
-                                    <>
-                                        <img 
-                                            src={getAvatarUrl(post.user.avatar)!}
-                                            alt={`${post.user.first_name} ${post.user.last_name}'s avatar`}
-                                            className="w-full h-full object-cover"
-                                            onError={(e) => {
-                                                // Fallback to default User icon on error
-                                                const target = e.target as HTMLImageElement;
-                                                target.style.display = 'none';
-                                                target.nextElementSibling?.classList.remove('hidden');
-                                            }}
-                                        />
-                                        <User className="w-5 h-5 text-white hidden" />
-                                    </>
-                                ) : (
-                                    <User className="w-5 h-5 text-white" />
-                                )}
-                            </div>
-                            <div className="flex-1">
-                                <div className="flex items-center space-x-2 mb-1">
-                                    <h3 className="text-white font-medium">
-                                        {post.user.first_name} {post.user.last_name}
-                                    </h3>
-                                </div>
-                                <p className="text-white/60 text-sm">
-                                    @{post.user.nickname || post.user.email.split('@')[0]} • {formatTimeAgo(post.created_at)}
-                                </p>
-                            </div>
-                        </div>
-                        <button 
-                            className="p-2 text-white/70 hover:text-white hover:bg-white/10 rounded-xl transition-all duration-200"
-                            title="More options"
-                            aria-label="More options"
-                        >
-                            <MoreHorizontal className="w-5 h-5" />
-                        </button>
-                    </div>
+  return (
+    <div className="min-h-screen relative overflow-hidden bg-gradient-to-br from-emerald-900 via-teal-900 to-cyan-800">
+      {/* Animated Background Elements */}
+      <div className="absolute inset-0">
+        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-emerald-500/20 rounded-full blur-3xl animate-pulse"></div>
+        <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-teal-500/20 rounded-full blur-3xl animate-pulse delay-1000"></div>
+        <div className="absolute top-3/4 left-1/2 w-64 h-64 bg-cyan-500/20 rounded-full blur-3xl animate-pulse delay-2000"></div>
+      </div>
 
-                    {/* Post Content */}
-                    <p className="text-white mb-4 text-base leading-relaxed whitespace-pre-wrap">
-                        {post.content}
-                    </p>
+      <Sidebar
+        isMobileMenuOpen={isMobileMenuOpen}
+        setIsMobileMenuOpen={setIsMobileMenuOpen}
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+        feedSubTab="all"
+        setFeedSubTab={() => {}}
+        activitySubTab="liked"
+        setActivitySubTab={() => {}}
+        chatSubTab="all"
+        setChatSubTab={() => {}}
+        eventsSubTab="all"
+        setEventsSubTab={() => {}}
+        chatUnreadAll={0}
+        chatUnreadDirect={0}
+        chatUnreadGroups={0}
+        fetchEvents={() => {}}
+        currentUser={currentUser}
+        logout={() => {}}
+        isCollapsed={isSidebarCollapsed}
+        setIsCollapsed={setIsSidebarCollapsed}
+      />
 
-                    {/* Post Image */}
-                    {post.image_url && (
-                        <div className="mb-4 rounded-xl overflow-hidden bg-white/5">
-                            <img 
-                                src={post.image_url.startsWith('http') ? 
-                                    post.image_url : 
-                                    `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}${post.image_url}`
-                                } 
-                                alt="Post image" 
-                                className="w-full h-auto object-cover"
+      <TopBar
+        isMobileMenuOpen={isMobileMenuOpen}
+        setIsMobileMenuOpen={setIsMobileMenuOpen}
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+        onNotificationsClick={() => {}}
+        unreadCount={0}
+        onSearchClick={() => {}}
+        onDiscoverClick={() => {}}
+      />
+
+      {/* Main Content */}
+      <div className={`main-content-layout p-2 lg:p-4 relative z-10 has-fixed-sidebar ${isSidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
+        <div className="max-w-7xl mx-auto h-full">
+          <div className="flex flex-col lg:flex-row gap-6 h-full">
+            {/* Main Content Area */}
+            <div className="flex-1 min-w-0 h-full">
+              {/* Post Card */}
+              <div className="bg-gradient-to-br from-white/10 via-white/5 to-transparent backdrop-blur-xl rounded-3xl border border-white/20 shadow-2xl p-8 mb-8 hover:shadow-emerald-500/10 transition-all duration-300 group">
+                  {/* Post Header */}
+                  <div className="flex items-center justify-between mb-6">
+                    <div className="flex items-center space-x-4 flex-1">
+                      <div className="relative">
+                        <div className="w-12 h-12 bg-gradient-to-br from-emerald-400 via-teal-500 to-cyan-600 rounded-full flex items-center justify-center overflow-hidden ring-2 ring-white/20 group-hover:ring-emerald-400/50 transition-all duration-300">
+                          {getAvatarUrl(post.user.avatar) ? (
+                            <>
+                              <img
+                                src={getAvatarUrl(post.user.avatar)!}
+                                alt={`${post.user.first_name} ${post.user.last_name}'s avatar`}
+                                className="w-full h-full object-cover"
                                 onError={(e) => {
-                                    // Fallback to placeholder on error
-                                    const target = e.target as HTMLImageElement;
-                                    target.style.display = 'none';
-                                    target.nextElementSibling?.classList.remove('hidden');
+                                  // Fallback to default User icon on error
+                                  const target = e.target as HTMLImageElement;
+                                  target.style.display = 'none';
+                                  target.nextElementSibling?.classList.remove('hidden');
                                 }}
-                            />
-                            <div className="aspect-video bg-gradient-to-br from-emerald-500/20 to-teal-500/20 flex items-center justify-center">
-                                <ImageIcon className="w-12 h-12 text-white/50" />
-                                <span className="ml-2 text-white/70">Image failed to load</span>
-                            </div>
+                              />
+                              <User className="w-6 h-6 text-white hidden" />
+                            </>
+                          ) : (
+                            <User className="w-6 h-6 text-white" />
+                          )}
                         </div>
-                    )}
-
-                    {/* Post Actions */}
-                    <div className="flex items-center justify-between pt-4 border-t border-white/10">
-                        <button
-                            onClick={handleLikePost}
-                            disabled={likePending || !connectionStatus}
-                            className={`flex items-center space-x-2 px-4 py-2 rounded-xl transition-all duration-200 ${
-                                post.is_liked
-                                    ? 'text-red-400 bg-red-500/10'
-                                    : 'text-white/70 hover:text-white hover:bg-white/10'
-                            } ${likePending || !connectionStatus ? 'opacity-50 cursor-not-allowed' : ''}`}
-                        >
-                            <Heart className={`w-4 h-4 ${post.is_liked ? 'fill-current' : ''} ${likePending ? 'animate-pulse' : ''}`} />
-                            <span>{post.like_count}</span>
-                            {!connectionStatus && (
-                                <span className="text-xs text-orange-400 ml-1">(Offline)</span>
-                            )}
-                        </button>
-
-                        <button
-                            onClick={handleBookmarkPost}
-                            disabled={!connectionStatus}
-                            className={`flex items-center space-x-2 px-4 py-2 rounded-xl transition-all duration-200 ${
-                                post.is_bookmarked
-                                    ? 'text-yellow-400 bg-yellow-500/10'
-                                    : 'text-white/70 hover:text-white hover:bg-white/10'
-                            } ${!connectionStatus ? 'opacity-50 cursor-not-allowed' : ''}`}
-                        >
-                            <Bookmark className={`w-4 h-4 ${post.is_bookmarked ? 'fill-current' : ''}`} />
-                            <span>{post.is_bookmarked ? 'Bookmarked' : 'Bookmark'}</span>
-                            {!connectionStatus && (
-                                <span className="text-xs text-orange-400 ml-1">(Offline)</span>
-                            )}
-                        </button>
-
-                        <button className="flex items-center space-x-2 px-4 py-2 text-white/70 hover:text-white hover:bg-white/10 rounded-xl transition-all duration-200">
-                            <MessageSquare className="w-4 h-4" />
-                            <span>{comments.length}</span>
-                        </button>
-
-                        <button className="flex items-center space-x-2 px-4 py-2 text-white/70 hover:text-white hover:bg-white/10 rounded-xl transition-all duration-200">
-                            <Send className="w-4 h-4" />
-                            <span>Share</span>
-                        </button>
+                        {/* Online Status Indicator */}
+                        <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-green-400 border-2 border-gray-900 rounded-full"></div>
+                      </div>
+                      <div className="flex-1">
+                        <div className="flex items-center space-x-2 mb-1">
+                          <h3 className="text-white font-semibold text-lg hover:text-emerald-300 transition-colors duration-200">
+                            {post.user.first_name} {post.user.last_name}
+                          </h3>
+                        </div>
+                        <p className="text-white/70 text-sm">
+                          @{post.user.nickname || post.user.email.split('@')[0]} • {formatTimeAgo(post.created_at)}
+                        </p>
+                      </div>
                     </div>
+                    <button
+                      className="p-3 text-white/70 hover:text-white hover:bg-white/10 rounded-xl transition-all duration-200 hover:scale-105"
+                      title="More options"
+                      aria-label="More options"
+                    >
+                      <MoreHorizontal className="w-5 h-5" />
+                    </button>
+                  </div>
+
+                  {/* Post Content */}
+                  <div className="mb-6">
+                    <p className="text-white text-lg leading-relaxed whitespace-pre-wrap">
+                      {post.content}
+                    </p>
+                  </div>
+
+                  {/* Post Image */}
+                  {post.image_url && (
+                    <div className="mb-6 rounded-2xl overflow-hidden bg-gradient-to-br from-white/5 to-transparent border border-white/10 group-hover:border-emerald-400/30 transition-all duration-300">
+                      <img
+                        src={post.image_url.startsWith('http') ?
+                          post.image_url :
+                          `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}${post.image_url}`
+                        }
+                        alt="Post image"
+                        className="w-full h-auto object-cover hover:scale-105 transition-transform duration-500"
+                        onError={(e) => {
+                          // Fallback to placeholder on error
+                          const target = e.target as HTMLImageElement;
+                          target.style.display = 'none';
+                          target.nextElementSibling?.classList.remove('hidden');
+                        }}
+                      />
+                      <div className="aspect-video bg-gradient-to-br from-emerald-500/20 to-teal-500/20 flex items-center justify-center">
+                        <ImageIcon className="w-16 h-16 text-white/50" />
+                        <span className="ml-3 text-white/70 font-medium">Image failed to load</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Post Actions */}
+                  <div className="flex items-center justify-between pt-6 border-t border-white/10">
+                    <button
+                      onClick={handleLikePost}
+                      disabled={likePending || !connectionStatus}
+                      className={`flex items-center space-x-3 px-5 py-3 rounded-2xl transition-all duration-300 hover:scale-105 ${
+                        post.is_liked
+                          ? 'text-red-400 bg-gradient-to-r from-red-500/20 to-pink-500/20 border border-red-400/30'
+                          : 'text-white/70 hover:text-white hover:bg-gradient-to-r from-white/10 to-white/5 border border-white/10'
+                      } ${likePending || !connectionStatus ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    >
+                      <Heart className={`w-5 h-5 ${post.is_liked ? 'fill-current animate-pulse' : ''} ${likePending ? 'animate-bounce' : ''}`} />
+                      <span className="font-medium">{post.like_count}</span>
+                      {!connectionStatus && (
+                        <span className="text-xs text-orange-400 ml-1">(Offline)</span>
+                      )}
+                    </button>
+
+                    <button
+                      onClick={handleBookmarkPost}
+                      disabled={!connectionStatus}
+                      className={`flex items-center space-x-3 px-5 py-3 rounded-2xl transition-all duration-300 hover:scale-105 ${
+                        post.is_bookmarked
+                          ? 'text-yellow-400 bg-gradient-to-r from-yellow-500/20 to-orange-500/20 border border-yellow-400/30'
+                          : 'text-white/70 hover:text-white hover:bg-gradient-to-r from-white/10 to-white/5 border border-white/10'
+                      } ${!connectionStatus ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    >
+                      <Bookmark className={`w-5 h-5 ${post.is_bookmarked ? 'fill-current' : ''}`} />
+                      <span className="font-medium">{post.is_bookmarked ? 'Saved' : 'Save'}</span>
+                      {!connectionStatus && (
+                        <span className="text-xs text-orange-400 ml-1">(Offline)</span>
+                      )}
+                    </button>
+
+                    <button className="flex items-center space-x-3 px-5 py-3 text-white/70 hover:text-white hover:bg-gradient-to-r from-white/10 to-white/5 border border-white/10 rounded-2xl transition-all duration-300 hover:scale-105">
+                      <MessageSquare className="w-5 h-5" />
+                      <span className="font-medium">{comments.length}</span>
+                    </button>
+
+                    <button className="flex items-center space-x-3 px-5 py-3 text-white/70 hover:text-white hover:bg-gradient-to-r from-white/10 to-white/5 border border-white/10 rounded-2xl transition-all duration-300 hover:scale-105">
+                      <Send className="w-5 h-5" />
+                      <span className="font-medium">Share</span>
+                    </button>
+                  </div>
                 </div>
 
                 {/* Comment Form */}
                 <div className="bg-gradient-to-r from-white/10 to-white/5 backdrop-blur-xl rounded-2xl border border-white/20 p-4 mb-6">
-                    <div className="flex items-start space-x-3">
-                        <div className="w-8 h-8 bg-gradient-to-r from-emerald-500 to-teal-600 rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden">
-                            {getAvatarUrl(user?.avatar) ? (
-                                <>
-                                    <img 
-                                        src={getAvatarUrl(user?.avatar)!}
-                                        alt={`${user?.first_name} ${user?.last_name}'s avatar`}
-                                        className="w-full h-full object-cover"
-                                        onError={(e) => {
-                                            // Fallback to default User icon on error
-                                            const target = e.target as HTMLImageElement;
-                                            target.style.display = 'none';
-                                            target.nextElementSibling?.classList.remove('hidden');
-                                        }}
-                                    />
-                                    <User className="w-4 h-4 text-white hidden" />
-                                </>
-                            ) : (
-                                <User className="w-4 h-4 text-white" />
-                            )}
-                        </div>
-                        <div className="flex-1">
-                            <textarea
-                                value={newComment}
-                                onChange={(e) => setNewComment(e.target.value)}
-                                placeholder="Write a comment..."
-                                className="w-full bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-white placeholder-white/60 focus:outline-none focus:border-emerald-400 resize-none"
-                                rows={3}
-                                maxLength={500}
-                            />
-                            <div className="flex items-center justify-between mt-2">
-                                <div className="flex items-center space-x-3">
-                                    <span className="text-white/60 text-xs">
-                                        {newComment.length}/500 characters
-                                    </span>
-                                    {!connectionStatus && (
-                                        <span className="text-orange-400 text-xs flex items-center space-x-1">
-                                            <div className="w-1.5 h-1.5 bg-orange-400 rounded-full"></div>
-                                            <span>Offline mode</span>
-                                        </span>
-                                    )}
-                                </div>
-                                <button
-                                    onClick={handleSubmitComment}
-                                    disabled={!newComment.trim() || isSubmittingComment || !isConnected}
-                                    className="bg-emerald-600 hover:bg-emerald-700 disabled:bg-white/10 disabled:text-white/50 text-white px-4 py-2 rounded-lg flex items-center space-x-2 transition-all duration-200"
-                                >
-                                    <Send className="w-4 h-4" />
-                                    <span>
-                                        {isSubmittingComment 
-                                            ? 'Posting...' 
-                                            : !connectionStatus 
-                                                ? 'Reconnecting...' 
-                                                : 'Post'}
-                                    </span>
-                                </button>
-                            </div>
-                        </div>
+                  <div className="flex items-start space-x-3">
+                    <div className="w-8 h-8 bg-gradient-to-r from-emerald-500 to-teal-600 rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden">
+                      {getAvatarUrl(user?.avatar) ? (
+                        <>
+                          <img
+                            src={getAvatarUrl(user?.avatar)!}
+                            alt={`${user?.first_name} ${user?.last_name}'s avatar`}
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                              // Fallback to default User icon on error
+                              const target = e.target as HTMLImageElement;
+                              target.style.display = 'none';
+                              target.nextElementSibling?.classList.remove('hidden');
+                            }}
+                          />
+                          <User className="w-4 h-4 text-white hidden" />
+                        </>
+                      ) : (
+                        <User className="w-4 h-4 text-white" />
+                      )}
                     </div>
+                    <div className="flex-1">
+                      <textarea
+                        value={newComment}
+                        onChange={(e) => setNewComment(e.target.value)}
+                        placeholder="Write a comment..."
+                        className="w-full bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-white placeholder-white/60 focus:outline-none focus:border-emerald-400 resize-none"
+                        rows={3}
+                        maxLength={500}
+                      />
+                      <div className="flex items-center justify-between mt-2">
+                        <div className="flex items-center space-x-3">
+                          <span className="text-white/60 text-xs">
+                            {newComment.length}/500 characters
+                          </span>
+                          {!connectionStatus && (
+                            <span className="text-orange-400 text-xs flex items-center space-x-1">
+                              <div className="w-1.5 h-1.5 bg-orange-400 rounded-full"></div>
+                              <span>Offline mode</span>
+                            </span>
+                          )}
+                        </div>
+                        <button
+                          onClick={handleSubmitComment}
+                          disabled={!newComment.trim() || isSubmittingComment || !isConnected}
+                          className="bg-emerald-600 hover:bg-emerald-700 disabled:bg-white/10 disabled:text-white/50 text-white px-4 py-2 rounded-lg flex items-center space-x-2 transition-all duration-200"
+                        >
+                          <Send className="w-4 h-4" />
+                          <span>
+                            {isSubmittingComment
+                              ? 'Posting...'
+                              : !connectionStatus
+                                ? 'Reconnecting...'
+                                : 'Post'}
+                          </span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
                 </div>
 
                 {/* Comments Section */}
                 <div className="bg-gradient-to-r from-white/10 to-white/5 backdrop-blur-xl rounded-2xl border border-white/20 p-6">
-                    <h2 className="text-white font-semibold text-lg mb-4">
-                        Comments ({comments.length})
-                    </h2>
+                  <h2 className="text-white font-semibold text-lg mb-4">
+                    Comments ({comments.length})
+                  </h2>
 
-                    {comments.length === 0 ? (
-                        <p className="text-white/60 text-center py-8">
-                            No comments yet. Be the first to comment!
-                        </p>
-                    ) : (
-                        <div className="space-y-4">
-                            {comments.map((comment) => (
-                                <div key={comment.id} className="flex items-start space-x-3 p-3 rounded-lg bg-white/5">
-                                    <div className="w-8 h-8 bg-gradient-to-r from-emerald-500 to-teal-600 rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden">
-                                        {getAvatarUrl(comment.user.avatar) ? (
-                                            <>
-                                                <img 
-                                                    src={getAvatarUrl(comment.user.avatar)!}
-                                                    alt={`${comment.user.first_name} ${comment.user.last_name}'s avatar`}
-                                                    className="w-full h-full object-cover"
-                                                    onError={(e) => {
-                                                        // Fallback to default User icon on error
-                                                        const target = e.target as HTMLImageElement;
-                                                        target.style.display = 'none';
-                                                        target.nextElementSibling?.classList.remove('hidden');
-                                                    }}
-                                                />
-                                                <User className="w-4 h-4 text-white hidden" />
-                                            </>
-                                        ) : (
-                                            <User className="w-4 h-4 text-white" />
-                                        )}
-                                    </div>
-                                    <div className="flex-1">
-                                        <div className="flex items-center space-x-2 mb-1">
-                                            <h4 className="text-white font-medium text-sm">
-                                                {comment.user.first_name} {comment.user.last_name}
-                                            </h4>
-                                            <span className="text-white/60 text-xs">
-                                                @{comment.user.nickname || comment.user.email.split('@')[0]}
-                                            </span>
-                                            <span className="text-white/60 text-xs">•</span>
-                                            <span className="text-white/60 text-xs">{comment.timeAgo}</span>
-                                        </div>
-                                        <p className="text-white/90 text-sm leading-relaxed whitespace-pre-wrap">
-                                            {comment.content}
-                                        </p>
-                                    </div>
-                                </div>
-                            ))}
+                  {comments.length === 0 ? (
+                    <p className="text-white/60 text-center py-8">
+                      No comments yet. Be the first to comment!
+                    </p>
+                  ) : (
+                    <div className="space-y-4">
+                      {comments.map((comment) => (
+                        <div key={comment.id} className="flex items-start space-x-3 p-3 rounded-lg bg-white/5">
+                          <div className="w-8 h-8 bg-gradient-to-r from-emerald-500 to-teal-600 rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden">
+                            {getAvatarUrl(comment.user.avatar) ? (
+                              <>
+                                <img
+                                  src={getAvatarUrl(comment.user.avatar)!}
+                                  alt={`${comment.user.first_name} ${comment.user.last_name}'s avatar`}
+                                  className="w-full h-full object-cover"
+                                  onError={(e) => {
+                                    // Fallback to default User icon on error
+                                    const target = e.target as HTMLImageElement;
+                                    target.style.display = 'none';
+                                    target.nextElementSibling?.classList.remove('hidden');
+                                  }}
+                                />
+                                <User className="w-4 h-4 text-white hidden" />
+                              </>
+                            ) : (
+                              <User className="w-4 h-4 text-white" />
+                            )}
+                          </div>
+                          <div className="flex-1">
+                            <div className="flex items-center space-x-2 mb-1">
+                              <h4 className="text-white font-medium text-sm">
+                                {comment.user.first_name} {comment.user.last_name}
+                              </h4>
+                              <span className="text-white/60 text-xs">
+                                @{comment.user.nickname || comment.user.email.split('@')[0]}
+                              </span>
+                              <span className="text-white/60 text-xs">•</span>
+                              <span className="text-white/60 text-xs">{comment.timeAgo}</span>
+                            </div>
+                            <p className="text-white/90 text-sm leading-relaxed whitespace-pre-wrap">
+                              {comment.content}
+                            </p>
+                          </div>
                         </div>
-                    )}
+                      ))}
+                    </div>
+                  )}
                 </div>
             </div>
+          </div>
         </div>
-    )
+      </div>
+      <RightSidebar
+        onlineUsers={onlineUsers}
+        followingUsers={following}
+        followersUsers={followers}
+        trendingTopics={trendingTopics}
+        onUserClick={(user) => {}}
+        currentUser={currentUser}
+        setActiveTab={setActiveTab}
+        logout={() => {}}
+      />
+    </div>
+  )
 }
 
 function ProtectedPostDetail() {

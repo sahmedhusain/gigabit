@@ -106,6 +106,7 @@ export interface Event {
   creator_id: number
   title: string
   description: string
+  location?: string
   event_time: string
   created_at: string
   updated_at: string
@@ -193,6 +194,7 @@ export interface EventResponse {
   creator_id: number
   title: string
   description: string
+  location?: string
   event_time: string
   created_at: string
   updated_at: string
@@ -230,12 +232,14 @@ export interface EventResponse {
 export interface CreateEventRequest {
   title: string;
   description: string;
+  location?: string;
   event_time: string; // ISO string format
 }
 
 export interface UpdateEventRequest {
   title?: string;
   description?: string;
+  location?: string;
   event_time?: string; // ISO string format
 }
 

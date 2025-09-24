@@ -34,6 +34,8 @@ interface ProfileSectionProps {
   isOwnProfile?: boolean
   showPrivacyOverlay?: boolean
   isFollowing?: boolean
+  initialFollowerCount?: number
+  initialFollowingCount?: number
 }
 
 export default function ProfileSection({
@@ -44,7 +46,9 @@ export default function ProfileSection({
   isLoadingFollowers,
   isOwnProfile = true,
   showPrivacyOverlay = false,
-  isFollowing = false
+  isFollowing = false,
+  initialFollowerCount,
+  initialFollowingCount
 }: ProfileSectionProps) {
   const router = useRouter()
   const { posts: realTimePosts, isConnected } = useRealTimePosts()
@@ -116,9 +120,17 @@ export default function ProfileSection({
   const displayFollowers = isConnected ? liveFollowers : followers
   const displayFollowing = isConnected ? liveFollowing : following
 
-  // Use real-time counts when connected, fallback to list lengths
-  const followersCount = countsConnected ? followerCounts.followers_count : (displayFollowers?.length ?? 0)
-  const followingCount = countsConnected ? followerCounts.following_count : (displayFollowing?.length ?? 0)
+  // Use real-time counts when connected, but prioritize initial counts for private profiles
+  const followersCount = (initialFollowerCount !== undefined) 
+    ? initialFollowerCount // Use provided initial count for private profiles
+    : (countsConnected 
+        ? followerCounts.followers_count 
+        : (displayFollowers?.length ?? followers?.length ?? 0))
+  const followingCount = (initialFollowingCount !== undefined)
+    ? initialFollowingCount // Use provided initial count for private profiles
+    : (countsConnected 
+        ? followerCounts.following_count 
+        : (displayFollowing?.length ?? following?.length ?? 0))
 
   const handlePostClick = (postId: number) => {
     router.push(`/post/${postId}`)
@@ -293,13 +305,14 @@ export default function ProfileSection({
         {/* Profile Content */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:gap-6">
           <div className="lg:col-span-2">
-            <div className="bg-gradient-to-r from-white/10 to-white/5 backdrop-blur-xl rounded-2xl lg:rounded-3xl border border-white/20 p-4 lg:p-6">
+            <div className="bg-gradient-to-r from-white/10 to-white/5 backdrop-blur-xl rounded-2xl lg:rounded-3xl border border-white/20 p-4 lg:p-6 relative">
               <div className="flex items-center justify-between mb-3 lg:mb-4">
                 <h3 className="text-lg lg:text-xl font-semibold text-white">Posts</h3>
                 {!connectionStatus && (
                   <span className="text-xs text-red-400">Offline</span>
                 )}
               </div>
+              
               <div className="space-y-3 lg:space-y-4">
                 {displayPosts.map((post) => (
                   <div
@@ -317,7 +330,7 @@ export default function ProfileSection({
                     </div>
                   </div>
                 ))}
-                {displayPosts.length === 0 && (
+                {displayPosts.length === 0 && !showPrivacyOverlay && (
                   <div className="text-white/60 text-center py-8">
                     <p className="text-sm">No posts yet</p>
                   </div>

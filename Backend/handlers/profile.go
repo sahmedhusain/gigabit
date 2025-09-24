@@ -11,39 +11,40 @@ import (
 )
 
 type ProfileHandler struct {
-	userService *services.UserService
+	userService   *services.UserService
+	followService *services.FollowService
 }
 
 func NewProfileHandler(db *sql.DB) *ProfileHandler {
 	return &ProfileHandler{
-		userService: services.NewUserService(db),
+		userService:   services.NewUserService(db),
+		followService: services.NewFollowService(db),
 	}
 }
 
 func (h *ProfileHandler) GetProfile(w http.ResponseWriter, r *http.Request, userIDStr string) {
-
-	//covert string to int
+	// covert string to int
 	userID, err := strconv.Atoi(userIDStr)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, "Invalid user ID")
 		return
 	}
 
-	//get the requesting user id from context for privacy check
+	// get the requesting user id from context for privacy check
 	requestingUserID, exists := r.Context().Value("user_id").(uint)
 	if !exists {
 		writeError(w, http.StatusUnauthorized, "User not authorized")
 		return
 	}
 
-	//get the user profile
+	// get the user profile
 	user, err := h.userService.GetUserByID(uint(userID))
 	if err != nil {
 		writeError(w, http.StatusNotFound, "User not found")
 		return
 	}
 
-	//check if the requesting user can view this profile (private account)
+	// check if the requesting user can view this profile (private account)
 	canView, err := h.userService.CanViewProfile(requestingUserID, uint(userID))
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "Failed to check profile privacy")
@@ -56,7 +57,6 @@ func (h *ProfileHandler) GetProfile(w http.ResponseWriter, r *http.Request, user
 	}
 
 	writeJSON(w, http.StatusOK, user)
-
 }
 
 func (h *ProfileHandler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
@@ -234,4 +234,43 @@ func (h *ProfileHandler) SearchUsers(w http.ResponseWriter, r *http.Request) {
 		"users": userResponses,
 		"count": len(userResponses),
 	})
+}
+
+// GetPublicStats returns follower/following counts for any user (public info)
+func (h *ProfileHandler) GetPublicStats(w http.ResponseWriter, r *http.Request, userIDStr string) {
+	if r.Method != http.MethodGet {
+		writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
+
+	// Convert string to int
+	userID, err := strconv.Atoi(userIDStr)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "Invalid user ID")
+		return
+	}
+
+	// Check if user exists
+	user, err := h.userService.GetUserByID(uint(userID))
+	if err != nil {
+		writeError(w, http.StatusNotFound, "User not found")
+		return
+	}
+
+	// Get follower counts (this is public information)
+	followers, following, err := h.followService.GetFollowCounts(uint(userID))
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "Failed to get follow counts")
+		return
+	}
+
+	// Return basic user info with public stats
+	response := map[string]interface{}{
+		"user_id":         user.ID,
+		"display_name":    user.FirstName + " " + user.LastName,
+		"follower_count":  followers,
+		"following_count": following,
+	}
+
+	writeJSON(w, http.StatusOK, response)
 }

@@ -138,6 +138,8 @@ func (s *Server) setupRoutes() {
 	s.router.HandleFunc("/api/profile/image", s.handleRoute(profileHandler.UpdateProfileImage, true))
 	s.router.HandleFunc("/api/profile/privacy", s.handleRoute(profileHandler.TogglePrivacy, true))
 	s.router.HandleFunc("/api/users/search", s.handleRoute(profileHandler.SearchUsers, true))
+	// Public stats route (no authentication required)
+	s.router.HandleFunc("/api/stats/", s.handlePublicStatsRoute(profileHandler))
 
 	// User routes
 	s.router.HandleFunc("/api/users", s.handleRoute(userHandler.GetAllUsers, true))
@@ -251,6 +253,20 @@ func (s *Server) handleProfileRoute(handler *handlers.ProfileHandler) http.Handl
 		authMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			handler.GetProfile(w, r, path)
 		})).ServeHTTP(w, r)
+	}
+}
+
+// handlePublicStatsRoute handles public stats requests (no auth required)
+func (s *Server) handlePublicStatsRoute(handler *handlers.ProfileHandler) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		path := strings.TrimPrefix(r.URL.Path, "/api/stats/")
+		if path == "" {
+			writeError(w, http.StatusNotFound, "User ID required")
+			return
+		}
+
+		// Call the handler directly (no authentication middleware)
+		handler.GetPublicStats(w, r, path)
 	}
 }
 

@@ -129,8 +129,8 @@ function DashboardPage() {
     nickname: user.nickname,
     aboutMe: user.about_me,
     memberSince: user.created_at,
-    followers: 0,
-    following: 0
+    followers: followers.length,
+    following: following.length
   } : null
 
   // Test function to manually check token

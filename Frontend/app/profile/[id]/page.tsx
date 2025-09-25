@@ -22,7 +22,7 @@ export default function ProfilePage() {
   const [followingCount, setFollowingCount] = useState<number>(0)
   const [isLoading, setIsLoading] = useState(true)
   const [isOwnProfile, setIsOwnProfile] = useState(false)
-  const [isFollowing, setIsFollowing] = useState(false)
+  const [isFollowing, setIsFollowing] = useState<boolean>(false)
 
   const userId = params.id as string
 
@@ -42,7 +42,6 @@ export default function ProfilePage() {
   const fetchUserProfile = async (userIdNum: number) => {
     try {
       setIsLoading(true)
-      console.log('Fetching profile for user:', userIdNum)
       
       // First try to get basic profile info
       try {
@@ -50,7 +49,6 @@ export default function ProfilePage() {
         setProfileUser(profileData)
         
         // Check if profile data includes follower/following counts
-        console.log('Profile data:', profileData)
         const profileDataAny = profileData as any
         if (profileDataAny.follower_count !== undefined) {
           setFollowerCount(profileDataAny.follower_count)
@@ -59,7 +57,7 @@ export default function ProfilePage() {
           setFollowingCount(profileDataAny.following_count)
         }
         
-        // Try to get additional data - these may fail for private profiles
+        // get more data
         const [postsResponse, followersResponse, followingResponse] = await Promise.allSettled([
           api.getUserPosts(userIdNum),
           api.getFollowers(userIdNum),
@@ -82,7 +80,6 @@ export default function ProfilePage() {
         } else {
           console.warn('Failed to load followers:', followersResponse.reason)
           setFollowers([])
-          // Don't set count to 0 - we'll try to get it another way
         }
         
         // Handle following response - always extract count even if following list is restricted  
@@ -93,7 +90,6 @@ export default function ProfilePage() {
         } else {
           console.warn('Failed to load following:', followingResponse.reason)
           setFollowing([])
-          // Don't set count to 0 - we'll try to get it another way
         }
 
         // Check if current user is following this profile user
@@ -107,7 +103,6 @@ export default function ProfilePage() {
         
         // Check if it's a private profile error
         if (profileError?.status === 403) {
-          console.log('Private profile detected, trying to get basic user info')
           
           // Try to get basic user info from the users list
           try {
@@ -121,14 +116,7 @@ export default function ProfilePage() {
                 is_private: true // Ensure it's marked as private
               }
               setProfileUser(basicUser)
-              console.log('Got basic user info for private profile:', basicUser)
               
-              // For private profiles, set placeholder counts since API calls will fail with 403
-              console.log('Setting placeholder counts for private profile')
-              setFollowerCount(25) // Placeholder count - replace with actual API if available
-              setFollowingCount(18) // Placeholder count - replace with actual API if available
-              setFollowers([25])
-              setFollowing([18, 12, 12])
               setIsFollowing(false)
               
               // Don't try to fetch posts for private profiles
@@ -152,7 +140,13 @@ export default function ProfilePage() {
       }
     } catch (err: any) {
       console.error('Error fetching user profile:', err)
-      error('Failed to load user profile.')
+      if (err.status === 403) {
+        error('This profile is private and you do not have permission to view it.')
+      } else if (err.status === 404) {
+        error('User not found.')
+      } else {
+        error('Failed to load user profile.')
+      }
     } finally {
       setIsLoading(false)
     }
@@ -196,7 +190,7 @@ export default function ProfilePage() {
               Back
             </button>
             <h1 className="text-2xl font-bold text-white">
-              {isOwnProfile ? 'My Profile' : `${profileUser?.first_name || ''} ${profileUser?.last_name || ''}'s Profile`}
+              {isOwnProfile ? 'My Profile' : `${profileUser.first_name} ${profileUser.last_name}'s Profile`}
             </h1>
           </div>
 
@@ -208,9 +202,9 @@ export default function ProfilePage() {
             posts={userPosts}
             isOwnProfile={isOwnProfile}
             isLoadingFollowers={isLoading}
-            isFollowing={isFollowing}
             followerCount={followerCount}
             followingCount={followingCount}
+            isFollowing={isFollowing}
           />
         </div>
       </div>
@@ -226,9 +220,9 @@ interface UserProfileSectionProps {
   posts: Post[]
   isOwnProfile: boolean
   isLoadingFollowers: boolean
-  isFollowing: boolean
   followerCount: number
   followingCount: number
+  isFollowing: boolean
 }
 
 function UserProfileSection({
@@ -238,9 +232,9 @@ function UserProfileSection({
   posts,
   isOwnProfile,
   isLoadingFollowers,
-  isFollowing,
-  followerCount,
-  followingCount
+  // followerCount,
+  // followingCount,
+  // isFollowing
 }: UserProfileSectionProps) {
   // Transform the User data to match ProfileSection expectations
   const transformedUser = {
@@ -258,9 +252,6 @@ function UserProfileSection({
     memberSince: profileUser.created_at
   }
 
-  // Determine if we should show privacy overlay
-  const shouldShowPrivacyOverlay = profileUser.is_private && !isOwnProfile
-
   return (
     <ProfileSection
       currentUser={transformedUser}
@@ -269,10 +260,6 @@ function UserProfileSection({
       posts={posts}
       isLoadingFollowers={isLoadingFollowers}
       isOwnProfile={isOwnProfile}
-      showPrivacyOverlay={shouldShowPrivacyOverlay}
-      isFollowing={isFollowing} // Pass the actual follow status
-      initialFollowerCount={followerCount}
-      initialFollowingCount={followingCount}
     />
   )
 }

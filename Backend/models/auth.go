@@ -9,6 +9,7 @@ type RegisterRequest struct {
 	Nickname    string `json:"nickname" binding:"max=30"`
 	AboutMe     string `json:"aboutMe" binding:"max=500"`
 	Avatar      string `json:"avatar" binding:"max=100"`
+	Gender      string `json:"gender" binding:"required,oneof=male female"`
 }
 
 type LoginRequest struct {

@@ -14,6 +14,7 @@ type User struct {
 	Avatar      *string   `json:"avatar"`
 	Nickname    *string   `json:"nickname"`
 	AboutMe     *string   `json:"about_me"`
+	Gender      *string   `json:"gender"`
 	IsPrivate   bool      `json:"is_private"`
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
@@ -28,6 +29,7 @@ type UserResponse struct {
 	Avatar      *string   `json:"avatar"`
 	Nickname    *string   `json:"nickname"`
 	AboutMe     *string   `json:"about_me"`
+	Gender      *string   `json:"gender"`
 	IsPrivate   bool      `json:"is_private"`
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
@@ -43,6 +45,7 @@ func (u *User) ToResponse() UserResponse {
 		Avatar:      u.Avatar,
 		Nickname:    u.Nickname,
 		AboutMe:     u.AboutMe,
+		Gender:      u.Gender,
 		IsPrivate:   u.IsPrivate,
 		CreatedAt:   u.CreatedAt,
 		UpdatedAt:   u.UpdatedAt,

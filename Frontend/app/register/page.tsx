@@ -58,11 +58,12 @@ export default function RegisterPage() {
     dateOfBirth: '',
     nickname: '',
     aboutMe: '',
-    avatar: '/avatars/defaultM.png' // Set default avatar value
+    avatar: '',
+    gender: ''
   })
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
-  const [avatarPreview, setAvatarPreview] = useState<string | null>('/avatars/defaultM.png') // Default avatar
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -72,8 +73,18 @@ export default function RegisterPage() {
     })
   }
 
+  const handleGenderSelect = (gender: 'male' | 'female') => {
+    const defaultAvatar = gender === 'male' ? '/avatars/defaultM.png' : '/avatars/defaultFM.png'
+    setFormData({ 
+      ...formData, 
+      gender: gender,
+      avatar: defaultAvatar
+    })
+    setAvatarPreview(defaultAvatar)
+  }
+
   const handleAvatarSelect = (avatarId: string) => {
-    const selectedAvatar = getAvatarOptions().find(avatar => avatar.id === avatarId);
+    const selectedAvatar = getAvatarOptions(formData.gender as 'male' | 'female').find(avatar => avatar.id === avatarId);
     setFormData({ ...formData, avatar: selectedAvatar?.imageUrl || avatarId })
     
     // Set preview to the selected avatar's image URL or ID for fallback
@@ -87,8 +98,8 @@ export default function RegisterPage() {
 
     try {
       // Validate required fields
-      if (!formData.email || !formData.password || !formData.firstName || !formData.lastName || !formData.dateOfBirth) {
-        throw new Error('Please fill in all required fields')
+      if (!formData.email || !formData.password || !formData.firstName || !formData.lastName || !formData.dateOfBirth || !formData.gender) {
+        throw new Error('Please fill in all required fields including gender')
       }
 
       if (formData.firstName.length < 3) {
@@ -202,47 +213,83 @@ export default function RegisterPage() {
 
             <div className="relative p-6 sm:p-8">
               <div className="space-y-6">
-                {/* Avatar Selection */}
+                {/* Gender and Avatar Selection */}
                 <div className="flex flex-col items-center mb-6 space-y-6">
-                  {/* Current Avatar Preview with Label */}
-                  <div className="text-center space-y-3">
-                    <h3 className="text-sm font-medium text-white/80 mb-2">Your Avatar</h3>
-                    <div className="relative group">
-                      <div className="w-28 h-28 rounded-full bg-white/10 border-2 border-emerald-400/50 shadow-lg shadow-emerald-400/20 flex items-center justify-center overflow-hidden backdrop-blur-sm">
-                        {avatarPreview ? (
-                          avatarPreview.startsWith('/') || avatarPreview.startsWith('data:') ? (
-                            <img src={avatarPreview} alt="Selected Avatar" className="w-full h-full object-cover rounded-full" />
-                          ) : (
-                            // Show gradient for selected avatar ID
-                            (() => {
-                              const selectedAvatar = getAvatarOptions().find(avatar => avatar.id === avatarPreview);
-                              return selectedAvatar ? (
-                                <div className={`w-full h-full rounded-full bg-gradient-to-r ${selectedAvatar.gradient} flex items-center justify-center`}>
-                                  <span className="text-white font-semibold text-2xl drop-shadow-lg">
-                                    {selectedAvatar.label}
-                                  </span>
-                                </div>
-                              ) : (
-                                <Camera className="w-8 h-8 text-white/50" />
-                              );
-                            })()
-                          )
-                        ) : (
-                          <Camera className="w-8 h-8 text-white/50" />
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Avatar Options with Label */}
+                  {/* Gender Selection */}
                   <div className="text-center space-y-4">
                     <div className="flex items-center justify-center space-x-2">
                       <div className="h-px w-8 bg-white/20"></div>
-                      <h4 className="text-sm font-medium text-white/70">Choose an Avatar</h4>
+                      <h3 className="text-sm font-medium text-white/80">Select Your Gender</h3>
                       <div className="h-px w-8 bg-white/20"></div>
                     </div>
-                    <div className="flex space-x-4">
-                      {getAvatarOptions().map((avatar) => (
+                    <div className="flex space-x-4 justify-center">
+                      <button
+                        type="button"
+                        onClick={() => handleGenderSelect('male')}
+                        className={`px-6 py-3 rounded-xl border-2 transition-all duration-300 ${
+                          formData.gender === 'male'
+                            ? 'border-blue-400 bg-blue-400/20 text-blue-300 shadow-lg shadow-blue-400/30'
+                            : 'border-white/30 text-white/70 hover:border-blue-400/60 hover:text-white'
+                        }`}
+                      >
+                        Male
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleGenderSelect('female')}
+                        className={`px-6 py-3 rounded-xl border-2 transition-all duration-300 ${
+                          formData.gender === 'female'
+                            ? 'border-pink-400 bg-pink-400/20 text-pink-300 shadow-lg shadow-pink-400/30'
+                            : 'border-white/30 text-white/70 hover:border-pink-400/60 hover:text-white'
+                        }`}
+                      >
+                        Female
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Avatar Preview */}
+                  {formData.gender && (
+                    <div className="text-center space-y-3">
+                      <h3 className="text-sm font-medium text-white/80 mb-2">Your Avatar</h3>
+                      <div className="relative group">
+                        <div className="w-28 h-28 rounded-full bg-white/10 border-2 border-emerald-400/50 shadow-lg shadow-emerald-400/20 flex items-center justify-center overflow-hidden backdrop-blur-sm">
+                          {avatarPreview ? (
+                            avatarPreview.startsWith('/') || avatarPreview.startsWith('data:') ? (
+                              <img src={avatarPreview} alt="Selected Avatar" className="w-full h-full object-cover rounded-full" />
+                            ) : (
+                              // Show gradient for selected avatar ID
+                              (() => {
+                                const selectedAvatar = getAvatarOptions(formData.gender as 'male' | 'female').find(avatar => avatar.id === avatarPreview);
+                                return selectedAvatar ? (
+                                  <div className={`w-full h-full rounded-full bg-gradient-to-r ${selectedAvatar.gradient} flex items-center justify-center`}>
+                                    <span className="text-white font-semibold text-2xl drop-shadow-lg">
+                                      {selectedAvatar.label}
+                                    </span>
+                                  </div>
+                                ) : (
+                                  <Camera className="w-8 h-8 text-white/50" />
+                                );
+                              })()
+                            )
+                          ) : (
+                            <Camera className="w-8 h-8 text-white/50" />
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Avatar Options - only show when gender is selected */}
+                  {formData.gender && (
+                    <div className="text-center space-y-4">
+                      <div className="flex items-center justify-center space-x-2">
+                        <div className="h-px w-8 bg-white/20"></div>
+                        <h4 className="text-sm font-medium text-white/70">Choose an Avatar</h4>
+                        <div className="h-px w-8 bg-white/20"></div>
+                      </div>
+                      <div className="flex flex-wrap gap-3 justify-center">
+                        {getAvatarOptions(formData.gender as 'male' | 'female').map((avatar) => (
                         <div
                           key={avatar.id}
                           onClick={() => handleAvatarSelect(avatar.id)}
@@ -279,10 +326,11 @@ export default function RegisterPage() {
                           {/* Hover overlay */}
                           <div className="absolute inset-0 rounded-full bg-emerald-400/0 group-hover:bg-emerald-400/10 transition-all duration-200 z-10"></div>
                         </div>
-                      ))}
+                        ))}
+                      </div>
+                      <p className="text-xs text-white/50">Click on any avatar to select it</p>
                     </div>
-                    <p className="text-xs text-white/50">Click on any avatar to select it</p>
-                  </div>
+                  )}
                 </div>
 
                 {/* Error Message */}

@@ -3,8 +3,9 @@ package services
 import (
 	"database/sql"
 	"log"
-	"social/models"
 	"time"
+
+	"social/models"
 )
 
 func min(a, b int) int {
@@ -24,8 +25,8 @@ func NewUserService(db *sql.DB) *UserService {
 
 func (s *UserService) CreateUser(user *models.User) error {
 	query := `
-		INSERT INTO users (email, password, first_name, last_name, date_of_birth, avatar, nickname, about_me, is_private, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		INSERT INTO users (email, password, first_name, last_name, date_of_birth, avatar, nickname, about_me, gender, is_private, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
 
 	now := time.Now()
@@ -37,7 +38,7 @@ func (s *UserService) CreateUser(user *models.User) error {
 	}
 
 	result, err := s.db.Exec(query, user.Email, user.Password, user.FirstName, user.LastName,
-		user.DateOfBirth, user.Avatar, user.Nickname, user.AboutMe, user.IsPrivate, now, now)
+		user.DateOfBirth, user.Avatar, user.Nickname, user.AboutMe, user.Gender, user.IsPrivate, now, now)
 	if err != nil {
 		return err
 	}
@@ -56,7 +57,7 @@ func (s *UserService) CreateUser(user *models.User) error {
 
 func (s *UserService) GetUserByEmail(email string) (*models.User, error) {
 	query := `
-		SELECT id, email, password, first_name, last_name, date_of_birth, avatar, nickname, about_me, is_private, created_at, updated_at
+		SELECT id, email, password, first_name, last_name, date_of_birth, avatar, nickname, about_me, gender, is_private, created_at, updated_at
 		FROM users WHERE email = ?
 	`
 
@@ -64,9 +65,8 @@ func (s *UserService) GetUserByEmail(email string) (*models.User, error) {
 	row := s.db.QueryRow(query, email)
 
 	err := row.Scan(&user.ID, &user.Email, &user.Password, &user.FirstName, &user.LastName,
-		&user.DateOfBirth, &user.Avatar, &user.Nickname, &user.AboutMe, &user.IsPrivate,
+		&user.DateOfBirth, &user.Avatar, &user.Nickname, &user.AboutMe, &user.Gender, &user.IsPrivate,
 		&user.CreatedAt, &user.UpdatedAt)
-
 	if err != nil {
 		return nil, err
 	}
@@ -76,7 +76,7 @@ func (s *UserService) GetUserByEmail(email string) (*models.User, error) {
 
 func (s *UserService) GetUserByNickname(nickname string) (*models.User, error) {
 	query := `
-		SELECT id, email, password, first_name, last_name, date_of_birth, avatar, nickname, about_me, is_private, created_at, updated_at
+		SELECT id, email, password, first_name, last_name, date_of_birth, avatar, nickname, about_me, gender, is_private, created_at, updated_at
 		FROM users WHERE nickname = ?
 	`
 
@@ -84,9 +84,8 @@ func (s *UserService) GetUserByNickname(nickname string) (*models.User, error) {
 	row := s.db.QueryRow(query, nickname)
 
 	err := row.Scan(&user.ID, &user.Email, &user.Password, &user.FirstName, &user.LastName,
-		&user.DateOfBirth, &user.Avatar, &user.Nickname, &user.AboutMe, &user.IsPrivate,
+		&user.DateOfBirth, &user.Avatar, &user.Nickname, &user.AboutMe, &user.Gender, &user.IsPrivate,
 		&user.CreatedAt, &user.UpdatedAt)
-
 	if err != nil {
 		return nil, err
 	}
@@ -95,7 +94,7 @@ func (s *UserService) GetUserByNickname(nickname string) (*models.User, error) {
 
 func (s *UserService) GetUserByID(id uint) (*models.User, error) {
 	query := `
-		SELECT id, email, password, first_name, last_name, date_of_birth, avatar, nickname, about_me, is_private, created_at, updated_at
+		SELECT id, email, password, first_name, last_name, date_of_birth, avatar, nickname, about_me, gender, is_private, created_at, updated_at
 		FROM users WHERE id = ?
 	`
 
@@ -103,9 +102,8 @@ func (s *UserService) GetUserByID(id uint) (*models.User, error) {
 	row := s.db.QueryRow(query, id)
 
 	err := row.Scan(&user.ID, &user.Email, &user.Password, &user.FirstName, &user.LastName,
-		&user.DateOfBirth, &user.Avatar, &user.Nickname, &user.AboutMe, &user.IsPrivate,
+		&user.DateOfBirth, &user.Avatar, &user.Nickname, &user.AboutMe, &user.Gender, &user.IsPrivate,
 		&user.CreatedAt, &user.UpdatedAt)
-
 	if err != nil {
 		return nil, err
 	}
@@ -133,7 +131,7 @@ func (s *UserService) UpdateUser(user *models.User) error {
 
 func (s *UserService) SearchUsers(query string, currentUserID uint) ([]*models.User, error) {
 	sqlQuery := `
-		SELECT id, email, password, first_name, last_name, date_of_birth, avatar, nickname, about_me, is_private, created_at, updated_at
+		SELECT id, email, password, first_name, last_name, date_of_birth, avatar, nickname, about_me, gender, is_private, created_at, updated_at
 		FROM users 
 		WHERE (first_name LIKE ? OR last_name LIKE ? OR email LIKE ? OR nickname LIKE ?) 
 		AND id != ?
@@ -151,7 +149,7 @@ func (s *UserService) SearchUsers(query string, currentUserID uint) ([]*models.U
 	for rows.Next() {
 		user := &models.User{}
 		err := rows.Scan(&user.ID, &user.Email, &user.Password, &user.FirstName, &user.LastName,
-			&user.DateOfBirth, &user.Avatar, &user.Nickname, &user.AboutMe, &user.IsPrivate,
+			&user.DateOfBirth, &user.Avatar, &user.Nickname, &user.AboutMe, &user.Gender, &user.IsPrivate,
 			&user.CreatedAt, &user.UpdatedAt)
 		if err != nil {
 			return nil, err

@@ -29,9 +29,11 @@ export default function ProfilePage() {
   const [userPosts, setUserPosts] = useState<Post[]>([])
   const [followers, setFollowers] = useState<any[]>([])
   const [following, setFollowing] = useState<any[]>([])
+  const [followerCount, setFollowerCount] = useState<number>(0)
+  const [followingCount, setFollowingCount] = useState<number>(0)
   const [isLoading, setIsLoading] = useState(true)
   const [isOwnProfile, setIsOwnProfile] = useState(false)
-  const [isFollowing, setIsFollowing] = useState(false)
+  const [isFollowing, setIsFollowing] = useState<boolean>(false)
 
   const userId = params.id as string
 
@@ -75,14 +77,22 @@ export default function ProfilePage() {
   const fetchUserProfile = async (userIdNum: number) => {
     try {
       setIsLoading(true)
-      console.log('Fetching profile for user:', userIdNum)
-
+      
       // First try to get basic profile info
       try {
         const profileData = await api.getProfile(userIdNum)
         setProfileUser(profileData)
-
-        // Try to get additional data - these may fail for private profiles
+        
+        // Check if profile data includes follower/following counts
+        const profileDataAny = profileData as any
+        if (profileDataAny.follower_count !== undefined) {
+          setFollowerCount(profileDataAny.follower_count)
+        }
+        if (profileDataAny.following_count !== undefined) {
+          setFollowingCount(profileDataAny.following_count)
+        }
+        
+        // get more data
         const [postsResponse, followersResponse, followingResponse] = await Promise.allSettled([
           api.getUserPosts(userIdNum),
           api.getFollowers(userIdNum),
@@ -96,18 +106,22 @@ export default function ProfilePage() {
           console.warn('Failed to load user posts:', postsResponse.reason)
           setUserPosts([])
         }
-
-        // Handle followers response
+        
+        // Handle followers response - always extract count even if followers list is restricted
         if (followersResponse.status === 'fulfilled') {
-          setFollowers(followersResponse.value.followers || [])
+          const followersData = followersResponse.value.followers || []
+          setFollowers(followersData)
+          setFollowerCount(followersResponse.value.count || followersData.length || 0)
         } else {
           console.warn('Failed to load followers:', followersResponse.reason)
           setFollowers([])
         }
-
-        // Handle following response
+        
+        // Handle following response - always extract count even if following list is restricted  
         if (followingResponse.status === 'fulfilled') {
-          setFollowing(followingResponse.value.following || [])
+          const followingData = followingResponse.value.following || []
+          setFollowing(followingData)
+          setFollowingCount(followingResponse.value.count || followingData.length || 0)
         } else {
           console.warn('Failed to load following:', followingResponse.reason)
           setFollowing([])
@@ -124,8 +138,7 @@ export default function ProfilePage() {
 
         // Check if it's a private profile error
         if (profileError?.status === 403) {
-          console.log('Private profile detected, trying to get basic user info')
-
+          
           // Try to get basic user info from the users list
           try {
             const usersResponse = await api.getUsers()
@@ -138,12 +151,11 @@ export default function ProfilePage() {
                 is_private: true // Ensure it's marked as private
               }
               setProfileUser(basicUser)
-              console.log('Got basic user info for private profile:', basicUser)
-
-              // Don't try to fetch posts/followers/following for private profiles
+              
+              setIsFollowing(false)
+              
+              // Don't try to fetch posts for private profiles
               setUserPosts([])
-              setFollowers([])
-              setFollowing([])
             } else {
               error('User not found.')
               return
@@ -163,7 +175,13 @@ export default function ProfilePage() {
       }
     } catch (err: any) {
       console.error('Error fetching user profile:', err)
-      error('Failed to load user profile.')
+      if (err.status === 403) {
+        error('This profile is private and you do not have permission to view it.')
+      } else if (err.status === 404) {
+        error('User not found.')
+      } else {
+        error('Failed to load user profile.')
+      }
     } finally {
       setIsLoading(false)
     }

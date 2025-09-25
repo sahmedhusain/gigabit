@@ -194,3 +194,20 @@ func (s *UserService) AreUsersConnected(userID1, userID2 uint) (bool, error) {
 
 	return count > 0, nil
 }
+
+// UpdateUserPrivacy updates the privacy setting for a user
+func (s *UserService) UpdateUserPrivacy(userID uint, isPrivate bool) error {
+	query := `
+		UPDATE users 
+		SET is_private = ?, updated_at = ?
+		WHERE id = ?
+	`
+
+	now := time.Now()
+	_, err := s.db.Exec(query, isPrivate, now, userID)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}

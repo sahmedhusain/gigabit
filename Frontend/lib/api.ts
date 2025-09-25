@@ -830,6 +830,12 @@ export class ApiClient {
     });
   }
 
+  async getPublicStats(userId: number): Promise<{ user_id: number, display_name: string, follower_count: number, following_count: number }> {
+    return this.request<{ user_id: number, display_name: string, follower_count: number, following_count: number }>(`/api/stats/${userId}`, {
+      method: 'GET',
+    });
+  }
+
   async updateUserPrivacy(userId: number, isPrivate: boolean): Promise<{ message: string; user: User }> {
     return this.request<{ message: string; user: User }>(`/api/profile/privacy`, {
       method: 'PUT',

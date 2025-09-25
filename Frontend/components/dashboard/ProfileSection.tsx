@@ -164,37 +164,28 @@ export default function ProfileSection({
               )}
             </div>
 
-            {/* Follow/Message Button - Only show for other users' profiles */}
+            {/* Follow/Unfollow Button - Only show for other users' profiles */}
             {!isOwnProfile && currentUser && (
               <div className="mt-4">
-                {followStatus.isFollowing ? (
-                  <button
-                    onClick={() => router.push(`/messages/${currentUser?.id}`)}
-                    className="px-4 py-2 bg-gradient-to-r from-blue-500 to-blue-600 rounded-xl text-white hover:from-blue-600 hover:to-blue-700 transition-all duration-200 text-sm font-medium"
-                  >
-                    Message
-                  </button>
-                ) : (
-                  <FollowHandler
-                    targetUser={{
-                      id: currentUser.id,
-                      first_name: currentUser.firstName || currentUser.first_name || '',
-                      last_name: currentUser.lastName || currentUser.last_name || '',
-                      nickname: currentUser.nickname || '',
-                      email: currentUser.email,
-                      avatar: currentUser.avatar || '',
-                      is_private: currentUser.isPrivate || currentUser.is_private || false,
-                      created_at: currentUser.memberSince || '',
-                      about_me: currentUser.aboutMe || '',
-                      date_of_birth: currentUser.dateOfBirth || '',
-                      updated_at: new Date().toISOString()
-                    }}
-                    currentFollowStatus={followStatus}
-                    onStatusChange={handleFollowStatusChange}
-                    disabled={!connectionStatus}
-                    size="sm"
-                  />
-                )}
+                <FollowHandler
+                  targetUser={{
+                    id: currentUser.id,
+                    first_name: currentUser.firstName || currentUser.first_name || '',
+                    last_name: currentUser.lastName || currentUser.last_name || '',
+                    nickname: currentUser.nickname || '',
+                    email: currentUser.email,
+                    avatar: currentUser.avatar || '',
+                    is_private: currentUser.isPrivate || currentUser.is_private || false,
+                    created_at: currentUser.memberSince || '',
+                    about_me: currentUser.aboutMe || '',
+                    date_of_birth: currentUser.dateOfBirth || '',
+                    updated_at: new Date().toISOString()
+                  }}
+                  currentFollowStatus={followStatus}
+                  onStatusChange={handleFollowStatusChange}
+                  disabled={!connectionStatus}
+                  size="sm"
+                />
               </div>
             )}
           </div>

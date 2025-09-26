@@ -148,7 +148,7 @@ export default function RightSidebar({
       try {
         const response = await api.getUserEvents()
         // Filter only events where user is going
-        const goingEvents = response.events.filter(event => event.user_response === 'going')
+        const goingEvents = response.events ? response.events.filter(event => event.user_response === 'going') : []
         setEvents(goingEvents)
       } catch (err) {
         console.error('Failed to fetch events:', err)
@@ -787,7 +787,14 @@ export default function RightSidebar({
                               <Users className="w-8 h-8 text-white/40" />
                             </div>
                             <p className="text-white/60 text-base font-medium mb-2">No following users</p>
-                            <p className="text-white/40 text-sm">Start following people to see them here</p>
+                            <p className="text-white/40 text-sm mb-4">Start following people to see them here</p>
+                            <button
+                              onClick={() => setActiveTab('discover')}
+                              className="flex items-center space-x-2 px-4 py-2 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 hover:text-emerald-200 rounded-xl text-sm font-medium transition-all duration-200 border border-emerald-400/30 hover:border-emerald-400/50"
+                            >
+                              <Users className="w-4 h-4" />
+                              <span>Discover People</span>
+                            </button>
                           </div>
                         );
                       }

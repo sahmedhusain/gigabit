@@ -154,7 +154,7 @@ export default function Sidebar({
         }] : []),
         {
           id: 'all',
-          label: 'All Posts',
+          label: 'Public',
           icon: Grid3X3,
           description: 'See all public posts',
           color: 'from-emerald-500 to-teal-600',

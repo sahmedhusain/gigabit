@@ -213,7 +213,7 @@ export default function RegisterPage() {
                       <div className="w-28 h-28 rounded-full bg-white/10 border-2 border-emerald-400/50 shadow-lg shadow-emerald-400/20 flex items-center justify-center overflow-hidden backdrop-blur-sm">
                         {avatarPreview ? (
                           avatarPreview.startsWith('/') || avatarPreview.startsWith('data:') ? (
-                            <Image src={avatarPreview} alt="Selected Avatar" className="w-full h-full object-cover rounded-full" />
+                            <Image src={avatarPreview} alt="Selected Avatar" width={112} height={112} className="w-full h-full object-cover rounded-full" />
                           ) : (
                             // Show gradient for selected avatar ID
                             (() => {
@@ -258,6 +258,8 @@ export default function RegisterPage() {
                           <Image
                             src={avatar.imageUrl} 
                             alt={`Avatar option ${avatar.label}`}
+                            width={80}
+                            height={80}
                             className="w-full h-full object-cover absolute inset-0 z-10 rounded-full"
                             onError={(e) => {
                               // Hide image on error, showing gradient fallback

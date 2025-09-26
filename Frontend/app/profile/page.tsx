@@ -17,7 +17,7 @@ import ProfileSection from '@/components/dashboard/ProfileSection';
 
 export default function ProfilePage() {
   const router = useRouter();
-  const { user: currentUser } = useAuth();
+  const { user: currentUser, logout } = useAuth();
   const { onlineUsers } = useWebSocket();
   const { error } = useToast();
   const { unread: liveUnreadCount } = useNotifications();
@@ -255,7 +255,7 @@ export default function ProfilePage() {
           }}
           currentUser={currentUserData}
           setActiveTab={handleTabChange}
-          logout={() => router.push('/login')}
+          logout={logout}
         />
       </div>
     </ProtectedRoute>

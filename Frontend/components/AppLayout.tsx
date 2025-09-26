@@ -44,7 +44,7 @@ export default function AppLayout({
   onTempPostClose
 }: AppLayoutProps) {
   const router = useRouter()
-  const { user } = useAuth()
+  const { user, logout } = useAuth()
   const { onlineUsers } = useWebSocket()
   const { unread: liveUnreadCount } = useNotifications()
 
@@ -171,7 +171,7 @@ export default function AppLayout({
         }}
         currentUser={currentUser}
         setActiveTab={handleTabChange}
-        logout={() => router.push('/login')}
+        logout={logout}
       />
     </div>
   )

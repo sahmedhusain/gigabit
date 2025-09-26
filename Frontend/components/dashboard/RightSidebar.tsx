@@ -18,8 +18,7 @@ import {
   UserPlus,
   Mail,
   Check,
-  X,
-  RotateCcw
+  X
 } from 'lucide-react'
 import { useWebSocket } from '@/context/WebSocketContext'
 import { api, Event } from '@/lib/api'
@@ -118,6 +117,9 @@ export default function RightSidebar({
   const [showEventsSlideUp, setShowEventsSlideUp] = useState(false)
   const [slideUpDate, setSlideUpDate] = useState<Date | null>(null)
   const [events, setEvents] = useState<Event[]>([])
+  const [showMonthYearPicker, setShowMonthYearPicker] = useState(false)
+  const [tempYear, setTempYear] = useState(new Date().getFullYear())
+  const [tempMonth, setTempMonth] = useState(new Date().getMonth())
 
   // Invitations state
   const [followRequests, setFollowRequests] = useState<FollowRequest[]>([])
@@ -257,12 +259,34 @@ export default function RightSidebar({
     })
   }
 
-  // Go to today's date
-  const goToToday = () => {
-    const today = new Date()
-    setSelectedDate(today)
-    setCalendarDate(today)
+  // Initialize temp values when picker opens
+  const openMonthYearPicker = () => {
+    setTempYear(calendarDate.getFullYear())
+    setTempMonth(calendarDate.getMonth())
+    setShowMonthYearPicker(true)
   }
+
+  // Apply temp values when done is pressed
+  const applyMonthYearSelection = () => {
+    const newDate = new Date(tempYear, tempMonth, 1);
+    setCalendarDate(newDate);
+    setShowMonthYearPicker(false);
+  }
+
+  // Close month/year picker when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (showMonthYearPicker) {
+        const target = event.target as Element;
+        if (!target.closest('.month-year-picker')) {
+          setShowMonthYearPicker(false);
+        }
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showMonthYearPicker]);
 
   // Transform events for calendar display
   const getEventsForDate = (date: Date) => {
@@ -525,9 +549,16 @@ export default function RightSidebar({
                     >
                       <ChevronLeft className="w-4 h-4 text-blue-400" />
                     </button>
-                    <div className="text-blue-400 text-xs font-medium min-w-[80px] text-center">
+                    <button
+                      onClick={(e) => { 
+                        e.stopPropagation(); 
+                        openMonthYearPicker(); 
+                      }}
+                      className="text-blue-400 text-xs font-medium min-w-[80px] text-center hover:bg-white/10 px-2 py-1 rounded-lg transition-colors cursor-pointer"
+                      title="Select month and year"
+                    >
                       {calendarDate.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
-                    </div>
+                    </button>
                     <button
                       onClick={(e) => { e.stopPropagation(); navigateMonth('next'); }}
                       className="p-1 rounded-lg hover:bg-white/10 transition-colors"
@@ -535,21 +566,80 @@ export default function RightSidebar({
                     >
                       <ChevronRight className="w-4 h-4 text-blue-400" />
                     </button>
-                    {(() => {
-                      const today = new Date();
-                      const isTodaySelected = selectedDate.toDateString() === today.toDateString();
-                      return !isTodaySelected ? (
-                        <button
-                          onClick={(e) => { e.stopPropagation(); goToToday(); }}
-                          className="p-1 rounded-lg hover:bg-white/10 transition-colors ml-2"
-                          title="Go to today"
-                        >
-                          <RotateCcw className="w-4 h-4 text-blue-400" />
-                        </button>
-                      ) : null;
-                    })()}
                   </div>
                 </div>
+                
+                {/* Month/Year Picker */}
+                {showMonthYearPicker && (
+                  <div className="mb-3 bg-white/5 rounded-xl p-3 border border-white/10 month-year-picker">
+                    <div className="grid grid-cols-2 gap-3">
+                      {/* Year Selector */}
+                      <div>
+                        <label className="text-white/70 text-xs font-medium mb-2 block">Year</label>
+                        <select
+                          value={tempYear}
+                          onChange={(e) => {
+                            setTempYear(parseInt(e.target.value));
+                          }}
+                          className="w-full bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-400 focus:bg-white/15 transition-colors"
+                          aria-label="Select year"
+                        >
+                          {Array.from({ length: 10 }, (_, i) => {
+                            const year = new Date().getFullYear() - 2 + i;
+                            return (
+                              <option key={year} value={year} className="bg-slate-800">
+                                {year}
+                              </option>
+                            );
+                          })}
+                        </select>
+                      </div>
+                      
+                      {/* Month Selector */}
+                      <div>
+                        <label className="text-white/70 text-xs font-medium mb-2 block">Month</label>
+                        <select
+                          value={tempMonth}
+                          onChange={(e) => {
+                            setTempMonth(parseInt(e.target.value));
+                          }}
+                          className="w-full bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-400 focus:bg-white/15 transition-colors"
+                          aria-label="Select month"
+                        >
+                          {[
+                            'January', 'February', 'March', 'April', 'May', 'June',
+                            'July', 'August', 'September', 'October', 'November', 'December'
+                          ].map((month, index) => (
+                            <option key={index} value={index} className="bg-slate-800">
+                              {month}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                    
+                    {/* Quick Navigation Buttons */}
+                    <div className="flex items-center justify-between mt-3 pt-3 border-t border-white/10">
+                      <button
+                        onClick={() => {
+                          const today = new Date();
+                          setCalendarDate(new Date(today.getFullYear(), today.getMonth(), 1));
+                          setSelectedDate(today);
+                          setShowMonthYearPicker(false);
+                        }}
+                        className="text-blue-400 hover:text-blue-300 text-xs font-medium transition-colors"
+                      >
+                      Today
+                      </button>
+                      <button
+                        onClick={applyMonthYearSelection}
+                        className="text-white/60 hover:text-white text-xs font-medium transition-colors"
+                      >
+                        Done
+                      </button>
+                    </div>
+                  </div>
+                )}
                 
                 {/* Mini Calendar - Fixed size */}
                 <div className="flex-shrink-0">
@@ -572,8 +662,7 @@ export default function RightSidebar({
                       
                       const days = [];
                       for (let i = 0; i < 42; i++) {
-                        const currentDate = new Date(startDate);
-                        currentDate.setDate(startDate.getDate() + i);
+                        const currentDate = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate() + i);
                         
                         const isCurrentMonth = currentDate.getMonth() === calendarDate.getMonth();
                         const isToday = currentDate.toDateString() === today.toDateString();
@@ -583,7 +672,10 @@ export default function RightSidebar({
                         days.push(
                           <button
                             key={i}
-                            onClick={(e) => { e.stopPropagation(); handleDateClick(new Date(currentDate)); }}
+                            onClick={(e) => { 
+                              e.stopPropagation(); 
+                              handleDateClick(new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate())); 
+                            }}
                             className={`
                               relative text-center text-xs py-2 rounded-lg transition-all duration-200 cursor-pointer aspect-square flex items-center justify-center
                               ${isCurrentMonth 

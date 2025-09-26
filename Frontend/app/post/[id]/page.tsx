@@ -332,6 +332,7 @@ function PostDetailPage() {
                       alt={`${post.user.first_name} ${post.user.last_name}'s avatar`}
                       width={48}
                       height={48}
+                      unoptimized={post.user.avatar.includes('/svg')}
                       className="w-12 h-12 rounded-full object-cover"
                     />
                   ) : (
@@ -379,6 +380,7 @@ function PostDetailPage() {
                 alt="Post image"
                 width={640}
                 height={256}
+                unoptimized={post.image_url.includes('/svg')}
                 className="w-full h-64 object-cover hover:scale-105 transition-transform duration-500"
               />
               <div className="aspect-video bg-gradient-to-br from-emerald-500/20 to-teal-500/20 flex items-center justify-center">
@@ -444,6 +446,7 @@ function PostDetailPage() {
                   alt={`${user?.first_name} ${user?.last_name}'s avatar`}
                   width={32}
                   height={32}
+                  unoptimized={user?.avatar.includes('/svg')}
                   className="w-8 h-8 rounded-full object-cover"
                 />
               ) : (
@@ -511,6 +514,7 @@ function PostDetailPage() {
                         alt={`${comment.user.first_name} ${comment.user.last_name}'s avatar`}
                         width={32}
                         height={32}
+                        unoptimized={comment.user.avatar.includes('/svg')}
                         className="w-8 h-8 rounded-full object-cover"
                       />
                     ) : (

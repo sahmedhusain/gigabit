@@ -200,6 +200,7 @@ function DirectMessagesPage() {
                             alt={getConversationName(conversation)}
                             width={48}
                             height={48}
+                            unoptimized={(getConversationAvatar(conversation)).includes('/svg')}
                             className="w-12 h-12 rounded-full border-2 border-white/20"
                           />
                           {conversation.type === 'private' && (

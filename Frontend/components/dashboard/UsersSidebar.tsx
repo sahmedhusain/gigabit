@@ -199,6 +199,7 @@ export default function UsersSidebar({ className = '', onUserClick }: UsersSideb
                       alt={`${user.first_name} ${user.last_name}`}
                       width={36}
                       height={36}
+                      unoptimized={user.avatar.includes('/svg')}
                       className="w-9 h-9 rounded-full object-cover border-2 border-white/20 group-hover:border-white/40 transition-colors"
                     />
                   ) : (

@@ -103,6 +103,7 @@ export default function PostCard({ post, onLike, onBookmark, currentSubTab }: Po
             alt="Post image" 
             width={500}
             height={300}
+            unoptimized={post.image.includes('/svg')}
             className="w-full h-auto object-cover"
             onError={(e) => {
               // Fallback to placeholder on error

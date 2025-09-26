@@ -72,6 +72,7 @@ export default function ActivitySection({
                 alt="Post content"
                 width={400}
                 height={256}
+                unoptimized={post.image.includes('/svg')}
                 className="w-full h-64 object-cover"
               />
             </div>

@@ -197,6 +197,7 @@ export default function GroupFeed({ groupId }: Props) {
                 alt="Post image"
                 width={640}
                 height={256}
+                unoptimized={post.image.includes('/svg')}
                 className="mt-3 max-w-full h-auto rounded-lg"
               />
             )}

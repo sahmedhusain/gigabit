@@ -172,6 +172,7 @@ export default function HomeFeed({
                 alt="Post content"
                 width={640}
                 height={256}
+                unoptimized={post.image.includes('/svg')}
                 className="w-full h-64 object-cover"
               />
             </div>

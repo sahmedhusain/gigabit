@@ -24,11 +24,10 @@ import {
 } from '@/lib/api'
 import { Sparkles } from 'lucide-react'
 
+// Import AppLayout instead of individual components
+import AppLayout from '@/components/AppLayout'
+
 // Import all dashboard components
-import TopBar from '@/components/dashboard/TopBar'
-import Sidebar from '@/components/dashboard/Sidebar'
-import RightSidebar from '@/components/dashboard/RightSidebar'
-import UsersSidebar from '@/components/dashboard/UsersSidebar'
 import CreatePost from '@/components/dashboard/CreatePost'
 import CreateGroup from '@/components/dashboard/CreateGroup'
 import CreateDirectMessage from '@/components/dashboard/CreateDirectMessage'
@@ -634,17 +633,13 @@ function DashboardPage() {
     }
   }
 
-  const handleChatToggle = () => {
-    if (activeTab === 'chats') {
-      // If we're already on chats, go back to previous tab
-      setActiveTab(previousTab)
-    } else {
-      // Navigate to chats tab and fetch data
-      setPreviousTab(activeTab)
-      setActiveTab('chats')
-      fetchConversations()
-      fetchGroups()
-    }
+  const handleChatClick = (chat: { conversationId: string; type: 'private' | 'group'; name: string; participantId?: number }) => {
+    setOpenChatWindow({
+      conversationId: parseInt(chat.conversationId),
+      type: chat.type,
+      name: chat.name,
+      participantId: chat.participantId
+    })
   }
 
   const handleDiscoverToggle = () => {
@@ -745,12 +740,8 @@ function DashboardPage() {
           />
         ) : (
           <ChatsSection
-            chats={chats}
-            groups={groups}
-            isLoadingChats={isLoadingChats}
-            isLoadingGroups={isLoadingGroups}
             chatSubTab={chatSubTab}
-            onChatClick={setOpenChatWindow}
+            onChatClick={handleChatClick}
             isUserOnline={isUserOnline}
             currentUser={user}
             showCreateGroup={showCreateGroup}
@@ -848,146 +839,92 @@ function DashboardPage() {
   }
 
   return (
-    <div className="min-h-screen relative overflow-hidden bg-gradient-to-br from-emerald-900 via-teal-900 to-cyan-800">
-      {/* Animated Background Elements */}
-      <div className="absolute inset-0">
-        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-emerald-500/20 rounded-full blur-3xl animate-pulse"></div>
-        <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-teal-500/20 rounded-full blur-3xl animate-pulse delay-1000"></div>
-        <div className="absolute top-3/4 left-1/2 w-64 h-64 bg-cyan-500/20 rounded-full blur-3xl animate-pulse delay-2000"></div>
-      </div>
+    <AppLayout>
+      <div className="min-h-screen relative overflow-hidden bg-gradient-to-br from-emerald-900 via-teal-900 to-cyan-800">
+        {/* Animated Background Elements */}
+        <div className="absolute inset-0">
+          <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-emerald-500/20 rounded-full blur-3xl animate-pulse"></div>
+          <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-teal-500/20 rounded-full blur-3xl animate-pulse delay-1000"></div>
+          <div className="absolute top-3/4 left-1/2 w-64 h-64 bg-cyan-500/20 rounded-full blur-3xl animate-pulse delay-2000"></div>
+        </div>
 
-      {/* Floating Particles */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        {[...Array(20)].map((_, i) => (
-          <div
-            key={i}
-            className="absolute animate-bounce floating-particle"
-          >
-            <Sparkles className="w-2 h-2 text-white/30" />
-          </div>
-        ))}
-      </div>
+        {/* Floating Particles */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          {[...Array(20)].map((_, i) => (
+            <div
+              key={i}
+              className="absolute animate-bounce floating-particle"
+            >
+              <Sparkles className="w-2 h-2 text-white/30" />
+            </div>
+          ))}
+        </div>
 
-      {(() => {
-        const chatUnreadAll = (chats || []).reduce((sum, c) => sum + (c.unread || 0), 0)
-        const chatUnreadDirect = (chats || []).filter(c => !c.isGroup).reduce((sum, c) => sum + (c.unread || 0), 0)
-        const chatUnreadGroups = (chats || []).filter(c => c.isGroup).reduce((sum, c) => sum + (c.unread || 0), 0)
-        return (
-      <Sidebar
-        isMobileMenuOpen={isMobileMenuOpen}
-        setIsMobileMenuOpen={setIsMobileMenuOpen}
-        activeTab={activeTab}
-        setActiveTab={handleTabChange}
-        feedSubTab={feedSubTab}
-        setFeedSubTab={setFeedSubTab}
-        activitySubTab={activitySubTab}
-        setActivitySubTab={setActivitySubTab}
-        chatSubTab={chatSubTab}
-        setChatSubTab={setChatSubTab}
-        eventsSubTab={eventsSubTab}
-        setEventsSubTab={setEventsSubTab}
-        chatUnreadAll={chatUnreadAll}
-        chatUnreadDirect={chatUnreadDirect}
-        chatUnreadGroups={chatUnreadGroups}
-        fetchEvents={refetchEvents}
-        currentUser={currentUser}
-        logout={logout}
-        isCollapsed={isSidebarCollapsed}
-        setIsCollapsed={setIsSidebarCollapsed}
-      />
-        )
-      })()}
+        <CreatePost
+          show={showCreatePost}
+          onClose={() => setShowCreatePost(false)}
+          newPostContent={newPostContent}
+          setNewPostContent={setNewPostContent}
+          newPostImage={newPostImage}
+          setNewPostImage={setNewPostImage}
+          postPrivacy={postPrivacy}
+          setPostPrivacy={setPostPrivacy}
+          selectedUsers={selectedUsers}
+          setSelectedUsers={setSelectedUsers}
+          availableUsers={availableUsers}
+          loadingUsers={loadingUsers}
+          onCreatePost={handleCreatePost}
+        />
 
-      <TopBar
-        isMobileMenuOpen={isMobileMenuOpen}
-        setIsMobileMenuOpen={setIsMobileMenuOpen}
-        activeTab={activeTab}
-        setActiveTab={handleTabChange}
-        onNotificationsClick={handleNotificationsToggle}
-        unreadCount={liveUnreadCount || unreadNotifications}
-        onSearchClick={handleSearchToggle}
-        onDiscoverClick={handleDiscoverToggle}
-      />
+        <CreateGeneralEvent
+          show={showCreateEvent}
+          onClose={() => setShowCreateEvent(false)}
+          onEventCreated={() => {
+            refetchEvents()
+            setShowCreateEvent(false)
+            success('Event created successfully!')
+          }}
+        />
 
-      <CreatePost
-        show={showCreatePost}
-        onClose={() => setShowCreatePost(false)}
-        newPostContent={newPostContent}
-        setNewPostContent={setNewPostContent}
-        newPostImage={newPostImage}
-        setNewPostImage={setNewPostImage}
-        postPrivacy={postPrivacy}
-        setPostPrivacy={setPostPrivacy}
-        selectedUsers={selectedUsers}
-        setSelectedUsers={setSelectedUsers}
-        availableUsers={availableUsers}
-        loadingUsers={loadingUsers}
-        onCreatePost={handleCreatePost}
-      />
+        <CreateDirectMessage
+          show={showCreateDirectMessage}
+          onClose={() => setShowCreateDirectMessage(false)}
+          followers={followers}
+          isLoading={isLoadingFollowers}
+          onStartChat={(followerId: number) => {
+            const follower = followers.find(f => f.id === followerId)
+            if (follower) {
+              const userName = `${follower.first_name} ${follower.last_name}`.trim() || follower.nickname || follower.email
+              handleStartDirectMessage(followerId, userName)
+            }
+          }}
+        />
 
-      <CreateGeneralEvent
-        show={showCreateEvent}
-        onClose={() => setShowCreateEvent(false)}
-        onEventCreated={() => {
-          refetchEvents()
-          setShowCreateEvent(false)
-          success('Event created successfully!')
-        }}
-      />
+        <CreateGroup
+          show={showCreateGroup}
+          onClose={() => setShowCreateGroup(false)}
+          onGroupCreated={() => {
+            fetchGroups()
+            setShowCreateGroup(false)
+            success('Group created successfully!')
+          }}
+        />
 
-      <CreateDirectMessage
-        show={showCreateDirectMessage}
-        onClose={() => setShowCreateDirectMessage(false)}
-        followers={followers}
-        isLoading={isLoadingFollowers}
-        onStartChat={(followerId: number) => {
-          const follower = followers.find(f => f.id === followerId)
-          if (follower) {
-            const userName = `${follower.first_name} ${follower.last_name}`.trim() || follower.nickname || follower.email
-            handleStartDirectMessage(followerId, userName)
-          }
-        }}
-      />
+        {showSearchPage && <SearchPage onClose={() => setShowSearchPage(false)} />}
 
-      <CreateGroup
-        show={showCreateGroup}
-        onClose={() => setShowCreateGroup(false)}
-        onGroupCreated={() => {
-          fetchGroups()
-          setShowCreateGroup(false)
-          success('Group created successfully!')
-        }}
-      />
-
-      {showSearchPage && <SearchPage onClose={() => setShowSearchPage(false)} />}
-
-      {/* Main Content */}
-      <div className={`main-content-layout p-2 lg:p-4 relative z-10 has-fixed-sidebar ${isSidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
-        <div className="max-w-7xl mx-auto h-full">
-          <div className="flex flex-col lg:flex-row gap-6 h-full">
-            {/* Main Content Area */}
-            <div className="flex-1 min-w-0 h-full">
-              {renderContent()}
+        {/* Main Content */}
+        <div className={`main-content-layout p-2 lg:p-4 relative z-10 has-fixed-sidebar ${isSidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
+          <div className="max-w-7xl mx-auto h-full">
+            <div className="flex flex-col lg:flex-row gap-6 h-full">
+              {/* Main Content Area */}
+              <div className="flex-1 min-w-0 h-full">
+                {renderContent()}
+              </div>
             </div>
           </div>
         </div>
       </div>
-
-      {/* Fixed Right Sidebar */}
-      <RightSidebar
-        onlineUsers={onlineUsers}
-        followingUsers={following}
-        followersUsers={followers}
-        trendingTopics={trendingTopics}
-        onUserClick={(user) => {
-          // TODO: Navigate to user profile
-          console.log('User clicked:', user)
-        }}
-        currentUser={currentUser}
-        setActiveTab={handleTabChange}
-        logout={logout}
-      />
-    </div>
+    </AppLayout>
   )
 }
 

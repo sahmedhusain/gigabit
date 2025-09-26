@@ -1,42 +1,29 @@
 'use client'
-import { useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import ProtectedRoute from '@/components/ProtectedRoute'
-
-function FeedPage() {
-  const router = useRouter()
-
-  useEffect(() => {
-    router.replace('/feed/all')
-  }, [router])
-
-  return null
-}
-
-// Wrap the entire component with ProtectedRoute
-function ProtectedFeedPage() {
-  return (
-    <ProtectedRoute>
-      <FeedPage />
-    </ProtectedRoute>
-  )
-}
-
-export default ProtectedFeedPage
+import AppLayout from '@/components/AppLayout'
+import HomeFeed from '@/components/dashboard/HomeFeed'
+import CreatePost from '@/components/dashboard/CreatePost'
+import { useAuth } from '@/context/AuthContext'
+import { useWebSocket } from '@/context/WebSocketContext'
+import { useToast } from '@/context/ToastContext'
+import { useNotifications } from '@/hooks'
+import { api, NetworkError, AuthenticationError } from '@/lib/api'
+import { getToken } from '@/lib/api'
+import { ApiClient, CreatePostRequest, ValidationError, Post } from '@/lib/api'
 
 function FeedPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { user } = useAuth()
-  const { isConnected, onlineUsers, addMessageListener } = useWebSocket()
+  const { isConnected, addMessageListener } = useWebSocket()
   const { success, error } = useToast()
   const { items: liveNotifications, unread: liveUnreadCount } = useNotifications()
 
   // Get filter from URL params
   const filterParam = searchParams.get('filter') || 'all'
   const [feedSubTab, setFeedSubTab] = useState(filterParam)
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
   const [showCreatePost, setShowCreatePost] = useState(false)
 
   // Post Creation State
@@ -50,32 +37,6 @@ function FeedPage() {
   // Data State
   const [posts, setPosts] = useState<Post[]>([])
   const [isLoadingPosts, setIsLoadingPosts] = useState(true)
-  const [followers, setFollowers] = useState<{ id: number; email: string; first_name: string; last_name: string; avatar?: string; nickname?: string; }[]>([])
-  const [following, setFollowing] = useState<{ id: number; email: string; first_name: string; last_name: string; avatar?: string; nickname?: string; }[]>([])
-
-  // Current User Processing
-  const currentUser = user ? {
-    id: user.id,
-    name: `${user.first_name} ${user.last_name}`,
-    username: user.nickname || user.email.split('@')[0],
-    avatar: user.avatar,
-    isPrivate: user.is_private,
-    email: user.email,
-    firstName: user.first_name,
-    lastName: user.last_name,
-    dateOfBirth: user.date_of_birth,
-    nickname: user.nickname,
-    aboutMe: user.about_me,
-    memberSince: user.created_at,
-    followers: 0,
-    following: 0
-  } : null
-
-  // Trending topics
-  const trendingTopics = [
-    '#SocialNetwork', '#TechNews', '#WebDev', '#AI', '#Startups',
-    '#React', '#TypeScript', '#NodeJS', '#Python', '#DevOps'
-  ]
 
   // Update URL when filter changes
   useEffect(() => {
@@ -88,7 +49,6 @@ function FeedPage() {
     if (user) {
       fetchFeedPosts()
       fetchUsers()
-      fetchFollowers()
     }
   }, [user])
 
@@ -106,8 +66,8 @@ function FeedPage() {
         case 'like':
           // Update like count in real-time for other users
           if (message.data?.post_id && message.data?.user_id !== user?.id) {
-            setPosts(prevPosts =>
-              prevPosts.map(post =>
+            setPosts((prevPosts: Post[]) =>
+              prevPosts.map((post: Post) =>
                 post.id === message.data.post_id
                   ? {
                     ...post,
@@ -185,22 +145,6 @@ function FeedPage() {
       console.error('Error fetching users:', err)
     } finally {
       setLoadingUsers(false)
-    }
-  }
-
-  const fetchFollowers = async () => {
-    if (!user) return
-
-    try {
-      const [followersData, followingData] = await Promise.all([
-        api.getFollowers(user.id),
-        api.getFollowing(user.id)
-      ])
-
-      setFollowers(Array.isArray(followersData?.followers) ? followersData.followers : [])
-      setFollowing(Array.isArray(followingData?.following) ? followingData.following : [])
-    } catch (err) {
-      console.error('Error fetching followers:', err)
     }
   }
 
@@ -282,7 +226,7 @@ function FeedPage() {
 
   const handleLikePost = async (postId: number) => {
     try {
-      const post = posts.find(p => p.id === postId)
+      const post = posts.find((p: Post) => p.id === postId)
       const wasLiked = post?.isLiked || false
 
       if (wasLiked) {
@@ -291,14 +235,14 @@ function FeedPage() {
         await api.likePost(postId)
       }
 
-      setPosts(posts.map(p =>
+      setPosts(posts.map((p: Post) =>
         p.id === postId
           ? { ...p, isLiked: !p.isLiked, likes: p.likes + (wasLiked ? -1 : 1) }
           : p
       ))
     } catch (err) {
       console.error('Error toggling like:', err)
-      setPosts(posts.map(p =>
+      setPosts(posts.map((p: Post) =>
         p.id === postId
           ? { ...p, isLiked: !p.isLiked, likes: p.likes + (p.isLiked ? -1 : 1) }
           : p
@@ -309,7 +253,7 @@ function FeedPage() {
 
   const handleBookmarkPost = async (postId: number) => {
     try {
-      const post = posts.find(p => p.id === postId)
+      const post = posts.find((p: Post) => p.id === postId)
       const wasBookmarked = post?.isBookmarked || false
 
       if (wasBookmarked) {
@@ -318,14 +262,14 @@ function FeedPage() {
         await api.toggleBookmark(postId)
       }
 
-      setPosts(posts.map(p =>
+      setPosts(posts.map((p: Post) =>
         p.id === postId
           ? { ...p, isBookmarked: !p.isBookmarked }
           : p
       ))
     } catch (err) {
       console.error('Error toggling bookmark:', err)
-      setPosts(posts.map(p =>
+      setPosts(posts.map((p: Post) =>
         p.id === postId
           ? { ...p, isBookmarked: !p.isBookmarked }
           : p
@@ -338,59 +282,12 @@ function FeedPage() {
     router.push(`/${newTab}`)
   }
 
-  const handleNotificationsToggle = () => {
-    router.push('/notifications')
-  }
-
-  const handleSearchToggle = () => {
-    router.push('/search')
-  }
-
-  const handleDiscoverToggle = () => {
-    router.push('/discover')
-  }
-
   return (
-    <div className="min-h-screen relative overflow-hidden bg-gradient-to-br from-emerald-900 via-teal-900 to-cyan-800">
-      {/* Animated Background Elements */}
-      <div className="absolute inset-0">
-        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-emerald-500/20 rounded-full blur-3xl animate-pulse"></div>
-        <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-teal-500/20 rounded-full blur-3xl animate-pulse delay-1000"></div>
-        <div className="absolute top-3/4 left-1/2 w-64 h-64 bg-cyan-500/20 rounded-full blur-3xl animate-pulse delay-2000"></div>
-      </div>
-
-      <Sidebar
-        isMobileMenuOpen={isMobileMenuOpen}
-        setIsMobileMenuOpen={setIsMobileMenuOpen}
-        activeTab="feed"
-        setActiveTab={handleTabChange}
-        feedSubTab={feedSubTab}
-        setFeedSubTab={setFeedSubTab}
-        activitySubTab="liked"
-        setActivitySubTab={() => {}}
-        chatSubTab="all"
-        setChatSubTab={() => {}}
-        chatUnreadAll={0}
-        chatUnreadDirect={0}
-        chatUnreadGroups={0}
-        fetchEvents={() => {}}
-        currentUser={currentUser}
-        logout={() => router.push('/login')}
-        isCollapsed={isSidebarCollapsed}
-        setIsCollapsed={setIsSidebarCollapsed}
-      />
-
-      <TopBar
-        isMobileMenuOpen={isMobileMenuOpen}
-        setIsMobileMenuOpen={setIsMobileMenuOpen}
-        activeTab="feed"
-        setActiveTab={handleTabChange}
-        onNotificationsClick={handleNotificationsToggle}
-        unreadCount={liveUnreadCount || 0}
-        onSearchClick={handleSearchToggle}
-        onDiscoverClick={handleDiscoverToggle}
-      />
-
+    <AppLayout 
+      activeTab="feed"
+      feedSubTab={feedSubTab}
+      setFeedSubTab={setFeedSubTab}
+    >
       <CreatePost
         show={showCreatePost}
         onClose={() => setShowCreatePost(false)}
@@ -407,52 +304,28 @@ function FeedPage() {
         onCreatePost={handleCreatePost}
       />
 
-      {/* Main Content */}
-      <div className={`main-content-layout p-2 lg:p-4 relative z-10 has-fixed-sidebar ${isSidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
-        <div className="max-w-7xl mx-auto h-full">
-          <div className="flex flex-col lg:flex-row gap-6 h-full">
-            {/* Main Content Area */}
-            <div className="flex-1 min-w-0 h-full">
-              <HomeFeed
-                posts={posts}
-                onPostLike={handleLikePost}
-                onPostBookmark={handleBookmarkPost}
-                setActiveTab={handleTabChange}
-                showCreatePost={showCreatePost}
-                setShowCreatePost={setShowCreatePost}
-                newPostContent={newPostContent}
-                setNewPostContent={setNewPostContent}
-                newPostImage={newPostImage}
-                setNewPostImage={setNewPostImage}
-                postPrivacy={postPrivacy}
-                setPostPrivacy={setPostPrivacy}
-                selectedUsers={selectedUsers}
-                setSelectedUsers={setSelectedUsers}
-                availableUsers={availableUsers}
-                loadingUsers={loadingUsers}
-                onCreatePost={handleCreatePost}
-                feedSubTab={feedSubTab}
-                setFeedSubTab={setFeedSubTab}
-              />
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Fixed Right Sidebar */}
-      <RightSidebar
-        onlineUsers={onlineUsers}
-        followingUsers={following}
-        followersUsers={followers}
-        trendingTopics={trendingTopics}
-        onUserClick={(user) => {
-          router.push(`/profile/${user.id}`)
-        }}
-        currentUser={currentUser}
+      <HomeFeed
+        posts={posts}
+        onPostLike={handleLikePost}
+        onPostBookmark={handleBookmarkPost}
         setActiveTab={handleTabChange}
-        logout={() => router.push('/login')}
+        showCreatePost={showCreatePost}
+        setShowCreatePost={setShowCreatePost}
+        newPostContent={newPostContent}
+        setNewPostContent={setNewPostContent}
+        newPostImage={newPostImage}
+        setNewPostImage={setNewPostImage}
+        postPrivacy={postPrivacy}
+        setPostPrivacy={setPostPrivacy}
+        selectedUsers={selectedUsers}
+        setSelectedUsers={setSelectedUsers}
+        availableUsers={availableUsers}
+        loadingUsers={loadingUsers}
+        onCreatePost={handleCreatePost}
+        feedSubTab={feedSubTab}
+        setFeedSubTab={setFeedSubTab}
       />
-    </div>
+    </AppLayout>
   )
 }
 

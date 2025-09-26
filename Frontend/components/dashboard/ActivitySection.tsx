@@ -25,12 +25,14 @@ export default function ActivitySection({
     if ((e.target as HTMLElement).closest('button')) {
       return
     }
-    router.push(`/post/${postId}`)
+    const url = `/post/${postId}?from=activity&subTab=${activitySubTab}`
+    router.push(url)
   }
 
   const handleCommentClick = (postId: number, e: React.MouseEvent) => {
     e.stopPropagation()
-    router.push(`/post/${postId}`)
+    const url = `/post/${postId}?from=activity&subTab=${activitySubTab}`
+    router.push(url)
   }
   // Mock data for demonstration - in real app, this would come from API
   const likedPosts = posts.filter(post => post.isLiked)

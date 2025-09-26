@@ -133,7 +133,8 @@ export default function ProfileSection({
         : (displayFollowing?.length ?? following?.length ?? 0))
 
   const handlePostClick = (postId: number) => {
-    router.push(`/post/${postId}`)
+    const url = `/post/${postId}?from=profile&userId=${currentUser?.id || ''}`
+    router.push(url)
   }
 
   return (

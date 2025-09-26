@@ -9,9 +9,10 @@ interface PostCardProps {
   post: Post
   onLike: (postId: number) => void
   onBookmark?: (postId: number) => void
+  currentSubTab?: string
 }
 
-export default function PostCard({ post, onLike, onBookmark }: PostCardProps) {
+export default function PostCard({ post, onLike, onBookmark, currentSubTab }: PostCardProps) {
   const router = useRouter()
   
   // Real-time comment integration
@@ -30,7 +31,8 @@ export default function PostCard({ post, onLike, onBookmark }: PostCardProps) {
     if ((e.target as HTMLElement).closest('button')) {
       return
     }
-    router.push(`/post/${post.id}`)
+    const url = currentSubTab ? `/post/${post.id}?from=feed&subTab=${currentSubTab}` : `/post/${post.id}`
+    router.push(url)
   }
 
   const handleLikeClick = (e: React.MouseEvent) => {
@@ -130,7 +132,8 @@ export default function PostCard({ post, onLike, onBookmark }: PostCardProps) {
             onClick={(e) => {
               e.stopPropagation()
               markNewCommentsAsRead()
-              router.push(`/post/${post.id}`)
+              const url = currentSubTab ? `/post/${post.id}?from=feed&subTab=${currentSubTab}` : `/post/${post.id}`
+              router.push(url)
             }}
             className="flex items-center space-x-1 lg:space-x-2 px-2 lg:px-4 py-1.5 lg:py-2 text-white/70 hover:text-white hover:bg-white/10 rounded-lg lg:rounded-xl transition-all duration-200 text-xs lg:text-sm relative">
             <MessageSquare className="w-3 h-3 lg:w-4 lg:h-4" />

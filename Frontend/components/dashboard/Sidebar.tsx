@@ -31,7 +31,8 @@ import {
   RefreshCw,
   Dot,
   CheckCircle,
-  XCircle
+  XCircle,
+  MessageSquare
 } from 'lucide-react'
 
 interface SidebarProps {
@@ -47,6 +48,8 @@ interface SidebarProps {
   setChatSubTab: (subTab: string) => void
   eventsSubTab: string
   setEventsSubTab: (subTab: string) => void
+  tempPostSubTab?: string
+  onTempPostClose?: () => void
   chatUnreadAll?: number
   chatUnreadDirect?: number
   chatUnreadGroups?: number
@@ -81,6 +84,27 @@ interface StatusOption {
   icon: React.ReactNode
 }
 
+interface MenuItem {
+  id: string
+  label: string
+  icon: React.ComponentType<any>
+  description: string
+  color: string
+  count?: number | string
+  onClick: () => void
+  isActive: boolean
+  isTemp?: boolean
+  onClose?: () => void
+}
+
+interface MenuSection {
+  id: 'chats' | 'feed' | 'activity' | 'events'
+  title: string
+  icon: React.ReactNode
+  description: string
+  items: MenuItem[]
+}
+
 export default function Sidebar({
   isMobileMenuOpen,
   setIsMobileMenuOpen,
@@ -94,6 +118,8 @@ export default function Sidebar({
   setChatSubTab,
   eventsSubTab,
   setEventsSubTab,
+  tempPostSubTab,
+  onTempPostClose,
   chatUnreadAll = 0,
   chatUnreadDirect = 0,
   chatUnreadGroups = 0,
@@ -113,7 +139,8 @@ export default function Sidebar({
     activeTab === 'events' ? 'events' : 
     activeTab === 'chats' ? 'chats' : 
     activeTab === 'activity' ? 'activity' :
-    'feed'
+    activeTab === 'feed' ? 'feed' :
+    null
   )
 
   // Disable collapse functionality entirely
@@ -169,7 +196,7 @@ export default function Sidebar({
     }
   ]
 
-  const menuSections = [
+  const menuSections: MenuSection[] = [
     {
       id: 'chats' as const,
       title: 'Chats',
@@ -220,6 +247,20 @@ export default function Sidebar({
       icon: <Home className="w-4 h-4" />,
       description: 'Your personalized content',
       items: [
+        ...(tempPostSubTab ? [{
+          id: `post-${tempPostSubTab}`,
+          label: `Post #${tempPostSubTab}`,
+          icon: MessageSquare,
+          description: 'Current post view',
+          color: 'from-emerald-500 to-teal-600',
+          count: undefined,
+          onClick: () => {
+            // Stay on current page
+          },
+          isActive: true,
+          isTemp: true,
+          onClose: onTempPostClose
+        }] : []),
         {
           id: 'all',
           label: 'All Posts',
@@ -230,7 +271,7 @@ export default function Sidebar({
           onClick: () => {
             router.push('/feed/all')
           },
-          isActive: activeTab === 'feed' && feedSubTab === 'all'
+          isActive: activeTab === 'feed' && feedSubTab === 'all' && !tempPostSubTab
         },
         {
           id: 'following',
@@ -242,7 +283,7 @@ export default function Sidebar({
           onClick: () => {
             router.push('/feed/following')
           },
-          isActive: activeTab === 'feed' && feedSubTab === 'following'
+          isActive: activeTab === 'feed' && feedSubTab === 'following' && !tempPostSubTab
         },
         {
           id: 'friends',
@@ -254,7 +295,7 @@ export default function Sidebar({
           onClick: () => {
             router.push('/feed/friends')
           },
-          isActive: activeTab === 'feed' && feedSubTab === 'friends'
+          isActive: activeTab === 'feed' && feedSubTab === 'friends' && !tempPostSubTab
         }
       ]
     },
@@ -507,6 +548,18 @@ export default function Sidebar({
                                   }`}>
                                     {item.label}
                                   </span>
+                                  {item.isTemp && item.onClose && (
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        item.onClose!()
+                                      }}
+                                      className="ml-auto p-2 text-white/70 hover:text-white hover:bg-white/20 rounded-lg transition-all duration-200 hover:scale-105"
+                                      title="Close"
+                                    >
+                                      <X className="w-5 h-5" />
+                                    </button>
+                                  )}
                                   {section.id === 'chats' && (() => {
                                     let count = 0
                                     if (item.id === 'all') count = chatUnreadAll

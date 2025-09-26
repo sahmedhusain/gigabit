@@ -14,10 +14,10 @@ import {
   NetworkError
 } from '@/lib/api'
 
+// Import AppLayout instead of individual components
+import AppLayout from '@/components/AppLayout'
+
 // Import dashboard components
-import TopBar from '@/components/dashboard/TopBar'
-import Sidebar from '@/components/dashboard/Sidebar'
-import RightSidebar from '@/components/dashboard/RightSidebar'
 import ChatsSection from '@/components/dashboard/ChatsSection'
 import CreateGroup from '@/components/dashboard/CreateGroup'
 import CreateDirectMessage from '@/components/dashboard/CreateDirectMessage'
@@ -33,8 +33,6 @@ function ChatsFilterPage() {
   const { conversations: liveConversations } = useConversations()
 
   const [chatSubTab, setChatSubTab] = useState(filter === 'groups' ? 'group' : filter || 'all')
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
   const [showCreateGroup, setShowCreateGroup] = useState(false)
   const [showCreateDirectMessage, setShowCreateDirectMessage] = useState(false)
 
@@ -277,64 +275,17 @@ function ChatsFilterPage() {
     router.push(`/${newTab}`)
   }
 
-  const handleNotificationsToggle = () => {
-    router.push('/notifications')
-  }
-
-  const handleSearchToggle = () => {
-    router.push('/search')
-  }
-
-  const handleDiscoverToggle = () => {
-    router.push('/discover')
-  }
-
   // Calculate unread counts
   const chatUnreadAll = (chats || []).reduce((sum, c) => sum + (c.unread || 0), 0)
   const chatUnreadDirect = (chats || []).filter(c => !c.isGroup).reduce((sum, c) => sum + (c.unread || 0), 0)
   const chatUnreadGroups = (chats || []).filter(c => c.isGroup).reduce((sum, c) => sum + (c.unread || 0), 0)
 
   return (
-    <div className="min-h-screen relative overflow-hidden bg-gradient-to-br from-emerald-900 via-teal-900 to-cyan-800">
-      {/* Animated Background Elements */}
-      <div className="absolute inset-0">
-        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-emerald-500/20 rounded-full blur-3xl animate-pulse"></div>
-        <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-teal-500/20 rounded-full blur-3xl animate-pulse delay-1000"></div>
-        <div className="absolute top-3/4 left-1/2 w-64 h-64 bg-cyan-500/20 rounded-full blur-3xl animate-pulse delay-2000"></div>
-      </div>
-
-      <Sidebar
-        isMobileMenuOpen={isMobileMenuOpen}
-        setIsMobileMenuOpen={setIsMobileMenuOpen}
-        activeTab="chats"
-        setActiveTab={handleTabChange}
-        feedSubTab="all"
-        setFeedSubTab={() => {}}
-        activitySubTab="liked"
-        setActivitySubTab={() => {}}
-        chatSubTab={chatSubTab}
-        setChatSubTab={setChatSubTab}
-        chatUnreadAll={chatUnreadAll}
-        chatUnreadDirect={chatUnreadDirect}
-        chatUnreadGroups={chatUnreadGroups}
-        fetchEvents={() => {}}
-        currentUser={currentUser}
-        logout={() => router.push('/login')}
-        isCollapsed={isSidebarCollapsed}
-        setIsCollapsed={setIsSidebarCollapsed}
-      />
-
-      <TopBar
-        isMobileMenuOpen={isMobileMenuOpen}
-        setIsMobileMenuOpen={setIsMobileMenuOpen}
-        activeTab="chats"
-        setActiveTab={handleTabChange}
-        onNotificationsClick={handleNotificationsToggle}
-        unreadCount={liveUnreadCount || 0}
-        onSearchClick={handleSearchToggle}
-        onDiscoverClick={handleDiscoverToggle}
-      />
-
+    <AppLayout 
+      activeTab="chats"
+      chatSubTab={chatSubTab}
+      setChatSubTab={setChatSubTab}
+    >
       <CreateDirectMessage
         show={showCreateDirectMessage}
         onClose={() => setShowCreateDirectMessage(false)}
@@ -359,57 +310,33 @@ function ChatsFilterPage() {
         }}
       />
 
-      {/* Main Content */}
-      <div className={`main-content-layout p-2 lg:p-4 relative z-10 has-fixed-sidebar ${isSidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
-        <div className="max-w-7xl mx-auto h-full">
-          <div className="flex flex-col lg:flex-row gap-6 h-full">
-            {/* Main Content Area */}
-            <div className="flex-1 min-w-0 h-full">
-              {openChatWindow ? (
-                <ChatWindow
-                  conversationId={openChatWindow.conversationId}
-                  conversationType={openChatWindow.type}
-                  participantName={openChatWindow.name}
-                  participantId={openChatWindow.participantId}
-                  onClose={() => setOpenChatWindow(null)}
-                />
-              ) : (
-                <ChatsSection
-                  chatSubTab={chatSubTab}
-                  onChatClick={(chat) => {
-                    setOpenChatWindow({
-                      conversationId: parseInt(chat.conversationId),
-                      type: chat.type,
-                      name: chat.name,
-                      participantId: chat.participantId
-                    });
-                  }}
-                  isUserOnline={isUserOnline}
-                  currentUser={user}
-                  showCreateGroup={showCreateGroup}
-                  setShowCreateDirectMessage={setShowCreateDirectMessage}
-                  setShowCreateGroup={setShowCreateGroup}
-                />
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Fixed Right Sidebar */}
-      <RightSidebar
-        onlineUsers={onlineUsers}
-        followingUsers={following}
-        followersUsers={followers}
-        trendingTopics={trendingTopics}
-        onUserClick={(user) => {
-          router.push(`/profile/${user.id}`)
-        }}
-        currentUser={currentUser}
-        setActiveTab={handleTabChange}
-        logout={() => router.push('/login')}
-      />
-    </div>
+      {openChatWindow ? (
+        <ChatWindow
+          conversationId={openChatWindow.conversationId}
+          conversationType={openChatWindow.type}
+          participantName={openChatWindow.name}
+          participantId={openChatWindow.participantId}
+          onClose={() => setOpenChatWindow(null)}
+        />
+      ) : (
+        <ChatsSection
+          chatSubTab={chatSubTab}
+          onChatClick={(chat) => {
+            setOpenChatWindow({
+              conversationId: parseInt(chat.conversationId),
+              type: chat.type,
+              name: chat.name,
+              participantId: chat.participantId
+            });
+          }}
+          isUserOnline={isUserOnline}
+          currentUser={user}
+          showCreateGroup={showCreateGroup}
+          setShowCreateDirectMessage={setShowCreateDirectMessage}
+          setShowCreateGroup={setShowCreateGroup}
+        />
+      )}
+    </AppLayout>
   )
 }
 

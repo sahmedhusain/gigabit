@@ -128,12 +128,14 @@ export default function HomeFeed({
     if ((e.target as HTMLElement).closest('button')) {
       return
     }
-    router.push(`/post/${postId}`)
+    const url = `/post/${postId}?from=feed&subTab=${feedSubTab}`
+    router.push(url)
   }
 
   const handleCommentClick = (postId: number, e: React.MouseEvent) => {
     e.stopPropagation()
-    router.push(`/post/${postId}`)
+    const url = `/post/${postId}?from=feed&subTab=${feedSubTab}`
+    router.push(url)
   }
 
   const getPrivacyIcon = (privacy: string) => {

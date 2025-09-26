@@ -18,10 +18,8 @@ import {
 } from '@/lib/api'
 
 // Import dashboard components
-import TopBar from '@/components/dashboard/TopBar'
-import Sidebar from '@/components/dashboard/Sidebar'
-import RightSidebar from '@/components/dashboard/RightSidebar'
 import ActivitySection from '@/components/dashboard/ActivitySection'
+import AppLayout from '@/components/AppLayout'
 
 function ActivityFilterPage() {
   const router = useRouter()
@@ -33,38 +31,10 @@ function ActivityFilterPage() {
   const { items: liveNotifications, unread: liveUnreadCount } = useNotifications()
 
   const [activitySubTab, setActivitySubTab] = useState(filter || 'liked')
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
 
   // Data State
   const [posts, setPosts] = useState<Post[]>([])
   const [isLoadingPosts, setIsLoadingPosts] = useState(true)
-  const [followers, setFollowers] = useState<{ id: number; email: string; first_name: string; last_name: string; avatar?: string; nickname?: string; }[]>([])
-  const [following, setFollowing] = useState<{ id: number; email: string; first_name: string; last_name: string; avatar?: string; nickname?: string; }[]>([])
-
-  // Current User Processing
-  const currentUser = user ? {
-    id: user.id,
-    name: `${user.first_name} ${user.last_name}`,
-    username: user.nickname || user.email.split('@')[0],
-    avatar: user.avatar,
-    isPrivate: user.is_private,
-    email: user.email,
-    firstName: user.first_name,
-    lastName: user.last_name,
-    dateOfBirth: user.date_of_birth,
-    nickname: user.nickname,
-    aboutMe: user.about_me,
-    memberSince: user.created_at,
-    followers: 0,
-    following: 0
-  } : null
-
-  // Trending topics
-  const trendingTopics = [
-    '#SocialNetwork', '#TechNews', '#WebDev', '#AI', '#Startups',
-    '#React', '#TypeScript', '#NodeJS', '#Python', '#DevOps'
-  ]
 
   // Update URL when filter changes
   useEffect(() => {
@@ -77,7 +47,6 @@ function ActivityFilterPage() {
   useEffect(() => {
     if (user) {
       fetchActivityPosts()
-      fetchFollowers()
     }
   }, [user, activitySubTab])
 
@@ -122,50 +91,62 @@ function ActivityFilterPage() {
       console.log('Fetching activity posts...')
       let response: any
 
+      let postsArr: any[] = []
+
       switch (activitySubTab) {
         case 'liked':
           // Fetch posts liked by the user
           response = await api.getUserLikedPosts()
+          postsArr = Array.isArray(response.posts) ? response.posts : [];
           break
         case 'commented':
           // Fetch posts commented by the user
           response = await api.getUserCommentedPosts()
+          postsArr = Array.isArray(response.posts) ? response.posts : [];
           break
         case 'saved':
           // Fetch saved/bookmarked posts
           response = await api.getUserBookmarks()
+          // Bookmarks response has a different structure - extract posts from bookmarks
+          const bookmarksArr = Array.isArray(response.bookmarks) ? response.bookmarks : [];
+          postsArr = bookmarksArr.map((bookmark: any) => bookmark.post).filter(Boolean);
           break
         default:
           response = await api.getUserLikedPosts()
+          postsArr = Array.isArray(response.posts) ? response.posts : [];
       }
-
-      const postsArr = Array.isArray(response.data) ? response.data : [];
       
       if (!postsArr.length) {
         setPosts([])
         return
       }
 
-      const mappedPosts = postsArr.map((post: any) => ({
-        id: post.id,
-        user: {
-          name: `${post.user.first_name} ${post.user.last_name}`,
-          username: post.user.nickname || post.user.email.split('@')[0],
-          avatar: post.user.avatar
-        },
-        content: post.content,
-        image: post.image_url ? 
-          (post.image_url.startsWith('http') ? 
-            post.image_url : 
-            `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}${post.image_url}`
-          ) : undefined,
-        likes: post.like_count,
-        comments: post.comment_count,
-        shares: 0,
-        timeAgo: formatTimeAgo(post.created_at),
-        privacy: post.privacy,
-        isLiked: post.is_liked
-      }))
+      const mappedPosts = postsArr.map((item: any) => {
+        // Handle different response structures
+        const post = activitySubTab === 'saved' ? item : item;
+        
+        return {
+          id: post.id,
+          user: {
+            name: `${post.user.first_name} ${post.user.last_name}`,
+            username: post.user.nickname || post.user.email.split('@')[0],
+            avatar: post.user.avatar
+          },
+          content: post.content,
+          image: post.image_url ? 
+            (post.image_url.startsWith('http') ? 
+              post.image_url : 
+              `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}${post.image_url}`
+            ) : undefined,
+          likes: post.like_count,
+          comments: post.comment_count,
+          shares: 0,
+          timeAgo: formatTimeAgo(post.created_at),
+          privacy: post.privacy,
+          isLiked: post.is_liked,
+          isBookmarked: post.is_bookmarked
+        }
+      })
       
       setPosts(mappedPosts)
     } catch (err) {
@@ -179,22 +160,6 @@ function ActivityFilterPage() {
       }
     } finally {
       setIsLoadingPosts(false)
-    }
-  }
-
-  const fetchFollowers = async () => {
-    if (!user) return
-
-    try {
-      const [followersData, followingData] = await Promise.all([
-        api.getFollowers(user.id),
-        api.getFollowing(user.id)
-      ])
-
-      setFollowers(Array.isArray(followersData?.followers) ? followersData.followers : [])
-      setFollowing(Array.isArray(followingData?.following) ? followingData.following : [])
-    } catch (err) {
-      console.error('Error fetching followers:', err)
     }
   }
 
@@ -269,91 +234,20 @@ function ActivityFilterPage() {
     router.push(`/${newTab}`)
   }
 
-  const handleNotificationsToggle = () => {
-    router.push('/notifications/all')
-  }
-
-  const handleSearchToggle = () => {
-    router.push('/search')
-  }
-
-  const handleDiscoverToggle = () => {
-    router.push('/discover')
-  }
-
   return (
-    <div className="min-h-screen relative overflow-hidden bg-gradient-to-br from-emerald-900 via-teal-900 to-cyan-800">
-      {/* Animated Background Elements */}
-      <div className="absolute inset-0">
-        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-emerald-500/20 rounded-full blur-3xl animate-pulse"></div>
-        <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-teal-500/20 rounded-full blur-3xl animate-pulse delay-1000"></div>
-        <div className="absolute top-3/4 left-1/2 w-64 h-64 bg-cyan-500/20 rounded-full blur-3xl animate-pulse delay-2000"></div>
-      </div>
-
-      <Sidebar
-        isMobileMenuOpen={isMobileMenuOpen}
-        setIsMobileMenuOpen={setIsMobileMenuOpen}
-        activeTab="activity"
-        setActiveTab={handleTabChange}
-        feedSubTab="all"
-        setFeedSubTab={() => {}}
+    <AppLayout 
+      activeTab="activity"
+      activitySubTab={activitySubTab}
+      setActivitySubTab={setActivitySubTab}
+    >
+      <ActivitySection
+        posts={posts}
+        onPostLike={handleLikePost}
+        onPostBookmark={handleBookmarkPost}
         activitySubTab={activitySubTab}
         setActivitySubTab={setActivitySubTab}
-        chatSubTab="all"
-        setChatSubTab={() => {}}
-        chatUnreadAll={0}
-        chatUnreadDirect={0}
-        chatUnreadGroups={0}
-        fetchEvents={() => {}}
-        currentUser={currentUser}
-        logout={() => router.push('/login')}
-        isCollapsed={isSidebarCollapsed}
-        setIsCollapsed={setIsSidebarCollapsed}
       />
-
-      <TopBar
-        isMobileMenuOpen={isMobileMenuOpen}
-        setIsMobileMenuOpen={setIsMobileMenuOpen}
-        activeTab="activity"
-        setActiveTab={handleTabChange}
-        onNotificationsClick={handleNotificationsToggle}
-        unreadCount={liveUnreadCount || 0}
-        onSearchClick={handleSearchToggle}
-        onDiscoverClick={handleDiscoverToggle}
-      />
-
-      {/* Main Content */}
-      <div className={`main-content-layout p-2 lg:p-4 relative z-10 has-fixed-sidebar ${isSidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
-        <div className="max-w-7xl mx-auto h-full">
-          <div className="flex flex-col lg:flex-row gap-6 h-full">
-            {/* Main Content Area */}
-            <div className="flex-1 min-w-0 h-full">
-              <ActivitySection
-                posts={posts}
-                onPostLike={handleLikePost}
-                onPostBookmark={handleBookmarkPost}
-                activitySubTab={activitySubTab}
-                setActivitySubTab={setActivitySubTab}
-              />
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Fixed Right Sidebar */}
-      <RightSidebar
-        onlineUsers={onlineUsers}
-        followingUsers={following}
-        followersUsers={followers}
-        trendingTopics={trendingTopics}
-        onUserClick={(user) => {
-          router.push(`/profile/${user.id}`)
-        }}
-        currentUser={currentUser}
-        setActiveTab={handleTabChange}
-        logout={() => router.push('/login')}
-      />
-    </div>
+    </AppLayout>
   )
 }
 

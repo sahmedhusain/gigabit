@@ -3,6 +3,7 @@ import "./globals.css";
 import { AuthProvider } from "@/context/AuthContext";
 import { WebSocketProvider } from "@/context/WebSocketContext";
 import { ToastProvider } from "@/context/ToastContext";
+import { SidebarDataProvider } from "@/context/SidebarDataContext";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import ThemeProvider from "@/components/ThemeProvider";
 
@@ -26,9 +27,11 @@ export default function RootLayout({
           <ErrorBoundary>
             <AuthProvider>
               <WebSocketProvider>
-                <ToastProvider>
-                  {children}
-                </ToastProvider>
+                <SidebarDataProvider>
+                  <ToastProvider>
+                    {children}
+                  </ToastProvider>
+                </SidebarDataProvider>
               </WebSocketProvider>
             </AuthProvider>
           </ErrorBoundary>

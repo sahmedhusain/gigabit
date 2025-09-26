@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"database/sql"
+	"log"
 	"net/http"
 	"strconv"
 
@@ -79,15 +81,24 @@ func (h *WebSocketHandler) CheckUserStatus(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	isOnline := h.hub.IsUserOnline(uint(userIDUint))
-	status := "offline"
-	if isOnline {
-		status = "online"
+	// Get database from context
+	db := r.Context().Value("db").(*sql.DB)
+
+	// Get user's status from database
+	var status string
+	err = db.QueryRow("SELECT status FROM users WHERE id = ?", uint(userIDUint)).Scan(&status)
+	if err != nil {
+		log.Printf("Failed to get status for user %d: %v", uint(userIDUint), err)
+		status = "offline" // Default if not found
 	}
+
+	isOnline := h.hub.IsUserOnline(uint(userIDUint))
+	// Only consider online if connected AND status is 'online'
+	actualOnline := isOnline && status == "online"
 
 	writeJSON(w, http.StatusOK, map[string]interface{}{
 		"user_id": uint(userIDUint),
 		"status":  status,
-		"online":  isOnline,
+		"online":  actualOnline,
 	})
 }

@@ -24,7 +24,8 @@ export interface WebSocketMessage {
 export interface OnlineUser {
   user_id: number
   username: string
-  is_online: boolean
+  status: 'online' | 'busy' | 'away' | 'invisible' | 'offline'
+  last_status_change?: string
 }
 
 interface WebSocketContextType {
@@ -103,18 +104,25 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
         switch (message.type) {
           case 'user_status':
             if (message.data?.online_users) {
-              setOnlineUsers(message.data.online_users)
+              // Handle initial online users list
+              const usersWithStatus = message.data.online_users.map((user: any) => ({
+                user_id: user.user_id,
+                username: user.username || `User ${user.user_id}`,
+                status: user.status || 'offline',
+                last_status_change: user.last_status_change
+              }))
+              setOnlineUsers(usersWithStatus)
             } else if (message.data?.user_id) {
+              // Handle individual user status update
               setOnlineUsers(prev => {
                 const filtered = prev.filter(u => u.user_id !== message.data.user_id)
-                if (message.data.status === 'online') {
-                  return [...filtered, {
-                    user_id: message.data.user_id,
-                    username: message.data.username || `User ${message.data.user_id}`,
-                    is_online: true
-                  }]
+                const newUser = {
+                  user_id: message.data.user_id,
+                  username: message.data.username || `User ${message.data.user_id}`,
+                  status: message.data.status || 'offline',
+                  last_status_change: message.data.last_status_change
                 }
-                return filtered
+                return [...filtered, newUser]
               })
             }
             break

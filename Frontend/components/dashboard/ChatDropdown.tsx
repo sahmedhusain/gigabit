@@ -9,7 +9,7 @@ interface Chat {
   lastMessage: string
   time: string
   unread: number
-  isOnline: boolean
+  status: 'online' | 'busy' | 'away' | 'invisible' | 'offline'
   isGroup: boolean
 }
 
@@ -35,12 +35,13 @@ export default function ChatDropdown({
   // Merge real-time conversation data with provided chats
   const enhancedChats = chats.map(chat => {
     const unreadCount = getMessageUnread(chat.id)
-    const isOnline = chat.isGroup ? false : onlineUsers.some(user => user.username === chat.name && user.is_online)
+    const onlineUser = chat.isGroup ? null : onlineUsers.find(user => user.username === chat.name)
+    const status = chat.isGroup ? 'offline' : (onlineUser?.status || 'offline')
     
     return {
       ...chat,
       unread: unreadCount,
-      isOnline: isOnline
+      status: status as 'online' | 'busy' | 'away' | 'invisible' | 'offline'
     }
   })
 
@@ -87,8 +88,13 @@ export default function ChatDropdown({
                       <User className="w-4 h-4 lg:w-5 lg:h-5 text-white" />
                     )}
                   </div>
-                  {!chat.isGroup && chat.isOnline && (
-                    <div className="absolute -bottom-0.5 -right-0.5 w-2 h-2 lg:w-3 lg:h-3 bg-green-500 rounded-full border border-white"></div>
+                  {!chat.isGroup && chat.status !== 'offline' && chat.status !== 'invisible' && (
+                    <div className={`absolute -bottom-0.5 -right-0.5 w-2 h-2 lg:w-3 lg:h-3 rounded-full border border-white ${
+                      chat.status === 'online' ? 'bg-green-500' :
+                      chat.status === 'busy' ? 'bg-red-500' :
+                      chat.status === 'away' ? 'bg-yellow-500' :
+                      'bg-gray-500'
+                    }`}></div>
                   )}
                 </div>
                 

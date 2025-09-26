@@ -5,11 +5,13 @@ import { api, User as UserType } from '@/lib/api'
 import { useAuth } from '@/context/AuthContext'
 import { useToast } from '@/context/ToastContext'
 import { useConnectionStatus } from '@/hooks'
+import { useWebSocket } from '@/context/WebSocketContext'
 import FollowHandler, { FollowStatus, getFollowStatusFromAPI, useFollowStatus } from './FollowHandler'
 
 interface UserWithFollowStatus extends UserType {
   followStatus: FollowStatus
-  isOnline?: boolean
+  status: 'online' | 'busy' | 'away' | 'invisible' | 'offline'
+  lastStatusChange?: string
 }
 
 interface UsersSidebarProps {
@@ -21,6 +23,7 @@ export default function UsersSidebar({ className = '', onUserClick }: UsersSideb
   const { user: currentUser } = useAuth()
   const { success, error, warning } = useToast()
   const { isConnected } = useConnectionStatus()
+  const { onlineUsers, addMessageListener } = useWebSocket()
   
   const [users, setUsers] = useState<UserWithFollowStatus[]>([])
   const [following, setFollowing] = useState<UserType[]>([])
@@ -29,6 +32,39 @@ export default function UsersSidebar({ className = '', onUserClick }: UsersSideb
   useEffect(() => {
     fetchUsersAndFollowing()
   }, [currentUser])
+
+  // Listen for real-time status updates
+  useEffect(() => {
+    const cleanup = addMessageListener((message) => {
+      if (message.type === 'user_status' && message.data?.user_id) {
+        setUsers(prev => prev.map(u => 
+          u.id === message.data.user_id 
+            ? { 
+                ...u, 
+                status: message.data.status || 'offline',
+                lastStatusChange: message.data.last_status_change
+              }
+            : u
+        ))
+      }
+    })
+
+    return cleanup
+  }, [addMessageListener])
+
+  // Update user statuses when onlineUsers changes
+  useEffect(() => {
+    setUsers(prev => prev.map(u => {
+      const onlineUser = onlineUsers.find(ou => ou.user_id === u.id)
+      return onlineUser 
+        ? { 
+            ...u, 
+            status: onlineUser.status,
+            lastStatusChange: onlineUser.last_status_change
+          }
+        : { ...u, status: 'offline' as const }
+    }))
+  }, [onlineUsers])
 
   const fetchUsersAndFollowing = async () => {
     if (!currentUser) return
@@ -48,14 +84,21 @@ export default function UsersSidebar({ className = '', onUserClick }: UsersSideb
       // Create a set of following user IDs for quick lookup
       const followingIds = new Set(followingUsers.map(u => u.id))
       
-      // Filter out current user and add follow status
+      // Filter out current user and add follow status and real-time status
       const usersWithStatus: UserWithFollowStatus[] = allUsers
         .filter((u: UserType) => u.id !== currentUser.id)
-        .map((u: UserType) => ({
-          ...u,
-          followStatus: getFollowStatusFromAPI(followingIds.has(u.id)),
-          isOnline: false // This would be populated from WebSocket data
-        }))
+        .map((u: UserType) => {
+          // Get real-time status from WebSocket data
+          const onlineUser = onlineUsers.find(ou => ou.user_id === u.id)
+          const status = onlineUser ? onlineUser.status : 'offline'
+          
+          return {
+            ...u,
+            followStatus: getFollowStatusFromAPI(followingIds.has(u.id)),
+            status: status as 'online' | 'busy' | 'away' | 'invisible' | 'offline',
+            lastStatusChange: onlineUser?.last_status_change
+          }
+        })
 
       setUsers(usersWithStatus)
       setFollowing(followingUsers)
@@ -157,10 +200,14 @@ export default function UsersSidebar({ className = '', onUserClick }: UsersSideb
                       <User className="w-4 h-4 text-white" />
                     </div>
                   )}
-                  {/* Online status indicator */}
+                  {/* Status indicator */}
                   {isConnected && (
                     <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-white/20 ${
-                      user.isOnline ? 'bg-green-500' : 'bg-gray-500'
+                      user.status === 'online' ? 'bg-green-500' :
+                      user.status === 'busy' ? 'bg-red-500' :
+                      user.status === 'away' ? 'bg-yellow-500' :
+                      user.status === 'invisible' ? 'bg-gray-500' :
+                      'bg-gray-400' // offline
                     }`}></div>
                   )}
                 </div>

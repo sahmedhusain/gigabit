@@ -125,8 +125,20 @@ func (h *Hub) Run() {
 			h.mu.Unlock()
 			log.Printf("Client %d connected", client.ID)
 
-			// Send user status update to other clients
-			h.broadcastUserStatus(client.ID, "online")
+			// Get user's current status from database and broadcast it
+			if h.db != nil {
+				var status string
+				err := h.db.QueryRow("SELECT status FROM users WHERE id = ?", client.ID).Scan(&status)
+				if err != nil {
+					log.Printf("Failed to get status for user %d: %v", client.ID, err)
+					status = "online" // Default fallback
+				}
+				// Broadcast the user's current status (from database)
+				h.BroadcastUserStatus(client.ID, status)
+			} else {
+				// Fallback if no database
+				h.BroadcastUserStatus(client.ID, "online")
+			}
 
 		case client := <-h.unregister:
 			h.mu.Lock()
@@ -136,8 +148,23 @@ func (h *Hub) Run() {
 				h.mu.Unlock()
 				log.Printf("Client %d disconnected", client.ID)
 
-				// Send user status update to other clients
-				h.broadcastUserStatus(client.ID, "offline")
+				// Only broadcast offline if user was online, otherwise keep their status
+				if h.db != nil {
+					var status string
+					err := h.db.QueryRow("SELECT status FROM users WHERE id = ?", client.ID).Scan(&status)
+					if err != nil {
+						log.Printf("Failed to get status for disconnecting user %d: %v", client.ID, err)
+						status = "online" // Default assumption
+					}
+					// Only broadcast offline if they were online
+					if status == "online" {
+						h.BroadcastUserStatus(client.ID, "offline")
+					}
+					// If they were busy/away/invisible, keep that status
+				} else {
+					// Fallback if no database
+					h.BroadcastUserStatus(client.ID, "offline")
+				}
 			} else {
 				h.mu.Unlock()
 			}
@@ -277,10 +304,11 @@ func (h *Hub) handleGetOnlineUsers(userID uint) {
 	onlineUsers := make([]map[string]interface{}, 0, len(h.clients))
 	for id := range h.clients {
 		// Get user info from database if available
-		var username string
+		var username, status string
+		var lastStatusChange time.Time
 		if h.db != nil {
 			var firstName, lastName string
-			err := h.db.QueryRow("SELECT first_name, last_name FROM users WHERE id = ?", id).Scan(&firstName, &lastName)
+			err := h.db.QueryRow("SELECT first_name, last_name, status, last_status_change FROM users WHERE id = ?", id).Scan(&firstName, &lastName, &status, &lastStatusChange)
 			if err == nil {
 				username = firstName + " " + lastName
 			}
@@ -291,9 +319,11 @@ func (h *Hub) handleGetOnlineUsers(userID uint) {
 		}
 
 		onlineUsers = append(onlineUsers, map[string]interface{}{
-			"user_id":   id,
-			"username":  username,
-			"is_online": true,
+			"user_id":            id,
+			"username":           username,
+			"status":             status,
+			"last_status_change": lastStatusChange.Unix(),
+			"is_online":          true,
 		})
 	}
 
@@ -312,9 +342,47 @@ func (h *Hub) handleGetOnlineUsers(userID uint) {
 
 // handleStatusChange handles user status change requests
 func (h *Hub) handleStatusChange(message Message) {
-	// For now, we only handle online/offline status automatically
-	// Custom status changes can be implemented later
-	log.Printf("Status change request from user %d", message.From)
+	if h.db == nil {
+		log.Printf("Database not available")
+		return
+	}
+
+	data, ok := message.Data.(map[string]interface{})
+	if !ok {
+		return
+	}
+
+	newStatus, ok := data["status"].(string)
+	if !ok {
+		log.Printf("Invalid status data from user %d", message.From)
+		return
+	}
+
+	// Validate status
+	validStatuses := map[string]bool{
+		"online":    true,
+		"invisible": true,
+		"busy":      true,
+		"away":      true,
+	}
+	if !validStatuses[newStatus] {
+		log.Printf("Invalid status '%s' from user %d", newStatus, message.From)
+		return
+	}
+
+	// Update status in database
+	query := `UPDATE users SET status = ?, last_status_change = ?, updated_at = ? WHERE id = ?`
+	now := time.Now()
+	_, err := h.db.Exec(query, newStatus, now, now, message.From)
+	if err != nil {
+		log.Printf("Failed to update status for user %d: %v", message.From, err)
+		return
+	}
+
+	// Broadcast status change to all connected clients
+	h.BroadcastUserStatus(message.From, newStatus)
+
+	log.Printf("User %d status changed to %s", message.From, newStatus)
 }
 
 // handleNotification sends a notification to a specific user
@@ -333,14 +401,26 @@ func (h *Hub) handleTypingIndicator(message Message) {
 	}
 }
 
-// broadcastUserStatus sends user status updates to all connected clients
-func (h *Hub) broadcastUserStatus(userID uint, status string) {
+// BroadcastUserStatus sends user status updates to all connected clients
+func (h *Hub) BroadcastUserStatus(userID uint, status string) {
+	// Get user info for the broadcast
+	var firstName, lastName string
+	if h.db != nil {
+		err := h.db.QueryRow("SELECT first_name, last_name FROM users WHERE id = ?", userID).Scan(&firstName, &lastName)
+		if err != nil {
+			log.Printf("Failed to get user info for status broadcast: %v", err)
+			firstName = "User"
+			lastName = fmt.Sprintf("%d", userID)
+		}
+	}
+
 	message := Message{
 		Type: MessageTypeUserStatus,
 		From: userID,
 		Data: map[string]interface{}{
-			"user_id": userID,
-			"status":  status,
+			"user_id":  userID,
+			"username": firstName + " " + lastName,
+			"status":   status,
 		},
 	}
 

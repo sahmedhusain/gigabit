@@ -31,6 +31,8 @@ export interface User {
   nickname: string;
   about_me: string;
   is_private: boolean;
+  status: string;
+  last_status_change: string;
   created_at: string;
   updated_at: string;
 }
@@ -846,9 +848,10 @@ export class ApiClient {
     });
   }
 
-  async getPublicStats(userId: number): Promise<{ user_id: number, display_name: string, follower_count: number, following_count: number }> {
-    return this.request<{ user_id: number, display_name: string, follower_count: number, following_count: number }>(`/api/stats/${userId}`, {
-      method: 'GET',
+  async updateUserStatus(status: string): Promise<User> {
+    return this.request<User>('/api/users/status', {
+      method: 'PUT',
+      body: JSON.stringify({ status }),
     });
   }
 

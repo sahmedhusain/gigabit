@@ -9,6 +9,8 @@ CREATE TABLE IF NOT EXISTS users (
     nickname VARCHAR(100),
     about_me TEXT,
     is_private BOOLEAN DEFAULT FALSE,
+    status VARCHAR(20) DEFAULT 'online',
+    last_status_change DATETIME DEFAULT CURRENT_TIMESTAMP,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );

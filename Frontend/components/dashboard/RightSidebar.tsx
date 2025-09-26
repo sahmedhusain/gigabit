@@ -31,6 +31,9 @@ import {
   X
 } from 'lucide-react'
 import UsersSidebar from './UsersSidebar'
+import { useWebSocket } from '@/context/WebSocketContext'
+import { api } from '@/lib/api'
+import { useToast } from '@/context/ToastContext'
 
 interface RightSidebarProps {
   onlineUsers: any[]
@@ -46,6 +49,8 @@ interface RightSidebarProps {
     isPrivate: boolean
     followers: number
     following: number
+    status: string
+    lastStatusChange: string
   } | null
   setActiveTab: (tab: string) => void
   logout: () => void
@@ -69,6 +74,8 @@ export default function RightSidebar({
   logout
 }: RightSidebarProps) {
   const router = useRouter()
+  const { sendMessage, addMessageListener } = useWebSocket()
+  const { success, error } = useToast()
   const [currentTime, setCurrentTime] = useState(new Date())
   const [isProfileDropdownOpen, setProfileDropdownOpen] = useState(false)
   const [userStatus, setUserStatus] = useState('online')
@@ -89,6 +96,41 @@ export default function RightSidebar({
     }, 60000)
     return () => clearInterval(timer)
   }, [])
+
+  // Set initial status from currentUser
+  useEffect(() => {
+    if (currentUser?.status) {
+      setUserStatus(currentUser.status)
+    }
+  }, [currentUser?.status])
+
+  // Handle status change
+  const handleStatusChange = async (newStatus: string) => {
+    if (!currentUser?.id) return
+
+    try {
+      // Call API to update status
+      await api.updateUserStatus(newStatus)
+      
+      // Update local state
+      setUserStatus(newStatus)
+      
+      // Send WebSocket message to broadcast status change
+      sendMessage({
+        type: 'user_status',
+        data: {
+          user_id: currentUser.id,
+          status: newStatus,
+          timestamp: new Date().toISOString()
+        }
+      })
+      
+      success(`Status updated to ${statusOptions.find(s => s.id === newStatus)?.label}`)
+    } catch (err) {
+      console.error('Failed to update status:', err)
+      error('Failed to update status. Please try again.')
+    }
+  }
 
   const statusOptions: StatusOption[] = [
     { id: 'online', label: 'Online', color: 'bg-green-500', icon: <Dot className="w-3 h-3 animate-pulse" /> },
@@ -312,7 +354,7 @@ export default function RightSidebar({
                     {statusOptions.map((status) => (
                       <button
                         key={status.id}
-                        onClick={() => setUserStatus(status.id)}
+                        onClick={() => handleStatusChange(status.id)}
                         className={`flex items-center space-x-2 p-2 rounded-lg text-xs transition-all duration-200 ${userStatus === status.id
                             ? 'bg-white/20 text-white'
                             : 'text-white/70 hover:bg-white/10 hover:text-white'
@@ -608,11 +650,12 @@ export default function RightSidebar({
               </h3>
               <div className="flex items-center space-x-2">
                 {(() => {
-                  // Count online users excluding current user
+                  // Count online users with status 'online' excluding current user
                   const onlineCount = onlineUsers.filter(user => 
                     (user.username !== currentUser?.username) && 
                     (user.id !== currentUser?.id) &&
-                    (user.user_id !== currentUser?.id)
+                    (user.user_id !== currentUser?.id) &&
+                    user.status === 'online'
                   ).length;
                   
                   // Only show online indicator if there are online users
@@ -684,53 +727,73 @@ export default function RightSidebar({
                         );
                       }
                       
+                      // Calculate users by status
+                      const usersByStatus = {
+                        online: sortedUsers.filter(user => {
+                          const onlineUser = onlineUsers.find(u => u.user_id === (user.id || user.user_id))
+                          return onlineUser?.status === 'online'
+                        }),
+                        busy: sortedUsers.filter(user => {
+                          const onlineUser = onlineUsers.find(u => u.user_id === (user.id || user.user_id))
+                          return onlineUser?.status === 'busy'
+                        }),
+                        away: sortedUsers.filter(user => {
+                          const onlineUser = onlineUsers.find(u => u.user_id === (user.id || user.user_id))
+                          return onlineUser?.status === 'away'
+                        }),
+                        offline: sortedUsers.filter(user => {
+                          const onlineUser = onlineUsers.find(u => u.user_id === (user.id || user.user_id))
+                          return !onlineUser || onlineUser.status === 'offline' || onlineUser.status === 'invisible'
+                        })
+                      }
+                      
                       return (
                         <>
-                          {/* Online Users Section */}
-                          {sortedOnline.length > 0 && (
+                          {/* Online Users */}
+                          {usersByStatus.online.length > 0 && (
                             <div className="mb-4">
                               <div className="flex items-center space-x-2 mb-3 px-2">
-                                <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></div>
-                                <span className="text-emerald-400 text-xs font-semibold uppercase tracking-wide">
-                                  Online ({sortedOnline.length})
+                                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                                <span className="text-green-400 text-xs font-semibold uppercase tracking-wide">
+                                  Online ({usersByStatus.online.length})
                                 </span>
                               </div>
                               <div className="space-y-1">
-                                {sortedOnline.map((followingUser, index) => {
-                                  const isMutualFriend = followerIds.has(followingUser.id || followingUser.user_id);
+                                {usersByStatus.online.map((followingUser, index) => {
+                                  const isMutualFriend = followerIds.has(followingUser.id || followingUser.user_id)
                                   const userName = followingUser.display_name || 
                                                  followingUser.name || 
                                                  (followingUser.first_name && followingUser.last_name ? 
                                                    `${followingUser.first_name} ${followingUser.last_name}` : '') ||
                                                  followingUser.username || 
-                                                 'Unknown User';
+                                                 'Unknown User'
                                   
                                   return (
                                     <div
                                       key={`online-${index}`}
-                                      className="flex items-center space-x-3 p-3 rounded-xl hover:bg-emerald-500/10 transition-all duration-300 cursor-pointer group border border-transparent hover:border-emerald-400/20"
+                                      className="flex items-center space-x-3 p-3 rounded-xl hover:bg-green-500/10 transition-all duration-300 cursor-pointer group border border-transparent hover:border-green-400/20"
                                       onClick={(e) => { e.stopPropagation(); onUserClick(followingUser); }}
                                     >
                                       <div className="relative flex-shrink-0">
                                         <img
                                           src={followingUser.avatar || followingUser.profile_image || '/default-avatar.png'}
                                           alt={followingUser.username || 'User'}
-                                          className="w-11 h-11 rounded-full border-2 border-emerald-400/50 group-hover:border-emerald-400 group-hover:scale-105 transition-all duration-300"
+                                          className="w-11 h-11 rounded-full border-2 border-green-400/50 group-hover:border-green-400 group-hover:scale-105 transition-all duration-300"
                                           onError={(e) => {
                                             const target = e.target as HTMLImageElement;
                                             target.src = '/default-avatar.png';
                                           }}
                                         />
-                                        <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-emerald-400 rounded-full border-2 border-white animate-pulse"></div>
+                                        <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-green-500 rounded-full border-2 border-white animate-pulse"></div>
                                       </div>
                                       <div className="flex-1 min-w-0">
                                         <div className="flex items-center space-x-2 mb-1">
-                                          <p className="text-sm font-semibold text-white group-hover:text-emerald-200 transition-colors truncate">
+                                          <p className="text-sm font-semibold text-white group-hover:text-green-200 transition-colors truncate">
                                             {userName}
                                           </p>
                                           {isMutualFriend && (
                                             <div title="Friend (Follows you back)" className="flex-shrink-0">
-                                              <UserCheck className="w-3.5 h-3.5 text-emerald-400" />
+                                              <UserCheck className="w-3.5 h-3.5 text-green-400" />
                                             </div>
                                           )}
                                         </div>
@@ -738,32 +801,152 @@ export default function RightSidebar({
                                           @{followingUser.username || followingUser.nickname || 'user'}
                                         </p>
                                       </div>
-                                      <ChevronRight className="w-4 h-4 text-white/40 group-hover:text-emerald-300 transition-colors" />
+                                      <ChevronRight className="w-4 h-4 text-white/40 group-hover:text-green-300 transition-colors" />
                                     </div>
                                   );
                                 })}
                               </div>
                             </div>
                           )}
-                          
-                          {/* Offline Users Section */}
-                          {sortedOffline.length > 0 && (
-                            <div>
+
+                          {/* Busy Users */}
+                          {usersByStatus.busy.length > 0 && (
+                            <div className="mb-4">
                               <div className="flex items-center space-x-2 mb-3 px-2">
-                                <div className="w-2 h-2 bg-gray-500 rounded-full"></div>
-                                <span className="text-gray-400 text-xs font-semibold uppercase tracking-wide">
-                                  Offline ({sortedOffline.length})
+                                <div className="w-2 h-2 bg-red-500 rounded-full"></div>
+                                <span className="text-red-400 text-xs font-semibold uppercase tracking-wide">
+                                  Busy ({usersByStatus.busy.length})
                                 </span>
                               </div>
                               <div className="space-y-1">
-                                {sortedOffline.map((followingUser, index) => {
-                                  const isMutualFriend = followerIds.has(followingUser.id || followingUser.user_id);
+                                {usersByStatus.busy.map((followingUser, index) => {
+                                  const isMutualFriend = followerIds.has(followingUser.id || followingUser.user_id)
                                   const userName = followingUser.display_name || 
                                                  followingUser.name || 
                                                  (followingUser.first_name && followingUser.last_name ? 
                                                    `${followingUser.first_name} ${followingUser.last_name}` : '') ||
                                                  followingUser.username || 
-                                                 'Unknown User';
+                                                 'Unknown User'
+                                  
+                                  return (
+                                    <div
+                                      key={`busy-${index}`}
+                                      className="flex items-center space-x-3 p-3 rounded-xl hover:bg-red-500/10 transition-all duration-300 cursor-pointer group border border-transparent hover:border-red-400/20"
+                                      onClick={(e) => { e.stopPropagation(); onUserClick(followingUser); }}
+                                    >
+                                      <div className="relative flex-shrink-0">
+                                        <img
+                                          src={followingUser.avatar || followingUser.profile_image || '/default-avatar.png'}
+                                          alt={followingUser.username || 'User'}
+                                          className="w-11 h-11 rounded-full border-2 border-red-400/50 group-hover:border-red-400 group-hover:scale-105 transition-all duration-300"
+                                          onError={(e) => {
+                                            const target = e.target as HTMLImageElement;
+                                            target.src = '/default-avatar.png';
+                                          }}
+                                        />
+                                        <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-red-500 rounded-full border-2 border-white"></div>
+                                      </div>
+                                      <div className="flex-1 min-w-0">
+                                        <div className="flex items-center space-x-2 mb-1">
+                                          <p className="text-sm font-semibold text-white group-hover:text-red-200 transition-colors truncate">
+                                            {userName}
+                                          </p>
+                                          {isMutualFriend && (
+                                            <div title="Friend (Follows you back)" className="flex-shrink-0">
+                                              <UserCheck className="w-3.5 h-3.5 text-red-400" />
+                                            </div>
+                                          )}
+                                        </div>
+                                        <p className="text-white/70 text-xs truncate">
+                                          @{followingUser.username || followingUser.nickname || 'user'}
+                                        </p>
+                                      </div>
+                                      <ChevronRight className="w-4 h-4 text-white/40 group-hover:text-red-300 transition-colors" />
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Away Users */}
+                          {usersByStatus.away.length > 0 && (
+                            <div className="mb-4">
+                              <div className="flex items-center space-x-2 mb-3 px-2">
+                                <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
+                                <span className="text-yellow-400 text-xs font-semibold uppercase tracking-wide">
+                                  Away ({usersByStatus.away.length})
+                                </span>
+                              </div>
+                              <div className="space-y-1">
+                                {usersByStatus.away.map((followingUser, index) => {
+                                  const isMutualFriend = followerIds.has(followingUser.id || followingUser.user_id)
+                                  const userName = followingUser.display_name || 
+                                                 followingUser.name || 
+                                                 (followingUser.first_name && followingUser.last_name ? 
+                                                   `${followingUser.first_name} ${followingUser.last_name}` : '') ||
+                                                 followingUser.username || 
+                                                 'Unknown User'
+                                  
+                                  return (
+                                    <div
+                                      key={`away-${index}`}
+                                      className="flex items-center space-x-3 p-3 rounded-xl hover:bg-yellow-500/10 transition-all duration-300 cursor-pointer group border border-transparent hover:border-yellow-400/20"
+                                      onClick={(e) => { e.stopPropagation(); onUserClick(followingUser); }}
+                                    >
+                                      <div className="relative flex-shrink-0">
+                                        <img
+                                          src={followingUser.avatar || followingUser.profile_image || '/default-avatar.png'}
+                                          alt={followingUser.username || 'User'}
+                                          className="w-11 h-11 rounded-full border-2 border-yellow-400/50 group-hover:border-yellow-400 group-hover:scale-105 transition-all duration-300"
+                                          onError={(e) => {
+                                            const target = e.target as HTMLImageElement;
+                                            target.src = '/default-avatar.png';
+                                          }}
+                                        />
+                                        <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-yellow-500 rounded-full border-2 border-white"></div>
+                                      </div>
+                                      <div className="flex-1 min-w-0">
+                                        <div className="flex items-center space-x-2 mb-1">
+                                          <p className="text-sm font-semibold text-white group-hover:text-yellow-200 transition-colors truncate">
+                                            {userName}
+                                          </p>
+                                          {isMutualFriend && (
+                                            <div title="Friend (Follows you back)" className="flex-shrink-0">
+                                              <UserCheck className="w-3.5 h-3.5 text-yellow-400" />
+                                            </div>
+                                          )}
+                                        </div>
+                                        <p className="text-white/70 text-xs truncate">
+                                          @{followingUser.username || followingUser.nickname || 'user'}
+                                        </p>
+                                      </div>
+                                      <ChevronRight className="w-4 h-4 text-white/40 group-hover:text-yellow-300 transition-colors" />
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Offline Users */}
+                          {usersByStatus.offline.length > 0 && (
+                            <div>
+                              <div className="flex items-center space-x-2 mb-3 px-2">
+                                <div className="w-2 h-2 bg-gray-500 rounded-full"></div>
+                                <span className="text-gray-400 text-xs font-semibold uppercase tracking-wide">
+                                  Offline ({usersByStatus.offline.length})
+                                </span>
+                              </div>
+                              <div className="space-y-1">
+                                {usersByStatus.offline.map((followingUser, index) => {
+                                  const isMutualFriend = followerIds.has(followingUser.id || followingUser.user_id)
+                                  const userName = followingUser.display_name || 
+                                                 followingUser.name || 
+                                                 (followingUser.first_name && followingUser.last_name ? 
+                                                   `${followingUser.first_name} ${followingUser.last_name}` : '') ||
+                                                 followingUser.username || 
+                                                 'Unknown User'
                                   
                                   return (
                                     <div
@@ -790,7 +973,7 @@ export default function RightSidebar({
                                           </p>
                                           {isMutualFriend && (
                                             <div title="Friend (Follows you back)" className="flex-shrink-0">
-                                              <UserCheck className="w-3.5 h-3.5 text-emerald-400" />
+                                              <UserCheck className="w-3.5 h-3.5 text-gray-400" />
                                             </div>
                                           )}
                                         </div>

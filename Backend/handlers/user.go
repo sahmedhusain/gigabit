@@ -9,17 +9,20 @@ import (
 	"social/middleware"
 	"social/models"
 	"social/services"
+	"social/websocket"
 )
 
 type UserHandler struct {
 	userService *services.UserService
 	db          *sql.DB
+	hub         *websocket.Hub
 }
 
-func NewUserHandler(db *sql.DB) *UserHandler {
+func NewUserHandler(db *sql.DB, hub *websocket.Hub) *UserHandler {
 	return &UserHandler{
 		userService: services.NewUserService(db),
 		db:          db,
+		hub:         hub,
 	}
 }
 
@@ -177,4 +180,54 @@ LIMIT 50
 	}
 
 	writeJSON(w, http.StatusOK, map[string]interface{}{"users": users})
+}
+
+func (h *UserHandler) UpdateStatus(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPut {
+		writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
+
+	userID, exists := middleware.GetUserID(r)
+	if !exists {
+		writeError(w, http.StatusUnauthorized, "User not authenticated")
+		return
+	}
+
+	var req struct {
+		Status string `json:"status"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	// Validate status
+	validStatuses := map[string]bool{
+		"online":    true,
+		"invisible": true,
+		"busy":      true,
+		"away":      true,
+	}
+	if !validStatuses[req.Status] {
+		writeError(w, http.StatusBadRequest, "Invalid status. Must be one of: online, invisible, busy, away")
+		return
+	}
+
+	if err := h.userService.UpdateUserStatus(userID, req.Status); err != nil {
+		writeError(w, http.StatusInternalServerError, "Failed to update status")
+		return
+	}
+
+	// Broadcast status change to all connected clients via WebSocket
+	h.hub.BroadcastUserStatus(userID, req.Status)
+
+	// Get updated user
+	user, err := h.userService.GetUserByID(userID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "Failed to get updated user")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, user.ToResponse())
 }

@@ -382,6 +382,15 @@ func (s *Server) handlePostRoute(handler *handlers.PostHandler) http.HandlerFunc
 			default:
 				writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
 			}
+		} else if len(parts) >= 2 && parts[0] == "user" {
+			userID := parts[1]
+			if r.Method != http.MethodGet {
+				writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
+				return
+			}
+			authMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				handler.GetUserPosts(w, r, userID)
+			})).ServeHTTP(w, r)
 		} else if len(parts) == 2 {
 			action := parts[1]
 			switch action {
@@ -414,15 +423,6 @@ func (s *Server) handlePostRoute(handler *handlers.PostHandler) http.HandlerFunc
 			default:
 				writeError(w, http.StatusNotFound, "Route not found")
 			}
-		} else if len(parts) >= 2 && parts[0] == "user" {
-			userID := parts[1]
-			if r.Method != http.MethodGet {
-				writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
-				return
-			}
-			authMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				handler.GetUserPosts(w, r, userID)
-			})).ServeHTTP(w, r)
 		} else {
 			writeError(w, http.StatusNotFound, "Route not found")
 		}

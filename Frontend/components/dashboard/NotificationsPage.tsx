@@ -1,6 +1,5 @@
 'use client'
-import { useState, useMemo, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useMemo } from 'react'
 import { 
   Bell, 
   Heart, 
@@ -13,12 +12,8 @@ import {
   CheckCheck, 
   Trash2, 
   Search, 
-  Filter, 
-  BellRing, 
   AlertCircle,
-  Clock,
-  Star,
-  Archive
+  Clock
 } from 'lucide-react'
 import { useNotifications } from '@/hooks/useNotifications'
 
@@ -41,7 +36,6 @@ interface NotificationFilters {
 }
 
 export default function NotificationsPage() {
-  const router = useRouter()
   const {
     items: notifications,
     unread,
@@ -228,7 +222,7 @@ export default function NotificationsPage() {
             <div className="flex gap-2">
               <select
                 value={filters.timeframe}
-                onChange={(e) => setFilters(prev => ({ ...prev, timeframe: e.target.value as any }))}
+                onChange={(e) => setFilters(prev => ({ ...prev, timeframe: e.target.value as NotificationFilters['timeframe'] }))}
                 className="px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all duration-300 backdrop-blur-sm min-w-[120px]"
                 aria-label="Filter by timeframe"
               >

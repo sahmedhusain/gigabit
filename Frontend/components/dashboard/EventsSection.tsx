@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { Calendar, MapPin, Users, Plus, Edit, Trash2, X, Clock, Check, Wifi, WifiOff } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Calendar, Users, Plus, Edit, Trash2, X, Check, Wifi, WifiOff } from 'lucide-react';
 import { api, Event, EventResponse, CreateEventRequest, UpdateEventRequest, GroupResponse } from '@/lib/api';
 import { useToast } from '@/context/ToastContext';
 import { useAuth } from '@/context/AuthContext';
@@ -34,6 +34,25 @@ interface EventDetailsModalProps {
   event: EventResponse | null;
   onEventDeleted: () => void;
   onEventUpdated: () => void;
+}
+
+interface EventResponseData {
+  responses: {
+    going: EventResponseItem[];
+    not_going: EventResponseItem[];
+  };
+  counts: {
+    going: number;
+    not_going: number;
+  };
+}
+
+interface EventResponseItem {
+  id: number;
+  user: {
+    first_name: string;
+    last_name: string;
+  };
 }
 
 const CreateEventModal: React.FC<CreateEventModalProps> = ({ isOpen, onClose, onEventCreated, groups, groupRoles }) => {
@@ -212,7 +231,7 @@ const EditEventModal: React.FC<EditEventModalProps> = ({ isOpen, onClose, event,
       success('Event updated successfully!');
       onEventUpdated();
       onClose();
-    } catch (err) {
+    } catch {
       error('Failed to update event. Please try again.');
     } finally {
       setIsLoading(false);
@@ -301,31 +320,27 @@ const EventDetailsModal: React.FC<EventDetailsModalProps> = ({
   onEventDeleted, 
   onEventUpdated 
 }) => {
-  const [responses, setResponses] = useState<any>(null);
-  const [isLoadingResponses, setIsLoadingResponses] = useState(false);
+  const [responses, setResponses] = useState<EventResponseData | null>(null);
   const [isRespondingToEvent, setIsRespondingToEvent] = useState(false);
   const [isDeletingEvent, setIsDeletingEvent] = useState(false);
   const { success, error } = useToast();
   const { user } = useAuth();
 
+  const loadEventResponses = useCallback(async () => {
+    if (!event) return;
+    try {
+      const data = await api.getEventResponses(event.id);
+      setResponses(data);
+    } catch {
+      console.error('Failed to load event responses:', 'Failed to load event responses');
+    }
+  }, [event]);
+
   useEffect(() => {
     if (event) {
       loadEventResponses();
     }
-  }, [event]);
-
-  const loadEventResponses = async () => {
-    if (!event) return;
-    setIsLoadingResponses(true);
-    try {
-      const data = await api.getEventResponses(event.id);
-      setResponses(data);
-    } catch (err) {
-      console.error('Failed to load event responses:', err);
-    } finally {
-      setIsLoadingResponses(false);
-    }
-  };
+  }, [event, loadEventResponses]);
 
   const handleEventResponse = async (option: 'going' | 'not_going') => {
     if (!event) return;
@@ -335,7 +350,7 @@ const EventDetailsModal: React.FC<EventDetailsModalProps> = ({
       success(`Marked as ${option === 'going' ? 'going' : 'not going'}!`);
       await loadEventResponses();
       onEventUpdated();
-    } catch (err) {
+    } catch {
       error('Failed to record response. Please try again.');
     } finally {
       setIsRespondingToEvent(false);
@@ -352,7 +367,7 @@ const EventDetailsModal: React.FC<EventDetailsModalProps> = ({
       success('Event deleted successfully!');
       onEventDeleted();
       onClose();
-    } catch (err) {
+    } catch {
       error('Failed to delete event. Please try again.');
     } finally {
       setIsDeletingEvent(false);
@@ -439,7 +454,7 @@ const EventDetailsModal: React.FC<EventDetailsModalProps> = ({
                 <div>
                   <h5 className="text-emerald-400 font-medium mb-2">Going ({responses.counts.going})</h5>
                   <div className="space-y-2">
-                    {responses.responses.going.map((response: any) => (
+                    {responses.responses.going.map((response: EventResponseItem) => (
                       <div key={response.id} className="flex items-center space-x-3 p-2 bg-white/5 rounded-lg">
                         <div className="w-8 h-8 bg-emerald-500 rounded-full flex items-center justify-center text-white text-sm font-medium">
                           {response.user.first_name[0]}{response.user.last_name[0]}
@@ -455,7 +470,7 @@ const EventDetailsModal: React.FC<EventDetailsModalProps> = ({
                 <div>
                   <h5 className="text-red-400 font-medium mb-2">Not Going ({responses.counts.not_going})</h5>
                   <div className="space-y-2">
-                    {responses.responses.not_going.map((response: any) => (
+                    {responses.responses.not_going.map((response: EventResponseItem) => (
                       <div key={response.id} className="flex items-center space-x-3 p-2 bg-white/5 rounded-lg">
                         <div className="w-8 h-8 bg-red-500 rounded-full flex items-center justify-center text-white text-sm font-medium">
                           {response.user.first_name[0]}{response.user.last_name[0]}
@@ -481,33 +496,16 @@ export const EventsSection: React.FC<EventsSectionProps> = ({ events, onEventsUp
   const [selectedEvent, setSelectedEvent] = useState<EventResponse | null>(null);
   const [groups, setGroups] = useState<GroupResponse[]>([]);
   const [groupRoles, setGroupRoles] = useState<{ [groupId: number]: { role: string; is_admin_or_creator: boolean } }>({});
-  const [isLoadingGroups, setIsLoadingGroups] = useState(false);
   const { user } = useAuth();
   
   // Real-time events integration
-  const {
-    events: realtimeEvents,
-    loading,
-    error: eventsError,
-    respond: handleEventResponse,
-    getUnreadCount,
-    isConnected: eventsConnected,
-    markEventAsRead
-  } = useRealTimeEvents()
+  useRealTimeEvents()
   
   // Connection status monitoring
   const { isConnected, connectionQuality } = useConnectionStatus()
-  
-  // Use real-time events if available, fallback to props
-  const displayEvents = realtimeEvents.length > 0 ? realtimeEvents : events
 
-  useEffect(() => {
-    loadUserGroups();
-  }, [user]);
-
-  const loadUserGroups = async () => {
+  const loadUserGroups = useCallback(async () => {
     if (!user) return;
-    setIsLoadingGroups(true);
     try {
       const data = await api.getUserGroups(user.id);
       const userGroups = data.data || [];
@@ -531,10 +529,12 @@ export const EventsSection: React.FC<EventsSectionProps> = ({ events, onEventsUp
       console.error('Failed to load user groups:', err);
       setGroups([]);
       setGroupRoles({});
-    } finally {
-      setIsLoadingGroups(false);
     }
-  };
+  }, [user]);
+
+  useEffect(() => {
+    loadUserGroups();
+  }, [loadUserGroups]);
 
   const handleEventClick = async (event: Event) => {
     try {

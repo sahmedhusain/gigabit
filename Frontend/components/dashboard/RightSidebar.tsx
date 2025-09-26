@@ -1,29 +1,19 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import Image from 'next/image'
 import { 
   Users, 
   Calendar, 
-  Clock,
-  Star,
   ChevronRight,
   ChevronLeft,
-  Globe,
-  MessageCircle,
-  Heart,
-  Share2,
-  User,
-  Crown,
-  Sparkles,
   MapPin,
-  Search,
-  
   Settings,
   LogOut,
   Shield,
   Zap,
   Dot,
-  UserCircle,
+  User,
   UserCheck,
   UserPlus,
   Mail,
@@ -31,17 +21,57 @@ import {
   X,
   RotateCcw
 } from 'lucide-react'
-import UsersSidebar from './UsersSidebar'
 import { useWebSocket } from '@/context/WebSocketContext'
 import { api, Event } from '@/lib/api'
 import { useToast } from '@/context/ToastContext'
 
+interface User {
+  id?: number
+  user_id?: number
+  username?: string
+  nickname?: string
+  name?: string
+  display_name?: string
+  first_name?: string
+  last_name?: string
+  avatar?: string
+  profile_image?: string
+  status?: string
+}
+
+interface FollowRequest {
+  id: number
+  requester?: {
+    id: number
+    first_name?: string
+    last_name?: string
+    nickname?: string
+    username?: string
+    avatar?: string
+  }
+  created_at: string
+}
+
+interface GroupInvitation {
+  id: number
+  group?: {
+    id: number
+    title?: string
+    creator?: {
+      id: number
+      first_name?: string
+      last_name?: string
+      avatar?: string
+    }
+  }
+  created_at: string
+}
+
 interface RightSidebarProps {
-  onlineUsers: any[]
-  followingUsers?: any[] // Add following users prop
-  followersUsers?: any[] // Add followers users prop for mutual relationships
-  trendingTopics: string[]
-  onUserClick: (user: any) => void
+  onlineUsers: User[]
+  followingUsers?: User[]
+  followersUsers?: User[]
+  onUserClick: (user: User) => void
   currentUser: {
     id: number
     name: string
@@ -68,14 +98,13 @@ export default function RightSidebar({
   onlineUsers,
   followingUsers = [], // Default to empty array
   followersUsers = [], // Default to empty array
-  trendingTopics,
   onUserClick,
   currentUser,
   setActiveTab,
   logout
 }: RightSidebarProps) {
   const router = useRouter()
-  const { sendMessage, addMessageListener } = useWebSocket()
+  const { sendMessage } = useWebSocket()
   const { success, error } = useToast()
   const [currentTime, setCurrentTime] = useState(new Date())
   const [isProfileDropdownOpen, setProfileDropdownOpen] = useState(false)
@@ -89,11 +118,10 @@ export default function RightSidebar({
   const [showEventsSlideUp, setShowEventsSlideUp] = useState(false)
   const [slideUpDate, setSlideUpDate] = useState<Date | null>(null)
   const [events, setEvents] = useState<Event[]>([])
-  const [loadingEvents, setLoadingEvents] = useState(false)
 
   // Invitations state
-  const [followRequests, setFollowRequests] = useState<any[]>([])
-  const [groupInvitations, setGroupInvitations] = useState<any[]>([])
+  const [followRequests, setFollowRequests] = useState<FollowRequest[]>([])
+  const [groupInvitations, setGroupInvitations] = useState<GroupInvitation[]>([])
   const [loadingInvitations, setLoadingInvitations] = useState(false)
 
   // Update time every minute and handle client-side hydration
@@ -118,7 +146,6 @@ export default function RightSidebar({
       if (!currentUser?.id) return
 
       try {
-        setLoadingEvents(true)
         const response = await api.getUserEvents()
         // Filter only events where user is going
         const goingEvents = response.events.filter(event => event.user_response === 'going')
@@ -126,13 +153,11 @@ export default function RightSidebar({
       } catch (err) {
         console.error('Failed to fetch events:', err)
         error('Failed to load events')
-      } finally {
-        setLoadingEvents(false)
       }
     }
 
     fetchEvents()
-  }, [currentUser?.id])
+  }, [currentUser?.id, error])
 
   // Fetch user invitations
   useEffect(() => {
@@ -159,7 +184,7 @@ export default function RightSidebar({
     }
 
     fetchInvitations()
-  }, [currentUser?.id])
+  }, [currentUser?.id, error])
 
   // Handle status change
   const handleStatusChange = async (newStatus: string) => {
@@ -294,11 +319,6 @@ export default function RightSidebar({
     setExpandedSection(expandedSection === section ? null : section)
   }
 
-  // Check if two dates are the same day
-  const isSameDay = (date1: Date, date2: Date) => {
-    return date1.toDateString() === date2.toDateString()
-  }
-
   return (
     <div className="fixed-right-sidebar">
       <div className="space-y-4">
@@ -318,9 +338,12 @@ export default function RightSidebar({
                           'bg-gradient-to-r from-gray-400 to-gray-500'
                     }`}>
                     {currentUser?.avatar ? (
-                      <img
+                      <Image
                         src={currentUser.avatar}
                         alt={currentUser.name}
+                        width={48}
+                        height={48}
+                        unoptimized={currentUser.avatar.includes('/svg')}
                         className="w-full h-full rounded-full object-cover"
                       />
                     ) : (
@@ -544,7 +567,6 @@ export default function RightSidebar({
                     {(() => {
                       const today = new Date();
                       const firstDay = new Date(calendarDate.getFullYear(), calendarDate.getMonth(), 1);
-                      const lastDay = new Date(calendarDate.getFullYear(), calendarDate.getMonth() + 1, 0);
                       const startDate = new Date(firstDay);
                       startDate.setDate(startDate.getDate() - firstDay.getDay());
                       
@@ -746,7 +768,7 @@ export default function RightSidebar({
                       );
                       
                       // Sort both groups by name
-                      const sortByName = (a: any, b: any) => {
+                      const sortByName = (a: User, b: User) => {
                         const nameA = (a.display_name || a.name || a.first_name + ' ' + a.last_name || a.username || '').toLowerCase();
                         const nameB = (b.display_name || b.name || b.first_name + ' ' + b.last_name || b.username || '').toLowerCase();
                         return nameA.localeCompare(nameB);
@@ -818,14 +840,13 @@ export default function RightSidebar({
                                       onClick={(e) => { e.stopPropagation(); onUserClick(followingUser); }}
                                     >
                                       <div className="relative flex-shrink-0">
-                                        <img
+                                        <Image
                                           src={followingUser.avatar || followingUser.profile_image || '/default-avatar.png'}
                                           alt={followingUser.username || 'User'}
+                                          width={44}
+                                          height={44}
+                                          unoptimized={(followingUser.avatar || followingUser.profile_image || '/default-avatar.png').includes('/svg')}
                                           className="w-11 h-11 rounded-full border-2 border-green-400/50 group-hover:border-green-400 group-hover:scale-105 transition-all duration-300"
-                                          onError={(e) => {
-                                            const target = e.target as HTMLImageElement;
-                                            target.src = '/default-avatar.png';
-                                          }}
                                         />
                                         <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-green-500 rounded-full border-2 border-white animate-pulse"></div>
                                       </div>
@@ -878,14 +899,13 @@ export default function RightSidebar({
                                       onClick={(e) => { e.stopPropagation(); onUserClick(followingUser); }}
                                     >
                                       <div className="relative flex-shrink-0">
-                                        <img
+                                        <Image
                                           src={followingUser.avatar || followingUser.profile_image || '/default-avatar.png'}
                                           alt={followingUser.username || 'User'}
+                                          width={44}
+                                          height={44}
+                                          unoptimized={(followingUser.avatar || followingUser.profile_image || '/default-avatar.png').includes('/svg')}
                                           className="w-11 h-11 rounded-full border-2 border-red-400/50 group-hover:border-red-400 group-hover:scale-105 transition-all duration-300"
-                                          onError={(e) => {
-                                            const target = e.target as HTMLImageElement;
-                                            target.src = '/default-avatar.png';
-                                          }}
                                         />
                                         <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-red-500 rounded-full border-2 border-white"></div>
                                       </div>
@@ -938,14 +958,13 @@ export default function RightSidebar({
                                       onClick={(e) => { e.stopPropagation(); onUserClick(followingUser); }}
                                     >
                                       <div className="relative flex-shrink-0">
-                                        <img
+                                        <Image
                                           src={followingUser.avatar || followingUser.profile_image || '/default-avatar.png'}
                                           alt={followingUser.username || 'User'}
+                                          width={44}
+                                          height={44}
+                                          unoptimized={(followingUser.avatar || followingUser.profile_image || '/default-avatar.png').includes('/svg')}
                                           className="w-11 h-11 rounded-full border-2 border-yellow-400/50 group-hover:border-yellow-400 group-hover:scale-105 transition-all duration-300"
-                                          onError={(e) => {
-                                            const target = e.target as HTMLImageElement;
-                                            target.src = '/default-avatar.png';
-                                          }}
                                         />
                                         <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-yellow-500 rounded-full border-2 border-white"></div>
                                       </div>
@@ -998,14 +1017,13 @@ export default function RightSidebar({
                                       onClick={(e) => { e.stopPropagation(); onUserClick(followingUser); }}
                                     >
                                       <div className="relative flex-shrink-0">
-                                        <img
+                                        <Image
                                           src={followingUser.avatar || followingUser.profile_image || '/default-avatar.png'}
                                           alt={followingUser.username || 'User'}
+                                          width={44}
+                                          height={44}
+                                          unoptimized={(followingUser.avatar || followingUser.profile_image || '/default-avatar.png').includes('/svg')}
                                           className="w-11 h-11 rounded-full border-2 border-gray-400/50 group-hover:border-gray-400 group-hover:scale-105 transition-all duration-300"
-                                          onError={(e) => {
-                                            const target = e.target as HTMLImageElement;
-                                            target.src = '/default-avatar.png';
-                                          }}
                                         />
                                         <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-gray-500 rounded-full border-2 border-white"></div>
                                       </div>
@@ -1091,14 +1109,13 @@ export default function RightSidebar({
                           >
                             <div className="flex items-start space-x-3">
                               <div className="relative flex-shrink-0">
-                                <img
+                                <Image
                                   src={request.requester?.avatar || '/default-avatar.png'}
                                   alt={request.requester?.first_name + ' ' + request.requester?.last_name}
+                                  width={40}
+                                  height={40}
+                                  unoptimized={(request.requester?.avatar || '/default-avatar.png').includes('/svg')}
                                   className="w-10 h-10 rounded-full border-2 border-orange-400/50 group-hover:border-orange-400 transition-colors"
-                                  onError={(e) => {
-                                    const target = e.target as HTMLImageElement;
-                                    target.src = '/default-avatar.png';
-                                  }}
                                 />
                                 <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-orange-500 rounded-full border-2 border-white flex items-center justify-center">
                                   <UserPlus className="w-2 h-2 text-white" />
@@ -1129,6 +1146,7 @@ export default function RightSidebar({
                                     onClick={async (e) => {
                                       e.stopPropagation();
                                       try {
+                                        if (!request.requester?.id) return;
                                         await api.respondToFollowRequest(request.requester.id, 'accept');
                                         setFollowRequests(prev => prev.filter(r => r.id !== request.id));
                                         success('Follow request accepted');
@@ -1146,6 +1164,7 @@ export default function RightSidebar({
                                     onClick={async (e) => {
                                       e.stopPropagation();
                                       try {
+                                        if (!request.requester?.id) return;
                                         await api.respondToFollowRequest(request.requester.id, 'decline');
                                         setFollowRequests(prev => prev.filter(r => r.id !== request.id));
                                         success('Follow request declined');
@@ -1173,14 +1192,13 @@ export default function RightSidebar({
                           >
                             <div className="flex items-start space-x-3">
                               <div className="relative flex-shrink-0">
-                                <img
+                                <Image
                                   src={invitation.group?.creator?.avatar || '/default-avatar.png'}
                                   alt={invitation.group?.creator?.first_name + ' ' + invitation.group?.creator?.last_name}
+                                  width={40}
+                                  height={40}
+                                  unoptimized={(invitation.group?.creator?.avatar || '/default-avatar.png').includes('/svg')}
                                   className="w-10 h-10 rounded-full border-2 border-orange-400/50 group-hover:border-orange-400 transition-colors"
-                                  onError={(e) => {
-                                    const target = e.target as HTMLImageElement;
-                                    target.src = '/default-avatar.png';
-                                  }}
                                 />
                                 <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-orange-500 rounded-full border-2 border-white flex items-center justify-center">
                                   <Users className="w-2 h-2 text-white" />
@@ -1211,6 +1229,7 @@ export default function RightSidebar({
                                     onClick={async (e) => {
                                       e.stopPropagation();
                                       try {
+                                        if (!invitation.group?.id) return;
                                         await api.acceptGroupInvitation(invitation.group.id);
                                         setGroupInvitations(prev => prev.filter(i => i.id !== invitation.id));
                                         success('Group invitation accepted');
@@ -1228,6 +1247,7 @@ export default function RightSidebar({
                                     onClick={async (e) => {
                                       e.stopPropagation();
                                       try {
+                                        if (!invitation.group?.id) return;
                                         await api.declineGroupInvitation(invitation.group.id);
                                         setGroupInvitations(prev => prev.filter(i => i.id !== invitation.id));
                                         success('Group invitation declined');
@@ -1253,7 +1273,7 @@ export default function RightSidebar({
                           <Mail className="w-8 h-8 text-white/40" />
                         </div>
                         <p className="text-white/60 text-base font-medium mb-2">No invitations</p>
-                        <p className="text-white/40 text-sm">You're all caught up!</p>
+                        <p className="text-white/40 text-sm">You&apos;re all caught up!</p>
                       </div>
                     )}
                   </div>

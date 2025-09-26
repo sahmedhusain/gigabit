@@ -1,7 +1,6 @@
 'use client'
 import { MessageSquare, User, Users } from 'lucide-react'
 import { useRealTimeMessages, useOnlineStatus, useConnectionStatus } from '@/hooks'
-import { useEffect } from 'react'
 
 interface Chat {
   id: number
@@ -26,9 +25,8 @@ export default function ChatDropdown({
   chats,
   onChatClick,
   onClose,
-  isUserOnline
 }: ChatDropdownProps) {
-  const { conversations, getUnreadCount: getMessageUnread } = useRealTimeMessages()
+  const { getUnreadCount: getMessageUnread } = useRealTimeMessages()
   const { onlineUsers } = useOnlineStatus()
   const { isConnected } = useConnectionStatus()
   

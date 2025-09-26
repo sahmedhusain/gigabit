@@ -1,11 +1,11 @@
 'use client'
-import { Heart, MessageCircle, Bookmark, Clock, Send } from 'lucide-react'
+import { Heart, MessageCircle, Bookmark, Send } from 'lucide-react'
 import { Post } from '@/lib/api'
 import { useRouter } from 'next/navigation'
+import Image from 'next/image'
 
 interface ActivitySectionProps {
   activitySubTab: string
-  setActivitySubTab: (tab: string) => void
   posts: Post[]
   onPostLike: (postId: number) => void
   onPostBookmark?: (postId: number) => void
@@ -13,7 +13,6 @@ interface ActivitySectionProps {
 
 export default function ActivitySection({
   activitySubTab,
-  setActivitySubTab,
   posts,
   onPostLike,
   onPostBookmark
@@ -38,8 +37,6 @@ export default function ActivitySection({
   const likedPosts = posts.filter(post => post.isLiked)
   const commentedPosts = posts.slice(0, 3) // Mock commented posts
   const savedPosts = posts.slice(0, 2) // Mock saved posts
-
-  const formatTimeAgo = (timeAgo: string) => timeAgo
 
   const renderPostCard = (post: Post, activityType: string) => (
     <div
@@ -70,9 +67,11 @@ export default function ActivitySection({
           
           {post.image && (
             <div className="mb-4 rounded-lg overflow-hidden">
-              <img
+              <Image
                 src={post.image}
                 alt="Post content"
+                width={400}
+                height={256}
                 className="w-full h-64 object-cover"
               />
             </div>
@@ -104,7 +103,6 @@ export default function ActivitySection({
               </button>
               
               <button 
-                onClick={(e) => e.stopPropagation()}
                 className="flex items-center space-x-2 text-white/60 hover:text-green-400 transition-colors"
               >
                 <Send className="w-5 h-5" />
@@ -115,7 +113,9 @@ export default function ActivitySection({
             <button 
               onClick={(e) => {
                 e.stopPropagation()
-                onPostBookmark && onPostBookmark(post.id)
+                if (onPostBookmark) {
+                  onPostBookmark(post.id)
+                }
               }}
               title={post.isBookmarked ? "Remove bookmark" : "Save post"}
               className={`p-2 rounded-lg transition-colors ${
@@ -138,24 +138,29 @@ export default function ActivitySection({
     let emptyIcon = <Heart className="w-16 h-16 text-white/30 mx-auto mb-4" />
 
     switch (activitySubTab) {
-      case 'liked':
+      case 'liked': {
         postsToShow = likedPosts
         emptyMessage = 'No liked posts yet'
         emptyIcon = <Heart className="w-16 h-16 text-white/30 mx-auto mb-4" />
         break
-      case 'commented':
+      }
+      case 'commented': {
         postsToShow = commentedPosts
         emptyMessage = 'No commented posts yet'
         emptyIcon = <MessageCircle className="w-16 h-16 text-white/30 mx-auto mb-4" />
         break
-      case 'saved':
+      }
+      case 'saved': {
         postsToShow = savedPosts
         emptyMessage = 'No saved posts yet'
         emptyIcon = <Bookmark className="w-16 h-16 text-white/30 mx-auto mb-4" />
         break
-      default:
+      }
+      default: {
         postsToShow = likedPosts
         emptyMessage = 'No activity yet'
+        break
+      }
     }
 
     if (postsToShow.length === 0) {
@@ -180,14 +185,14 @@ export default function ActivitySection({
       {/* Header */}
       <div className="flex-shrink-0 mb-6">
         <h1 className="text-2xl font-bold text-white mb-2">
-          {activitySubTab === 'liked' && 'Liked Posts'}
-          {activitySubTab === 'commented' && 'Commented Posts'}
-          {activitySubTab === 'saved' && 'Saved Posts'}
+          {activitySubTab === 'liked' ? 'Liked Posts' :
+           activitySubTab === 'commented' ? 'Commented Posts' :
+           activitySubTab === 'saved' ? 'Saved Posts' : 'Activity'}
         </h1>
         <p className="text-white/70">
-          {activitySubTab === 'liked' && 'Posts you\'ve liked'}
-          {activitySubTab === 'commented' && 'Posts you\'ve commented on'}
-          {activitySubTab === 'saved' && 'Your bookmarked posts'}
+          {activitySubTab === 'liked' ? 'Posts you\'ve liked' :
+           activitySubTab === 'commented' ? 'Posts you\'ve commented on' :
+           activitySubTab === 'saved' ? 'Your bookmarked posts' : 'Your activity'}
         </p>
       </div>
 

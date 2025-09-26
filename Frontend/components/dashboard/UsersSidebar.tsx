@@ -1,12 +1,13 @@
 'use client'
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { User, MessageCircle } from 'lucide-react'
 import { api, User as UserType } from '@/lib/api'
 import { useAuth } from '@/context/AuthContext'
 import { useToast } from '@/context/ToastContext'
 import { useConnectionStatus } from '@/hooks'
 import { useWebSocket } from '@/context/WebSocketContext'
-import FollowHandler, { FollowStatus, getFollowStatusFromAPI, useFollowStatus } from './FollowHandler'
+import FollowHandler, { FollowStatus, getFollowStatusFromAPI } from './FollowHandler'
+import Image from 'next/image'
 
 interface UserWithFollowStatus extends UserType {
   followStatus: FollowStatus
@@ -21,7 +22,7 @@ interface UsersSidebarProps {
 
 export default function UsersSidebar({ className = '', onUserClick }: UsersSidebarProps) {
   const { user: currentUser } = useAuth()
-  const { success, error, warning } = useToast()
+  const { error, warning } = useToast()
   const { isConnected } = useConnectionStatus()
   const { onlineUsers, addMessageListener } = useWebSocket()
   
@@ -29,9 +30,54 @@ export default function UsersSidebar({ className = '', onUserClick }: UsersSideb
   const [following, setFollowing] = useState<UserType[]>([])
   const [isLoading, setIsLoading] = useState(true)
 
+  const fetchUsersAndFollowing = useCallback(async () => {
+    if (!currentUser) return
+
+    try {
+      setIsLoading(true)
+      
+      // Fetch all users and current user's following list in parallel
+      const [usersResponse, followingResponse] = await Promise.all([
+        api.getUsers(),
+        api.getFollowing(currentUser.id)
+      ])
+
+      const allUsers = usersResponse.users || []
+      const followingUsers = followingResponse.following || []
+      
+      // Create a set of following user IDs for quick lookup
+      const followingIds = new Set(followingUsers.map((u: UserType) => u.id))
+      
+      // Filter out current user and add follow status and real-time status
+      const usersWithStatus: UserWithFollowStatus[] = allUsers
+        .filter((u: UserType) => u.id !== currentUser.id)
+        .map((u: UserType) => {
+          // Get real-time status from WebSocket data
+          const onlineUser = onlineUsers.find(ou => ou.user_id === u.id)
+          const status = onlineUser ? onlineUser.status : 'offline'
+          
+          return {
+            ...u,
+            followStatus: getFollowStatusFromAPI(followingIds.has(u.id)),
+            status: status as 'online' | 'busy' | 'away' | 'invisible' | 'offline',
+            lastStatusChange: onlineUser?.last_status_change
+          }
+        })
+
+      setUsers(usersWithStatus)
+      setFollowing(followingUsers)
+    } catch (err: unknown) {
+      console.error('Error fetching users:', err)
+      const msg = err instanceof Error ? err.message : String(err)
+      error(msg || 'Failed to load users')
+    } finally {
+      setIsLoading(false)
+    }
+  }, [currentUser, onlineUsers, error])
+
   useEffect(() => {
-    fetchUsersAndFollowing()
-  }, [currentUser])
+    void fetchUsersAndFollowing()
+  }, [fetchUsersAndFollowing])
 
   // Listen for real-time status updates
   useEffect(() => {
@@ -66,49 +112,7 @@ export default function UsersSidebar({ className = '', onUserClick }: UsersSideb
     }))
   }, [onlineUsers])
 
-  const fetchUsersAndFollowing = async () => {
-    if (!currentUser) return
 
-    try {
-      setIsLoading(true)
-      
-      // Fetch all users and current user's following list in parallel
-      const [usersResponse, followingResponse] = await Promise.all([
-        api.getUsers(),
-        api.getFollowing(currentUser.id)
-      ])
-
-      const allUsers = usersResponse.users || []
-      const followingUsers = followingResponse.following || []
-      
-      // Create a set of following user IDs for quick lookup
-      const followingIds = new Set(followingUsers.map(u => u.id))
-      
-      // Filter out current user and add follow status and real-time status
-      const usersWithStatus: UserWithFollowStatus[] = allUsers
-        .filter((u: UserType) => u.id !== currentUser.id)
-        .map((u: UserType) => {
-          // Get real-time status from WebSocket data
-          const onlineUser = onlineUsers.find(ou => ou.user_id === u.id)
-          const status = onlineUser ? onlineUser.status : 'offline'
-          
-          return {
-            ...u,
-            followStatus: getFollowStatusFromAPI(followingIds.has(u.id)),
-            status: status as 'online' | 'busy' | 'away' | 'invisible' | 'offline',
-            lastStatusChange: onlineUser?.last_status_change
-          }
-        })
-
-      setUsers(usersWithStatus)
-      setFollowing(followingUsers)
-    } catch (err) {
-      console.error('Error fetching users:', err)
-      error('Failed to load users')
-    } finally {
-      setIsLoading(false)
-    }
-  }
 
   const handleFollowStatusChange = (userId: number, newStatus: FollowStatus) => {
     // Update the user's follow status in the list
@@ -172,7 +176,7 @@ export default function UsersSidebar({ className = '', onUserClick }: UsersSideb
       
       {!isConnected && (
         <div className="mb-4 p-3 bg-yellow-500/10 border border-yellow-400/20 rounded-xl">
-          <p className="text-yellow-400 text-sm">You're offline. Follow actions are disabled.</p>
+          <p className="text-yellow-400 text-sm">You are offline. Follow actions are disabled.</p>
         </div>
       )}
       
@@ -190,9 +194,11 @@ export default function UsersSidebar({ className = '', onUserClick }: UsersSideb
               >
                 <div className="relative flex-shrink-0">
                   {user.avatar ? (
-                    <img 
-                      src={user.avatar} 
+                    <Image
+                      src={user.avatar}
                       alt={`${user.first_name} ${user.last_name}`}
+                      width={36}
+                      height={36}
                       className="w-9 h-9 rounded-full object-cover border-2 border-white/20 group-hover:border-white/40 transition-colors"
                     />
                   ) : (

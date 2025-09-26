@@ -5,7 +5,6 @@ import { useAuth } from '@/context/AuthContext'
 
 export interface UserStatus extends OnlineUser {
   lastSeen?: string
-  status?: 'online' | 'offline' | 'away' | 'busy'
 }
 
 export function useOnlineStatus() {
@@ -20,7 +19,7 @@ export function useOnlineStatus() {
     onlineUsers.forEach(onlineUser => {
       statusMap.set(onlineUser.user_id, {
         ...onlineUser,
-        status: onlineUser.is_online ? 'online' : 'offline'
+        lastSeen: onlineUser.status !== 'online' ? onlineUser.last_status_change : undefined
       })
     })
     
@@ -29,7 +28,7 @@ export function useOnlineStatus() {
 
   const isUserOnline = useCallback((userId: number): boolean => {
     const userStatus = userStatuses.get(userId)
-    return userStatus?.is_online || false
+    return userStatus?.status === 'online' || false
   }, [userStatuses])
 
   const getUserStatus = useCallback((userId: number): UserStatus | null => {
@@ -50,11 +49,11 @@ export function useOnlineStatus() {
   }, [isConnected, user, sendMessage])
 
   const getOnlineCount = useCallback((): number => {
-    return Array.from(userStatuses.values()).filter(status => status.is_online).length
+    return Array.from(userStatuses.values()).filter(status => status.status === 'online').length
   }, [userStatuses])
 
   const getOnlineUsers = useCallback((): UserStatus[] => {
-    return Array.from(userStatuses.values()).filter(status => status.is_online)
+    return Array.from(userStatuses.values()).filter(status => status.status === 'online')
   }, [userStatuses])
 
   const refreshOnlineUsers = useCallback(() => {

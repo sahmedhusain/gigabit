@@ -1,9 +1,17 @@
 'use client'
 import { X, Camera, Image as ImageIcon, Globe, Users, Lock, User, Check } from 'lucide-react'
-import { CreatePostRequest, api } from '@/lib/api'
-import { ChangeEvent, useRef, useState } from 'react'
+import { ChangeEvent, useRef } from 'react'
 import { useOptimisticUpdate, useConnectionStatus, useUpload } from '@/hooks'
 import { useToast } from '@/context/ToastContext'
+
+interface UserOption {
+  id: number
+  display_name?: string
+  first_name: string
+  last_name: string
+  nickname?: string
+  email: string
+}
 
 interface CreatePostProps {
   show: boolean
@@ -16,7 +24,7 @@ interface CreatePostProps {
   setPostPrivacy: (privacy: string) => void
   selectedUsers: number[]
   setSelectedUsers: (users: number[]) => void
-  availableUsers: any[]
+  availableUsers: UserOption[]
   loadingUsers: boolean
   onCreatePost: () => void
 }
@@ -39,10 +47,9 @@ export default function CreatePost({
   onCreatePost
 }: CreatePostProps) {
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const [uploadError, setUploadError] = useState<string>('')
-  const { success, error } = useToast()
+  const { success, error: toastError } = useToast()
   const { isConnected } = useConnectionStatus()
-  const { progress, isUploading, uploadImage: uploadFile } = useUpload()
+  const { progress, isUploading } = useUpload()
   
   const { isLoading, performUpdate } = useOptimisticUpdate({
     onSuccess: () => {
@@ -61,14 +68,15 @@ export default function CreatePost({
       }
       onClose()
     },
-    onError: (error: any) => {
-      error(`Failed to create post: ${error.message}`)
+    onError: (err: unknown) => {
+      const message = err instanceof Error ? err.message : String(err)
+      toastError(`Failed to create post: ${message}`)
     }
   })
 
   const handleCreatePost = async () => {
     if (!isConnected) {
-      error('Cannot create post while offline')
+      toastError('Cannot create post while offline')
       return
     }
     
@@ -90,41 +98,14 @@ export default function CreatePost({
     const file = event.target.files?.[0]
     if (file) {
       setNewPostImage(file)
-      setUploadError('') // Clear any previous error
     }
   }
 
   // remove selected image
   const removeImage = () => {
     setNewPostImage(null)
-    setUploadError('')
     if (fileInputRef.current) {
       fileInputRef.current.value = ''
-    }
-  }
-
-  const uploadImage = async (file: File): Promise<string | null> => {
-    try {
-      const formData = new FormData()
-      formData.append('image', file)
-
-      const response = await fetch ('/api/uploads', {
-        method: 'POST',
-        body: formData,
-        credentials: 'include'
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || "Failed to upload image")
-      }
-
-      const data = await response.json()
-      return data.filename
-    } catch (error) {
-      console.error("Image upload error:", error)
-      setUploadError(error instanceof Error ? error.message : "Failed to upload image")
-      return null
     }
   }
 
@@ -169,7 +150,7 @@ export default function CreatePost({
             <div className="space-y-3">
               <label className="text-white font-semibold text-sm lg:text-base flex items-center space-x-2">
                 <div className="w-2 h-2 bg-emerald-400 rounded-full"></div>
-                <span>What's on your mind?</span>
+                <span>What&apos;s on your mind?</span>
               </label>
               <div className="relative">
                 <textarea
@@ -247,8 +228,11 @@ export default function CreatePost({
                   <span className="text-white/70 text-sm">{progress}%</span>
                 </div>
                 <div className="w-full bg-white/20 rounded-full h-3">
+                  {/* eslint-disable-next-line @typescript-eslint/ban-ts-comment */}
+                  {/* inline style used for dynamic width */}
                   <div
                     className="bg-gradient-to-r from-emerald-500 via-teal-600 to-cyan-600 h-3 rounded-full transition-all duration-500 shadow-sm"
+                    // eslint-disable-next-line react/forbid-dom-props
                     style={{ width: `${Math.min(100, Math.max(0, progress))}%` }}
                   />
                 </div>
@@ -257,8 +241,8 @@ export default function CreatePost({
 
             {/* Connection Status */}
             {!isConnected && (
-              <div className="bg-gradient-to-r from-red-500/20 to-pink-500/20 border border-red-400/30 rounded-2xl p-4 animate-in slide-in-from-top-2 duration-300">
-                <p className="text-red-300 text-sm font-medium">You're currently offline. Post will be created when connection is restored.</p>
+        <div className="bg-gradient-to-r from-red-500/20 to-pink-500/20 border border-red-400/30 rounded-2xl p-4 animate-in slide-in-from-top-2 duration-300">
+          <p className="text-red-300 text-sm font-medium">You are currently offline. Post will be created when connection is restored.</p>
               </div>
             )}
 

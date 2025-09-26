@@ -20,8 +20,8 @@ export function useFollowers() {
         api.getFollowers(user.id),
         api.getFollowing(user.id)
       ])
-      setFollowers(Array.isArray(foll?.data) ? foll.data : [])
-      setFollowing(Array.isArray(follg?.data) ? follg.data : [])
+      setFollowers(Array.isArray(foll?.followers) ? foll.followers : [])
+      setFollowing(Array.isArray(follg?.following) ? follg.following : [])
     } catch (e: any) {
       setErr(e?.message || 'Failed to load followers')
       error('Failed to load followers.')

@@ -1,11 +1,9 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
-import { useAuth } from '@/context/AuthContext'
-import { useWebSocket } from '@/context/WebSocketContext'
-import { api, API_BASE_URL } from '@/lib/api'
+import { API_BASE_URL } from '@/lib/api'
 import ChatWindow from '@/components/ChatWindow'
-import { MessageCircle, Users, Hash, User } from 'lucide-react'
+import { MessageCircle, Users, Hash } from 'lucide-react'
 import { useRealTimeMessages, useOnlineStatus, useConnectionStatus } from '@/hooks'
 
 interface GroupChatProps {
@@ -14,18 +12,16 @@ interface GroupChatProps {
 }
 
 const GroupChat: React.FC<GroupChatProps> = ({ groupId, groupTitle }) => {
-  const { user } = useAuth()
-  const { isConnected, onlineUsers } = useWebSocket()
   const { isConnected: connectionStatus } = useConnectionStatus()
   const { onlineUsers: liveOnlineUsers } = useOnlineStatus()
-  const { getUnreadCount, conversations } = useRealTimeMessages()
+  const { getUnreadCount } = useRealTimeMessages()
   
   const [showChat, setShowChat] = useState(false)
   const [memberCount, setMemberCount] = useState(0)
-  const [recentMessages, setRecentMessages] = useState<any[]>([])
+  const [recentMessages, setRecentMessages] = useState<unknown[]>([])
 
   // Calculate online member count from real-time data
-  const onlineMemberCount = liveOnlineUsers.filter(user => user.is_online).length
+  const onlineMemberCount = liveOnlineUsers.filter(user => user.status === 'online').length
   const unreadCount = getUnreadCount(groupId)
 
   useEffect(() => {
@@ -155,26 +151,33 @@ const GroupChat: React.FC<GroupChatProps> = ({ groupId, groupTitle }) => {
               {recentMessages.length > 0 && (
                 <div className="space-y-2">
                   <h5 className="text-white/80 text-sm font-medium mb-2">Recent Messages</h5>
-                  {recentMessages.slice(0, 3).map((message, index) => (
-                    <div key={message.id || index} className="bg-white/5 rounded-lg p-3 border border-white/10">
-                      <div className="flex items-center space-x-2 mb-1">
-                        <div className="w-6 h-6 bg-gradient-to-r from-emerald-500 to-teal-600 rounded-full flex items-center justify-center">
-                          <span className="text-white text-xs font-semibold">
-                            {message.sender?.first_name?.[0] || message.sender?.nickname?.[0] || 'U'}
-                          </span>
-                        </div>
-                        <span className="text-white/80 text-sm font-medium">
-                          {message.sender?.first_name && message.sender?.last_name
-                            ? `${message.sender.first_name} ${message.sender.last_name}`
-                            : message.sender?.nickname || 'Unknown User'}
-                        </span>
-                        <span className="text-white/50 text-xs">
-                          {new Date(message.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                        </span>
-                      </div>
-                      <p className="text-white/70 text-sm truncate">{message.content}</p>
-                    </div>
-                  ))}
+                        {recentMessages.slice(0, 3).map((message, index) => {
+                          const m = (message as Record<string, unknown>) || {};
+                          const sender = (m.sender as Record<string, unknown>) || {};
+                          const senderInitial = typeof sender.first_name === 'string' && sender.first_name.length > 0
+                            ? (sender.first_name as string)[0]
+                            : (typeof sender.nickname === 'string' && sender.nickname.length > 0 ? (sender.nickname as string)[0] : 'U');
+
+                          const senderName = (typeof sender.first_name === 'string' && typeof sender.last_name === 'string')
+                            ? `${sender.first_name} ${sender.last_name}`
+                            : (typeof sender.nickname === 'string' ? sender.nickname : 'Unknown User');
+
+                          const createdAt = typeof m.created_at === 'string' ? new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+                          const content = typeof m.content === 'string' ? m.content : '';
+
+                          return (
+                            <div key={(m.id as string) || index} className="bg-white/5 rounded-lg p-3 border border-white/10">
+                              <div className="flex items-center space-x-2 mb-1">
+                                <div className="w-6 h-6 bg-gradient-to-r from-emerald-500 to-teal-600 rounded-full flex items-center justify-center">
+                                  <span className="text-white text-xs font-semibold">{senderInitial}</span>
+                                </div>
+                                <span className="text-white/80 text-sm font-medium">{senderName}</span>
+                                <span className="text-white/50 text-xs">{createdAt}</span>
+                              </div>
+                              <p className="text-white/70 text-sm truncate">{content}</p>
+                            </div>
+                          );
+                        })}
                 </div>
               )}
 

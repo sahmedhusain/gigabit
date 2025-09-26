@@ -14,7 +14,6 @@ import {
   Post,
   type Notification as NotificationType,
   Group,
-  Event,
   Chat,
   NetworkError,
   ValidationError,
@@ -45,39 +44,39 @@ import {
 } from '@/components/dashboard/DashboardSections'
 
 function DashboardPage() {
-  const router = useRouter()
-  const { user, logout, checkAuth } = useAuth()
-  const { isConnected, onlineUsers, addMessageListener, sendMessage } = useWebSocket()
-  const { success, error, warning } = useToast()
-  const { isOffline, lastConnectionCheck } = useOffline()
+  const _router = useRouter()
+  const { user, logout: _logout, checkAuth } = useAuth()
+  const { isConnected, onlineUsers, addMessageListener, sendMessage: _sendMessage } = useWebSocket()
+  const { success, error, warning: _warning } = useToast()
+  const { isOffline: _isOffline, lastConnectionCheck: _lastConnectionCheck } = useOffline()
   
   // Real-time hooks
-  const { isConnected: connectionStatus } = useConnectionStatus()
-  const { posts: livePosts, isLoading: postsLoading } = useRealTimePosts()
-  const { items: liveNotifications, unread: liveUnreadCount } = useNotifications()
-  const { groups: liveGroups } = useRealTimeGroups()
+  const { isConnected: _connectionStatus } = useConnectionStatus()
+  const { posts: _livePosts, isLoading: _postsLoading } = useRealTimePosts()
+  const { items: _liveNotifications, unread: _liveUnreadCount } = useNotifications()
+  const { groups: _liveGroups } = useRealTimeGroups()
   const { 
     events: liveEvents, 
     loading: eventsLoading, 
     respond: respondToEvent,
     refetch: refetchEvents 
   } = useRealTimeEvents()
-  const { conversations: liveConversations } = useConversations()
+  const { conversations: _liveConversations } = useConversations()
 
   // UI State
   const [activeTab, setActiveTab] = useState('feed')
   const [previousTab, setPreviousTab] = useState('feed')
   const [feedSubTab, setFeedSubTab] = useState('all')
   const [activitySubTab, setActivitySubTab] = useState('liked')
-  const [chatSubTab, setChatSubTab] = useState('all')
-  const [eventsSubTab, setEventsSubTab] = useState('all')
+  const [chatSubTab, _setChatSubTab] = useState('all')
+  const [eventsSubTab, _setEventsSubTab] = useState('all')
   const [showCreatePost, setShowCreatePost] = useState(false)
   const [showCreateGroup, setShowCreateGroup] = useState(false)
   const [showCreateEvent, setShowCreateEvent] = useState(false)
   const [showCreateDirectMessage, setShowCreateDirectMessage] = useState(false)
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+  const [_isMobileMenuOpen, _setIsMobileMenuOpen] = useState(false)
   const [showSearchPage, setShowSearchPage] = useState(false)
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
+  const [_isSidebarCollapsed, _setIsSidebarCollapsed] = useState(false)
 
   // Post Creation State
   const [newPostContent, setNewPostContent] = useState('')
@@ -89,16 +88,16 @@ function DashboardPage() {
 
   // Data State - Use real-time data when available
   const [posts, setPosts] = useState<Post[]>([])
-  const [isLoadingPosts, setIsLoadingPosts] = useState(true)
+  const [_isLoadingPosts, setIsLoadingPosts] = useState(true)
   const [notifications, setNotifications] = useState<NotificationType[]>([])
   const [isLoadingNotifications, setIsLoadingNotifications] = useState(false)
-  const [groups, setGroups] = useState<Group[]>([])
-  const [isLoadingGroups, setIsLoadingGroups] = useState(false)
+  const [_groups, setGroups] = useState<Group[]>([])
+  const [_isLoadingGroups, setIsLoadingGroups] = useState(false)
   const [chats, setChats] = useState<Chat[]>([])
-  const [isLoadingChats, setIsLoadingChats] = useState(false)
-  const [unreadNotifications, setUnreadNotifications] = useState(0)
-  const [isSearching, setIsSearching] = useState(false)
-  const [isLoadingTrending, setIsLoadingTrending] = useState(false)
+  const [_isLoadingChats, setIsLoadingChats] = useState(false)
+  const [_unreadNotifications, setUnreadNotifications] = useState(0)
+  const [_isSearching, _setIsSearching] = useState(false)
+  const [_isLoadingTrending, _setIsLoadingTrending] = useState(false)
   const [openChatWindow, setOpenChatWindow] = useState<{
     conversationId: number
     type: 'private' | 'group',
@@ -110,7 +109,7 @@ function DashboardPage() {
   const [isLoadingFollowers, setIsLoadingFollowers] = useState(false)
 
   // Data for trending topics (can be expanded later)
-  const trendingTopics = [
+  const _trendingTopics = [
     '#SocialNetwork', '#TechNews', '#WebDev', '#AI', '#Startups',
     '#React', '#TypeScript', '#NodeJS', '#Python', '#DevOps'
   ]
@@ -139,7 +138,7 @@ function DashboardPage() {
     try {
       await checkAuth()
       console.log('Token still valid')
-    } catch (error) {
+    } catch (_error) {
       console.log('Token expired or invalid')
     }
   }
@@ -261,7 +260,7 @@ function DashboardPage() {
           if (chat.isGroup) return chat // Groups don't have online status
           
           const isOnline = chat.participantId 
-            ? onlineUsers.some(u => u.user_id === chat.participantId && u.is_online)
+            ? onlineUsers.some(u => u.user_id === chat.participantId && u.status === 'online')
             : false
           
           return { ...chat, isOnline }
@@ -277,33 +276,36 @@ function DashboardPage() {
       console.log('Fetching feed posts...')
       const response = await api.getFeed(20, 0)
       console.log('Feed API response:', response)
-      const postsArr = Array.isArray(response.data) ? response.data : [];
+  const postsArr = Array.isArray(response.data) ? response.data as unknown[] : [];
       console.log('Posts array:', postsArr)
       if (!postsArr.length) {
         setPosts([])
         console.log('No posts found in response')
         return
       }
-      const mappedPosts = postsArr.map((post: any) => ({
-        id: post.id,
-        user: {
-          name: `${post.user.first_name} ${post.user.last_name}`,
-          username: post.user.nickname || post.user.email.split('@')[0],
-          avatar: post.user.avatar
-        },
-        content: post.content,
-        image: post.image_url ? 
-          (post.image_url.startsWith('http') ? 
-            post.image_url : 
-            `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}${post.image_url}`
-          ) : undefined,
-        likes: post.like_count,
-        comments: post.comment_count,
-        shares: 0,
-        timeAgo: formatTimeAgo(post.created_at),
-        privacy: post.privacy,
-        isLiked: post.is_liked
-      }))
+      const mappedPosts = postsArr.map((post: unknown) => {
+        const p = post as Record<string, unknown>
+        const userObj = p['user'] as Record<string, unknown> | undefined
+
+        const imageUrl = typeof p['image_url'] === 'string' ? String(p['image_url']) : undefined
+
+        return {
+          id: Number(p['id']) || 0,
+          user: {
+            name: userObj ? `${String(userObj['first_name'] ?? '')} ${String(userObj['last_name'] ?? '')}` : 'Unknown',
+            username: userObj ? String(userObj['nickname'] ?? userObj['email'] ?? '').split('@')[0] : 'unknown',
+            avatar: userObj ? String(userObj['avatar'] ?? '') : ''
+          },
+          content: typeof p['content'] === 'string' ? String(p['content']) : '',
+          image: imageUrl ? (imageUrl.startsWith('http') ? imageUrl : `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}${imageUrl}`) : undefined,
+          likes: Number(p['like_count']) || 0,
+          comments: Number(p['comment_count']) || 0,
+          shares: 0,
+          timeAgo: formatTimeAgo(String(p['created_at'] ?? '')),
+          privacy: String(p['privacy'] ?? ''),
+          isLiked: Boolean(p['is_liked'])
+        }
+      })
       console.log('Mapped posts:', mappedPosts)
       setPosts(mappedPosts)
     } catch (err) {
@@ -320,7 +322,7 @@ function DashboardPage() {
     }
   }
 
-  const fetchNotifications = async () => {
+  const _fetchNotifications = async () => {
     try {
       setIsLoadingNotifications(true)
       const data = await api.getNotifications(20, 0)
@@ -348,17 +350,20 @@ function DashboardPage() {
     try {
       setIsLoadingGroups(true)
       const data = await api.getUserGroups(user?.id || 0)
-      const dataAny: any = data
-      const groupsArr = Array.isArray(dataAny?.groups) ? dataAny.groups : Array.isArray(dataAny?.data) ? dataAny.data : []
-      setGroups(groupsArr.map((group: any) => ({
-        id: group.id,
-        name: group.title ?? group.name ?? '',
-        description: group.description ?? '',
-        members: group.member_count ?? 0,
-        isJoined: !!group.is_member,
-        lastActivity: formatTimeAgo(group.updated_at ?? group.updatedAt ?? new Date().toISOString()),
-        timestamp: group.updated_at ?? group.updatedAt ?? new Date().toISOString() // Add timestamp for sorting
-      })))
+      const dataRec = data as Record<string, unknown>
+      const groupsArr = Array.isArray(dataRec['groups'] as unknown) ? dataRec['groups'] as unknown[] : Array.isArray(dataRec['data'] as unknown) ? dataRec['data'] as unknown[] : []
+      setGroups(groupsArr.map((group: unknown) => {
+        const g = group as Record<string, unknown>
+        return {
+          id: Number(g['id']) || 0,
+          name: String(g['title'] ?? g['name'] ?? ''),
+          description: String(g['description'] ?? ''),
+          members: Number(g['member_count'] ?? 0),
+          isJoined: !!g['is_member'],
+          lastActivity: formatTimeAgo(String(g['updated_at'] ?? g['updatedAt'] ?? new Date().toISOString())),
+          timestamp: String(g['updated_at'] ?? g['updatedAt'] ?? new Date().toISOString())
+        }
+      }))
     } catch (err) {
       console.error('Error fetching groups:', err)
       if (err instanceof NetworkError) {
@@ -375,28 +380,36 @@ function DashboardPage() {
     try {
       setIsLoadingChats(true)
       const data = await api.getConversations()
-      setChats(data.conversations.map(conversation => {
-        const participantName = conversation.type === 'private'
-          ? `${conversation.participant?.first_name || ''} ${conversation.participant?.last_name || ''}`.trim() || 'Unknown User'
-          : conversation.group?.title || 'Unknown Group'
-        
-        // Check if participant is online for private conversations
-        const isOnline = conversation.type === 'private' && conversation.participant?.id
-          ? onlineUsers.some(u => u.user_id === conversation.participant?.id && u.is_online)
+      const dataRec = data as Record<string, unknown>
+      const convs = Array.isArray(dataRec['conversations'] as unknown) ? dataRec['conversations'] as unknown[] : []
+      setChats(convs.map((conversation: unknown) => {
+        const c = conversation as Record<string, unknown>
+        const participant = c['participant'] as Record<string, unknown> | undefined
+        const group = c['group'] as Record<string, unknown> | undefined
+        const lastMessage = c['last_message'] as Record<string, unknown> | undefined
+
+        const participantName = c['type'] === 'private'
+          ? `${String(participant?.['first_name'] ?? '')} ${String(participant?.['last_name'] ?? '')}`.trim() || 'Unknown User'
+          : String(group?.['title'] ?? 'Unknown Group')
+
+        const participantId = participant ? Number(participant['id']) || undefined : undefined
+
+        const isOnline = c['type'] === 'private' && participantId
+          ? onlineUsers.some(u => u.user_id === participantId && u.status === 'online')
           : false
-        
+
         return {
-          id: conversation.id,
+          id: Number(c['id']) || 0,
           name: participantName,
-          lastMessage: conversation.last_message.content,
-          time: formatTimeAgo(conversation.updated_at),
-          timestamp: conversation.updated_at, // Add timestamp for sorting
-          unread: conversation.unread_count,
+          lastMessage: lastMessage ? String(lastMessage['content'] ?? '') : '',
+          time: formatTimeAgo(String(c['updated_at'] ?? '')),
+          timestamp: String(c['updated_at'] ?? ''),
+          unread: Number(c['unread_count'] ?? 0),
           isOnline: isOnline,
-          isGroup: conversation.type === 'group',
-          participantId: conversation.participant?.id,
-          participantAvatar: conversation.participant?.avatar, // Add participant avatar
-          lastMessageSenderId: conversation.last_message.sender_id // Add sender ID for "You:" prefix
+          isGroup: String(c['type'] ?? '') === 'group',
+          participantId: participantId,
+          participantAvatar: participant ? String(participant['avatar'] ?? '') : undefined,
+          lastMessageSenderId: lastMessage ? Number(lastMessage['sender_id'] ?? 0) : undefined
         }
       }))
     } catch (err) {
@@ -610,10 +623,10 @@ function DashboardPage() {
   }
 
   const isUserOnline = (userId: number): boolean => {
-    return onlineUsers.some(u => u.user_id === userId && u.is_online)
+    return onlineUsers.some(u => u.user_id === userId && u.status === 'online')
   }
 
-  const handleNotificationsToggle = () => {
+  const _handleNotificationsToggle = () => {
     if (activeTab === 'notifications') {
       // If we're already on notifications, go back to previous tab
       setActiveTab(previousTab)
@@ -642,7 +655,7 @@ function DashboardPage() {
     })
   }
 
-  const handleDiscoverToggle = () => {
+  const _handleDiscoverToggle = () => {
     if (activeTab === 'discover') {
       // If Discover is already open, go back to the previous tab
       setActiveTab(previousTab)
@@ -653,7 +666,7 @@ function DashboardPage() {
     }
   }
 
-  const handleSearchToggle = () => {
+  const _handleSearchToggle = () => {
     setShowSearchPage(!showSearchPage)
   }
 
@@ -711,7 +724,6 @@ function DashboardPage() {
             posts={posts}
             onPostLike={handleLikePost}
             onPostBookmark={handleBookmarkPost}
-            setActiveTab={handleTabChange}
             showCreatePost={showCreatePost}
             setShowCreatePost={setShowCreatePost}
             newPostContent={newPostContent}
@@ -726,7 +738,6 @@ function DashboardPage() {
             loadingUsers={loadingUsers}
             onCreatePost={handleCreatePost}
             feedSubTab={feedSubTab}
-            setFeedSubTab={setFeedSubTab}
           />
         )
       case 'chats':
@@ -753,7 +764,6 @@ function DashboardPage() {
         return (
           <ActivitySection
             activitySubTab={activitySubTab}
-            setActivitySubTab={setActivitySubTab}
             posts={posts}
             onPostLike={handleLikePost}
             onPostBookmark={handleBookmarkPost}
@@ -763,11 +773,9 @@ function DashboardPage() {
         return (
           <CommunitySection
             events={liveEvents}
-            onEventsUpdate={refetchEvents}
             isLoadingEvents={eventsLoading}
             notifications={notifications}
             isLoadingNotifications={isLoadingNotifications}
-            showCreateEvent={showCreateEvent}
             setShowCreateEvent={setShowCreateEvent}
             onEventRespond={respondToEvent}
             communitySubTab={'events'}
@@ -778,11 +786,9 @@ function DashboardPage() {
         return (
           <CommunitySection
             events={liveEvents}
-            onEventsUpdate={refetchEvents}
             isLoadingEvents={eventsLoading}
             notifications={notifications}
             isLoadingNotifications={isLoadingNotifications}
-            showCreateEvent={showCreateEvent}
             setShowCreateEvent={setShowCreateEvent}
             onEventRespond={respondToEvent}
             communitySubTab={'activity'}
@@ -795,20 +801,18 @@ function DashboardPage() {
             followers={followers}
             following={following}
             posts={posts}
-            isLoadingFollowers={isLoadingFollowers}
           />
         )
       case 'settings': 
         return (
           <SettingsSection
-            currentUser={currentUser}
             testTokenExpiration={testTokenExpiration}
           />
         )
       case 'search':
         return <SearchPage onClose={() => setActiveTab(previousTab)} />
       case 'discover':
-        return <DiscoverPage onClose={() => setActiveTab(previousTab)} />
+        return <DiscoverPage />
       case 'notifications':
         return <NotificationsPage />
       default:
@@ -817,7 +821,6 @@ function DashboardPage() {
             posts={posts}
             onPostLike={handleLikePost}
             onPostBookmark={handleBookmarkPost}
-            setActiveTab={handleTabChange}
             showCreatePost={showCreatePost}
             setShowCreatePost={setShowCreatePost}
             newPostContent={newPostContent}
@@ -832,7 +835,6 @@ function DashboardPage() {
             loadingUsers={loadingUsers}
             onCreatePost={handleCreatePost}
             feedSubTab={feedSubTab}
-            setFeedSubTab={setFeedSubTab}
           />
         )
     }
@@ -913,7 +915,7 @@ function DashboardPage() {
         {showSearchPage && <SearchPage onClose={() => setShowSearchPage(false)} />}
 
         {/* Main Content */}
-        <div className={`main-content-layout p-2 lg:p-4 relative z-10 has-fixed-sidebar ${isSidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
+        <div className={`main-content-layout p-2 lg:p-4 relative z-10 has-fixed-sidebar ${false ? 'sidebar-collapsed' : ''}`}>
           <div className="max-w-7xl mx-auto h-full">
             <div className="flex flex-col lg:flex-row gap-6 h-full">
               {/* Main Content Area */}

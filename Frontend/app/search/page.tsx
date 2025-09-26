@@ -2,15 +2,6 @@
 import { useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import ProtectedRoute from '@/components/ProtectedRoute'
-import { useAuth } from '@/context/AuthContext'
-import { useWebSocket } from '@/context/WebSocketContext'
-import { useToast } from '@/context/ToastContext'
-import { useNotifications } from '@/hooks'
-import {
-  api,
-  NetworkError
-} from '@/lib/api'
-
 // Import dashboard components
 import SearchPage from '@/components/dashboard/SearchPage'
 import AppLayout from '@/components/AppLayout'
@@ -18,12 +9,8 @@ import AppLayout from '@/components/AppLayout'
 function SearchPageRoute() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const { user } = useAuth()
-  const { isConnected, onlineUsers } = useWebSocket()
-  const { success, error } = useToast()
-  const { items: liveNotifications, unread: liveUnreadCount } = useNotifications()
 
-  const [query, setQuery] = useState(searchParams.get('q') || '')
+  const [query] = useState(searchParams.get('q') || '')
 
   // Update URL when search query changes
   useEffect(() => {

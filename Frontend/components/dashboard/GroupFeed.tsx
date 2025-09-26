@@ -1,10 +1,10 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
-import { useAuth } from '../../context/AuthContext'
+import React, { useState, useEffect, useCallback } from 'react'
 import { useToast } from '../../context/ToastContext'
-import { Heart, MessageCircle, User, Wifi, WifiOff } from 'lucide-react'
-import { useRealTimeGroups, useConnectionStatus, useOptimisticUpdate, useOnlineStatus } from '@/hooks'
+import { Heart, MessageCircle, User } from 'lucide-react'
+import { useConnectionStatus, useOnlineStatus } from '@/hooks'
+import Image from 'next/image'
 
 type GroupPost = {
   id: string
@@ -27,7 +27,6 @@ type Props = {
 }
 
 export default function GroupFeed({ groupId }: Props) {
-  const { user } = useAuth()
   const toast = useToast()
   const [posts, setPosts] = useState<GroupPost[]>([])
   const [loading, setLoading] = useState(true)
@@ -35,22 +34,9 @@ export default function GroupFeed({ groupId }: Props) {
   
   // Real-time hooks
   const { isConnected } = useConnectionStatus()
-  const { groups } = useRealTimeGroups()
   const { onlineUsers } = useOnlineStatus()
-  
-  // Optimistic updates for likes
-  const { performUpdate: performOptimisticLike, isLoading: likePending } = useOptimisticUpdate(
-    null,
-    {
-      onError: () => toast.error('Failed to update like')
-    }
-  )
 
-  useEffect(() => {
-    fetchPosts()
-  }, [groupId])
-
-  async function fetchPosts() {
+  const fetchPosts = useCallback(async () => {
     try {
       setLoading(true)
       const res = await fetch(`/api/groups/${groupId}/posts`, {
@@ -63,16 +49,21 @@ export default function GroupFeed({ groupId }: Props) {
 
       const data = await res.json()
       setPosts(data.posts || [])
-    } catch (err: any) {
-      setError(err.message || 'Failed to load posts')
-      toast.error(err.message || 'Failed to load posts')
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to load posts'
+      setError(message)
+      toast.error(message)
     } finally {
       setLoading(false)
     }
-  }
+  }, [groupId, toast])
+
+  useEffect(() => {
+    fetchPosts()
+  }, [fetchPosts])
 
   async function handleLike(postId: string) {
-    if (likePending || !isConnected) return
+    if (!isConnected) return
 
     const post = posts.find(p => p.id === postId)
     if (!post) return
@@ -97,7 +88,7 @@ export default function GroupFeed({ groupId }: Props) {
       if (!res.ok) {
         throw new Error('Failed to like post')
       }
-    } catch (err: any) {
+    } catch {
       // Revert on error
       setPosts(prev => prev.map(p =>
         p.id === postId ? post : p
@@ -170,7 +161,7 @@ export default function GroupFeed({ groupId }: Props) {
       
       {posts.map(post => {
         // Check if post author is online
-        const isAuthorOnline = onlineUsers.some(u => u.user_id.toString() === post.user.id && u.is_online)
+        const isAuthorOnline = onlineUsers.some(u => u.user_id.toString() === post.user.id && u.status === 'online')
         
         return (
           <div key={post.id} className="bg-white rounded-lg shadow p-4">
@@ -201,9 +192,11 @@ export default function GroupFeed({ groupId }: Props) {
           <div className="mb-3">
             <p className="whitespace-pre-wrap">{post.content}</p>
             {post.image && (
-              <img
+              <Image
                 src={post.image}
                 alt="Post image"
+                width={640}
+                height={256}
                 className="mt-3 max-w-full h-auto rounded-lg"
               />
             )}

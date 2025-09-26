@@ -1,12 +1,10 @@
 'use client'
-import { useState, useEffect, ReactNode } from 'react'
+import { useState, ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
 import { useWebSocket } from '@/context/WebSocketContext'
-import { useToast } from '@/context/ToastContext'
 import { useSidebarData } from '@/context/SidebarDataContext'
-import { useConnectionStatus, useNotifications, useRealTimeGroups, useRealTimeEvents, useConversations } from '@/hooks'
-import { api, NetworkError, AuthenticationError } from '@/lib/api'
+import { useNotifications } from '@/hooks'
 import { Sparkles } from 'lucide-react'
 
 // Import layout components
@@ -46,28 +44,17 @@ export default function AppLayout({
   onTempPostClose
 }: AppLayoutProps) {
   const router = useRouter()
-  const { user, logout } = useAuth()
-  const { isConnected, onlineUsers } = useWebSocket()
-  const { success, error } = useToast()
-  const { isConnected: connectionStatus } = useConnectionStatus()
-  const { items: liveNotifications, unread: liveUnreadCount } = useNotifications()
-  const { groups: liveGroups } = useRealTimeGroups()
-  const { events: liveEvents, refetch: refetchEvents } = useRealTimeEvents()
-  const { conversations: liveConversations } = useConversations()
+  const { user } = useAuth()
+  const { onlineUsers } = useWebSocket()
+  const { unread: liveUnreadCount } = useNotifications()
 
   // Use sidebar data from context
-  const { followers, following, chats, groups, isLoadingChats, isLoadingGroups } = useSidebarData()
+  const { followers, following, chats } = useSidebarData()
 
   // Layout state
   const [activeTab, setActiveTab] = useState(initialActiveTab)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
-
-  // Trending topics
-  const trendingTopics = [
-    '#SocialNetwork', '#TechNews', '#WebDev', '#AI', '#Startups',
-    '#React', '#TypeScript', '#NodeJS', '#Python', '#DevOps'
-  ]
+  const [isSidebarCollapsed] = useState(false)
 
   // Current User Processing
   const currentUser = user ? {
@@ -105,10 +92,6 @@ export default function AppLayout({
 
   const handleDiscoverToggle = () => {
     handleTabChange('discover')
-  }
-
-  const handleSearchToggle = () => {
-    handleTabChange('search')
   }
 
   // Calculate unread counts
@@ -155,21 +138,14 @@ export default function AppLayout({
         chatUnreadAll={chatUnreadAll}
         chatUnreadDirect={chatUnreadDirect}
         chatUnreadGroups={chatUnreadGroups}
-        fetchEvents={refetchEvents}
-        currentUser={currentUser}
-        logout={() => router.push('/login')}
-        isCollapsed={isSidebarCollapsed}
-        setIsCollapsed={setIsSidebarCollapsed}
       />
 
       <TopBar
         isMobileMenuOpen={isMobileMenuOpen}
         setIsMobileMenuOpen={setIsMobileMenuOpen}
         activeTab={activeTab}
-        setActiveTab={handleTabChange}
         onNotificationsClick={handleNotificationsToggle}
         unreadCount={liveUnreadCount || 0}
-        onSearchClick={handleSearchToggle}
         onDiscoverClick={handleDiscoverToggle}
       />
 
@@ -190,7 +166,6 @@ export default function AppLayout({
         onlineUsers={onlineUsers}
         followingUsers={following}
         followersUsers={followers}
-        trendingTopics={trendingTopics}
         onUserClick={(user) => {
           router.push(`/profile/${user.id}`)
         }}

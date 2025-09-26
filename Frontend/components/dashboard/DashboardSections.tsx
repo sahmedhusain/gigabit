@@ -1,24 +1,29 @@
 "use client"
 import React from 'react'
 import { useRouter } from 'next/navigation'
-import { User, Users, Plus, MessageCircle, Calendar, MapPin} from 'lucide-react'
+import { User, Plus, MessageCircle, Calendar } from 'lucide-react'
 import { useRealTimeGroups, useRealTimeEvents, useConnectionStatus, useOnlineStatus } from '@/hooks'
 
 // Clean DashboardSections: Followers, Groups, Settings
 
+interface Follower {
+  id: number
+  first_name?: string
+  last_name?: string
+}
+
 interface FollowersSectionProps {
-  followers: any[]
-  following: any[]
+  followers: Follower[]
   isLoadingFollowers: boolean
 }
 
-export function FollowersSection({ followers, following, isLoadingFollowers }: FollowersSectionProps) {
+export function FollowersSection({ followers, isLoadingFollowers }: FollowersSectionProps) {
   const { isConnected } = useConnectionStatus()
   const { onlineUsers } = useOnlineStatus()
   
   // Helper function to check if a follower is online
   const isFollowerOnline = (followerId: number) => {
-    return onlineUsers.some(user => user.user_id === followerId && user.is_online)
+    return onlineUsers.some(user => user.user_id === followerId && user.status === 'online')
   }
 
   return (
@@ -76,11 +81,13 @@ export function FollowersSection({ followers, following, isLoadingFollowers }: F
 
 interface Group {
   id: number
-  name: string
-  description: string
-  members: number
-  isJoined: boolean
-  lastActivity: string
+  // some APIs use `title` while others use `name`
+  title?: string
+  name?: string
+  description?: string
+  members?: number
+  isJoined?: boolean
+  lastActivity?: string
 }
 
 interface GroupsSectionProps {
@@ -94,7 +101,7 @@ export function GroupsSection({ groups, onCreateGroup }: GroupsSectionProps) {
   const { groups: liveGroups, unreadUpdates, loading } = useRealTimeGroups()
   
   // Use live groups if available, fallback to props
-  const displayGroups = liveGroups && liveGroups.length > 0 ? liveGroups : groups
+  const displayGroups: Group[] = (liveGroups && liveGroups.length > 0 ? liveGroups : groups) as Group[]
 
   const handleGroupClick = (groupId: number) => {
     router.push(`/group/${groupId}`)
@@ -131,14 +138,14 @@ export function GroupsSection({ groups, onCreateGroup }: GroupsSectionProps) {
         {displayGroups.length === 0 ? (
           <div className="text-white/60">No groups yet.</div>
         ) : (
-          (displayGroups || []).map((g) => {
+          (displayGroups || []).map((g: Group) => {
             const unreadCount = unreadUpdates.get(g.id) || 0
             return (
               <div key={g.id} className="p-3 mb-2 bg-white/3 rounded-md text-white cursor-pointer hover:bg-white/5 transition-colors" onClick={() => handleGroupClick(g.id)}>
                 <div className="flex items-center justify-between">
                   <div>
                     <div className="font-semibold flex items-center space-x-2">
-                      <span>{(g as any).title || (g as any).name}</span>
+                      <span>{g.title || g.name}</span>
                       {unreadCount > 0 && (
                         <div className="bg-red-500 text-white text-xs rounded-full min-w-5 h-5 flex items-center justify-center px-1">
                           {unreadCount > 99 ? '99+' : unreadCount}
@@ -319,13 +326,10 @@ export function EventsSection({ events }: EventsSectionProps) {
 }
 
 interface SettingsSectionProps {
-  currentUser: {
-    isPrivate: boolean
-  } | null
   testTokenExpiration: () => void
 }
 
-export function SettingsSection({ currentUser, testTokenExpiration }: SettingsSectionProps) {
+export function SettingsSection({ testTokenExpiration }: SettingsSectionProps) {
   const { isConnected } = useConnectionStatus()
   
   return (

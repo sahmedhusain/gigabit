@@ -1,6 +1,7 @@
 'use client'
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
+import Image from 'next/image'
 import { 
   Search, 
   User, 
@@ -14,17 +15,13 @@ import {
   MapPin,
   Calendar,
   Eye,
-  Heart,
   Grid3X3,
   Hash,
-  Flame,
   Plus,
   ArrowUp,
   ArrowDown,
   Minus,
-  Check,
-  Crown,
-  Shield
+  Check
 } from 'lucide-react'
 import { api, User as UserType, GroupResponse } from '@/lib/api'
 import { useAuth } from '@/context/AuthContext'
@@ -53,16 +50,12 @@ interface TrendingTag {
   trend: 'up' | 'down' | 'stable'
 }
 
-interface DiscoverPageProps {
-  onClose: () => void
-}
-
 type UserFilter = 'all' | 'not_following' | 'online' | 'new_members'
 type GroupFilter = 'all' | 'available' | 'joined' | 'active'
 type SortBy = 'newest' | 'members' | 'active' | 'name_asc' | 'name_desc'
 type DiscoverTab = 'users' | 'groups' | 'trending'
 
-export default function DiscoverPage({ onClose }: DiscoverPageProps) {
+export default function DiscoverPage() {
   const { user: currentUser } = useAuth()
   const { success, error, warning } = useToast()
   const { isConnected } = useConnectionStatus()
@@ -74,7 +67,6 @@ export default function DiscoverPage({ onClose }: DiscoverPageProps) {
   // Users state
   const [users, setUsers] = useState<UserWithFollowStatus[]>([])
   const [filteredUsers, setFilteredUsers] = useState<UserWithFollowStatus[]>([])
-  const [following, setFollowing] = useState<UserType[]>([])
   const [userFilter, setUserFilter] = useState<UserFilter>('not_following')
   
   // Groups state
@@ -91,38 +83,7 @@ export default function DiscoverPage({ onClose }: DiscoverPageProps) {
   const [sortBy, setSortBy] = useState<SortBy>('newest')
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
 
-  useEffect(() => {
-    fetchData()
-  }, [currentUser])
-
-  useEffect(() => {
-    if (activeTab === 'users') {
-      applyUserFiltersAndSort()
-    } else if (activeTab === 'groups') {
-      applyGroupFiltersAndSort()
-    }
-  }, [users, groups, searchQuery, userFilter, groupFilter, sortBy, activeTab])
-
-  const fetchData = async () => {
-    if (!currentUser) return
-
-    try {
-      setIsLoading(true)
-      
-      await Promise.all([
-        fetchUsers(),
-        fetchGroups(),
-        fetchTrendingTags()
-      ])
-    } catch (err: any) {
-      console.error('Failed to fetch discover data:', err)
-      error('Failed to load discover data')
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  const fetchUsers = async () => {
+  const fetchUsers = useCallback(async () => {
     try {
       const [usersResponse, followingResponse] = await Promise.all([
         api.getUsers(),
@@ -147,13 +108,12 @@ export default function DiscoverPage({ onClose }: DiscoverPageProps) {
         }))
 
       setUsers(usersWithStatus)
-      setFollowing(followingUsers)
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Failed to fetch users:', err)
     }
-  }
+  }, [currentUser])
 
-  const fetchGroups = async () => {
+  const fetchGroups = useCallback(async () => {
     try {
       const response = await api.getAllGroups(50, 0)
       
@@ -170,7 +130,7 @@ export default function DiscoverPage({ onClose }: DiscoverPageProps) {
         }))
         
         setGroups(groupsWithStatus)
-      } catch (userGroupsError) {
+      } catch {
         // If getUserGroups fails, just set is_member to false for all groups
         const groupsWithStatus: GroupWithJoinStatus[] = (response.groups || []).map(group => ({
           ...group,
@@ -181,12 +141,12 @@ export default function DiscoverPage({ onClose }: DiscoverPageProps) {
         
         setGroups(groupsWithStatus)
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Failed to fetch groups:', err)
     }
-  }
+  }, [currentUser])
 
-  const fetchTrendingTags = async () => {
+  const fetchTrendingTags = useCallback(async () => {
     // Mock trending tags data - replace with real API call when available
     const mockTags: TrendingTag[] = [
       { tag: 'technology', count: 1250, growth: 15.3, trend: 'up' },
@@ -202,9 +162,32 @@ export default function DiscoverPage({ onClose }: DiscoverPageProps) {
     ]
     
     setTrendingTags(mockTags)
-  }
+  }, [])
 
-  const applyUserFiltersAndSort = () => {
+  const fetchData = useCallback(async () => {
+    if (!currentUser) return
+
+    try {
+      setIsLoading(true)
+      
+      await Promise.all([
+        fetchUsers(),
+        fetchGroups(),
+        fetchTrendingTags()
+      ])
+    } catch (err: unknown) {
+      console.error('Failed to fetch discover data:', err)
+      error('Failed to load discover data')
+    } finally {
+      setIsLoading(false)
+    }
+  }, [currentUser, error, fetchUsers, fetchGroups, fetchTrendingTags])
+
+  useEffect(() => {
+    fetchData()
+  }, [fetchData])
+
+  const applyUserFiltersAndSort = useCallback(() => {
     let filtered = [...users]
 
     // Apply search filter
@@ -254,9 +237,9 @@ export default function DiscoverPage({ onClose }: DiscoverPageProps) {
     })
 
     setFilteredUsers(filtered)
-  }
+  }, [users, searchQuery, userFilter, sortBy])
 
-  const applyGroupFiltersAndSort = () => {
+  const applyGroupFiltersAndSort = useCallback(() => {
     let filtered = [...groups]
 
     // Apply search filter
@@ -300,7 +283,15 @@ export default function DiscoverPage({ onClose }: DiscoverPageProps) {
     })
 
     setFilteredGroups(filtered)
-  }
+  }, [groups, searchQuery, groupFilter, sortBy])
+
+  useEffect(() => {
+    if (activeTab === 'users') {
+      applyUserFiltersAndSort()
+    } else if (activeTab === 'groups') {
+      applyGroupFiltersAndSort()
+    }
+  }, [users, groups, searchQuery, userFilter, groupFilter, sortBy, activeTab, applyUserFiltersAndSort, applyGroupFiltersAndSort])
 
   const handleFollowStatusChange = (userId: number, newStatus: FollowStatus) => {
     setUsers(prevUsers => 
@@ -341,7 +332,7 @@ export default function DiscoverPage({ onClose }: DiscoverPageProps) {
         )
       )
       success('Successfully joined the group!')
-    } catch (err: any) {
+    } catch {
       error('Failed to join group')
     }
   }
@@ -362,7 +353,7 @@ export default function DiscoverPage({ onClose }: DiscoverPageProps) {
         )
       )
       success('Successfully left the group!')
-    } catch (err: any) {
+    } catch {
       error('Failed to leave group')
     }
   }
@@ -580,7 +571,7 @@ export default function DiscoverPage({ onClose }: DiscoverPageProps) {
             <div className="bg-yellow-500/10 border border-yellow-400/20 rounded-xl p-4 mt-4">
               <div className="flex items-center space-x-2">
                 <Eye className="w-5 h-5 text-yellow-400" />
-                <p className="text-yellow-400 font-medium">You're offline. Actions are disabled.</p>
+                <p className="text-yellow-400 font-medium">You&apos;re offline. Actions are disabled.</p>
               </div>
             </div>
           )}
@@ -632,9 +623,12 @@ export default function DiscoverPage({ onClose }: DiscoverPageProps) {
               <>
                 <div className="relative mb-4">
                   {user.avatar ? (
-                    <img 
+                    <Image 
                       src={user.avatar} 
                       alt={`${user.first_name} ${user.last_name}`}
+                      width={64}
+                      height={64}
+                      unoptimized={user.avatar.includes('/svg')}
                       className="w-16 h-16 rounded-full object-cover border-2 border-white/20 group-hover:border-white/40 transition-colors mx-auto"
                     />
                   ) : (
@@ -708,9 +702,12 @@ export default function DiscoverPage({ onClose }: DiscoverPageProps) {
                 <div className="flex items-center space-x-4 flex-1">
                   <div className="relative flex-shrink-0">
                     {user.avatar ? (
-                      <img 
+                      <Image 
                         src={user.avatar} 
                         alt={`${user.first_name} ${user.last_name}`}
+                        width={48}
+                        height={48}
+                        unoptimized={user.avatar.includes('/svg')}
                         className="w-12 h-12 rounded-full object-cover border-2 border-white/20 group-hover:border-white/40 transition-colors"
                       />
                     ) : (

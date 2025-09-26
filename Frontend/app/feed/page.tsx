@@ -1,14 +1,12 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import ProtectedRoute from '@/components/ProtectedRoute'
 import AppLayout from '@/components/AppLayout'
 import HomeFeed from '@/components/dashboard/HomeFeed'
 import CreatePost from '@/components/dashboard/CreatePost'
 import { useAuth } from '@/context/AuthContext'
-import { useWebSocket } from '@/context/WebSocketContext'
 import { useToast } from '@/context/ToastContext'
-import { useNotifications } from '@/hooks'
 import { api, NetworkError, AuthenticationError } from '@/lib/api'
 import { getToken } from '@/lib/api'
 import { ApiClient, CreatePostRequest, ValidationError, Post } from '@/lib/api'
@@ -17,9 +15,7 @@ function FeedPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { user } = useAuth()
-  const { isConnected, addMessageListener } = useWebSocket()
   const { success, error } = useToast()
-  const { items: liveNotifications, unread: liveUnreadCount } = useNotifications()
 
   // Get filter from URL params
   const filterParam = searchParams.get('filter') || 'all'
@@ -36,7 +32,6 @@ function FeedPage() {
 
   // Data State
   const [posts, setPosts] = useState<Post[]>([])
-  const [isLoadingPosts, setIsLoadingPosts] = useState(true)
 
   // Update URL when filter changes
   useEffect(() => {
@@ -44,83 +39,43 @@ function FeedPage() {
     router.replace(newUrl)
   }, [feedSubTab, router])
 
-  // Fetch data when component loads
-  useEffect(() => {
-    if (user) {
-      fetchFeedPosts()
-      fetchUsers()
-    }
-  }, [user])
-
-  // WebSocket real-time notifications
-  useEffect(() => {
-    if (!isConnected) return
-
-    const removeListener = addMessageListener((message) => {
-      switch (message.type) {
-        case 'post_update':
-          console.log('Post update received:', message.data)
-          fetchFeedPosts()
-          break
-
-        case 'like':
-          // Update like count in real-time for other users
-          if (message.data?.post_id && message.data?.user_id !== user?.id) {
-            setPosts((prevPosts: Post[]) =>
-              prevPosts.map((post: Post) =>
-                post.id === message.data.post_id
-                  ? {
-                    ...post,
-                    likes: message.data.like_count || post.likes
-                  }
-                  : post
-              )
-            )
-          }
-          break
-
-        default:
-          console.log('Received WebSocket message:', message)
-      }
-    })
-
-    return removeListener
-  }, [isConnected, addMessageListener, user?.id])
-
-  const fetchFeedPosts = async () => {
+  const fetchFeedPosts = useCallback(async () => {
     try {
-      setIsLoadingPosts(true)
+      // setIsLoadingPosts(true)
       console.log('Fetching feed posts...')
       const response = await api.getFeed(20, 0)
       console.log('Feed API response:', response)
-      const postsArr = Array.isArray(response.data) ? response.data : [];
-      
+      const respRec = response as Record<string, unknown>
+      const postsArr = Array.isArray(respRec['data'] as unknown) ? respRec['data'] as unknown[] : [];
+
       if (!postsArr.length) {
         setPosts([])
         return
       }
 
-      const mappedPosts = postsArr.map((post: any) => ({
-        id: post.id,
-        user: {
-          name: `${post.user.first_name} ${post.user.last_name}`,
-          username: post.user.nickname || post.user.email.split('@')[0],
-          avatar: post.user.avatar
-        },
-        content: post.content,
-        image: post.image_url ? 
-          (post.image_url.startsWith('http') ? 
-            post.image_url : 
-            `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}${post.image_url}`
-          ) : undefined,
-        likes: post.like_count,
-        comments: post.comment_count,
-        shares: 0,
-        timeAgo: formatTimeAgo(post.created_at),
-        privacy: post.privacy,
-        isLiked: post.is_liked
-      }))
-      
+      const mappedPosts = postsArr.map((post: unknown) => {
+        const p = post as Record<string, unknown>
+        const userObj = p['user'] as Record<string, unknown> | undefined
+        const imageUrl = typeof p['image_url'] === 'string' ? String(p['image_url']) : undefined
+
+        return {
+          id: Number(p['id']) || 0,
+          user: {
+            name: userObj ? `${String(userObj['first_name'] ?? '')} ${String(userObj['last_name'] ?? '')}` : 'Unknown',
+            username: userObj ? String(userObj['nickname'] ?? userObj['email'] ?? '').split('@')[0] : 'unknown',
+            avatar: userObj ? String(userObj['avatar'] ?? '') : ''
+          },
+          content: typeof p['content'] === 'string' ? String(p['content']) : '',
+          image: imageUrl ? (imageUrl.startsWith('http') ? imageUrl : `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}${imageUrl}`) : undefined,
+          likes: Number(p['like_count']) || 0,
+          comments: Number(p['comment_count']) || 0,
+          shares: 0,
+          timeAgo: formatTimeAgo(String(p['created_at'] ?? '')),
+          privacy: String(p['privacy'] ?? ''),
+          isLiked: Boolean(p['is_liked'])
+        }
+      })
+
       setPosts(mappedPosts)
     } catch (err) {
       console.error('Error fetching posts:', err)
@@ -132,9 +87,17 @@ function FeedPage() {
         error('Unable to load posts right now.')
       }
     } finally {
-      setIsLoadingPosts(false)
+      // setIsLoadingPosts(false)
     }
-  }
+  }, [error])
+
+  // Fetch data when component loads
+  useEffect(() => {
+    if (user) {
+      fetchFeedPosts()
+      fetchUsers()
+    }
+  }, [user, fetchFeedPosts])
 
   const fetchUsers = async () => {
     try {
@@ -278,10 +241,6 @@ function FeedPage() {
     }
   }
 
-  const handleTabChange = (newTab: string) => {
-    router.push(`/${newTab}`)
-  }
-
   return (
     <AppLayout 
       activeTab="feed"
@@ -308,7 +267,6 @@ function FeedPage() {
         posts={posts}
         onPostLike={handleLikePost}
         onPostBookmark={handleBookmarkPost}
-        setActiveTab={handleTabChange}
         showCreatePost={showCreatePost}
         setShowCreatePost={setShowCreatePost}
         newPostContent={newPostContent}
@@ -323,7 +281,6 @@ function FeedPage() {
         loadingUsers={loadingUsers}
         onCreatePost={handleCreatePost}
         feedSubTab={feedSubTab}
-        setFeedSubTab={setFeedSubTab}
       />
     </AppLayout>
   )

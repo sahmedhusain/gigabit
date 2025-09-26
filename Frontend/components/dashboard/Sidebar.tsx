@@ -1,6 +1,7 @@
-'use client'
-import { useState, useEffect } from 'react'
+ 'use client'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import Image from 'next/image'
 import { 
   Home, 
   MessageCircle, 
@@ -9,27 +10,10 @@ import {
   Calendar, 
   X, 
   Sparkles, 
-  Bell, 
-  LogOut, 
   Heart, 
   Grid3X3, 
   UserCheck, 
   Bookmark,
-  Plus,
-  Search,
-  TrendingUp,
-  Clock,
-  Globe,
-  Shield,
-  Zap,
-  Star,
-  Award,
-  Target,
-  Layers,
-  Compass,
-  Filter,
-  RefreshCw,
-  Dot,
   CheckCircle,
   XCircle,
   MessageSquare
@@ -53,41 +37,12 @@ interface SidebarProps {
   chatUnreadAll?: number
   chatUnreadDirect?: number
   chatUnreadGroups?: number
-  fetchEvents: () => void
-  currentUser: {
-    id: number
-    name: string
-    username: string
-    avatar?: string
-    isPrivate: boolean
-    followers: number
-    following: number
-  } | null
-  logout: () => void
-  isCollapsed?: boolean
-  setIsCollapsed?: (collapsed: boolean) => void
-}
-
-interface QuickAction {
-  id: string
-  label: string
-  icon: React.ReactNode
-  color: string
-  count?: number
-  onClick: () => void
-}
-
-interface StatusOption {
-  id: string
-  label: string
-  color: string
-  icon: React.ReactNode
 }
 
 interface MenuItem {
   id: string
   label: string
-  icon: React.ComponentType<any>
+  icon: React.ComponentType<React.SVGProps<SVGSVGElement>>
   description: string
   color: string
   count?: number | string
@@ -109,32 +64,18 @@ export default function Sidebar({
   isMobileMenuOpen,
   setIsMobileMenuOpen,
   activeTab,
-  setActiveTab,
   feedSubTab,
-  setFeedSubTab,
   activitySubTab,
-  setActivitySubTab,
   chatSubTab,
-  setChatSubTab,
   eventsSubTab,
-  setEventsSubTab,
   tempPostSubTab,
   onTempPostClose,
   chatUnreadAll = 0,
   chatUnreadDirect = 0,
-  chatUnreadGroups = 0,
-  fetchEvents,
-  currentUser,
-  logout,
-  isCollapsed: _isCollapsed = false,
-  setIsCollapsed: _setIsCollapsed
+  chatUnreadGroups = 0
 }: SidebarProps) {
   const router = useRouter()
   const [hoveredItem, setHoveredItem] = useState<string | null>(null)
-  const [isProfileDropdownOpen, setProfileDropdownOpen] = useState(false)
-  const [userStatus, setUserStatus] = useState('online')
-  const [currentTime, setCurrentTime] = useState(new Date())
-  const [showQuickActions, setShowQuickActions] = useState(false)
   const [expandedSection, setExpandedSection] = useState<'feed' | 'chats' | 'activity' | 'events' | null>(
     activeTab === 'events' ? 'events' : 
     activeTab === 'chats' ? 'chats' : 
@@ -145,56 +86,6 @@ export default function Sidebar({
 
   // Disable collapse functionality entirely
   const isCollapsed = false
-
-  // Update time every minute
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setCurrentTime(new Date())
-    }, 60000)
-    return () => clearInterval(timer)
-  }, [])
-
-  // Removed automatic default setting to prevent interference with other pages
-
-  const statusOptions: StatusOption[] = [
-    { id: 'online', label: 'Online', color: 'bg-green-500', icon: <Dot className="w-3 h-3 animate-pulse" /> },
-    { id: 'busy', label: 'Busy', color: 'bg-red-500', icon: <Dot className="w-3 h-3" /> },
-    { id: 'away', label: 'Away', color: 'bg-yellow-500', icon: <Dot className="w-3 h-3" /> },
-    { id: 'invisible', label: 'Invisible', color: 'bg-gray-500', icon: <Dot className="w-3 h-3" /> }
-  ]
-
-  const quickActions: QuickAction[] = [
-    {
-      id: 'create-post',
-      label: 'New Post',
-      icon: <Plus className="w-4 h-4" />,
-      color: 'from-emerald-500 to-teal-600',
-      onClick: () => console.log('Create post')
-    },
-    {
-      id: 'messages',
-      label: 'Messages',
-      icon: <MessageCircle className="w-4 h-4" />,
-      color: 'from-blue-500 to-cyan-600',
-      count: 3,
-      onClick: () => router.push('/chats')
-    },
-    {
-      id: 'notifications',
-      label: 'Notifications',
-      icon: <Bell className="w-4 h-4" />,
-      color: 'from-purple-500 to-pink-600',
-      count: 7,
-      onClick: () => router.push('/notifications')
-    },
-    {
-      id: 'explore',
-      label: 'Explore',
-      icon: <Compass className="w-4 h-4" />,
-      color: 'from-orange-500 to-red-600',
-      onClick: () => router.push('/search')
-    }
-  ]
 
   const menuSections: MenuSection[] = [
     {
@@ -389,20 +280,7 @@ export default function Sidebar({
     }
   ]
 
-  const formatTime = (date: Date) => {
-    return date.toLocaleTimeString('en-US', { 
-      hour: '2-digit', 
-      minute: '2-digit',
-      hour12: true 
-    })
-  }
-
-  const getUserGreeting = () => {
-    const hour = new Date().getHours()
-    if (hour < 12) return 'Good morning'
-    if (hour < 18) return 'Good afternoon'
-    return 'Good evening'
-  }
+  // formatTime and getUserGreeting were removed because they're not used in this component.
 
   return (
     <>
@@ -431,11 +309,14 @@ export default function Sidebar({
       className="w-full group transition-all duration-300 text-center"
                   aria-label="Go to homepage"
                 >
-          <div className="flex items-center justify-center h-14 box-border p-0 rounded-xl hover:bg-white/10 transition-all duration-300">
-                    <img
+          <div className="flex items-center justify-center h-14 box-border p-0 rounded-xl hover:bg-white/10 transition-all duration-300 relative">
+                    <Image
                       src="/logo.png"
                       alt="Gigabit Logo"
-                      className="h-full w-auto max-w-full rounded-xl object-contain drop-shadow-xl transition-all duration-300 group-hover:drop-shadow-2xl transform translate-y-[3px]"
+                      fill
+                      sizes="320px"
+                      priority
+                      className="object-contain rounded-xl drop-shadow-xl transition-all duration-300 group-hover:drop-shadow-2xl transform translate-y-[3px]"
                     />
                   </div>
                 </button>

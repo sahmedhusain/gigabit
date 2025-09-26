@@ -3,7 +3,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
-import { Eye, EyeOff, Mail, Lock, User, Calendar, Camera, Edit3, ArrowRight, Sparkles, Upload, Chrome, Apple as AppleIcon, GithubIcon } from 'lucide-react'
+import { Eye, EyeOff, Mail, Lock, ArrowRight, Sparkles, Chrome,  GithubIcon } from 'lucide-react'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -40,8 +40,9 @@ export default function LoginPage() {
 
       // Redirect to feed on success
       router.push('/feed/all')
-    } catch (err: any) {
-      setError(err.message || 'Login failed. Please try again.')
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setError(msg || 'Login failed. Please try again.')
     } finally {
       setIsLoading(false)
     }
@@ -92,7 +93,7 @@ export default function LoginPage() {
             Gigabit
           </h1>
           <p className="text-base sm:text-lg text-white/80 font-light">
-            Step into tomorrow's social experience
+            Step into tomorrow&apos;s social experience
           </p>
         </div>
 

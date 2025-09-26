@@ -1,5 +1,6 @@
 'use client'
 import { useState, useMemo } from 'react'
+import Image from 'next/image'
 import { X, Search, MessageSquarePlus, MessageCircle } from 'lucide-react'
 
 interface Follower {
@@ -113,7 +114,7 @@ export default function CreateDirectMessage({
                     <div className="relative">
                       <div className="w-12 h-12 bg-gradient-to-br from-blue-500 via-indigo-600 to-purple-600 rounded-2xl flex items-center justify-center text-white font-bold shadow-lg group-hover:shadow-xl transition-all duration-300">
                         {follower.avatar ? (
-                          <img src={follower.avatar} alt={follower.first_name} className="w-full h-full rounded-2xl object-cover" />
+                          <Image src={follower.avatar} alt={follower.first_name} width={48} height={48} unoptimized={follower.avatar.includes('/svg')} className="w-full h-full rounded-2xl object-cover" />
                         ) : (
                           follower.first_name[0]?.toUpperCase()
                         )}

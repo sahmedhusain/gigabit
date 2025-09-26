@@ -1,22 +1,18 @@
 'use client'
 import { useState, useEffect } from 'react'
-import { TrendingUp, Activity, Wifi, WifiOff, RefreshCw, Users, UserCheck, Heart, Filter, Globe, Lock, EyeOff, MessageCircle, Sparkles, Bookmark, Send } from 'lucide-react'
-import PostCard from './PostCard'
+import { Heart, Globe, Lock, EyeOff, MessageCircle, Sparkles, Bookmark, Send } from 'lucide-react'
 import CreatePost from './CreatePost'
 import { Post } from '@/lib/api'
 import { Plus } from 'lucide-react'
 import { useRealTimePosts } from '@/hooks/useRealTimePosts'
-import { useConnectionStatus } from '@/hooks/useConnectionStatus'
 import { useDocumentTitle } from '@/hooks/useDocumentTitle'
 import { useRouter } from 'next/navigation'
-
-type FeedFilter = 'all' | 'followers' | 'friends' | 'favorites'
+import Image from 'next/image'
 
 interface HomeFeedProps {
   posts: Post[]
   onPostLike: (postId: number) => void
   onPostBookmark?: (postId: number) => void
-  setActiveTab: (tab: string) => void
   showCreatePost: boolean
   setShowCreatePost: (show: boolean) => void
   newPostContent: string
@@ -31,14 +27,12 @@ interface HomeFeedProps {
   loadingUsers: boolean
   onCreatePost: () => Promise<void>
   feedSubTab: string
-  setFeedSubTab: (tab: string) => void
 }
 
 export default function HomeFeed({
   posts,
   onPostLike,
   onPostBookmark,
-  setActiveTab,
   showCreatePost,
   setShowCreatePost,
   newPostContent,
@@ -52,40 +46,20 @@ export default function HomeFeed({
   availableUsers,
   loadingUsers,
   onCreatePost,
-  feedSubTab,
-  setFeedSubTab
+  feedSubTab
 }: HomeFeedProps) {
   const router = useRouter()
   // Feed filter state
-  const [activeFilter, setActiveFilter] = useState<FeedFilter>('all')
-  const [isLoadingPosts, setIsLoadingPosts] = useState(false)
+  const [isLoadingPosts] = useState(false)
 
   // Use real-time posts hook
   const {
-    isLoading,
-    error,
     unreadCount,
-    isConnected,
-    likePost,
-    refreshPosts,
     markAsRead
   } = useRealTimePosts()
-
-  const { connectionQuality, statusMessage } = useConnectionStatus()
   
   // Update document title with unread count
   const { setUnread, setPageTitle } = useDocumentTitle()
-
-  // Transform API posts to expected Post format
-  const transformPost = (apiPost: any): Post => {
-    return {
-      ...apiPost,
-      likes: apiPost.likes || 0,
-      shares: apiPost.shares || 0,
-      timeAgo: apiPost.timeAgo || 'Just now',
-      isLiked: apiPost.isLiked || apiPost.is_liked || false
-    }
-  }
 
   useEffect(() => {
     setPageTitle('Home')
@@ -114,14 +88,6 @@ export default function HomeFeed({
       window.removeEventListener('focus', handleFocus)
     }
   }, [unreadCount, markAsRead])
-
-  const handlePostLike = async (postId: number) => {
-    try {
-      await likePost(postId)
-    } catch (error) {
-      console.error('Failed to like post:', error)
-    }
-  }
 
   const handlePostClick = (postId: number, e: React.MouseEvent) => {
     // Don't navigate if clicking on interactive elements
@@ -172,9 +138,12 @@ export default function HomeFeed({
       <div className="flex items-start space-x-3">
         <div className="w-12 h-12 bg-gradient-to-r from-emerald-400 to-teal-500 rounded-full flex items-center justify-center text-white font-bold">
           {post.user.avatar ? (
-            <img
+            <Image
               src={post.user.avatar}
               alt={post.user.name}
+              width={48}
+              height={48}
+              unoptimized={post.user.avatar.includes('/svg')}
               className="w-12 h-12 rounded-full object-cover"
             />
           ) : (
@@ -198,9 +167,11 @@ export default function HomeFeed({
           
           {post.image && (
             <div className="mb-4 rounded-lg overflow-hidden">
-              <img
+              <Image
                 src={post.image}
                 alt="Post content"
+                width={640}
+                height={256}
                 className="w-full h-64 object-cover"
               />
             </div>
@@ -278,11 +249,11 @@ export default function HomeFeed({
         <div className="text-center py-16">
           <Sparkles className="w-16 h-16 text-white/30 mx-auto mb-4" />
           <p className="text-white/60 mb-2">No posts found</p>
-          <p className="text-white/40 text-sm">
-            {feedSubTab === 'following' && "Start following users to see their posts here"}
-            {feedSubTab === 'friends' && "Connect with friends to see their posts here"}
-            {feedSubTab === 'all' && "Be the first to share something!"}
-          </p>
+            <p className="text-white/40 text-sm">
+            {feedSubTab === 'following' && 'Start following users to see their posts here'}
+            {feedSubTab === 'friends' && 'Connect with friends to see their posts here'}
+            {feedSubTab === 'all' && 'Be the first to share something!'}
+            </p>
         </div>
       )
     }

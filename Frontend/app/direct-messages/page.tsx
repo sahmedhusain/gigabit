@@ -1,8 +1,8 @@
 'use client'
 import { useState, useEffect } from 'react'
+import Image from 'next/image'
 import ProtectedRoute from '@/components/ProtectedRoute'
 import ChatWindow from '@/components/ChatWindow'
-import { useAuth } from '@/context/AuthContext'
 import { useWebSocket } from '@/context/WebSocketContext'
 import { useRealTimeMessages } from '@/hooks/useRealTimeMessages'
 import { api } from '@/lib/api'
@@ -33,7 +33,6 @@ interface Conversation {
 }
 
 function DirectMessagesPage() {
-  const { user } = useAuth()
   const { isConnected } = useWebSocket()
   const [conversations, setConversations] = useState<Conversation[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -43,11 +42,7 @@ function DirectMessagesPage() {
 
   // Real-time messaging
   const {
-    messages,
-    sendMessage,
-    markAsRead,
-    getUnreadCount,
-    isConnected: messagesConnected
+    markAsRead
   } = useRealTimeMessages()
 
   useEffect(() => {
@@ -76,26 +71,6 @@ function DirectMessagesPage() {
 
   const handleCloseChat = () => {
     setSelectedConversation(null)
-  }
-
-  const handleStartDirectMessage = (userId: number) => {
-    // For now, we'll create a temporary conversation object
-    // In a real implementation, you'd fetch or create the conversation from the backend
-    const tempConversation: Conversation = {
-      id: Date.now(), // Temporary ID
-      type: 'private',
-      participant: {
-        id: userId,
-        first_name: 'User', // You'd fetch the actual user data
-        last_name: '',
-        avatar: '/default-avatar.png'
-      },
-      last_message: undefined,
-      unread_count: 0,
-      updated_at: new Date().toISOString()
-    }
-    setSelectedConversation(tempConversation)
-    setShowNewChat(false)
   }
 
   const formatTime = (dateString: string) => {
@@ -220,9 +195,11 @@ function DirectMessagesPage() {
                     >
                       <div className="flex items-center space-x-3">
                         <div className="relative">
-                          <img
+                          <Image
                             src={getConversationAvatar(conversation)}
                             alt={getConversationName(conversation)}
+                            width={48}
+                            height={48}
                             className="w-12 h-12 rounded-full border-2 border-white/20"
                           />
                           {conversation.type === 'private' && (

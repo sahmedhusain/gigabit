@@ -4,8 +4,9 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
 import { getAvatarOptions } from '@/utils/avatarUtils'
+import Image from 'next/image'
 
-import { Eye, EyeOff, Mail, Lock, User, Calendar, Camera, Edit3, ArrowRight, Sparkles, Upload, Chrome, Apple as AppleIcon, GithubIcon } from 'lucide-react'
+import { Eye, EyeOff, Mail, Lock, User, Calendar, Camera, Edit3, ArrowRight, Sparkles, Chrome, GithubIcon } from 'lucide-react'
 
 function validatePassword(password: string) {
 
@@ -113,7 +114,7 @@ export default function RegisterPage() {
         throw new Error('Please enter a valid email address')
       }
 
-      var returnValue = validatePassword(formData.password)
+      const returnValue = validatePassword(formData.password)
       if (returnValue) {
         throw new Error(returnValue)
       }
@@ -145,8 +146,9 @@ export default function RegisterPage() {
 
       // Redirect to feed on success
       router.push('/feed/all')
-    } catch (err: any) {
-      setError(err.message || 'Registration failed. Please try again.')
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setError(msg || 'Registration failed. Please try again.')
     } finally {
       setIsLoading(false)
     }
@@ -211,7 +213,7 @@ export default function RegisterPage() {
                       <div className="w-28 h-28 rounded-full bg-white/10 border-2 border-emerald-400/50 shadow-lg shadow-emerald-400/20 flex items-center justify-center overflow-hidden backdrop-blur-sm">
                         {avatarPreview ? (
                           avatarPreview.startsWith('/') || avatarPreview.startsWith('data:') ? (
-                            <img src={avatarPreview} alt="Selected Avatar" className="w-full h-full object-cover rounded-full" />
+                            <Image src={avatarPreview} alt="Selected Avatar" className="w-full h-full object-cover rounded-full" />
                           ) : (
                             // Show gradient for selected avatar ID
                             (() => {
@@ -253,7 +255,7 @@ export default function RegisterPage() {
                           }`}
                         >
                           {/* Image layer */}
-                          <img 
+                          <Image
                             src={avatar.imageUrl} 
                             alt={`Avatar option ${avatar.label}`}
                             className="w-full h-full object-cover absolute inset-0 z-10 rounded-full"

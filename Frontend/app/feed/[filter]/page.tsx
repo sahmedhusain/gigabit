@@ -1,12 +1,11 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import ProtectedRoute from '@/components/ProtectedRoute'
 import AppLayout from '@/components/AppLayout'
 import { useAuth } from '@/context/AuthContext'
 import { useWebSocket } from '@/context/WebSocketContext'
 import { useToast } from '@/context/ToastContext'
-import { useRealTimePosts, useNotifications } from '@/hooks'
 import {
   api,
   ApiClient,
@@ -27,9 +26,8 @@ function FeedFilterPage() {
   const params = useParams()
   const filter = params.filter as string
   const { user } = useAuth()
-  const { isConnected, onlineUsers, addMessageListener } = useWebSocket()
+  const { isConnected, addMessageListener } = useWebSocket()
   const { success, error } = useToast()
-  const { items: liveNotifications, unread: liveUnreadCount } = useNotifications()
 
   const [feedSubTab, setFeedSubTab] = useState(filter || 'all')
   const [showCreatePost, setShowCreatePost] = useState(false)
@@ -44,7 +42,6 @@ function FeedFilterPage() {
 
   // Data State
   const [posts, setPosts] = useState<Post[]>([])
-  const [isLoadingPosts, setIsLoadingPosts] = useState(true)
 
   // Update URL when filter changes
   useEffect(() => {
@@ -53,13 +50,68 @@ function FeedFilterPage() {
     }
   }, [feedSubTab, filter, router])
 
-  // Fetch data when component loads
-  useEffect(() => {
-    if (user) {
-      fetchFeedPosts()
-      fetchUsers()
+  const fetchFeedPosts = useCallback(async () => {
+    try {
+      console.log('Fetching feed posts...')
+  let response: unknown
+
+      switch (feedSubTab) {
+        case 'following':
+          // Fetch posts from users the current user is following
+          response = await api.getFeed(20, 0) // This should be filtered on backend
+          break
+        case 'friends':
+          // Fetch posts from friends (mutual follows)
+          response = await api.getFeed(20, 0) // This should be filtered on backend
+          break
+        default: // 'all'
+          response = await api.getFeed(20, 0)
+      }
+
+  const respRec = response as Record<string, unknown>
+  const postsArr = Array.isArray(respRec['data'] as unknown) ? respRec['data'] as unknown[] : [];
+      
+      if (!postsArr.length) {
+        setPosts([])
+        return
+      }
+
+      const mappedPosts = postsArr.map((post: unknown) => {
+        const p = post as Record<string, unknown>
+        const userObj = p['user'] as Record<string, unknown> | undefined
+        const imageUrl = typeof p['image_url'] === 'string' ? String(p['image_url']) : undefined
+
+        return {
+          id: Number(p['id']) || 0,
+          user: {
+            name: userObj ? `${String(userObj['first_name'] ?? '')} ${String(userObj['last_name'] ?? '')}` : 'Unknown',
+            username: userObj ? String(userObj['nickname'] ?? userObj['email'] ?? '').split('@')[0] : 'unknown',
+            avatar: userObj ? String(userObj['avatar'] ?? '') : ''
+          },
+          content: typeof p['content'] === 'string' ? String(p['content']) : '',
+          image: imageUrl ? (imageUrl.startsWith('http') ? imageUrl : `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}${imageUrl}`) : undefined,
+          likes: Number(p['like_count']) || 0,
+          comments: Number(p['comment_count']) || 0,
+          shares: 0,
+          timeAgo: formatTimeAgo(String(p['created_at'] ?? '')),
+          privacy: String(p['privacy'] ?? ''),
+          isLiked: Boolean(p['is_liked'])
+        }
+      })
+      
+      setPosts(mappedPosts)
+    } catch (err) {
+      console.error('Error fetching posts:', err)
+      if (err instanceof NetworkError) {
+        error('Failed to load posts. Please check your connection.')
+      } else if (err instanceof AuthenticationError) {
+        error('Please log in again to continue.')
+      } else {
+        error('Unable to load posts right now.')
+      }
+    } finally {
     }
-  }, [user, feedSubTab])
+  }, [feedSubTab, error])
 
   // WebSocket real-time notifications
   useEffect(() => {
@@ -94,69 +146,15 @@ function FeedFilterPage() {
     })
 
     return removeListener
-  }, [isConnected, addMessageListener, user?.id])
+  }, [isConnected, addMessageListener, user?.id, fetchFeedPosts])
 
-  const fetchFeedPosts = async () => {
-    try {
-      setIsLoadingPosts(true)
-      console.log('Fetching feed posts...')
-      let response: any
-
-      switch (feedSubTab) {
-        case 'following':
-          // Fetch posts from users the current user is following
-          response = await api.getFeed(20, 0) // This should be filtered on backend
-          break
-        case 'friends':
-          // Fetch posts from friends (mutual follows)
-          response = await api.getFeed(20, 0) // This should be filtered on backend
-          break
-        default: // 'all'
-          response = await api.getFeed(20, 0)
-      }
-
-      const postsArr = Array.isArray(response.data) ? response.data : [];
-      
-      if (!postsArr.length) {
-        setPosts([])
-        return
-      }
-
-      const mappedPosts = postsArr.map((post: any) => ({
-        id: post.id,
-        user: {
-          name: `${post.user.first_name} ${post.user.last_name}`,
-          username: post.user.nickname || post.user.email.split('@')[0],
-          avatar: post.user.avatar
-        },
-        content: post.content,
-        image: post.image_url ? 
-          (post.image_url.startsWith('http') ? 
-            post.image_url : 
-            `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}${post.image_url}`
-          ) : undefined,
-        likes: post.like_count,
-        comments: post.comment_count,
-        shares: 0,
-        timeAgo: formatTimeAgo(post.created_at),
-        privacy: post.privacy,
-        isLiked: post.is_liked
-      }))
-      
-      setPosts(mappedPosts)
-    } catch (err) {
-      console.error('Error fetching posts:', err)
-      if (err instanceof NetworkError) {
-        error('Failed to load posts. Please check your connection.')
-      } else if (err instanceof AuthenticationError) {
-        error('Please log in again to continue.')
-      } else {
-        error('Unable to load posts right now.')
-      }
-    } finally {
-      setIsLoadingPosts(false)
+  // Fetch data when component loads
+  useEffect(() => {
+    if (user) {
+      fetchFeedPosts()
+      fetchUsers()
     }
-  }
+  }, [user, feedSubTab, fetchFeedPosts])
 
   const fetchUsers = async () => {
     try {
@@ -300,10 +298,6 @@ function FeedFilterPage() {
     }
   }
 
-  const handleTabChange = (newTab: string) => {
-    router.push(`/${newTab}`)
-  }
-
   return (
     <AppLayout 
       activeTab="feed"
@@ -330,7 +324,6 @@ function FeedFilterPage() {
         posts={posts}
         onPostLike={handleLikePost}
         onPostBookmark={handleBookmarkPost}
-        setActiveTab={handleTabChange}
         showCreatePost={showCreatePost}
         setShowCreatePost={setShowCreatePost}
         newPostContent={newPostContent}
@@ -345,7 +338,6 @@ function FeedFilterPage() {
         loadingUsers={loadingUsers}
         onCreatePost={handleCreatePost}
         feedSubTab={feedSubTab}
-        setFeedSubTab={setFeedSubTab}
       />
     </AppLayout>
   )

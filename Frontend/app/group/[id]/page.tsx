@@ -1,11 +1,11 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import ProtectedRoute from '@/components/ProtectedRoute'
 import { useAuth } from '@/context/AuthContext'
 import { useToast } from '@/context/ToastContext'
-import { useRealTimeGroups, useRealTimeEvents, useConnectionStatus, useOnlineStatus } from '@/hooks'
-import { api, Group, Event, User, API_BASE_URL, getToken, PostResponse } from '@/lib/api'
+import { useConnectionStatus, useOnlineStatus } from '@/hooks'
+import { api, Event, API_BASE_URL, getToken } from '@/lib/api'
 import GroupChat from '@/components/GroupChat'
 import {
   Users,
@@ -15,11 +15,9 @@ import {
   UserPlus,
   LogOut,
   Crown,
-  MapPin,
   Clock,
   ArrowLeft,
-  X,
-  Heart
+  X
 } from 'lucide-react'
 import CreateEvent from '@/components/dashboard/CreateEvent'
 import CreateGroupPost from '@/components/dashboard/CreateGroupPost'
@@ -62,8 +60,6 @@ function GroupDetailsPage() {
   const { success, error } = useToast()
   const { isConnected } = useConnectionStatus()
   const { onlineUsers } = useOnlineStatus()
-  const { getGroup, loading: groupLoading } = useRealTimeGroups()
-  const { events: liveEvents } = useRealTimeEvents()
 
   const [group, setGroup] = useState<GroupDetails | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -72,21 +68,14 @@ function GroupDetailsPage() {
   const [showInviteModal, setShowInviteModal] = useState(false)
   const [inviteEmail, setInviteEmail] = useState('')
   const [isInviting, setIsInviting] = useState(false)
-  const [posts, setPosts] = useState<PostResponse[]>([])
   const [showCreateEvent, setShowCreateEvent] = useState(false)
 
   // Get online member count
   const onlineMemberCount = group?.members.filter(member => 
-    onlineUsers.some(onlineUser => onlineUser.user_id === member.id && onlineUser.is_online)
+    onlineUsers.some(onlineUser => onlineUser.user_id === member.id && onlineUser.status === 'online')
   ).length || 0
 
-  useEffect(() => {
-    if (id) {
-      fetchGroupDetails()
-    }
-  }, [id])
-
-  const fetchGroupDetails = async () => {
+  const fetchGroupDetails = useCallback(async () => {
     try {
       setIsLoading(true)
       const groupId = parseInt(id as string)
@@ -110,10 +99,10 @@ function GroupDetailsPage() {
       const groupEvents = eventsData.events.filter((event: Event) => event.group_id === groupId)
 
       // Fetch group posts
-      const postsData = await api.getGroupPosts(groupId)
-      const groupPosts = postsData.posts || []
+      // const postsData = await api.getGroupPosts(groupId)
+      // const groupPosts = postsData.posts || []
 
-      setPosts(groupPosts)
+      // setPosts(groupPosts)
 
       setGroup({
         ...groupInfo,
@@ -134,7 +123,13 @@ function GroupDetailsPage() {
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [id, error])
+
+  useEffect(() => {
+    if (id) {
+      fetchGroupDetails()
+    }
+  }, [id, fetchGroupDetails])
 
   const handleJoinGroup = async () => {
     if (!group) return

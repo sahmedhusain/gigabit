@@ -6,7 +6,6 @@ import {
   Users, 
   MessageCircle, 
   Heart, 
-  Share, 
   Globe, 
   Shield, 
   Zap,
@@ -238,7 +237,7 @@ export default function HomePage() {
               <h3 className="text-2xl font-bold bg-gradient-to-r from-white via-emerald-100 to-teal-200 bg-clip-text text-transparent">
                 Gigabit
               </h3>
-              <p className="text-white/60 mt-2">Step into tomorrow's social experience</p>
+              <p className="text-white/60 mt-2">Step into tomorrow&apos;s social experience</p>
             </div>
             
             <div className="flex flex-col sm:flex-row items-center space-y-4 sm:space-y-0 sm:space-x-8">

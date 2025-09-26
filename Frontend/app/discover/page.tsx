@@ -1,15 +1,8 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import ProtectedRoute from '@/components/ProtectedRoute'
 import { useAuth } from '@/context/AuthContext'
-import { useWebSocket } from '@/context/WebSocketContext'
-import { useToast } from '@/context/ToastContext'
-import { useNotifications } from '@/hooks'
-import {
-  api,
-  NetworkError
-} from '@/lib/api'
 
 // Import AppLayout instead of individual components
 import AppLayout from '@/components/AppLayout'
@@ -21,11 +14,8 @@ function DiscoverPageRoute() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { user } = useAuth()
-  const { isConnected, onlineUsers } = useWebSocket()
-  const { success, error } = useToast()
-  const { items: liveNotifications, unread: liveUnreadCount } = useNotifications()
 
-  const [category, setCategory] = useState(searchParams.get('category') || 'trending')
+  const category = searchParams.get('category') || 'trending'
 
   // Update URL when category changes
   useEffect(() => {
@@ -40,17 +30,9 @@ function DiscoverPageRoute() {
     // No data fetching needed for discover page
   }, [user])
 
-  const handleTabChange = (newTab: string) => {
-    router.push(`/${newTab}`)
-  }
-
-  const handleClose = () => {
-    router.back()
-  }
-
   return (
     <AppLayout activeTab="discover">
-      <DiscoverPage onClose={handleClose} />
+      <DiscoverPage />
     </AppLayout>
   )
 }

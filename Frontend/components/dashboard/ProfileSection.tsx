@@ -1,12 +1,12 @@
 'use client'
-import { User, Settings, Lock, Globe } from 'lucide-react'
+import Image from 'next/image'
+import { User, Lock, Globe } from 'lucide-react'
 import { Post, api } from '@/lib/api'
 import { useRealTimePosts, useFollowers, useConnectionStatus, useFollowerCounts } from '@/hooks'
 import { getAvatarUrl } from '@/utils/avatarUtils'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import { useToast } from '@/context/ToastContext'
-import { useWebSocket } from '@/context/WebSocketContext'
 import FollowHandler, { FollowStatus, getFollowStatusFromAPI } from './FollowHandler'
 
 interface ProfileSectionProps {
@@ -27,10 +27,9 @@ interface ProfileSectionProps {
     first_name?: string
     last_name?: string
   } | null
-  followers: any[]
-  following: any[]
+  followers: unknown[]
+  following: unknown[]
   posts: Post[]
-  isLoadingFollowers: boolean
   isOwnProfile?: boolean
   showPrivacyOverlay?: boolean
   isFollowing?: boolean
@@ -43,7 +42,6 @@ export default function ProfileSection({
   followers,
   following,
   posts,
-  isLoadingFollowers,
   isOwnProfile = true,
   showPrivacyOverlay = false,
   isFollowing = false,
@@ -92,7 +90,7 @@ export default function ProfileSection({
     setIsUpdatingPrivacy(true)
     try {
       // Call the API to update privacy setting
-      const response = await api.updateUserPrivacy(currentUser.id, makePrivate)
+      await api.updateUserPrivacy(currentUser.id, makePrivate)
 
       success(`Profile is now ${makePrivate ? 'private' : 'public'}`)
 
@@ -104,11 +102,11 @@ export default function ProfileSection({
         currentUser.isPrivate = makePrivate
         // Also update the alternate property name if it exists
         if ('is_private' in currentUser) {
-          (currentUser as any).is_private = makePrivate
+          (currentUser as { is_private?: boolean }).is_private = makePrivate
         }
       }
 
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Failed to update privacy setting:', err)
       error('Failed to update privacy setting. Please try again.')
     } finally {
@@ -147,9 +145,12 @@ export default function ProfileSection({
             <div className="w-24 h-24 lg:w-32 lg:h-32 bg-gradient-to-r from-emerald-500 to-teal-600 rounded-full flex items-center justify-center overflow-hidden">
               {getAvatarUrl(currentUser?.avatar) ? (
                 <>
-                  <img
+                  <Image
                     src={getAvatarUrl(currentUser?.avatar)!}
-                    alt={`${currentUser?.name}'s avatar`}
+                    alt={`${currentUser?.name}&apos;s avatar`}
+                    width={128}
+                    height={128}
+                    unoptimized={getAvatarUrl(currentUser?.avatar)!.includes('/svg')}
                     className="w-full h-full object-cover"
                     onError={(e) => {
                       // Fallback to default User icon on error
@@ -180,7 +181,9 @@ export default function ProfileSection({
                     created_at: currentUser.memberSince || '',
                     about_me: currentUser.aboutMe || '',
                     date_of_birth: currentUser.dateOfBirth || '',
-                    updated_at: new Date().toISOString()
+                    updated_at: new Date().toISOString(),
+                    status: 'online',
+                    last_status_change: new Date().toISOString()
                   }}
                   currentFollowStatus={followStatus}
                   onStatusChange={handleFollowStatusChange}
@@ -261,7 +264,7 @@ export default function ProfileSection({
             <div className="mb-4">
               <h4 className="text-white font-semibold mb-2">Bio</h4>
               <p className="text-white/80 text-sm">
-                {currentUser?.aboutMe || 'This user hasn\'t written a bio yet.'}
+                {currentUser?.aboutMe || 'This user hasn&apos;t written a bio yet.'}
               </p>
             </div>
             <div>
@@ -289,7 +292,7 @@ export default function ProfileSection({
             <div className="text-center p-6">
               <Lock className="w-12 h-12 text-white/70 mx-auto mb-4" />
               <h4 className="text-xl font-semibold text-white mb-2">Private Profile</h4>
-              <p className="text-white/70">This user's profile is private. Follow them to see their details.</p>
+              <p className="text-white/70">This user&apos;s profile is private. Follow them to see their details.</p>
             </div>
           </div>
         )}
@@ -316,8 +319,8 @@ export default function ProfileSection({
                     <div className="flex items-center justify-between text-xs lg:text-sm text-white/60">
                       <span>Just now</span>
                       <div className="flex space-x-3 lg:space-x-4">
-                        <span>{(post as any).like_count || (post as any).likes || 0} likes</span>
-                        <span>{Array.isArray((post as any).comments) ? (post as any).comments.length : ((post as any).comment_count || (post as any).comments || 0)} comments</span>
+                        <span>{(post as { like_count?: number; likes?: number }).like_count || (post as { like_count?: number; likes?: number }).likes || 0} likes</span>
+                        <span>{Array.isArray((post as { comments?: unknown[] }).comments) ? (post as { comments?: unknown[] }).comments!.length : ((post as { comment_count?: number; comments?: number }).comment_count || (post as { comment_count?: number; comments?: number }).comments || 0)} comments</span>
                       </div>
                     </div>
                   </div>

@@ -4,25 +4,6 @@ import { X, Send, Smile, Paperclip, Image, Check, CheckCheck, Clock } from 'luci
 import { useAuth } from '@/context/AuthContext'
 import { useRealTimeMessages, useTypingIndicator, useConnectionStatus, useOnlineStatus } from '@/hooks'
 
-interface Message {
-  id: number | string
-  content: string
-  sender_id: number
-  sender_name: string
-  created_at: string
-  is_own: boolean
-  status?: 'sending' | 'sent' | 'delivered' | 'read'
-  type?: 'text' | 'image' | 'file'
-  file_url?: string
-  file_name?: string,
-  sender: {
-    id: number;
-    first_name: string;
-    last_name: string;
-    avatar?: string;
-  }
-}
-
 interface ChatWindowProps {
   conversationId: number
   conversationType: 'private' | 'group'
@@ -50,19 +31,14 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
   const {
     messages,
     sendMessage: sendRealTimeMessage,
-    isConnected: messagesConnected,
     isLoading,
     fetchConversationMessages
   } = useRealTimeMessages()
 
-  // Use the conversationId directly for message loading
-  const effectiveConversationId = conversationId
-
   // Typing indicator integration
   const {
     typingUsers,
-    startTyping,
-    stopTyping
+    startTyping
   } = useTypingIndicator(conversationId)
 
   // Connection status monitoring
@@ -89,7 +65,6 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
     if ((!newMessage.trim() && !selectedFile) || !isConnected) return
 
     try {
-      let fileUrl = ''
       let messageContent = newMessage.trim()
       let messageType: 'text' | 'image' | 'file' = 'text'
 
@@ -105,8 +80,6 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
         })
 
         if (uploadResponse.ok) {
-          const uploadData = await uploadResponse.json()
-          fileUrl = `/uploads/${uploadData.filename}`
           messageType = selectedFile.type.startsWith('image/') ? 'image' : 'file'
           if (!messageContent) {
             messageContent = selectedFile.name
@@ -188,9 +161,18 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
     }
   }
 
-  const renderSimpleMessageContent = (message: any) => {
-    console.log('Message content:', message.content, 'Type:', typeof message.content)
-    return <div className="text-sm">{message.content || 'No content'}</div>
+  const renderSimpleMessageContent = (message: unknown) => {
+    if (message && typeof message === 'object' && 'content' in message) {
+  const content = (message as { content?: unknown }).content
+      if (typeof content === 'string') {
+        return <div className="text-sm">{content || 'No content'}</div>
+      }
+      // fallback for non-string content
+      return <div className="text-sm">{String(content ?? 'No content')}</div>
+    }
+
+    // Unknown message shape
+    return <div className="text-sm">No content</div>
   }
 
   const formatTime = (dateString: string) => {
@@ -313,7 +295,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-3">
                 {selectedFile.type.startsWith('image/') ? (
-                  <Image className="w-5 h-5 text-white/70" />
+                  <Image className="w-5 h-5 text-white/70" aria-label="Image file" />
                 ) : (
                   <Paperclip className="w-5 h-5 text-white/70" />
                 )}

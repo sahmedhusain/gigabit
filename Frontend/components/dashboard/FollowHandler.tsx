@@ -1,6 +1,6 @@
 'use client'
 import React, { useState, useEffect, useCallback } from 'react'
-import { UserPlus, UserMinus, Clock, X } from 'lucide-react'
+import { UserPlus, UserMinus, X } from 'lucide-react'
 import { useWebSocket, WebSocketMessage } from '@/context/WebSocketContext'
 import { useToast } from '@/context/ToastContext'
 import { User } from '@/lib/api'
@@ -34,21 +34,6 @@ export default function FollowHandler({
   useEffect(() => {
     setLocalStatus(currentFollowStatus)
   }, [currentFollowStatus])
-
-  // Listen for WebSocket follow update messages
-  useEffect(() => {
-    const removeListener = addMessageListener((message: WebSocketMessage) => {
-      if (message.type === 'follow_update' && message.data?.user_id === targetUser.id) {
-        handleFollowUpdateMessage(message)
-      } else if (message.type === 'error' && isLoading) {
-        // Handle error messages when we're waiting for a follow response
-        setIsLoading(false)
-        error(message.content || 'An error occurred')
-      }
-    })
-
-    return removeListener
-  }, [addMessageListener, targetUser.id, isLoading, error])
 
   const handleFollowUpdateMessage = useCallback((message: WebSocketMessage) => {
     const data = message.data
@@ -95,6 +80,21 @@ export default function FollowHandler({
     }
   }, [onStatusChange, success])
 
+  // Listen for WebSocket follow update messages
+  useEffect(() => {
+    const removeListener = addMessageListener((message: WebSocketMessage) => {
+      if (message.type === 'follow_update' && message.data?.user_id === targetUser.id) {
+        handleFollowUpdateMessage(message)
+      } else if (message.type === 'error' && isLoading) {
+        // Handle error messages when we're waiting for a follow response
+        setIsLoading(false)
+        error(message.content || 'An error occurred')
+      }
+    })
+
+    return removeListener
+  }, [addMessageListener, targetUser.id, isLoading, error, handleFollowUpdateMessage])
+
   const handleFollowAction = useCallback(async () => {
     if (!isConnected || disabled || isLoading) {
       if (!isConnected) {
@@ -106,7 +106,7 @@ export default function FollowHandler({
     setIsLoading(true)
 
     try {
-      let messageType: string
+      let messageType: WebSocketMessage['type']
       let action: string
 
       if (localStatus.isFollowing) {
@@ -129,7 +129,7 @@ export default function FollowHandler({
       }
 
       const message: Omit<WebSocketMessage, 'timestamp'> = {
-        type: messageType as any,
+        type: messageType,
         to: targetUser.id,
         action: action,
         data: {

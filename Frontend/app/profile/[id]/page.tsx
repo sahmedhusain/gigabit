@@ -1,13 +1,11 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import ProtectedRoute from '@/components/ProtectedRoute'
 import AppLayout from '@/components/AppLayout'
 import ProfileSection from '@/components/dashboard/ProfileSection'
 import { useAuth } from '@/context/AuthContext'
 import { useToast } from '@/context/ToastContext'
-import { useWebSocket } from '@/context/WebSocketContext'
-import { useNotifications } from '@/hooks'
 import { api, User, Post } from '@/lib/api'
 
 function ProfilePage() {
@@ -15,35 +13,18 @@ function ProfilePage() {
   const router = useRouter()
   const { user: currentUser } = useAuth()
   const { error } = useToast()
-  const { isConnected, onlineUsers } = useWebSocket()
-  const { items: liveNotifications, unread: liveUnreadCount } = useNotifications()
 
   const [profileUser, setProfileUser] = useState<User | null>(null)
   const [userPosts, setUserPosts] = useState<Post[]>([])
-  const [followers, setFollowers] = useState<any[]>([])
-  const [following, setFollowing] = useState<any[]>([])
-  const [followerCount, setFollowerCount] = useState<number>(0)
-  const [followingCount, setFollowingCount] = useState<number>(0)
+  const [followers, setFollowers] = useState<unknown[]>([])
+  const [following, setFollowing] = useState<unknown[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isOwnProfile, setIsOwnProfile] = useState(false)
   const [isFollowing, setIsFollowing] = useState<boolean>(false)
 
   const userId = params.id as string
 
-  useEffect(() => {
-    if (userId && currentUser) {
-      const userIdNum = parseInt(userId)
-      if (isNaN(userIdNum)) {
-        error('Invalid user ID')
-        router.push('/feed/all')
-        return
-      }
-      setIsOwnProfile(userIdNum === currentUser.id)
-      fetchUserProfile(userIdNum)
-    }
-  }, [userId, currentUser])
-
-  const fetchUserProfile = async (userIdNum: number) => {
+  const fetchUserProfile = useCallback(async (userIdNum: number) => {
     try {
       setIsLoading(true)
 
@@ -53,12 +34,12 @@ function ProfilePage() {
         setProfileUser(profileData)
 
         // Check if profile data includes follower/following counts
-        const profileDataAny = profileData as any
-        if (profileDataAny.follower_count !== undefined) {
-          setFollowerCount(profileDataAny.follower_count)
+  const profileDataRec = profileData as unknown as Record<string, unknown>
+        if (profileDataRec['follower_count'] !== undefined) {
+          // followerCount not used, skip setting
         }
-        if (profileDataAny.following_count !== undefined) {
-          setFollowingCount(profileDataAny.following_count)
+        if (profileDataRec['following_count'] !== undefined) {
+          // followingCount not used, skip setting
         }
 
         // get more data
@@ -80,7 +61,7 @@ function ProfilePage() {
         if (followersResponse.status === 'fulfilled') {
           const followersData = followersResponse.value.followers || []
           setFollowers(followersData)
-          setFollowerCount(followersResponse.value.count || followersData.length || 0)
+          // followerCount not used, skip setting
         } else {
           console.warn('Failed to load followers:', followersResponse.reason)
           setFollowers([])
@@ -90,7 +71,7 @@ function ProfilePage() {
         if (followingResponse.status === 'fulfilled') {
           const followingData = followingResponse.value.following || []
           setFollowing(followingData)
-          setFollowingCount(followingResponse.value.count || followingData.length || 0)
+          // followingCount not used, skip setting
         } else {
           console.warn('Failed to load following:', followingResponse.reason)
           setFollowing([])
@@ -98,25 +79,33 @@ function ProfilePage() {
 
         // Check if current user is following this profile user
         if (followersResponse.status === 'fulfilled') {
-          const isCurrentUserFollowing = followersResponse.value.followers?.some(
-            (follower: any) => follower.id === currentUser?.id
-          )
+          const followersVal = followersResponse.value as Record<string, unknown>
+          const isCurrentUserFollowing = Array.isArray(followersVal['followers'] as unknown) ? (followersVal['followers'] as unknown[]).some((follower: unknown) => {
+            const f = follower as Record<string, unknown>
+            return Number(f['id']) === currentUser?.id
+          }) : false
           setIsFollowing(isCurrentUserFollowing || false)
-        }      } catch (profileError: any) {
+        }
+      } catch (profileError: unknown) {
         console.error('Profile fetch failed:', profileError)
 
+        const profileErr = profileError as Record<string, unknown>
+
         // Check if it's a private profile error
-        if (profileError?.status === 403) {
+        if (profileErr['status'] === 403) {
 
           // Try to get basic user info from the users list
           try {
             const usersResponse = await api.getUsers()
-            const targetUser = usersResponse.users.find((u: any) => u.id === userIdNum)
+            const targetUser = (usersResponse.users as unknown[]).find((u: unknown) => {
+              const uu = u as Record<string, unknown>
+              return Number(uu['id']) === userIdNum
+            })
 
             if (targetUser) {
               // Create a basic user object for private profile display
               const basicUser = {
-                ...targetUser,
+                ...(targetUser as User),
                 is_private: true // Ensure it's marked as private
               }
               setProfileUser(basicUser)
@@ -134,7 +123,7 @@ function ProfilePage() {
             error('This profile is private and you do not have permission to view it.')
             return
           }
-        } else if (profileError?.status === 404) {
+        } else if (profileErr['status'] === 404) {
           error('User not found.')
           return
         } else {
@@ -142,11 +131,12 @@ function ProfilePage() {
           return
         }
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error fetching user profile:', err)
-      if (err.status === 403) {
+      const errRec = err as Record<string, unknown>
+      if (errRec['status'] === 403) {
         error('This profile is private and you do not have permission to view it.')
-      } else if (err.status === 404) {
+      } else if (errRec['status'] === 404) {
         error('User not found.')
       } else {
         error('Failed to load user profile.')
@@ -154,7 +144,20 @@ function ProfilePage() {
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [currentUser, error])
+
+  useEffect(() => {
+    if (userId && currentUser) {
+      const userIdNum = parseInt(userId)
+      if (isNaN(userIdNum)) {
+        error('Invalid user ID')
+        router.push('/feed/all')
+        return
+      }
+      setIsOwnProfile(userIdNum === currentUser.id)
+      fetchUserProfile(userIdNum)
+    }
+  }, [userId, currentUser, error, fetchUserProfile, router])
 
   if (!currentUser) {
     return (
@@ -206,7 +209,6 @@ function ProfilePage() {
         followers={followers}
         following={following}
         posts={userPosts}
-        isLoadingFollowers={isLoading}
         isOwnProfile={isOwnProfile}
         showPrivacyOverlay={profileUser.is_private && !isOwnProfile}
         isFollowing={isFollowing}

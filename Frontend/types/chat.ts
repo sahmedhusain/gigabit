@@ -1,4 +1,4 @@
-import { User } from './user';
+import { User } from '@/lib/api';
 
 export interface ChatItem {
   id: string;

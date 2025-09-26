@@ -1,29 +1,25 @@
 'use client'
 import { useState, useEffect } from 'react'
-import { Calendar, Clock, MapPin, Users, Bell, Activity, Heart, MessageCircle, Plus, Check, X, ArrowUpDown } from 'lucide-react'
+import { Calendar, MapPin, Users, Bell, Activity, Heart, MessageCircle, Plus, Check, X, ArrowUpDown } from 'lucide-react'
 import { Event, type Notification as NotificationType, api } from '@/lib/api'
 import { useToast } from '@/context/ToastContext'
 
 interface CommunitySectionProps {
   events: Event[]
-  onEventsUpdate: () => void
   isLoadingEvents: boolean
   notifications: NotificationType[]
   isLoadingNotifications: boolean
-  showCreateEvent: boolean
   setShowCreateEvent: (show: boolean) => void
-  onEventRespond?: (eventId: number, option: 'going' | 'not_going') => Promise<any>
+  onEventRespond?: (eventId: number, option: 'going' | 'not_going') => Promise<void>
   communitySubTab: string
   eventsSubTab?: string
 }
 
 export default function CommunitySection({
   events,
-  onEventsUpdate,
   isLoadingEvents,
   notifications,
   isLoadingNotifications,
-  showCreateEvent,
   setShowCreateEvent,
   onEventRespond,
   communitySubTab,
@@ -76,10 +72,11 @@ export default function CommunitySection({
         success(`Marked as ${option === 'going' ? 'Going' : 'Not Going'}`)
       }
       // Real-time updates will sync the state, no need to call onEventsUpdate
-    } catch (err: any) {
+    } catch (err: unknown) {
       // Revert optimistic update on error
       setOptimisticEvents(events)
-      error(err.message || 'Failed to update response')
+      const message = err instanceof Error ? err.message : String(err)
+      error(message || 'Failed to update response')
     } finally {
       setRespondingToEvent(null)
     }
@@ -124,7 +121,7 @@ export default function CommunitySection({
     }
 
     // Sort events based on sortBy option
-    let sortedEvents = [...optimisticEvents]
+    const sortedEvents = [...optimisticEvents]
 
     switch (sortBy) {
       case 'newest':
@@ -441,7 +438,7 @@ export default function CommunitySection({
             <div className="relative">
               <select
                 value={sortBy}
-                onChange={(e) => setSortBy(e.target.value as any)}
+                onChange={(e) => setSortBy(e.target.value as 'newest' | 'oldest')}
                 className="bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400/50 appearance-none pr-8"
                 title="Sort events"
               >

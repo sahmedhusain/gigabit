@@ -1,15 +1,16 @@
 'use client'
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
-import { User, Heart, MessageSquare, MoreHorizontal, Send, Image as ImageIcon, Bookmark, Check } from 'lucide-react'
+import { User, Heart, MessageSquare, MoreHorizontal, Send, Image as ImageIcon, Bookmark } from 'lucide-react'
 import ProtectedRoute from '@/components/ProtectedRoute'
 import AppLayout from '@/components/AppLayout'
 import { useAuth } from '@/context/AuthContext'
 import { useWebSocket } from '@/context/WebSocketContext'
 import { useToast } from '@/context/ToastContext'
-import { useConnectionStatus, useOptimisticUpdate, useOnlineStatus } from '@/hooks'
-import { api, APIPost, Comment as CommentType, NetworkError, ValidationError } from '@/lib/api'
+import { useConnectionStatus, useOptimisticUpdate } from '@/hooks'
+import { api, APIPost, Comment as CommentType, NetworkError } from '@/lib/api'
 import { getAvatarUrl } from '@/utils/avatarUtils'
+import Image from 'next/image'
 
 interface CommentWithUser extends CommentType {
     timeAgo: string
@@ -23,7 +24,6 @@ function PostDetailPage() {
   const { sendMessage, addMessageListener, isConnected } = useWebSocket()
   const { success, error } = useToast()
   const { isConnected: connectionStatus } = useConnectionStatus()
-  const { onlineUsers } = useOnlineStatus()
 
   // Get navigation context from URL params
   const from = searchParams.get('from')
@@ -33,7 +33,6 @@ function PostDetailPage() {
   const [post, setPost] = useState<APIPost | null>(null)
   const [comments, setComments] = useState<CommentWithUser[]>([])
   const [isLoadingPost, setIsLoadingPost] = useState(true)
-  const [isLoadingComments, setIsLoadingComments] = useState(false)
   const [newComment, setNewComment] = useState('')
   const [isSubmittingComment, setIsSubmittingComment] = useState(false)
 
@@ -44,24 +43,6 @@ function PostDetailPage() {
             onError: () => error('Failed to update like')
         }
     )
-
-  // Current User Processing
-  const currentUser = user ? {
-    id: user.id,
-    name: `${user.first_name} ${user.last_name}`,
-    username: user.nickname || user.email.split('@')[0],
-    avatar: user.avatar,
-    isPrivate: user.is_private,
-    email: user.email,
-    firstName: user.first_name,
-    lastName: user.last_name,
-    dateOfBirth: user.date_of_birth,
-    nickname: user.nickname,
-    aboutMe: user.about_me,
-    memberSince: user.created_at,
-    followers: 0,
-    following: 0
-  } : null
 
     // Format time ago
     const formatTimeAgo = (dateString: string) => {
@@ -78,7 +59,7 @@ function PostDetailPage() {
     }
 
     // Fetch post details
-    const fetchPost = async () => {
+    const fetchPost = useCallback(async () => {
         if (!id) return
 
         try {
@@ -113,7 +94,7 @@ function PostDetailPage() {
         } finally {
             setIsLoadingPost(false)
         }
-    }
+    }, [id, error, from, subTab, searchParams, router])
 
     // Handle like post with optimistic updates
     const handleLikePost = async () => {
@@ -127,7 +108,7 @@ function PostDetailPage() {
         }
 
         // Use optimistic update hook
-        await performOptimisticUpdate((current) => optimisticPost, async () => {
+        await performOptimisticUpdate(() => optimisticPost, async () => {
             try {
                 if (wasLiked) {
                     await api.unlikePost(post.id)
@@ -274,12 +255,12 @@ function PostDetailPage() {
         })
 
         return removeListener
-    }, [isConnected, addMessageListener, post?.id])
+    }, [isConnected, addMessageListener, post])
 
     // Load post on component mount
     useEffect(() => {
         fetchPost()
-    }, [id])
+    }, [fetchPost])
 
   if (isLoadingPost) {
     return (
@@ -346,20 +327,13 @@ function PostDetailPage() {
               <div className="relative">
                 <div className="w-12 h-12 bg-gradient-to-br from-emerald-400 via-teal-500 to-cyan-600 rounded-full flex items-center justify-center overflow-hidden ring-2 ring-white/20 group-hover:ring-emerald-400/50 transition-all duration-300">
                   {getAvatarUrl(post.user.avatar) ? (
-                    <>
-                      <img
-                        src={getAvatarUrl(post.user.avatar)!}
-                        alt={`${post.user.first_name} ${post.user.last_name}'s avatar`}
-                        className="w-full h-full object-cover"
-                        onError={(e) => {
-                          // Fallback to default User icon on error
-                          const target = e.target as HTMLImageElement;
-                          target.style.display = 'none';
-                          target.nextElementSibling?.classList.remove('hidden');
-                        }}
-                      />
-                      <User className="w-6 h-6 text-white hidden" />
-                    </>
+                    <Image
+                      src={getAvatarUrl(post.user.avatar)!}
+                      alt={`${post.user.first_name} ${post.user.last_name}'s avatar`}
+                      width={48}
+                      height={48}
+                      className="w-12 h-12 rounded-full object-cover"
+                    />
                   ) : (
                     <User className="w-6 h-6 text-white" />
                   )}
@@ -397,19 +371,15 @@ function PostDetailPage() {
           {/* Post Image */}
           {post.image_url && (
             <div className="mb-6 rounded-2xl overflow-hidden bg-gradient-to-br from-white/5 to-transparent border border-white/10 group-hover:border-emerald-400/30 transition-all duration-300">
-              <img
+              <Image
                 src={post.image_url.startsWith('http') ?
                   post.image_url :
                   `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}${post.image_url}`
                 }
                 alt="Post image"
-                className="w-full h-auto object-cover hover:scale-105 transition-transform duration-500"
-                onError={(e) => {
-                  // Fallback to placeholder on error
-                  const target = e.target as HTMLImageElement;
-                  target.style.display = 'none';
-                  target.nextElementSibling?.classList.remove('hidden');
-                }}
+                width={640}
+                height={256}
+                className="w-full h-64 object-cover hover:scale-105 transition-transform duration-500"
               />
               <div className="aspect-video bg-gradient-to-br from-emerald-500/20 to-teal-500/20 flex items-center justify-center">
                 <ImageIcon className="w-16 h-16 text-white/50" />
@@ -469,20 +439,13 @@ function PostDetailPage() {
           <div className="flex items-start space-x-3">
             <div className="w-8 h-8 bg-gradient-to-r from-emerald-500 to-teal-600 rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden">
               {getAvatarUrl(user?.avatar) ? (
-                <>
-                  <img
-                    src={getAvatarUrl(user?.avatar)!}
-                    alt={`${user?.first_name} ${user?.last_name}'s avatar`}
-                    className="w-full h-full object-cover"
-                    onError={(e) => {
-                      // Fallback to default User icon on error
-                      const target = e.target as HTMLImageElement;
-                      target.style.display = 'none';
-                      target.nextElementSibling?.classList.remove('hidden');
-                    }}
-                  />
-                  <User className="w-4 h-4 text-white hidden" />
-                </>
+                <Image
+                  src={getAvatarUrl(user?.avatar)!}
+                  alt={`${user?.first_name} ${user?.last_name}'s avatar`}
+                  width={32}
+                  height={32}
+                  className="w-8 h-8 rounded-full object-cover"
+                />
               ) : (
                 <User className="w-4 h-4 text-white" />
               )}
@@ -543,20 +506,13 @@ function PostDetailPage() {
                 <div key={comment.id} className="flex items-start space-x-3 p-3 rounded-lg bg-white/5">
                   <div className="w-8 h-8 bg-gradient-to-r from-emerald-500 to-teal-600 rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden">
                     {getAvatarUrl(comment.user.avatar) ? (
-                      <>
-                        <img
-                          src={getAvatarUrl(comment.user.avatar)!}
-                          alt={`${comment.user.first_name} ${comment.user.last_name}'s avatar`}
-                          className="w-full h-full object-cover"
-                          onError={(e) => {
-                            // Fallback to default User icon on error
-                            const target = e.target as HTMLImageElement;
-                            target.style.display = 'none';
-                            target.nextElementSibling?.classList.remove('hidden');
-                          }}
-                        />
-                        <User className="w-4 h-4 text-white hidden" />
-                      </>
+                      <Image
+                        src={getAvatarUrl(comment.user.avatar)!}
+                        alt={`${comment.user.first_name} ${comment.user.last_name}'s avatar`}
+                        width={32}
+                        height={32}
+                        className="w-8 h-8 rounded-full object-cover"
+                      />
                     ) : (
                       <User className="w-4 h-4 text-white" />
                     )}

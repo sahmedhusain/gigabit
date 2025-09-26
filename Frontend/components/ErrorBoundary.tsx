@@ -23,7 +23,8 @@ export default class ErrorBoundary extends Component<Props, State> {
     return { hasError: true, error };
   }
 
-  componentDidCatch(error: Error, errorInfo: any) {
+  componentDidCatch(error: Error, errorInfo: unknown) {
+    // Keep errorInfo as unknown and log safely
     console.error('ErrorBoundary caught an error:', error, errorInfo);
     this.setState({ error });
   }

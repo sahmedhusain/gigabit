@@ -1,9 +1,8 @@
 'use client'
 import { useState } from 'react'
 import useSWR from 'swr'
-import { MessageCircle, Users, Plus, Search, MessageSquarePlus } from 'lucide-react'
+import { MessageCircle, Plus, Search, MessageSquarePlus } from 'lucide-react'
 import { api } from '@/lib/api'
-import { ChatItem as ChatItemType } from '@/types/chat'
 import ChatItem from '@/components/chat/ChatItem'
 import ChatSkeleton from '@/components/chat/ChatSkeleton'
 import { User } from '@/lib/api'
@@ -24,9 +23,7 @@ export default function ChatsSection({
   chatSubTab,
   onChatClick,
   isUserOnline,
-  currentUser,
   setShowCreateDirectMessage,
-  showCreateGroup,
   setShowCreateGroup
 }: ChatsSectionProps) {
   const [searchQuery, setSearchQuery] = useState('')

@@ -1,8 +1,9 @@
 'use client'
 import { User, Heart, MessageSquare, MoreHorizontal, Bookmark, Image as ImageIcon, Send } from 'lucide-react'
+import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { Post } from '@/lib/api'
-import { useRealTimeComments, useConnectionStatus } from '@/hooks'
+import { useRealTimeComments } from '@/hooks'
 import { getAvatarUrl } from '@/utils/avatarUtils'
 
 interface PostCardProps {
@@ -19,12 +20,8 @@ export default function PostCard({ post, onLike, onBookmark, currentSubTab }: Po
   const { 
     comments, 
     newCommentsCount, 
-    isConnected: commentsConnected,
     markNewCommentsAsRead 
   } = useRealTimeComments(post.id)
-  
-  // Connection status monitoring
-  const { isConnected } = useConnectionStatus()
 
   const handlePostClick = (e: React.MouseEvent) => {
     // Don't navigate if clicking on interactive elements
@@ -58,10 +55,13 @@ export default function PostCard({ post, onLike, onBookmark, currentSubTab }: Po
           <div className="w-8 h-8 lg:w-10 lg:h-10 bg-gradient-to-r from-emerald-500 to-teal-600 rounded-full flex items-center justify-center overflow-hidden">
             {getAvatarUrl(post.user.avatar) ? (
               <>
-                <img 
+                <Image 
                   src={getAvatarUrl(post.user.avatar)!}
                   alt={`${post.user.name}'s avatar`}
-                  className="w-full h-full object-cover"
+                  width={40}
+                  height={40}
+                  unoptimized={getAvatarUrl(post.user.avatar)!.includes('/svg')}
+                  className="w-full h-full object-cover rounded-full"
                   onError={(e) => {
                     // Fallback to default User icon on error
                     const target = e.target as HTMLImageElement;
@@ -96,11 +96,13 @@ export default function PostCard({ post, onLike, onBookmark, currentSubTab }: Po
       {/* Post Image */}
       {post.image && (
         <div className="mb-3 lg:mb-4 rounded-xl lg:rounded-2xl overflow-hidden bg-white/5">
-          <img 
+          <Image 
             src={post.image.startsWith('http') ? 
               post.image : `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}${post.image}`
             } 
             alt="Post image" 
+            width={500}
+            height={300}
             className="w-full h-auto object-cover"
             onError={(e) => {
               // Fallback to placeholder on error

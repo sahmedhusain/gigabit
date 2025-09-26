@@ -37,6 +37,52 @@ export interface User {
   updated_at: string;
 }
 
+export interface Bookmark {
+  id: number;
+  post_id: number;
+  user_id: number;
+  created_at: string;
+  // additional fields may be present
+  [key: string]: unknown;
+}
+
+export interface Member {
+  id: number;
+  user: User;
+  role?: string;
+  joined_at?: string;
+  [key: string]: unknown;
+}
+
+export interface MessageItem {
+  id: number;
+  sender: User;
+  receiver_id?: number;
+  group_id?: number;
+  content: string;
+  message_type: 'private' | 'group';
+  image_url?: string;
+  created_at: string;
+  [key: string]: unknown;
+}
+
+export interface FollowRequestItem {
+  id: number;
+  from_user: User;
+  status: string;
+  created_at: string;
+  [key: string]: unknown;
+}
+
+export interface GroupInvitationItem {
+  id: number;
+  group: GroupResponse;
+  inviter: User;
+  status: string;
+  created_at: string;
+  [key: string]: unknown;
+}
+
 // Frontend-specific data structures
 export interface Post {
   id: number;
@@ -293,7 +339,7 @@ export interface PostsResponse {
 export interface APIError {
   error: string;
   code?: string;
-  details?: any;
+  details?: unknown;
   status?: number;
 }
 
@@ -413,9 +459,10 @@ export class ApiClient {
         const text = await response.text();
         return text as unknown as T;
       }
-    } catch (error) {
+    } catch (_error) {
+      const error = _error as unknown;
       // Handle network errors
-      if (error instanceof TypeError && error.message === 'Failed to fetch') {
+      if (error instanceof TypeError && (error as Error).message === 'Failed to fetch') {
         if (retryCount < this.maxRetries) {
           console.log(`Network error, retrying (${retryCount + 1}/${this.maxRetries}) after ${this.retryDelay}ms`);
           await this.delay(this.retryDelay * Math.pow(2, retryCount));
@@ -425,12 +472,12 @@ export class ApiClient {
       }
 
       // Re-throw custom errors
-      if (error instanceof AuthenticationError || error instanceof ValidationError || error instanceof NetworkError) {
-        throw error;
+      if ((error instanceof AuthenticationError) || (error instanceof ValidationError) || (error instanceof NetworkError)) {
+        throw error as Error;
       }
 
       console.error('API request failed:', error);
-      throw new NetworkError(error instanceof Error ? error.message : 'Unknown error occurred');
+      throw new NetworkError((error instanceof Error) ? error.message : 'Unknown error occurred');
     }
   }
 
@@ -448,7 +495,9 @@ export class ApiClient {
     try {
       await this.healthCheck();
       return true;
-    } catch (error) {
+    } catch (_error) {
+      // mark variable as used to satisfy linter
+      void _error;
       return false;
     }
   }
@@ -559,8 +608,8 @@ export class ApiClient {
     });
   }
 
-  async getUserBookmarks(limit: number = 20, offset: number = 0): Promise<{ bookmarks: any[], count: number }> {
-    return this.request<{ bookmarks: any[], count: number }>(`/api/bookmarks?limit=${limit}&offset=${offset}`, {
+  async getUserBookmarks(limit: number = 20, offset: number = 0): Promise<{ bookmarks: Bookmark[]; count: number }> {
+    return this.request<{ bookmarks: Bookmark[]; count: number }>(`/api/bookmarks?limit=${limit}&offset=${offset}`, {
       method: 'GET',
     });
   }
@@ -587,7 +636,9 @@ export class ApiClient {
   }
 
   // Groups endpoints
-  async getUserGroups(userId: number): Promise<{ data: GroupResponse[] }> {
+  async getUserGroups(_userId: number): Promise<{ data: GroupResponse[] }> {
+    // _userId is accepted for API compatibility; mark as used to avoid lint warnings
+    void _userId;
     const response = await this.request<{ groups: GroupResponse[], count: number, limit: number, offset: number }>(`/api/groups`, {
       method: 'GET',
     });
@@ -648,8 +699,8 @@ export class ApiClient {
     });
   }
 
-  async getGroupMembers(groupId: number): Promise<{ members: any[], count: number }> {
-    return this.request<{ members: any[], count: number }>(`/api/groups/${groupId}/members`, {
+  async getGroupMembers(groupId: number): Promise<{ members: Member[]; count: number }> {
+    return this.request<{ members: Member[]; count: number }>(`/api/groups/${groupId}/members`, {
       method: 'GET',
     });
   }
@@ -754,21 +805,21 @@ export class ApiClient {
     });
   }
 
-  async sendMessage(data: { receiver_id?: number; group_id?: number; content: string; message_type: 'private' | 'group'; image_url?: string }): Promise<{ message: string; data: any }> {
-    return this.request<{ message: string; data: any }>('/api/messages', {
+  async sendMessage(data: { receiver_id?: number; group_id?: number; content: string; message_type: 'private' | 'group'; image_url?: string }): Promise<{ message: string; data: MessageItem }> {
+    return this.request<{ message: string; data: MessageItem }>('/api/messages', {
       method: 'POST',
       body: JSON.stringify(data),
     });
   }
 
-  async getPrivateMessages(userId: number, limit: number = 50, offset: number = 0): Promise<{ messages: any[]; count: number; limit: number; offset: number }> {
-    return this.request<{ messages: any[]; count: number; limit: number; offset: number }>(`/api/messages/private/${userId}?limit=${limit}&offset=${offset}`, {
+  async getPrivateMessages(userId: number, limit: number = 50, offset: number = 0): Promise<{ messages: MessageItem[]; count: number; limit: number; offset: number }> {
+    return this.request<{ messages: MessageItem[]; count: number; limit: number; offset: number }>(`/api/messages/private/${userId}?limit=${limit}&offset=${offset}`, {
       method: 'GET',
     });
   }
 
-  async getGroupMessages(groupId: number, limit: number = 50, offset: number = 0): Promise<{ messages: any[]; count: number; limit: number; offset: number }> {
-    return this.request<{ messages: any[]; count: number; limit: number; offset: number }>(`/api/messages/group/${groupId}?limit=${limit}&offset=${offset}`, {
+  async getGroupMessages(groupId: number, limit: number = 50, offset: number = 0): Promise<{ messages: MessageItem[]; count: number; limit: number; offset: number }> {
+    return this.request<{ messages: MessageItem[]; count: number; limit: number; offset: number }>(`/api/messages/group/${groupId}?limit=${limit}&offset=${offset}`, {
       method: 'GET',
     });
   }
@@ -780,8 +831,8 @@ export class ApiClient {
     });
   }
 
-  async getConversationMessages(conversationId: number, limit: number = 50, offset: number = 0): Promise<{ messages: any[]; count: number; limit: number; offset: number }> {
-    return this.request<{ messages: any[]; count: number; limit: number; offset: number }>(`/api/messages/conversation/${conversationId}?limit=${limit}&offset=${offset}`, {
+  async getConversationMessages(conversationId: number, limit: number = 50, offset: number = 0): Promise<{ messages: MessageItem[]; count: number; limit: number; offset: number }> {
+    return this.request<{ messages: MessageItem[]; count: number; limit: number; offset: number }>(`/api/messages/conversation/${conversationId}?limit=${limit}&offset=${offset}`, {
       method: 'GET',
     });
   }
@@ -818,20 +869,20 @@ export class ApiClient {
     });
   }
 
-  async getFollowRequests(): Promise<{ requests: any[], count: number }> {
-    return this.request<{ requests: any[], count: number }>(`/api/follow/requests`, {
+  async getFollowRequests(): Promise<{ requests: FollowRequestItem[]; count: number }> {
+    return this.request<{ requests: FollowRequestItem[]; count: number }>(`/api/follow/requests`, {
       method: 'GET',
     });
   }
 
-  async getGroupInvitations(): Promise<{ invitations: any[], count: number }> {
-    return this.request<{ invitations: any[], count: number }>(`/api/groups/invitations`, {
+  async getGroupInvitations(): Promise<{ invitations: GroupInvitationItem[]; count: number }> {
+    return this.request<{ invitations: GroupInvitationItem[]; count: number }>(`/api/groups/invitations`, {
       method: 'GET',
     });
   }
 
-  async getUsers(): Promise<{ users: any[] }> {
-    return this.request<{ users: any[] }>('/api/users', {
+  async getUsers(): Promise<{ users: User[] }> {
+    return this.request<{ users: User[] }>('/api/users', {
       method: 'GET',
     });
   }
@@ -925,8 +976,8 @@ export const isAuthenticated = (): boolean => {
 export const logoutUser = async (): Promise<void> => {
   try {
     await api.logout();
-  } catch (error) {
-    console.error('Logout error:', error);
+  } catch (_error) {
+    console.error('Logout error:', _error);
   } finally {
     removeToken();
     // Redirect to login page

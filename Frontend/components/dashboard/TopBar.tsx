@@ -1,6 +1,6 @@
 'use client'
 
-import { Menu, X, Bell, MessageCircle, Search, Users, Calendar, UserCheck, Hash, Filter, FileText, User, ChevronDown, Compass } from 'lucide-react'
+import { Menu, X, Bell, Search, Users, Calendar, Hash, Filter, FileText, User, ChevronDown, Compass } from 'lucide-react'
 import { useState } from 'react'
 
 
@@ -8,10 +8,8 @@ interface TopBarProps {
   isMobileMenuOpen: boolean
   setIsMobileMenuOpen: (open: boolean) => void
   activeTab: string
-  setActiveTab: (tab: string) => void
   onNotificationsClick: () => void
   unreadCount: number
-  onSearchClick: () => void
   onDiscoverClick: () => void
 }
 
@@ -19,10 +17,8 @@ export default function TopBar({
   isMobileMenuOpen,
   setIsMobileMenuOpen,
   activeTab,
-  setActiveTab,
   onNotificationsClick,
   unreadCount,
-  onSearchClick,
   onDiscoverClick,
 }: TopBarProps) {
   const [searchQuery, setSearchQuery] = useState('')

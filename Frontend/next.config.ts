@@ -3,7 +3,7 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   output: 'standalone',
   images: {
-    domains: ['localhost'],
+    domains: ['localhost', 'api.dicebear.com'],
     formats: ['image/webp', 'image/avif'],
   },
   serverExternalPackages: ['sqlite3'],

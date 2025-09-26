@@ -2,7 +2,6 @@
 import { X, Calendar, Clock } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { useToast } from '@/context/ToastContext'
-import { useAuth } from '@/context/AuthContext'
 import { useGroups } from '@/hooks/useGroups'
 import { api } from '@/lib/api'
 
@@ -28,7 +27,6 @@ export default function CreateGeneralEvent({
   
   const { success, error: showError } = useToast()
   const { groups, loading: groupsLoading } = useGroups()
-  const { user } = useAuth()
 
   // For now, show all groups the user is a member of
   // The backend will handle permissions for creating events
@@ -112,8 +110,9 @@ export default function CreateGeneralEvent({
       onEventCreated?.()
       onClose()
       
-    } catch (err: any) {
-      showError(err.message || 'Failed to create event')
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err)
+      showError(msg || 'Failed to create event')
     } finally {
       setIsLoading(false)
     }

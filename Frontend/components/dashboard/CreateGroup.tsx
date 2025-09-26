@@ -32,8 +32,9 @@ export default function CreateGroup({
       onGroupCreated?.()
       onClose()
     },
-    onError: (error: any) => {
-      showError(`Failed to create group: ${error.message}`)
+    onError: (error: unknown) => {
+      const message = error instanceof Error ? error.message : String(error)
+      showError(`Failed to create group: ${message}`)
     }
   })
 
@@ -171,7 +172,7 @@ export default function CreateGroup({
             {/* Connection Status */}
             {!isConnected && (
               <div className="bg-gradient-to-r from-red-500/20 to-pink-500/20 border border-red-400/30 rounded-2xl p-4 animate-in slide-in-from-top-2 duration-300">
-                <p className="text-red-300 text-sm font-medium">You're currently offline. Group will be created when connection is restored.</p>
+                <p className="text-red-300 text-sm font-medium">You are currently offline. Group will be created when connection is restored.</p>
               </div>
             )}
           </div>

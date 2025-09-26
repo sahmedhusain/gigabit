@@ -1,5 +1,5 @@
 'use client'
-import { X, Calendar, Clock } from 'lucide-react'
+import { X, Calendar } from 'lucide-react'
 import { api } from '@/lib/api'
 import { useState } from 'react'
 import { useOptimisticUpdate, useConnectionStatus } from '@/hooks'
@@ -38,8 +38,9 @@ export default function CreateEvent({
       onEventCreated?.()
       onClose()
     },
-    onError: (error: any) => {
-      showError(`Failed to create event: ${error.message}`)
+    onError: (error: unknown) => {
+      const message = error instanceof Error ? error.message : String(error)
+      showError(`Failed to create event: ${message}`)
     }
   })
 
@@ -208,7 +209,7 @@ export default function CreateEvent({
                 <div className="text-sm text-blue-300">
                   <p className="font-medium mb-1">Event Features:</p>
                   <ul className="space-y-1 text-blue-200/80">
-                    <li>• Group members can respond "Going" or "Not going"</li>
+                    <li>• Group members can respond &quot;Going&quot; or &quot;Not going&quot;</li>
                     <li>• Track attendance and responses</li>
                     <li>• Real-time updates for all group members</li>
                     <li>• Edit or delete events you created</li>

@@ -1,19 +1,17 @@
-'use client'
-import { useState, useEffect } from 'react'
+"use client"
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import ProtectedRoute from '@/components/ProtectedRoute'
 import { useAuth } from '@/context/AuthContext'
 import { useWebSocket } from '@/context/WebSocketContext'
 import { useToast } from '@/context/ToastContext'
-import { useRealTimePosts, useNotifications } from '@/hooks'
 import {
   api,
-  ApiClient,
   Post,
-  getToken,
-  CreatePostRequest,
+  PostResponse,
+  APIPost,
+  Bookmark,
   NetworkError,
-  ValidationError,
   AuthenticationError
 } from '@/lib/api'
 
@@ -21,20 +19,33 @@ import {
 import ActivitySection from '@/components/dashboard/ActivitySection'
 import AppLayout from '@/components/AppLayout'
 
+// Helper: format relative time
+const formatTimeAgo = (dateString: string) => {
+  const date = new Date(dateString)
+  const now = new Date()
+  const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000)
+
+  if (diffInSeconds < 60) return 'Just now'
+  if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m ago`
+  if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h ago`
+  if (diffInSeconds < 604800) return `${Math.floor(diffInSeconds / 86400)}d ago`
+
+  return date.toLocaleDateString()
+}
+
 function ActivityFilterPage() {
   const router = useRouter()
   const params = useParams()
   const filter = params.filter as string
   const { user } = useAuth()
-  const { isConnected, onlineUsers, addMessageListener } = useWebSocket()
-  const { success, error } = useToast()
-  const { items: liveNotifications, unread: liveUnreadCount } = useNotifications()
+  const { isConnected, addMessageListener } = useWebSocket()
+  const { error } = useToast()
 
   const [activitySubTab, setActivitySubTab] = useState(filter || 'liked')
 
   // Data State
   const [posts, setPosts] = useState<Post[]>([])
-  const [isLoadingPosts, setIsLoadingPosts] = useState(true)
+  const [, setIsLoadingPosts] = useState(true)
 
   // Update URL when filter changes
   useEffect(() => {
@@ -44,87 +55,48 @@ function ActivityFilterPage() {
   }, [activitySubTab, filter, router])
 
   // Fetch data when component loads
-  useEffect(() => {
-    if (user) {
-      fetchActivityPosts()
-    }
-  }, [user, activitySubTab])
-
-  // WebSocket real-time notifications
-  useEffect(() => {
-    if (!isConnected) return
-
-    const removeListener = addMessageListener((message) => {
-      switch (message.type) {
-        case 'post_update':
-          console.log('Post update received:', message.data)
-          fetchActivityPosts()
-          break
-
-        case 'like':
-          // Update like count in real-time for other users
-          if (message.data?.post_id && message.data?.user_id !== user?.id) {
-            setPosts(prevPosts =>
-              prevPosts.map(post =>
-                post.id === message.data.post_id
-                  ? {
-                    ...post,
-                    likes: message.data.like_count || post.likes
-                  }
-                  : post
-              )
-            )
-          }
-          break
-
-        default:
-          console.log('Received WebSocket message:', message)
-      }
-    })
-
-    return removeListener
-  }, [isConnected, addMessageListener, user?.id])
-
-  const fetchActivityPosts = async () => {
+  const fetchActivityPosts = useCallback(async () => {
     try {
       setIsLoadingPosts(true)
       console.log('Fetching activity posts...')
-      let response: any
+      let response: { posts?: PostResponse[]; bookmarks?: Bookmark[] } | undefined
 
-      let postsArr: any[] = []
+      let postsArr: Array<PostResponse | APIPost> = []
 
       switch (activitySubTab) {
         case 'liked':
           // Fetch posts liked by the user
           response = await api.getUserLikedPosts()
-          postsArr = Array.isArray(response.posts) ? response.posts : [];
+          postsArr = Array.isArray(response?.posts) ? response.posts : []
           break
         case 'commented':
           // Fetch posts commented by the user
           response = await api.getUserCommentedPosts()
-          postsArr = Array.isArray(response.posts) ? response.posts : [];
+          postsArr = Array.isArray(response?.posts) ? response.posts : []
           break
         case 'saved':
           // Fetch saved/bookmarked posts
           response = await api.getUserBookmarks()
           // Bookmarks response has a different structure - extract posts from bookmarks
-          const bookmarksArr = Array.isArray(response.bookmarks) ? response.bookmarks : [];
-          postsArr = bookmarksArr.map((bookmark: any) => bookmark.post).filter(Boolean);
+          const bookmarksArr = Array.isArray(response?.bookmarks) ? response.bookmarks : []
+          postsArr = bookmarksArr
+            .map((bookmark: Bookmark & { post?: APIPost }) => bookmark.post)
+            .filter((p): p is APIPost => Boolean(p))
           break
         default:
           response = await api.getUserLikedPosts()
-          postsArr = Array.isArray(response.posts) ? response.posts : [];
+          postsArr = Array.isArray(response?.posts) ? response.posts : []
       }
-      
+
       if (!postsArr.length) {
         setPosts([])
         return
       }
 
-      const mappedPosts = postsArr.map((item: any) => {
+  const mappedPosts = postsArr.map((item: PostResponse | APIPost) => {
         // Handle different response structures
-        const post = activitySubTab === 'saved' ? item : item;
-        
+        const post = item
+
         return {
           id: post.id,
           user: {
@@ -133,9 +105,9 @@ function ActivityFilterPage() {
             avatar: post.user.avatar
           },
           content: post.content,
-          image: post.image_url ? 
-            (post.image_url.startsWith('http') ? 
-              post.image_url : 
+          image: post.image_url ?
+            (post.image_url.startsWith('http') ?
+              post.image_url :
               `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}${post.image_url}`
             ) : undefined,
           likes: post.like_count,
@@ -144,12 +116,12 @@ function ActivityFilterPage() {
           timeAgo: formatTimeAgo(post.created_at),
           privacy: post.privacy,
           isLiked: post.is_liked,
-          isBookmarked: post.is_bookmarked
+          isBookmarked: 'is_bookmarked' in post ? (post as APIPost).is_bookmarked : false
         }
       })
-      
+
       setPosts(mappedPosts)
-    } catch (err) {
+        } catch (err) {
       console.error('Error fetching posts:', err)
       if (err instanceof NetworkError) {
         error('Failed to load posts. Please check your connection.')
@@ -161,20 +133,44 @@ function ActivityFilterPage() {
     } finally {
       setIsLoadingPosts(false)
     }
-  }
+      }, [activitySubTab, error])
 
-  const formatTimeAgo = (dateString: string) => {
-    const date = new Date(dateString)
-    const now = new Date()
-    const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000)
+      // WebSocket real-time notifications
+      useEffect(() => {
+        if (!isConnected) return
 
-    if (diffInSeconds < 60) return 'Just now'
-    if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m ago`
-    if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h ago`
-    if (diffInSeconds < 604800) return `${Math.floor(diffInSeconds / 86400)}d ago`
+        const removeListener = addMessageListener((message) => {
+          switch (message.type) {
+            case 'post_update':
+              console.log('Post update received:', message.data)
+              fetchActivityPosts()
+              break
 
-    return date.toLocaleDateString()
-  }
+            case 'like':
+              // Update like count in real-time for other users
+              if (message.data?.post_id && message.data?.user_id !== user?.id) {
+                setPosts(prevPosts =>
+                  prevPosts.map(post =>
+                    post.id === message.data.post_id
+                      ? {
+                        ...post,
+                        likes: message.data.like_count || post.likes
+                      }
+                      : post
+                  )
+                )
+              }
+              break
+
+            default:
+              console.log('Received WebSocket message:', message)
+          }
+        })
+
+        return removeListener
+      }, [isConnected, addMessageListener, user?.id, fetchActivityPosts])
+
+  // ...formatTimeAgo is defined at module scope
 
   const handleLikePost = async (postId: number) => {
     try {
@@ -230,9 +226,7 @@ function ActivityFilterPage() {
     }
   }
 
-  const handleTabChange = (newTab: string) => {
-    router.push(`/${newTab}`)
-  }
+  // handler intentionally removed (unused)
 
   return (
     <AppLayout 
@@ -245,7 +239,6 @@ function ActivityFilterPage() {
         onPostLike={handleLikePost}
         onPostBookmark={handleBookmarkPost}
         activitySubTab={activitySubTab}
-        setActivitySubTab={setActivitySubTab}
       />
     </AppLayout>
   )

@@ -1,6 +1,6 @@
 'use client'
-import { useState, useEffect } from 'react'
-import { X, Bell, BellOff, Volume2, VolumeX, Mail, Smartphone } from 'lucide-react'
+import { useState, useEffect, useCallback } from 'react'
+import { X, Bell, Volume2, VolumeX, Mail, Smartphone } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import { useConnectionStatus } from '@/hooks'
 
@@ -40,13 +40,7 @@ export default function NotificationSettingsModal({ show, onClose }: Notificatio
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
 
-  useEffect(() => {
-    if (show && user) {
-      fetchPreferences()
-    }
-  }, [show, user])
-
-  const fetchPreferences = async () => {
+  const fetchPreferences = useCallback(async () => {
     if (!user) return
 
     setLoading(true)
@@ -66,7 +60,13 @@ export default function NotificationSettingsModal({ show, onClose }: Notificatio
     } finally {
       setLoading(false)
     }
-  }
+  }, [user, preferences])
+
+  useEffect(() => {
+    if (show && user) {
+      fetchPreferences()
+    }
+  }, [show, user, fetchPreferences])
 
   const savePreferences = async () => {
     if (!user) return
@@ -129,7 +129,7 @@ export default function NotificationSettingsModal({ show, onClose }: Notificatio
           {!isConnected && (
             <div className="mb-4 p-3 bg-yellow-500/20 border border-yellow-500/30 rounded-lg">
               <p className="text-yellow-400 text-sm">
-                You're currently offline. Changes will be saved when connection is restored.
+                You are currently offline. Changes will be saved when connection is restored.
               </p>
             </div>
           )}

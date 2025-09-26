@@ -230,9 +230,8 @@ export function useRealTimeEvents(groupId?: number) {
           return event
         }),
         async () => {
-          const res = await api.respondToEvent(eventId, option)
+          await api.respondToEvent(eventId, option)
           success(`Marked as ${option === 'going' ? 'going' : 'not going'}`)
-          return res
         }
       )
     } catch (err: any) {

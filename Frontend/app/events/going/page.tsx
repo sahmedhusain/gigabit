@@ -3,14 +3,8 @@ import { useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import ProtectedRoute from '@/components/ProtectedRoute'
 import { useAuth } from '@/context/AuthContext'
-import { useWebSocket } from '@/context/WebSocketContext'
 import { useToast } from '@/context/ToastContext'
-import { useNotifications, useRealTimeEvents } from '@/hooks'
-import {
-  api,
-  Event,
-  NetworkError
-} from '@/lib/api'
+import { useRealTimeEvents } from '@/hooks'
 
 // Import dashboard components
 import CommunitySection from '@/components/dashboard/CommunitySection'
@@ -21,9 +15,7 @@ function EventsGoingPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { user } = useAuth()
-  const { isConnected, onlineUsers, addMessageListener } = useWebSocket()
-  const { success, error } = useToast()
-  const { items: liveNotifications, unread: liveUnreadCount } = useNotifications()
+  const { success } = useToast()
   const { 
     events: liveEvents, 
     loading: eventsLoading, 
@@ -51,10 +43,6 @@ function EventsGoingPage() {
     }
   }, [user, refetchEvents])
 
-  const handleTabChange = (newTab: string) => {
-    router.push(`/${newTab}`)
-  }
-
   return (
     <AppLayout 
       activeTab="events"
@@ -73,11 +61,9 @@ function EventsGoingPage() {
 
       <CommunitySection
         events={liveEvents}
-        onEventsUpdate={refetchEvents}
         isLoadingEvents={eventsLoading}
         notifications={[]}
         isLoadingNotifications={false}
-        showCreateEvent={showCreateEvent}
         setShowCreateEvent={setShowCreateEvent}
         onEventRespond={respondToEvent}
         communitySubTab={'events'}

@@ -16,7 +16,7 @@ export default function CreateGroupPost({ groupId, onCreated }: Props) {
   const toast = useToast()
   const router = useRouter()
   const { isConnected } = useConnectionStatus()
-  const { progress, isUploading, uploadImage } = useUpload()
+  const { progress, isUploading } = useUpload()
 
   const [content, setContent] = useState('')
   const [image, setImage] = useState<File | null>(null)
@@ -30,8 +30,9 @@ export default function CreateGroupPost({ groupId, onCreated }: Props) {
       setError(null)
       onCreated?.()
     },
-    onError: (error: any) => {
-      toast.error(`Failed to create post: ${error.message}`)
+    onError: (error: unknown) => {
+      const message = error instanceof Error ? error.message : String(error)
+      toast.error(`Failed to create post: ${message}`)
     }
   })
 
@@ -88,7 +89,7 @@ export default function CreateGroupPost({ groupId, onCreated }: Props) {
       {/* Connection Status */}
       {!isConnected && (
         <div className="mb-2 p-2 bg-red-500/10 border border-red-400/20 rounded text-red-400 text-sm">
-          You're offline. Post will be created when connection is restored.
+          You are offline. Post will be created when connection is restored.
         </div>
       )}
       

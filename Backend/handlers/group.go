@@ -460,3 +460,22 @@ func (h *GroupHandler) GetUserRole(w http.ResponseWriter, r *http.Request, group
 		"is_admin_or_creator": isAdminOrCreator,
 	})
 }
+
+func (h *GroupHandler) GetUserInvitations(w http.ResponseWriter, r *http.Request) {
+	userID, ok := r.Context().Value("user_id").(uint)
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "User not authenticated")
+		return
+	}
+
+	invitations, err := h.groupService.GetUserInvitations(userID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "Failed to get invitations")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"invitations": invitations,
+		"count":       len(invitations),
+	})
+}

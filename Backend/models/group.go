@@ -93,3 +93,9 @@ type GroupInviteRequest struct {
 type JoinGroupRequest struct {
 	GroupID uint `json:"group_id" binding:"required"`
 }
+
+type GroupInvitationResponse struct {
+	ID        uint          `json:"id"`
+	Group     GroupResponse `json:"group"`
+	CreatedAt time.Time     `json:"created_at"`
+}

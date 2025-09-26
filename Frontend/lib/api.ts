@@ -818,6 +818,18 @@ export class ApiClient {
     });
   }
 
+  async getFollowRequests(): Promise<{ requests: any[], count: number }> {
+    return this.request<{ requests: any[], count: number }>(`/api/follow/requests`, {
+      method: 'GET',
+    });
+  }
+
+  async getGroupInvitations(): Promise<{ invitations: any[], count: number }> {
+    return this.request<{ invitations: any[], count: number }>(`/api/groups/invitations`, {
+      method: 'GET',
+    });
+  }
+
   async getUsers(): Promise<{ users: any[] }> {
     return this.request<{ users: any[] }>('/api/users', {
       method: 'GET',

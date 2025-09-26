@@ -15,15 +15,16 @@ func LoadMockData(db *sql.DB) error {
 	// Define the order of loading (important for foreign key constraints)
 	sqlFiles := []string{
 		"users.sql",
-		"follows.sql", 
+		"follows.sql",
 		"posts.sql",
 		"likes.sql",
 		"comments.sql",
 		"groups.sql",
+		"group_members.sql",
 		"events.sql",
+		"event_responses.sql",
 		"messages.sql",
 		"notifications.sql",
-		"group_members.sql",
 	}
 
 	mockDataDir := "mockdata"

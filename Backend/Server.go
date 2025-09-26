@@ -162,6 +162,8 @@ func (s *Server) setupRoutes() {
 	// Group routes
 	s.router.HandleFunc("/api/groups", s.handleGroupsRoute(groupHandler))
 	s.router.HandleFunc("/api/groups/", s.handleGroupRoute(groupHandler, eventHandler))
+	s.router.HandleFunc("/api/groups/invitations", s.handleRoute(groupHandler.GetUserInvitations, true))
+	s.router.HandleFunc("/api/follow/requests", s.handleRoute(followHandler.GetFollowRequests, true))
 
 	// Event routes
 	s.router.HandleFunc("/api/events", s.handleUserEventsRoute(eventHandler))

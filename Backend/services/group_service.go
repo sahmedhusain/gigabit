@@ -493,3 +493,45 @@ func (s *GroupService) IsUserAdminOrCreator(groupID, userID uint) (bool, error) 
 	}
 	return role == "admin" || role == "creator", nil
 }
+
+func (s *GroupService) GetUserInvitations(userID uint) ([]models.GroupInvitationResponse, error) {
+	query := `
+SELECT gm.id, gm.group_id, gm.created_at,
+       g.name as group_name, g.description as group_description,
+       u.first_name, u.last_name, u.avatar, u.nickname
+FROM group_members gm
+JOIN groups g ON gm.group_id = g.id
+JOIN users u ON g.creator_id = u.id
+WHERE gm.user_id = ? AND gm.status = 'invited'
+ORDER BY gm.created_at DESC
+	`
+
+	rows, err := s.db.Query(query, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var invitations []models.GroupInvitationResponse
+	for rows.Next() {
+		var invitation models.GroupInvitationResponse
+		var group models.GroupResponse
+		var creator models.UserResponse
+
+		err := rows.Scan(
+			&invitation.ID, &group.ID, &invitation.CreatedAt,
+			&group.Title, &group.Description,
+			&creator.FirstName, &creator.LastName, &creator.Avatar, &creator.Nickname,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		creator.ID = group.CreatorID
+		group.Creator = creator
+		invitation.Group = group
+		invitations = append(invitations, invitation)
+	}
+
+	return invitations, nil
+}

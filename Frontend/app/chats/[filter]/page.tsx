@@ -241,13 +241,16 @@ function ChatsFilterPage() {
     return date.toLocaleDateString()
   }
 
-  const isUserOnline = (userId: number): boolean => {
-    return onlineUsers.some(u => u.user_id === userId && u.status === 'online')
+  const getUserStatus = (userId: number): string => {
+    const onlineUser = onlineUsers.find(u => u.user_id === userId)
+    if (!onlineUser) return 'offline'
+    if (onlineUser.status === 'invisible' || onlineUser.status === 'offline') return 'offline'
+    return onlineUser.status // 'online', 'busy', 'away'
   }
 
   const handleStartDirectMessage = async (userId: number, userName: string) => {
     try {
-      // Get existing conversations to check if one already exists
+      // Check if there's already an existing conversation
       const conversationsData = await api.getConversations()
 
       // Find existing conversation with this user
@@ -264,21 +267,34 @@ function ChatsFilterPage() {
           participantId: userId
         })
       } else {
-        // Create a new conversation
-        const newConversation = await api.createConversation(userId);
-        setOpenChatWindow({
-          conversationId: newConversation.id,
-          type: 'private',
-          name: userName,
-          participantId: userId
+        // Send an initial message to create the conversation automatically
+        await api.sendMessage({
+          content: "Hi!", // Initial greeting message
+          message_type: 'private',
+          receiver_id: userId
         })
+
+        // Find the newly created conversation
+        const updatedConversations = await api.getConversations()
+        const newConversation = updatedConversations.conversations.find(
+          conv => conv.type === 'private' && conv.participant?.id === userId
+        )
+
+        if (newConversation) {
+          setOpenChatWindow({
+            conversationId: newConversation.id,
+            type: 'private',
+            name: userName,
+            participantId: userId
+          })
+        } else {
+          error('Failed to create conversation. Please try again.')
+          return
+        }
       }
 
       // Close the create direct message modal
       setShowCreateDirectMessage(false)
-
-      // Refresh conversations list
-      fetchConversations()
 
       success(`Started conversation with ${userName}`)
     } catch (err) {
@@ -328,6 +344,7 @@ function ChatsFilterPage() {
         onClose={() => setShowCreateDirectMessage(false)}
         followers={followers}
         isLoading={isLoadingFollowers}
+        getUserStatus={getUserStatus}
         onStartChat={(followerId: number) => {
           const follower = followers.find(f => f.id === followerId)
           if (follower) {
@@ -360,13 +377,13 @@ function ChatsFilterPage() {
           chatSubTab={chatSubTab}
           onChatClick={(chat) => {
             setOpenChatWindow({
-              conversationId: parseInt(chat.conversationId),
+              conversationId: chat.conversationId,
               type: chat.type,
               name: chat.name,
               participantId: chat.participantId
             });
           }}
-          isUserOnline={isUserOnline}
+          getUserStatus={getUserStatus}
           currentUser={user}
           showCreateGroup={showCreateGroup}
           setShowCreateDirectMessage={setShowCreateDirectMessage}

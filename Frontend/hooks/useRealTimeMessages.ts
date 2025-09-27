@@ -26,6 +26,8 @@ export function useRealTimeMessages() {
   const [messages, setMessages] = useState<Map<number, Message[]>>(new Map())
   const [unreadCounts, setUnreadCounts] = useState<Map<number, number>>(new Map())
   const [isLoading, setIsLoading] = useState(false)
+  const [isLoadingMore, setIsLoadingMore] = useState<Map<number, boolean>>(new Map())
+  const [hasMoreMessages, setHasMoreMessages] = useState<Map<number, boolean>>(new Map())
   const [error, setError] = useState<string | null>(null)
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -37,23 +39,11 @@ export function useRealTimeMessages() {
       console.log('WebSocket message received:', message)
       
       if (message.type === 'private_message' || message.type === 'group_message') {
-        // For private messages, use the participant ID as conversation ID
-        let conversationId: number
-
-        if (message.type === 'group_message') {
-          conversationId = message.group_id || 0
-        } else {
-          // For private messages, use the other participant's ID as conversation ID
-          // If I'm the sender, use the receiver ID; if I'm the receiver, use the sender ID
-          if (message.from === user?.id) {
-            conversationId = message.to || 0
-          } else {
-            conversationId = message.from || 0
-          }
-        }
+        // Get conversation ID from message data
+        const conversationId = (message as any).data?.conversation_id || 0
 
         const newMessage: Message = {
-          id: (message as any).id || Date.now(), // Use real ID if available
+          id: (message as any).data?.id || Date.now(), // Use real ID if available
           conversation_id: conversationId,
           sender_id: message.from || 0,
           content: message.content || '',
@@ -139,25 +129,18 @@ export function useRealTimeMessages() {
     }
   }, [])
 
-  const fetchConversationMessages = useCallback(async (conversationId: number, conversationType: 'private' | 'group', participantId?: number) => {
+  const fetchConversationMessages = useCallback(async (conversationId: number, conversationType: 'private' | 'group', participantId?: number, limit: number = 20, offset: number = 0, append: boolean = false) => {
     try {
       setIsLoading(true)
       setError(null)
 
-      console.log('Fetching messages for:', { conversationId, conversationType, participantId })
+      console.log('Fetching messages for:', { conversationId, conversationType, participantId, limit, offset, append })
 
       let response: { messages: any[]; count: number; limit: number; offset: number }
 
-      // Use type-specific endpoints directly
-      if (conversationType === 'group') {
-        console.log('Fetching group messages for group ID:', conversationId)
-        response = await api.getGroupMessages(conversationId)
-      } else if (participantId) {
-        console.log('Fetching private messages with participant ID:', participantId)
-        response = await api.getPrivateMessages(participantId)
-      } else {
-        throw new Error('Cannot fetch private messages: no participant ID')
-      }
+      // Use conversation-specific endpoint
+      console.log('Fetching messages for conversation ID:', conversationId)
+      response = await api.getConversationMessages(conversationId, limit, offset)
 
       console.log('API response:', response)
 
@@ -182,9 +165,25 @@ export function useRealTimeMessages() {
 
       // Update messages map
       setMessages(prev => {
+        const conversationMessages = prev.get(conversationId) || []
         const updated = new Map(prev)
-        updated.set(conversationId, transformedMessages)
-        console.log(`Loaded ${transformedMessages.length} messages for conversation ${conversationId}`)
+        
+        if (append) {
+          // Append older messages at the beginning
+          updated.set(conversationId, [...transformedMessages, ...conversationMessages])
+        } else {
+          // Replace messages (initial load)
+          updated.set(conversationId, transformedMessages)
+        }
+        
+        console.log(`Loaded ${transformedMessages.length} messages for conversation ${conversationId} (append: ${append})`)
+        return updated
+      })
+
+      // Update hasMoreMessages based on whether we got the full limit
+      setHasMoreMessages(prev => {
+        const updated = new Map(prev)
+        updated.set(conversationId, transformedMessages.length === limit)
         return updated
       })
 
@@ -193,8 +192,34 @@ export function useRealTimeMessages() {
       setError(err.message || 'Failed to fetch messages')
     } finally {
       setIsLoading(false)
+      if (append) {
+        setIsLoadingMore(prev => {
+          const updated = new Map(prev)
+          updated.set(conversationId, false)
+          return updated
+        })
+      }
     }
   }, [])
+
+  const loadMoreMessages = useCallback(async (conversationId: number, conversationType: 'private' | 'group', participantId?: number) => {
+    const currentMessages = messages.get(conversationId) || []
+    if (currentMessages.length === 0 || isLoadingMore.get(conversationId)) {
+      return
+    }
+
+    try {
+      setIsLoadingMore(prev => {
+        const updated = new Map(prev)
+        updated.set(conversationId, true)
+        return updated
+      })
+
+      await fetchConversationMessages(conversationId, conversationType, participantId, 10, currentMessages.length, true)
+    } catch (err) {
+      console.error('Failed to load more messages:', err)
+    }
+  }, [messages, isLoadingMore, fetchConversationMessages])
 
   const sendMessage = useCallback(async (
     conversationId: number,
@@ -337,6 +362,8 @@ export function useRealTimeMessages() {
     messages,
     unreadCounts,
     isLoading,
+    isLoadingMore,
+    hasMoreMessages,
     error,
     isConnected,
     messagesEndRef,
@@ -346,6 +373,7 @@ export function useRealTimeMessages() {
     getUnreadCount,
     scrollToBottom,
     refreshConversations: fetchConversations,
-    fetchConversationMessages
+    fetchConversationMessages,
+    loadMoreMessages
   }
 }

@@ -9,8 +9,7 @@ CREATE TABLE IF NOT EXISTS private_conversations (
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (participant1_id) REFERENCES users(id) ON DELETE CASCADE,
-    FOREIGN KEY (participant2_id) REFERENCES users(id) ON DELETE CASCADE,
-    FOREIGN KEY (last_message_id) REFERENCES messages(id) ON DELETE SET NULL
+    FOREIGN KEY (participant2_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
 -- Create indexes for better performance

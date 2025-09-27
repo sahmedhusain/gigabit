@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 // LoadMockData loads all mock data SQL files into the database
@@ -16,11 +17,14 @@ func LoadMockData(db *sql.DB) error {
 	sqlFiles := []string{
 		"users.sql",
 		"follows.sql",
+		"groups.sql",
+		"group_members.sql",
+		"group_conversations.sql",
+		"private_conversations.sql",
+		"private_messages.sql",
 		"posts.sql",
 		"likes.sql",
 		"comments.sql",
-		"groups.sql",
-		"group_members.sql",
 		"events.sql",
 		"event_responses.sql",
 		"messages.sql",
@@ -59,7 +63,10 @@ func ClearAllData(db *sql.DB) error {
 	// Define tables to clear in reverse order to handle foreign keys
 	tables := []string{
 		"notifications",
-		"messages",
+		"group_messages",
+		"private_messages",
+		"group_conversations",
+		"private_conversations",
 		"event_responses",
 		"events",
 		"group_members",
@@ -74,11 +81,14 @@ func ClearAllData(db *sql.DB) error {
 
 	for _, table := range tables {
 		if _, err := db.Exec(fmt.Sprintf("DELETE FROM %s", table)); err != nil {
-			return fmt.Errorf("failed to clear table %s: %v", table, err)
+			// Ignore "no such table" errors since some tables may not exist yet
+			if !strings.Contains(err.Error(), "no such table") {
+				return fmt.Errorf("failed to clear table %s: %v", table, err)
+			}
 		}
 		// Reset auto-increment counter for each table
 		if _, err := db.Exec(fmt.Sprintf("DELETE FROM sqlite_sequence WHERE name='%s'", table)); err != nil {
-			// Ignore errors here as some tables may not have auto-increment
+			// Ignore errors here as some tables may not have auto-increment or may not exist
 		}
 		log.Printf("✓ Cleared table %s", table)
 	}

@@ -133,8 +133,11 @@ func (h *Hub) Run() {
 					log.Printf("Failed to get status for user %d: %v", client.ID, err)
 					status = "online" // Default fallback
 				}
-				// Broadcast the user's current status (from database)
-				h.BroadcastUserStatus(client.ID, status)
+
+				// If user is invisible, don't broadcast their online status
+				if status != "invisible" {
+					h.BroadcastUserStatus(client.ID, status)
+				}
 			} else {
 				// Fallback if no database
 				h.BroadcastUserStatus(client.ID, "online")
@@ -148,23 +151,8 @@ func (h *Hub) Run() {
 				h.mu.Unlock()
 				log.Printf("Client %d disconnected", client.ID)
 
-				// Only broadcast offline if user was online, otherwise keep their status
-				if h.db != nil {
-					var status string
-					err := h.db.QueryRow("SELECT status FROM users WHERE id = ?", client.ID).Scan(&status)
-					if err != nil {
-						log.Printf("Failed to get status for disconnecting user %d: %v", client.ID, err)
-						status = "online" // Default assumption
-					}
-					// Only broadcast offline if they were online
-					if status == "online" {
-						h.BroadcastUserStatus(client.ID, "offline")
-					}
-					// If they were busy/away/invisible, keep that status
-				} else {
-					// Fallback if no database
-					h.BroadcastUserStatus(client.ID, "offline")
-				}
+				// Broadcast offline status when user disconnects
+				h.BroadcastUserStatus(client.ID, "offline")
 			} else {
 				h.mu.Unlock()
 			}
@@ -318,12 +306,19 @@ func (h *Hub) handleGetOnlineUsers(userID uint) {
 			username = fmt.Sprintf("User %d", id)
 		}
 
+		// For connected users, their status should be their database status
+		// If status is "invisible", they should appear offline to others
+		displayStatus := status
+		if status == "invisible" {
+			displayStatus = "offline"
+		}
+
 		onlineUsers = append(onlineUsers, map[string]interface{}{
 			"user_id":            id,
 			"username":           username,
-			"status":             status,
+			"status":             displayStatus,
 			"last_status_change": lastStatusChange.Unix(),
-			"is_online":          true,
+			"is_online":          displayStatus != "offline",
 		})
 	}
 
@@ -414,13 +409,19 @@ func (h *Hub) BroadcastUserStatus(userID uint, status string) {
 		}
 	}
 
+	// If status is "invisible", broadcast as "offline" to other users
+	displayStatus := status
+	if status == "invisible" {
+		displayStatus = "offline"
+	}
+
 	message := Message{
 		Type: MessageTypeUserStatus,
 		From: userID,
 		Data: map[string]interface{}{
 			"user_id":  userID,
 			"username": firstName + " " + lastName,
-			"status":   status,
+			"status":   displayStatus,
 		},
 	}
 

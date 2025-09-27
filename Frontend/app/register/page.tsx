@@ -1,4 +1,5 @@
 'use client'
+import dynamic from 'next/dynamic'
 import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -47,7 +48,7 @@ function validatePassword(password: string) {
 }
 
 
-export default function RegisterPage() {
+function RegisterPage() {
   const router = useRouter()
   const { register } = useAuth()
 
@@ -529,3 +530,5 @@ export default function RegisterPage() {
     </div>
   )
 }
+
+export default dynamic(() => Promise.resolve(RegisterPage), { ssr: false })

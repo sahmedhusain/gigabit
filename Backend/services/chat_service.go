@@ -29,8 +29,21 @@ func (s *ChatService) GetUnifiedChats(userID uint) ([]models.UnifiedChatItem, er
 
 	allChats := append(privateChats, groupChats...)
 
-	// Sort all chats by last message time
+	// Sort all chats: first by those with messages (by last message time), then groups without messages (by joining date)
 	sort.Slice(allChats, func(i, j int) bool {
+		// If both have messages, sort by last message time (newest first)
+		if allChats[i].LastMessage != nil && allChats[j].LastMessage != nil {
+			return allChats[i].LastMessageTime.After(allChats[j].LastMessageTime)
+		}
+		// If only i has message, i comes first
+		if allChats[i].LastMessage != nil && allChats[j].LastMessage == nil {
+			return true
+		}
+		// If only j has message, j comes first
+		if allChats[i].LastMessage == nil && allChats[j].LastMessage != nil {
+			return false
+		}
+		// Both don't have messages (should only be groups), sort by joining date (newest first)
 		return allChats[i].LastMessageTime.After(allChats[j].LastMessageTime)
 	})
 
@@ -42,16 +55,17 @@ func (s *ChatService) getPrivateChats(userID uint) ([]models.UnifiedChatItem, er
 		SELECT c.id, c.participant1_id, c.participant2_id, c.last_message_id, c.updated_at,
 			   u1.id, u1.first_name, u1.last_name, u1.avatar, u1.nickname,
 			   u2.id, u2.first_name, u2.last_name, u2.avatar, u2.nickname,
-			   m.id, m.content, m.created_at
+			   m.id, m.content, m.created_at, m.sender_id,
+			   CASE WHEN c.participant1_id = ? THEN c.unread_count1 ELSE c.unread_count2 END as unread_count
 		FROM private_conversations c
 		JOIN users u1 ON c.participant1_id = u1.id
 		JOIN users u2 ON c.participant2_id = u2.id
-		LEFT JOIN messages m ON c.last_message_id = m.id
+		LEFT JOIN private_messages m ON c.last_message_id = m.id
 		WHERE (c.participant1_id = ? OR c.participant2_id = ?)
 		ORDER BY c.updated_at DESC
 	`
 
-	rows, err := s.db.Query(query, userID, userID)
+	rows, err := s.db.Query(query, userID, userID, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -67,12 +81,14 @@ func (s *ChatService) getPrivateChats(userID uint) ([]models.UnifiedChatItem, er
 		var msgID sql.NullInt64
 		var msgContent sql.NullString
 		var msgCreatedAt sql.NullTime
+		var msgSenderID sql.NullInt64
+		var unreadCount int
 
 		err := rows.Scan(
 			&convID, &participant1ID, &participant2ID, &lastMessageID, &updatedAt,
 			&p1.ID, &p1.FirstName, &p1.LastName, &p1.Avatar, &p1.Nickname,
 			&p2.ID, &p2.FirstName, &p2.LastName, &p2.Avatar, &p2.Nickname,
-			&msgID, &msgContent, &msgCreatedAt,
+			&msgID, &msgContent, &msgCreatedAt, &msgSenderID, &unreadCount,
 		)
 		if err != nil {
 			return nil, err
@@ -87,7 +103,14 @@ func (s *ChatService) getPrivateChats(userID uint) ([]models.UnifiedChatItem, er
 
 		var lastMessage *string
 		if msgContent.Valid {
-			lastMessage = &msgContent.String
+			// Format message based on sender
+			content := msgContent.String
+			if msgSenderID.Valid && uint(msgSenderID.Int64) == userID {
+				formatted := "You: " + content
+				lastMessage = &formatted
+			} else {
+				lastMessage = &content
+			}
 		}
 
 		lastMessageTime := updatedAt
@@ -96,14 +119,17 @@ func (s *ChatService) getPrivateChats(userID uint) ([]models.UnifiedChatItem, er
 		}
 
 		chat := models.UnifiedChatItem{
-			ID:              fmt.Sprintf("private_%d", participant.ID),
+			ID:              fmt.Sprintf("private_%d", convID),
 			Type:            "private",
 			Name:            fmt.Sprintf("%s %s", participant.FirstName, participant.LastName),
 			Avatar:          participant.Avatar,
 			LastMessage:     lastMessage,
 			LastMessageTime: lastMessageTime,
-			HasUnread:       false, // TODO: Implement unread count
-			UnreadCount:     0,     // TODO: Implement unread count
+			HasUnread:       unreadCount > 0,
+			UnreadCount:     unreadCount,
+			Participant:     &participant,
+			ConversationID:  convID,
+			ParticipantID:   &participant.ID,
 		}
 		chats = append(chats, chat)
 	}
@@ -113,14 +139,16 @@ func (s *ChatService) getPrivateChats(userID uint) ([]models.UnifiedChatItem, er
 
 func (s *ChatService) getGroupChats(userID uint) ([]models.UnifiedChatItem, error) {
 	query := `
-        SELECT g.id, g.name, g.created_at,
-               m.content, m.created_at as last_message_time
+        SELECT g.id, g.name, gm.created_at, gc.id as conv_id,
+               m.content, m.created_at as last_message_time, m.sender_id,
+               u.first_name
         FROM groups g
         JOIN group_members gm ON g.id = gm.group_id
         LEFT JOIN group_conversations gc ON g.id = gc.group_id
-        LEFT JOIN messages m ON gc.last_message_id = m.id
+        LEFT JOIN group_messages m ON gc.last_message_id = m.id
+        LEFT JOIN users u ON m.sender_id = u.id
         WHERE gm.user_id = ? AND gm.status = 'member'
-        ORDER BY COALESCE(m.created_at, g.created_at) DESC
+        ORDER BY COALESCE(m.created_at, gm.created_at) DESC
 	`
 
 	rows, err := s.db.Query(query, userID)
@@ -133,33 +161,56 @@ func (s *ChatService) getGroupChats(userID uint) ([]models.UnifiedChatItem, erro
 	for rows.Next() {
 		var groupID uint
 		var groupName string
-		var groupCreatedAt time.Time
+		var createdAt time.Time
+		var convID sql.NullInt64
 		var lastMessage sql.NullString
 		var lastMessageTime sql.NullTime
+		var msgSenderID sql.NullInt64
+		var senderFirstName sql.NullString
 
-		err := rows.Scan(&groupID, &groupName, &groupCreatedAt, &lastMessage, &lastMessageTime)
+		err := rows.Scan(&groupID, &groupName, &createdAt, &convID, &lastMessage, &lastMessageTime, &msgSenderID, &senderFirstName)
 		if err != nil {
 			return nil, err
 		}
 
 		var lastMsg *string
 		if lastMessage.Valid {
-			lastMsg = &lastMessage.String
+			content := lastMessage.String
+			if msgSenderID.Valid && uint(msgSenderID.Int64) == userID {
+				formatted := "You: " + content
+				lastMsg = &formatted
+			} else if senderFirstName.Valid {
+				formatted := senderFirstName.String + ": " + content
+				lastMsg = &formatted
+			} else {
+				lastMsg = &content
+			}
 		}
 
-		timestamp := groupCreatedAt
+		timestamp := createdAt
 		if lastMessageTime.Valid {
 			timestamp = lastMessageTime.Time
 		}
 
+		convIDValue := uint(convID.Int64)
+		if !convID.Valid {
+			// If no conversation yet, use group id as fallback
+			convIDValue = groupID
+		}
+
 		chat := models.UnifiedChatItem{
-			ID:              fmt.Sprintf("group_%d", groupID),
+			ID:              fmt.Sprintf("group_%d", convIDValue),
 			Type:            "group",
 			Name:            groupName,
 			LastMessage:     lastMsg,
 			LastMessageTime: timestamp,
-			HasUnread:       false, // TODO: Implement unread count
-			UnreadCount:     0,     // TODO: Implement unread count
+			HasUnread:       false, // Group unread counts not implemented yet
+			UnreadCount:     0,     // Group unread counts not implemented yet
+			Group: &models.GroupResponse{
+				ID:    groupID,
+				Title: groupName,
+			},
+			ConversationID: convIDValue,
 		}
 		chats = append(chats, chat)
 	}

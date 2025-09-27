@@ -5,8 +5,7 @@ CREATE TABLE IF NOT EXISTS group_conversations (
     last_message_id INTEGER,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (group_id) REFERENCES groups(id) ON DELETE CASCADE,
-    FOREIGN KEY (last_message_id) REFERENCES messages(id) ON DELETE SET NULL
+    FOREIGN KEY (group_id) REFERENCES groups(id) ON DELETE CASCADE
 );
 
 -- Create indexes for better performance

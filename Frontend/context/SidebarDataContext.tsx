@@ -82,7 +82,7 @@ export function SidebarDataProvider({ children }: { children: ReactNode }) {
         return {
           id: conversation.id,
           name: participantName,
-          lastMessage: conversation.last_message.content,
+          lastMessage: conversation.last_message?.content || '',
           time: formatTimeAgo(conversation.updated_at),
           timestamp: conversation.updated_at,
           unread: conversation.unread_count,
@@ -90,7 +90,7 @@ export function SidebarDataProvider({ children }: { children: ReactNode }) {
           isGroup: conversation.type === 'group',
           participantId: conversation.participant?.id,
           participantAvatar: conversation.participant?.avatar,
-          lastMessageSenderId: conversation.last_message.sender_id
+          lastMessageSenderId: conversation.last_message?.sender_id
         }
       }))
       setChatsLoaded(true)

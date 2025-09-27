@@ -728,14 +728,14 @@ func (s *Server) handleMessageRoute(handler *handlers.MessageHandler) http.Handl
 				return
 			}
 			authMiddleware(http.HandlerFunc(handler.MarkAsRead)).ServeHTTP(w, r)
-		case "typing":
-			if r.Method != http.MethodPost {
+		case "conversation":
+			if r.Method != http.MethodGet {
 				writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
 				return
 			}
-			authMiddleware(http.HandlerFunc(handler.SendTypingIndicator)).ServeHTTP(w, r)
-		default:
-			writeError(w, http.StatusNotFound, "Route not found")
+			authMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				handler.GetConversationMessages(w, r, targetID)
+			})).ServeHTTP(w, r)
 		}
 	}
 }

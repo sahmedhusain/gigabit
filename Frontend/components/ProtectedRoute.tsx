@@ -10,19 +10,19 @@ interface ProtectedRouteProps {
 export default function ProtectedRoute({ children }: ProtectedRouteProps) {
   const { isAuthenticated, isLoading } = useAuth()
   const router = useRouter()
-  const [isMounted, setIsMounted] = useState(false)
+  const [hasHydrated, setHasHydrated] = useState(false)
 
   useEffect(() => {
-    setIsMounted(true)
+    setHasHydrated(true)
   }, [])
 
   useEffect(() => {
-    if (isMounted && !isLoading && !isAuthenticated) {
+    if (hasHydrated && !isLoading && !isAuthenticated) {
       router.push('/login')
     }
-  }, [isAuthenticated, isLoading, router, isMounted])
+  }, [isAuthenticated, isLoading, router, hasHydrated])
 
-  if (isLoading || !isMounted) {
+  if (!hasHydrated || isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-emerald-900 via-teal-900 to-cyan-800">
         <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-white"></div>

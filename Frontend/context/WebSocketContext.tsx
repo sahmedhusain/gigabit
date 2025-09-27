@@ -116,6 +116,12 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
               // Handle individual user status update
               setOnlineUsers(prev => {
                 const filtered = prev.filter(u => u.user_id !== message.data.user_id)
+                
+                // If status is offline, don't add the user back (they disconnected)
+                if (message.data.status === 'offline') {
+                  return filtered
+                }
+                
                 const newUser = {
                   user_id: message.data.user_id,
                   username: message.data.username || `User ${message.data.user_id}`,

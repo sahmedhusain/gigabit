@@ -1,14 +1,22 @@
-import { User } from '@/lib/api';
+import { User, GroupResponse } from '@/lib/api';
 
 export interface ChatItem {
-  id: string;
+  id: number;
   type: 'private' | 'group';
-  name: string;
+  name?: string;
   avatar?: string;
   lastMessage?: string;
-  lastMessageTime: string;
-  hasUnread: boolean;
-  unreadCount: number;
+  lastMessageTime?: string;
+  hasUnread?: boolean;
+  unreadCount?: number;
+  unread_count: number;
   isOnline?: boolean;
+  isTyping?: boolean;
+  typingUsers?: string[];
   participants?: User[];
+  participant?: User;
+  group?: GroupResponse;
+  conversationId?: number;
+  participantId?: number;
+  updated_at: string;
 }

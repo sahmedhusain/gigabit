@@ -1,11 +1,12 @@
 'use client'
+import dynamic from 'next/dynamic'
 import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
 import { Eye, EyeOff, Mail, Lock, ArrowRight, Sparkles, Chrome,  GithubIcon } from 'lucide-react'
 
-export default function LoginPage() {
+function LoginPage() {
   const router = useRouter()
   const { login } = useAuth()
   
@@ -247,3 +248,5 @@ export default function LoginPage() {
     </div>
   )
 }
+
+export default dynamic(() => Promise.resolve(LoginPage), { ssr: false })

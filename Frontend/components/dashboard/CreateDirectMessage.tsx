@@ -18,6 +18,7 @@ interface CreateDirectMessageProps {
   followers: Follower[]
   onStartChat: (followerId: number) => void
   isLoading: boolean
+  getUserStatus: (userId: number) => string
 }
 
 export default function CreateDirectMessage({
@@ -25,7 +26,8 @@ export default function CreateDirectMessage({
   onClose,
   followers,
   onStartChat,
-  isLoading
+  isLoading,
+  getUserStatus
 }: CreateDirectMessageProps) {
   const [searchQuery, setSearchQuery] = useState('')
 
@@ -119,7 +121,12 @@ export default function CreateDirectMessage({
                           follower.first_name[0]?.toUpperCase()
                         )}
                       </div>
-                      <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-gradient-to-br from-emerald-400 to-teal-500 rounded-full border-2 border-white"></div>
+                      <div className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-white ${
+                        getUserStatus(follower.id) === 'online' ? 'bg-green-500' :
+                        getUserStatus(follower.id) === 'busy' ? 'bg-red-500' :
+                        getUserStatus(follower.id) === 'away' ? 'bg-yellow-500' :
+                        'bg-gray-500'
+                      }`}></div>
                     </div>
                     <div className="flex-1 min-w-0 text-left">
                       <p className="text-white font-semibold text-sm lg:text-base truncate group-hover:text-white/90">

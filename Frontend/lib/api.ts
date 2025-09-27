@@ -304,7 +304,7 @@ export interface ConversationResponse {
   type: 'private' | 'group';
   participant?: User;
   group?: GroupResponse;
-  last_message: {
+  last_message?: {
     content: string;
     created_at: string;
     sender_id: number;
@@ -793,15 +793,6 @@ export class ApiClient {
   async getChats(): Promise<{ chats: ChatItem[] }> {
     return this.request<{ chats: ChatItem[] }>('/api/chats', {
       method: 'GET',
-    });
-  }
-
-  async createConversation(userId: number): Promise<ConversationResponse> {
-    // Instead of creating a separate conversation, we'll send an initial message
-    // This will automatically create the conversation in the backend
-    return this.request<ConversationResponse>('/api/conversations', {
-      method: 'POST',
-      body: JSON.stringify({ user_id: userId }),
     });
   }
 

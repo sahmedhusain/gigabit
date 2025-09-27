@@ -1,6 +1,7 @@
 package models
 
 import (
+	"fmt"
 	"time"
 )
 
@@ -38,13 +39,18 @@ type UserResponse struct {
 }
 
 func (u *User) ToResponse() UserResponse {
+	avatarURL := ""
+	if u.Avatar != nil && *u.Avatar != "" {
+		avatarURL = fmt.Sprintf("http://localhost:8080/api/uploads/%s", *u.Avatar)
+	}
+
 	return UserResponse{
 		ID:               u.ID,
 		Email:            u.Email,
 		FirstName:        u.FirstName,
 		LastName:         u.LastName,
 		DateOfBirth:      u.DateOfBirth,
-		Avatar:           u.Avatar,
+		Avatar:           &avatarURL,
 		Nickname:         u.Nickname,
 		AboutMe:          u.AboutMe,
 		IsPrivate:        u.IsPrivate,

@@ -85,3 +85,20 @@ type TypingIndicator struct {
 	ConversationID string `json:"conversation_id"`
 	IsTyping       bool   `json:"is_typing"`
 }
+
+type ConversationResponse struct {
+	ID          uint            `json:"id"`
+	Type        string          `json:"type"` // "private" or "group"
+	Participant *UserResponse   `json:"participant,omitempty"`
+	Group       *GroupResponse  `json:"group,omitempty"`
+	LastMessage *MessageSummary `json:"last_message,omitempty"`
+	UnreadCount int             `json:"unread_count"`
+	UpdatedAt   string          `json:"updated_at"`
+}
+
+type MessageSummary struct {
+	Content   string        `json:"content"`
+	CreatedAt string        `json:"created_at"`
+	SenderID  uint          `json:"sender_id,omitempty"`
+	Sender    *UserResponse `json:"sender,omitempty"`
+}

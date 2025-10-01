@@ -204,17 +204,24 @@ WHERE (
 p.user_id = ?
 -- Public posts
 OR p.privacy = 'public'
--- Almost private posts from followed users
+-- Followers only posts from followed users
 OR (p.privacy = 'followers' AND f.id IS NOT NULL)
--- Private posts specifically shared with user
-OR (p.privacy = 'private' AND pp.user_id = ?)
+-- Friends only posts from mutual followers
+OR (p.privacy = 'friends' AND f.id IS NOT NULL AND EXISTS (
+    SELECT 1 FROM follows f2 
+    WHERE f2.follower_id = p.user_id 
+    AND f2.following_id = ? 
+    AND f2.status = 'accepted'
+))
+-- Listed posts specifically shared with user
+OR (p.privacy = 'listed' AND pp.user_id = ?)
 )
 GROUP BY p.id, u.id
 ORDER BY p.created_at DESC
 LIMIT ? OFFSET ?
 `
 
-rows, err := s.db.Query(query, currentUserID, currentUserID, currentUserID, currentUserID, currentUserID, limit, offset)
+rows, err := s.db.Query(query, currentUserID, currentUserID, currentUserID, currentUserID, currentUserID, currentUserID, limit, offset)
 if err != nil {
 log.Printf("Error getting feed posts: %v", err)
 return nil, err
@@ -267,12 +274,15 @@ func (s *PostService) UpdatePost(postID uint, userID uint, updateReq *models.Upd
 		return err
 	}
 
-	// Update post privacy if privacy is 'private'
-	if updateReq.Privacy == "private" {
+	// Update post privacy if privacy is 'listed'
+	if updateReq.Privacy == "listed" {
 		// Clear existing privacy settings
 		s.db.Exec("DELETE FROM post_privacy WHERE post_id = ?", postID)
 		// Add new privacy settings
 		s.AddPostPrivacyUsers(postID, updateReq.SpecificUserIDs)
+	} else {
+		// If not listed, clear any existing privacy settings
+		s.db.Exec("DELETE FROM post_privacy WHERE post_id = ?", postID)
 	}
 
 	return nil
@@ -325,7 +335,10 @@ func (s *PostService) CanViewPost(postID uint, currentUserID uint) (bool, error)
 	case "followers":
 		// Check if current user follows the post owner
 		return s.isFollowing(currentUserID, ownerID)
-	case "private":
+	case "friends":
+		// Check if users are mutual followers (friends)
+		return s.AreFriends(currentUserID, ownerID)
+	case "listed":
 		// Check if current user is in the specific user list
 		return s.isInPostPrivacyList(postID, currentUserID)
 	default:
@@ -414,50 +427,192 @@ return posts, nil
 
 // GetUserCommentedPosts returns posts that the user has commented on
 func (s *PostService) GetUserCommentedPosts(userID uint, limit, offset int) ([]models.PostResponse, error) {
-query := `
-SELECT DISTINCT p.id, p.user_id, p.content, p.image_url, p.privacy, p.created_at, p.updated_at,
-       u.first_name, u.last_name, u.avatar, u.nickname,
-       COUNT(DISTINCT l.id) as like_count,
-       COUNT(DISTINCT c2.id) as comment_count,
-       CASE WHEN ul.id IS NOT NULL THEN 1 ELSE 0 END as is_liked,
-       CASE WHEN b.id IS NOT NULL THEN 1 ELSE 0 END as is_bookmarked
-FROM posts p
-JOIN users u ON p.user_id = u.id
-JOIN comments uc ON p.id = uc.post_id AND uc.user_id = ?
-LEFT JOIN likes l ON p.id = l.post_id
-LEFT JOIN comments c2 ON p.id = c2.post_id
-LEFT JOIN likes ul ON p.id = ul.post_id AND ul.user_id = ?
-LEFT JOIN bookmarks b ON p.id = b.post_id AND b.user_id = ?
-GROUP BY p.id, u.id
-ORDER BY uc.created_at DESC
-LIMIT ? OFFSET ?
-`
+	query := `
+	SELECT DISTINCT p.id, p.user_id, p.content, p.image_url, p.privacy, p.created_at, p.updated_at,
+	       u.first_name, u.last_name, u.avatar, u.nickname,
+	       COUNT(DISTINCT l.id) as like_count,
+	       COUNT(DISTINCT c2.id) as comment_count,
+	       CASE WHEN ul.id IS NOT NULL THEN 1 ELSE 0 END as is_liked,
+	       CASE WHEN b.id IS NOT NULL THEN 1 ELSE 0 END as is_bookmarked
+	FROM posts p
+	JOIN users u ON p.user_id = u.id
+	JOIN comments c ON p.id = c.post_id AND c.user_id = ?
+	LEFT JOIN likes l ON p.id = l.post_id
+	LEFT JOIN comments c2 ON p.id = c2.post_id
+	LEFT JOIN likes ul ON p.id = ul.post_id AND ul.user_id = ?
+	LEFT JOIN bookmarks b ON p.id = b.post_id AND b.user_id = ?
+	GROUP BY p.id, u.id
+	ORDER BY p.created_at DESC
+	LIMIT ? OFFSET ?
+	`
 
-rows, err := s.db.Query(query, userID, userID, userID, limit, offset)
-if err != nil {
-return nil, err
+	rows, err := s.db.Query(query, userID, userID, userID, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var posts []models.PostResponse
+	for rows.Next() {
+		var post models.PostResponse
+		var user models.UserResponse
+
+		err := rows.Scan(
+			&post.ID, &post.UserID, &post.Content, &post.ImageURL, &post.Privacy,
+			&post.CreatedAt, &post.UpdatedAt,
+			&user.FirstName, &user.LastName, &user.Avatar, &user.Nickname,
+			&post.LikeCount, &post.CommentCount, &post.IsLiked, &post.IsBookmarked,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		user.ID = post.UserID
+		post.User = user
+		posts = append(posts, post)
+	}
+
+	return posts, nil
 }
-defer rows.Close()
 
-var posts []models.PostResponse
-for rows.Next() {
-var post models.PostResponse
-var user models.UserResponse
-
-err := rows.Scan(
-&post.ID, &post.UserID, &post.Content, &post.ImageURL, &post.Privacy,
-&post.CreatedAt, &post.UpdatedAt,
-&user.FirstName, &user.LastName, &user.Avatar, &user.Nickname,
-&post.LikeCount, &post.CommentCount, &post.IsLiked, &post.IsBookmarked,
-)
-if err != nil {
-return nil, err
+// GetAllFeedPosts returns all posts that the user is allowed to see, regardless of who posted them
+func (s *PostService) GetAllFeedPosts(currentUserID uint, limit int, offset int) ([]models.PostResponse, error) {
+	// This is the same as the original GetFeedPosts - shows all posts user can see
+	return s.GetFeedPosts(currentUserID, limit, offset)
 }
 
-user.ID = post.UserID
-post.User = user
-posts = append(posts, post)
+// GetFollowingFeedPosts returns posts only from users that the current user is following
+func (s *PostService) GetFollowingFeedPosts(currentUserID uint, limit int, offset int) ([]models.PostResponse, error) {
+	query := `
+	SELECT p.id, p.user_id, p.content, p.image_url, p.privacy, p.created_at, p.updated_at,
+	       u.first_name, u.last_name, u.avatar, u.nickname,
+	       COUNT(DISTINCT l.id) as like_count,
+	       COUNT(DISTINCT c.id) as comment_count,
+	       CASE WHEN ul.id IS NOT NULL THEN 1 ELSE 0 END as is_liked,
+	       CASE WHEN b.id IS NOT NULL THEN 1 ELSE 0 END as is_bookmarked
+	FROM posts p
+	JOIN users u ON p.user_id = u.id
+	LEFT JOIN likes l ON p.id = l.post_id
+	LEFT JOIN comments c ON p.id = c.post_id
+	LEFT JOIN likes ul ON p.id = ul.post_id AND ul.user_id = ?
+	LEFT JOIN bookmarks b ON p.id = b.post_id AND b.user_id = ?
+	LEFT JOIN follows f ON p.user_id = f.following_id AND f.follower_id = ? AND f.status = 'accepted'
+	LEFT JOIN post_privacy pp ON p.id = pp.post_id
+	WHERE (
+		-- User's own posts
+		p.user_id = ?
+		-- Posts from followed users with appropriate privacy
+		OR (f.id IS NOT NULL AND (
+			p.privacy = 'public'
+			OR p.privacy = 'followers'
+			OR (p.privacy = 'friends' AND EXISTS (
+				SELECT 1 FROM follows f2 
+				WHERE f2.follower_id = p.user_id 
+				AND f2.following_id = ? 
+				AND f2.status = 'accepted'
+			))
+			OR (p.privacy = 'listed' AND pp.user_id = ?)
+		))
+	)
+	GROUP BY p.id, u.id
+	ORDER BY p.created_at DESC
+	LIMIT ? OFFSET ?
+	`
+
+	rows, err := s.db.Query(query, currentUserID, currentUserID, currentUserID, currentUserID, currentUserID, currentUserID, limit, offset)
+	if err != nil {
+		log.Printf("Error getting following feed posts: %v", err)
+		return nil, err
+	}
+	defer rows.Close()
+
+	var posts []models.PostResponse
+	for rows.Next() {
+		var post models.PostResponse
+		var user models.UserResponse
+
+		err := rows.Scan(
+			&post.ID, &post.UserID, &post.Content, &post.ImageURL, &post.Privacy,
+			&post.CreatedAt, &post.UpdatedAt,
+			&user.FirstName, &user.LastName, &user.Avatar, &user.Nickname,
+			&post.LikeCount, &post.CommentCount, &post.IsLiked, &post.IsBookmarked,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		user.ID = post.UserID
+		post.User = user
+		posts = append(posts, post)
+	}
+
+	return posts, nil
 }
 
-return posts, nil
+// GetFriendsFeedPosts returns posts only from friends (mutual followers)
+func (s *PostService) GetFriendsFeedPosts(currentUserID uint, limit int, offset int) ([]models.PostResponse, error) {
+	query := `
+	SELECT p.id, p.user_id, p.content, p.image_url, p.privacy, p.created_at, p.updated_at,
+	       u.first_name, u.last_name, u.avatar, u.nickname,
+	       COUNT(DISTINCT l.id) as like_count,
+	       COUNT(DISTINCT c.id) as comment_count,
+	       CASE WHEN ul.id IS NOT NULL THEN 1 ELSE 0 END as is_liked,
+	       CASE WHEN b.id IS NOT NULL THEN 1 ELSE 0 END as is_bookmarked
+	FROM posts p
+	JOIN users u ON p.user_id = u.id
+	LEFT JOIN likes l ON p.id = l.post_id
+	LEFT JOIN comments c ON p.id = c.post_id
+	LEFT JOIN likes ul ON p.id = ul.post_id AND ul.user_id = ?
+	LEFT JOIN bookmarks b ON p.id = b.post_id AND b.user_id = ?
+	LEFT JOIN follows f ON p.user_id = f.following_id AND f.follower_id = ? AND f.status = 'accepted'
+	LEFT JOIN post_privacy pp ON p.id = pp.post_id
+	WHERE (
+		-- User's own posts
+		p.user_id = ?
+		-- Posts from friends (mutual followers) with appropriate privacy
+		OR (f.id IS NOT NULL AND EXISTS (
+			SELECT 1 FROM follows f2 
+			WHERE f2.follower_id = p.user_id 
+			AND f2.following_id = ? 
+			AND f2.status = 'accepted'
+		) AND (
+			p.privacy = 'public'
+			OR p.privacy = 'followers'
+			OR p.privacy = 'friends'
+			OR (p.privacy = 'listed' AND pp.user_id = ?)
+		))
+	)
+	GROUP BY p.id, u.id
+	ORDER BY p.created_at DESC
+	LIMIT ? OFFSET ?
+	`
+
+	rows, err := s.db.Query(query, currentUserID, currentUserID, currentUserID, currentUserID, currentUserID, currentUserID, limit, offset)
+	if err != nil {
+		log.Printf("Error getting friends feed posts: %v", err)
+		return nil, err
+	}
+	defer rows.Close()
+
+	var posts []models.PostResponse
+	for rows.Next() {
+		var post models.PostResponse
+		var user models.UserResponse
+
+		err := rows.Scan(
+			&post.ID, &post.UserID, &post.Content, &post.ImageURL, &post.Privacy,
+			&post.CreatedAt, &post.UpdatedAt,
+			&user.FirstName, &user.LastName, &user.Avatar, &user.Nickname,
+			&post.LikeCount, &post.CommentCount, &post.IsLiked, &post.IsBookmarked,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		user.ID = post.UserID
+		post.User = user
+		posts = append(posts, post)
+	}
+
+	return posts, nil
 }

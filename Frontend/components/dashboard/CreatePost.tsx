@@ -12,8 +12,8 @@ interface CreatePostProps {
   setNewPostContent: (content: string) => void
   newPostImage: File | null
   setNewPostImage: (image: File | null) => void
-  postPrivacy: string
-  setPostPrivacy: (privacy: string) => void
+  postPrivacy: 'public' | 'followers' | 'friends' | 'listed'
+  setPostPrivacy: (privacy: 'public' | 'followers' | 'friends' | 'listed') => void
   selectedUsers: number[]
   setSelectedUsers: (users: number[]) => void
   availableUsers: any[]
@@ -43,7 +43,7 @@ export default function CreatePost({
   const { success, error } = useToast()
   const { isConnected } = useConnectionStatus()
   const { progress, isUploading, uploadImage: uploadFile } = useUpload()
-  
+
   const { isLoading, performUpdate } = useOptimisticUpdate({
     onSuccess: () => {
       success('Post created successfully!')
@@ -71,7 +71,7 @@ export default function CreatePost({
       error('Cannot create post while offline')
       return
     }
-    
+
     performUpdate(
       (current) => ({ ...current, isCreating: true }),
       async () => {
@@ -84,7 +84,7 @@ export default function CreatePost({
   const handleImageClick = () => {
     fileInputRef.current?.click()
   }
-  
+
   // selects image
   const handleImageSelect = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
@@ -108,7 +108,7 @@ export default function CreatePost({
       const formData = new FormData()
       formData.append('image', file)
 
-      const response = await fetch ('/api/uploads', {
+      const response = await fetch('/api/uploads', {
         method: 'POST',
         body: formData,
         credentials: 'include'
@@ -272,7 +272,8 @@ export default function CreatePost({
                 {[
                   { value: 'public', icon: Globe, label: 'Public', desc: 'Anyone can see this post' },
                   { value: 'followers', icon: Users, label: 'Followers Only', desc: 'Only your followers can see this' },
-                  { value: 'private', icon: Lock, label: 'Selected Followers', desc: 'Choose specific followers' }
+                  { value: 'friends', icon: User, label: 'Friends Only', desc: 'Only mutual followers can see this' },
+                  { value: 'listed', icon: Lock, label: 'Selected Users', desc: 'Choose specific users only' }
                 ].map((option) => (
                   <label key={option.value} className="flex items-start space-x-3 cursor-pointer group">
                     <input
@@ -280,21 +281,18 @@ export default function CreatePost({
                       name="privacy"
                       value={option.value}
                       checked={postPrivacy === option.value}
-                      onChange={(e) => setPostPrivacy(e.target.value)}
+                      onChange={(e) => setPostPrivacy(e.target.value as 'public' | 'followers' | 'friends' | 'listed')}
                       className="sr-only"
                     />
-                    <div className={`w-5 h-5 mt-0.5 rounded-full border-2 flex-shrink-0 transition-all duration-300 ${
-                      postPrivacy === option.value
+                    <div className={`w-5 h-5 mt-0.5 rounded-full border-2 flex-shrink-0 transition-all duration-300 ${postPrivacy === option.value
                         ? 'border-emerald-400 bg-emerald-400 shadow-lg shadow-emerald-400/25'
                         : 'border-white/40 group-hover:border-white/60'
-                    }`}></div>
-                    <option.icon className={`w-5 h-5 mt-0.5 flex-shrink-0 transition-all duration-300 ${
-                      postPrivacy === option.value ? 'text-emerald-400' : 'text-white/70 group-hover:text-white/90'
-                    }`} />
+                      }`}></div>
+                    <option.icon className={`w-5 h-5 mt-0.5 flex-shrink-0 transition-all duration-300 ${postPrivacy === option.value ? 'text-emerald-400' : 'text-white/70 group-hover:text-white/90'
+                      }`} />
                     <div className="flex-1">
-                      <div className={`font-semibold text-sm lg:text-base transition-all duration-300 ${
-                        postPrivacy === option.value ? 'text-white' : 'text-white/90 group-hover:text-white'
-                      }`}>{option.label}</div>
+                      <div className={`font-semibold text-sm lg:text-base transition-all duration-300 ${postPrivacy === option.value ? 'text-white' : 'text-white/90 group-hover:text-white'
+                        }`}>{option.label}</div>
                       <div className="text-white/60 text-xs lg:text-sm">{option.desc}</div>
                     </div>
                   </label>
@@ -303,7 +301,7 @@ export default function CreatePost({
             </div>
 
             {/* Selected Users */}
-            {postPrivacy === 'private' && (
+            {postPrivacy === 'listed' && (
               <div className="bg-white/5 border border-white/10 rounded-2xl p-4">
                 <label className="text-white font-semibold mb-4 text-sm lg:text-base flex items-center space-x-2">
                   <div className="w-2 h-2 bg-purple-400 rounded-full"></div>
@@ -336,11 +334,10 @@ export default function CreatePost({
                           }}
                           className="sr-only"
                         />
-                        <div className={`w-5 h-5 mt-0.5 rounded-lg border-2 flex-shrink-0 transition-all duration-300 flex items-center justify-center ${
-                          selectedUsers.includes(user.id)
+                        <div className={`w-5 h-5 mt-0.5 rounded-lg border-2 flex-shrink-0 transition-all duration-300 flex items-center justify-center ${selectedUsers.includes(user.id)
                             ? 'border-emerald-400 bg-emerald-400 shadow-lg shadow-emerald-400/25'
                             : 'border-white/40 group-hover:border-white/60'
-                        }`}>
+                          }`}>
                           {selectedUsers.includes(user.id) && (
                             <Check className="w-3 h-3 text-white" />
                           )}
@@ -384,11 +381,10 @@ export default function CreatePost({
             <button
               onClick={handleCreatePost}
               disabled={isLoading || isUploading || !isConnected}
-              className={`w-full sm:w-auto px-6 py-3 rounded-2xl text-white font-semibold text-sm lg:text-base transition-all duration-300 hover:scale-105 shadow-lg ${
-                isLoading || isUploading || !isConnected
+              className={`w-full sm:w-auto px-6 py-3 rounded-2xl text-white font-semibold text-sm lg:text-base transition-all duration-300 hover:scale-105 shadow-lg ${isLoading || isUploading || !isConnected
                   ? 'bg-white/20 cursor-not-allowed'
                   : 'bg-gradient-to-r from-emerald-500 via-teal-600 to-cyan-600 hover:from-emerald-600 hover:via-teal-700 hover:to-cyan-700 shadow-emerald-500/25'
-              }`}
+                }`}
             >
               {isLoading ? (
                 <div className="flex items-center justify-center space-x-2">

@@ -268,7 +268,7 @@ export interface ConversationResponse {
 
 export interface CreatePostRequest {
   content: string;
-  privacy?: string;
+  privacy?: 'public' | 'followers' | 'friends' | 'listed';
   image_url?: string;
   specific_user_ids?: number[];
 }
@@ -486,12 +486,28 @@ export class ApiClient {
   }
 
   // Posts endpoints
-  async getFeed(limit: number = 20, offset: number = 0): Promise<{ data: PostResponse[] }> {
-    const response = await this.request<{ count: number; limit: number; offset: number; posts: PostResponse[] }>(`/api/feed?limit=${limit}&offset=${offset}`, {
+  async getFeed(limit: number = 20, offset: number = 0, filter?: string): Promise<{ data: PostResponse[] }> {
+    let url = `/api/feed?limit=${limit}&offset=${offset}`;
+    if (filter) {
+      url += `&filter=${filter}`;
+    }
+    const response = await this.request<{ count: number; limit: number; offset: number; posts: PostResponse[] }>(url, {
       method: 'GET',
     });
     // Transform the response to match the expected format
     return { data: response.posts };
+  }
+
+  async getAllFeed(limit: number = 20, offset: number = 0): Promise<{ data: PostResponse[] }> {
+    return this.getFeed(limit, offset, 'all');
+  }
+
+  async getFollowingFeed(limit: number = 20, offset: number = 0): Promise<{ data: PostResponse[] }> {
+    return this.getFeed(limit, offset, 'following');
+  }
+
+  async getFriendsFeed(limit: number = 20, offset: number = 0): Promise<{ data: PostResponse[] }> {
+    return this.getFeed(limit, offset, 'friends');
   }
 
   async getPosts(): Promise<PostsResponse> {

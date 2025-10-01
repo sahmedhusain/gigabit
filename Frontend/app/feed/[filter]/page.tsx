@@ -41,7 +41,7 @@ function FeedFilterPage() {
   // Post Creation State
   const [newPostContent, setNewPostContent] = useState('')
   const [newPostImage, setNewPostImage] = useState<File | null>(null)
-  const [postPrivacy, setPostPrivacy] = useState('public')
+  const [postPrivacy, setPostPrivacy] = useState<'public' | 'followers' | 'friends' | 'listed'>('public')
   const [selectedUsers, setSelectedUsers] = useState<number[]>([])
   const [availableUsers, setAvailableUsers] = useState<{ id: number; email: string; first_name: string; last_name: string; avatar?: string; nickname?: string; display_name?: string; }[]>([])
   const [loadingUsers, setLoadingUsers] = useState(false)
@@ -136,18 +136,18 @@ function FeedFilterPage() {
       switch (feedSubTab) {
         case 'following':
           // Fetch posts from users the current user is following
-          response = await api.getFeed(20, 0) // This should be filtered on backend
+          response = await api.getFollowingFeed(20, 0)
           break
         case 'friends':
           // Fetch posts from friends (mutual follows)
-          response = await api.getFeed(20, 0) // This should be filtered on backend
+          response = await api.getFriendsFeed(20, 0)
           break
         default: // 'all'
-          response = await api.getFeed(20, 0)
+          response = await api.getAllFeed(20, 0)
       }
 
       const postsArr = Array.isArray(response.data) ? response.data : [];
-      
+
       if (!postsArr.length) {
         setPosts([])
         return
@@ -161,9 +161,9 @@ function FeedFilterPage() {
           avatar: post.user.avatar
         },
         content: post.content,
-        image: post.image_url ? 
-          (post.image_url.startsWith('http') ? 
-            post.image_url : 
+        image: post.image_url ?
+          (post.image_url.startsWith('http') ?
+            post.image_url :
             `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}${post.image_url}`
           ) : undefined,
         likes: post.like_count,
@@ -173,7 +173,7 @@ function FeedFilterPage() {
         privacy: post.privacy,
         isLiked: post.is_liked
       }))
-      
+
       setPosts(mappedPosts)
     } catch (err) {
       console.error('Error fetching posts:', err)
@@ -265,11 +265,11 @@ function FeedFilterPage() {
 
       const postData: CreatePostRequest = {
         content: newPostContent,
-        privacy: postPrivacy === 'followers' ? 'almost_private' : postPrivacy,
+        privacy: postPrivacy, // Use the privacy value directly (public, followers, friends, listed)
         image_url: imageUrl
       }
 
-      if (postPrivacy === 'private' && selectedUsers.length > 0) {
+      if (postPrivacy === 'listed' && selectedUsers.length > 0) {
         postData.specific_user_ids = selectedUsers
       }
 
@@ -380,13 +380,13 @@ function FeedFilterPage() {
         feedSubTab={feedSubTab}
         setFeedSubTab={setFeedSubTab}
         activitySubTab="liked"
-        setActivitySubTab={() => {}}
+        setActivitySubTab={() => { }}
         chatSubTab="all"
-        setChatSubTab={() => {}}
+        setChatSubTab={() => { }}
         chatUnreadAll={0}
         chatUnreadDirect={0}
         chatUnreadGroups={0}
-        fetchEvents={() => {}}
+        fetchEvents={() => { }}
         currentUser={currentUser}
         logout={() => router.push('/login')}
         isCollapsed={isSidebarCollapsed}

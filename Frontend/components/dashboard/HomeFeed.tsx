@@ -23,8 +23,8 @@ interface HomeFeedProps {
   setNewPostContent: (content: string) => void
   newPostImage: File | null
   setNewPostImage: (image: File | null) => void
-  postPrivacy: string
-  setPostPrivacy: (privacy: string) => void
+  postPrivacy: 'public' | 'followers' | 'friends' | 'listed'
+  setPostPrivacy: (privacy: 'public' | 'followers' | 'friends' | 'listed') => void
   selectedUsers: number[]
   setSelectedUsers: (users: number[]) => void
   availableUsers: { id: number; email: string; first_name: string; last_name: string; avatar?: string; nickname?: string; display_name?: string; }[]
@@ -72,7 +72,7 @@ export default function HomeFeed({
   } = useRealTimePosts()
 
   const { connectionQuality, statusMessage } = useConnectionStatus()
-  
+
   // Update document title with unread count
   const { setUnread, setPageTitle } = useDocumentTitle()
 
@@ -179,7 +179,7 @@ export default function HomeFeed({
             post.user.name[0]?.toUpperCase()
           )}
         </div>
-        
+
         <div className="flex-1">
           <div className="flex items-center justify-between mb-2">
             <div>
@@ -191,9 +191,9 @@ export default function HomeFeed({
               <span>{post.timeAgo}</span>
             </div>
           </div>
-          
+
           <p className="text-white/80 mb-4 leading-relaxed">{post.content}</p>
-          
+
           {post.image && (
             <div className="mb-4 rounded-lg overflow-hidden">
               <img
@@ -203,7 +203,7 @@ export default function HomeFeed({
               />
             </div>
           )}
-          
+
           <div className="flex items-center justify-between pt-4 border-t border-white/10">
             <div className="flex items-center space-x-6">
               <button
@@ -211,25 +211,24 @@ export default function HomeFeed({
                   e.stopPropagation()
                   onPostLike(post.id)
                 }}
-                className={`flex items-center space-x-2 transition-all ${
-                  post.isLiked
+                className={`flex items-center space-x-2 transition-all ${post.isLiked
                     ? 'text-red-400 hover:text-red-300'
                     : 'text-white/60 hover:text-red-400'
-                }`}
+                  }`}
               >
                 <Heart className={`w-5 h-5 ${post.isLiked ? 'fill-current' : ''}`} />
                 <span>{post.likes}</span>
               </button>
-              
-              <button 
+
+              <button
                 onClick={(e) => handleCommentClick(post.id, e)}
                 className="flex items-center space-x-2 text-white/60 hover:text-blue-400 transition-colors"
               >
                 <MessageCircle className="w-5 h-5" />
                 <span>{post.comments}</span>
               </button>
-              
-              <button 
+
+              <button
                 onClick={(e) => e.stopPropagation()}
                 className="flex items-center space-x-2 text-white/60 hover:text-green-400 transition-colors"
               >
@@ -245,11 +244,10 @@ export default function HomeFeed({
                   onPostBookmark(post.id)
                 }}
                 title={post.isBookmarked ? "Remove bookmark" : "Save post"}
-                className={`p-2 rounded-lg transition-colors ${
-                  post.isBookmarked
+                className={`p-2 rounded-lg transition-colors ${post.isBookmarked
                     ? 'text-yellow-400 hover:text-yellow-300 bg-yellow-500/10'
                     : 'text-white/60 hover:text-yellow-400 hover:bg-white/10'
-                }`}
+                  }`}
               >
                 <Bookmark className={`w-5 h-5 ${post.isBookmarked ? 'fill-current' : ''}`} />
               </button>
@@ -262,7 +260,7 @@ export default function HomeFeed({
 
   const renderContent = () => {
     const postsToShow = filteredPosts()
-    
+
     if (isLoadingPosts) {
       return (
         <div className="flex items-center justify-center py-12">

@@ -73,7 +73,7 @@ export default function RightSidebar({
   const [isProfileDropdownOpen, setProfileDropdownOpen] = useState(false)
   const [userStatus, setUserStatus] = useState('online')
   const [isClient, setIsClient] = useState(false)
-  const [expandedSection, setExpandedSection] = useState<'calendar' | 'following' | 'invitations' | null>('calendar')
+  const [expandedSection, setExpandedSection] = useState<'calendar' | 'following'  | null>('calendar')
   
   // Calendar state
   const [selectedDate, setSelectedDate] = useState(new Date())
@@ -177,59 +177,10 @@ export default function RightSidebar({
     return getEventsForDate(date).length > 0
   }
 
-  const toggleSection = (section: 'calendar' | 'following' | 'invitations') => {
+  const toggleSection = (section: 'calendar' | 'following' ) => {
     setExpandedSection(expandedSection === section ? null : section)
   }
 
-  // Mock invitations data
-  const mockInvitations = [
-    {
-      id: 1,
-      type: 'friend_request',
-      user: {
-        name: 'Alice Johnson',
-        username: 'alice_j',
-        avatar: '/api/placeholder/40/40'
-      },
-      timestamp: '2 hours ago',
-      message: 'Wants to be friends'
-    },
-    {
-      id: 2,
-      type: 'group_invitation',
-      user: {
-        name: 'Tech Enthusiasts',
-        username: 'tech_group',
-        avatar: '/api/placeholder/40/40'
-      },
-      timestamp: '5 hours ago',
-      message: 'Invited you to join the group',
-      invitedBy: 'John Smith'
-    },
-    {
-      id: 3,
-      type: 'event_invitation',
-      user: {
-        name: 'Weekend Hackathon',
-        username: 'hackathon_2024',
-        avatar: '/api/placeholder/40/40'
-      },
-      timestamp: '1 day ago',
-      message: 'Invited you to the event',
-      invitedBy: 'Sarah Chen'
-    },
-    {
-      id: 4,
-      type: 'friend_request',
-      user: {
-        name: 'Mike Rodriguez',
-        username: 'mike_r',
-        avatar: '/api/placeholder/40/40'
-      },
-      timestamp: '2 days ago',
-      message: 'Wants to be friends'
-    }
-  ]
 
   // Check if two dates are the same day
   const isSameDay = (date1: Date, date2: Date) => {
@@ -813,135 +764,7 @@ export default function RightSidebar({
               </div>
             )}
           </div>
-        </div>
-
-        {/* Invitations Section */}
-        <div className={`sidebar-section bg-gradient-to-br from-orange-500/10 via-red-500/10 to-pink-500/10 backdrop-blur-xl rounded-2xl border border-orange-400/20 shadow-xl ${
-          expandedSection === 'invitations' ? 'expandable' : 'collapsed'
-        }`}>
-          <div className="p-4">
-            <div 
-              className={`flex items-center justify-between cursor-pointer ${expandedSection === 'invitations' ? 'mb-4' : 'mb-2 h-12'}`}
-              onClick={() => toggleSection('invitations')}
-            >
-              <h3 className="text-white font-bold text-base flex items-center">
-                <Mail className="w-4 h-4 text-orange-400 mr-2.5" />
-                Invitations
-                {mockInvitations.length > 0 && (
-                  <span className="ml-2 bg-orange-500/20 text-orange-300 text-xs px-2 py-0.5 rounded-full font-semibold">
-                    {mockInvitations.length}
-                  </span>
-                )}
-              </h3>
-              <div className="flex items-center space-x-2">
-                {mockInvitations.length > 0 && (
-                  <div className="flex items-center space-x-1">
-                    <div className="w-2 h-2 bg-orange-400 rounded-full animate-pulse"></div>
-                    <span className="text-orange-400 text-xs font-medium">
-                      {mockInvitations.filter(inv => inv.timestamp.includes('hour')).length} new
-                    </span>
-                  </div>
-                )}
-                {/* Chevrons removed */}
-              </div>
-            </div>
-
-            {/* Expanded State */}
-            {expandedSection === 'invitations' && (
-              <div className="section-content invitation-content flex-1 flex flex-col min-h-0">
-                <div className="flex-1 overflow-y-auto">
-                  <div className="space-y-3">
-                    {mockInvitations.length > 0 ? (
-                      mockInvitations.map((invitation) => (
-                        <div
-                          key={invitation.id}
-                          className="bg-white/5 rounded-xl p-3 border border-white/10 hover:bg-white/10 transition-all duration-300 group"
-                        >
-                          <div className="flex items-start space-x-3">
-                            <div className="relative flex-shrink-0">
-                              <img
-                                src={invitation.user.avatar}
-                                alt={invitation.user.name}
-                                className="w-10 h-10 rounded-full border-2 border-orange-400/50 group-hover:border-orange-400 transition-colors"
-                                onError={(e) => {
-                                  const target = e.target as HTMLImageElement;
-                                  target.src = '/default-avatar.png';
-                                }}
-                              />
-                              {/* Type indicator */}
-                              <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-orange-500 rounded-full border-2 border-white flex items-center justify-center">
-                                {invitation.type === 'friend_request' && <UserPlus className="w-2 h-2 text-white" />}
-                                {invitation.type === 'group_invitation' && <Users className="w-2 h-2 text-white" />}
-                                {invitation.type === 'event_invitation' && <Calendar className="w-2 h-2 text-white" />}
-                              </div>
-                            </div>
-                            
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-start justify-between mb-1">
-                                <div>
-                                  <p className="text-sm font-semibold text-white truncate">
-                                    {invitation.user.name}
-                                  </p>
-                                  <p className="text-xs text-white/60 truncate">
-                                    @{invitation.user.username}
-                                  </p>
-                                </div>
-                                <span className="text-xs text-white/50 ml-2 flex-shrink-0">
-                                  {invitation.timestamp}
-                                </span>
-                              </div>
-                              
-                              <p className="text-xs text-white/70 mb-2">
-                                {invitation.message}
-                                {invitation.invitedBy && (
-                                  <span className="text-orange-300"> by {invitation.invitedBy}</span>
-                                )}
-                              </p>
-                              
-                              {/* Action buttons */}
-                              <div className="flex items-center space-x-2">
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    // Handle accept invitation
-                                    console.log('Accepted invitation:', invitation.id);
-                                  }}
-                                  className="flex items-center space-x-1 px-3 py-1.5 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 hover:text-emerald-200 rounded-lg text-xs font-medium transition-all duration-200"
-                                >
-                                  <Check className="w-3 h-3" />
-                                  <span>Accept</span>
-                                </button>
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    // Handle decline invitation
-                                    console.log('Declined invitation:', invitation.id);
-                                  }}
-                                  className="flex items-center space-x-1 px-3 py-1.5 bg-red-500/20 hover:bg-red-500/30 text-red-300 hover:text-red-200 rounded-lg text-xs font-medium transition-all duration-200"
-                                >
-                                  <X className="w-3 h-3" />
-                                  <span>Decline</span>
-                                </button>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      ))
-                    ) : (
-                      <div className="flex flex-col items-center justify-center py-12 text-center">
-                        <div className="w-16 h-16 bg-white/10 rounded-full flex items-center justify-center mx-auto mb-4">
-                          <Mail className="w-8 h-8 text-white/40" />
-                        </div>
-                        <p className="text-white/60 text-base font-medium mb-2">No invitations</p>
-                        <p className="text-white/40 text-sm">You're all caught up!</p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
+        </div> 
       </div>
     </div>             
   )

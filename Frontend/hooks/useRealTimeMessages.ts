@@ -42,6 +42,7 @@ export function useRealTimeMessages() {
 
         if (message.type === 'group_message') {
           conversationId = message.group_id || 0
+          console.log('Group message received for group:', conversationId)
         } else {
           // For private messages, use the other participant's ID as conversation ID
           // If I'm the sender, use the receiver ID; if I'm the receiver, use the sender ID
@@ -50,6 +51,7 @@ export function useRealTimeMessages() {
           } else {
             conversationId = message.from || 0
           }
+          console.log('Private message received for conversation:', conversationId)
         }
 
         const newMessage: Message = {
@@ -75,19 +77,26 @@ export function useRealTimeMessages() {
           const conversationMessages = prev.get(conversationId) || []
           const updated = new Map(prev)
           
-          // Check if message already exists to prevent duplicates (by content and sender for better matching)
-          const messageExists = conversationMessages.some(msg => 
-            (msg.id === newMessage.id) || 
-            (msg.content === newMessage.content && 
-             msg.sender_id === newMessage.sender_id && 
-             Math.abs(new Date(msg.created_at).getTime() - new Date(newMessage.created_at).getTime()) < 5000) // Within 5 seconds
-          )
+          // Check if message already exists to prevent duplicates
+          // Match by ID first, then by content+sender+time window
+          const messageExists = conversationMessages.some(msg => {
+            // If both have real IDs (not timestamps), compare them
+            if (msg.id && newMessage.id && 
+                msg.id < 1000000000000 && newMessage.id < 1000000000000) {
+              return msg.id === newMessage.id
+            }
+            
+            // Otherwise, use content-based matching (for optimistic messages)
+            return msg.content === newMessage.content && 
+                   msg.sender_id === newMessage.sender_id && 
+                   Math.abs(new Date(msg.created_at).getTime() - new Date(newMessage.created_at).getTime()) < 10000 // Within 10 seconds
+          })
           
           if (!messageExists) {
             updated.set(conversationId, [...conversationMessages, newMessage])
-            console.log(`Added new message to conversation ${conversationId}:`, newMessage.content)
+            console.log(`✅ Added new message to conversation ${conversationId}:`, newMessage.content.substring(0, 50))
           } else {
-            console.log(`Duplicate message prevented for conversation ${conversationId}:`, newMessage.content)
+            console.log(`⛔ Duplicate message prevented for conversation ${conversationId}:`, newMessage.content.substring(0, 50))
           }
           
           return updated
@@ -233,39 +242,20 @@ export function useRealTimeMessages() {
         return updated
       })
 
-      // Send via WebSocket
-      const wsMessage: any = {
-        type: groupId ? 'group_message' : 'private_message',
+      // Send to backend API - the backend will handle WebSocket broadcast
+      const apiData: any = {
         content,
-        message_type: messageType
+        message_type: groupId ? 'group' : 'private'
       }
 
       if (groupId) {
-        wsMessage.group_id = groupId
+        apiData.group_id = groupId
       } else if (recipientId) {
-        wsMessage.to = recipientId
+        apiData.receiver_id = recipientId
       }
 
-      send(wsMessage)
-
-      // Also send to backend API for persistence
-      try {
-        const apiData: any = {
-          content,
-          message_type: groupId ? 'group' : 'private'
-        }
-
-        if (groupId) {
-          apiData.group_id = groupId
-        } else if (recipientId) {
-          apiData.receiver_id = recipientId
-        }
-
-        await api.sendMessage(apiData)
-      } catch (apiError) {
-        console.error('Failed to persist message to backend:', apiError)
-        // Don't throw here as WebSocket might have succeeded
-      }
+      console.log('Sending message via API:', apiData)
+      await api.sendMessage(apiData)
 
     } catch (err: any) {
       console.error('Failed to send message:', err)

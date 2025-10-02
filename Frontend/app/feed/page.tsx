@@ -1,28 +1,17 @@
 'use client'
-import { useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useEffect, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import ProtectedRoute from '@/components/ProtectedRoute'
-
-function FeedPage() {
-  const router = useRouter()
-
-  useEffect(() => {
-    router.replace('/feed/all')
-  }, [router])
-
-  return null
-}
-
-// Wrap the entire component with ProtectedRoute
-function ProtectedFeedPage() {
-  return (
-    <ProtectedRoute>
-      <FeedPage />
-    </ProtectedRoute>
-  )
-}
-
-export default ProtectedFeedPage
+import { useAuth } from '@/context/AuthContext'
+import { useWebSocket } from '@/context/WebSocketContext'
+import { useToast } from '@/context/ToastContext'
+import { useNotifications } from '@/hooks/useNotifications'
+import { api, ApiClient, type CreatePostRequest, type Post, getToken, NetworkError, AuthenticationError, ValidationError } from '@/lib/api'
+import Sidebar from '@/components/dashboard/Sidebar'
+import TopBar from '@/components/dashboard/TopBar'
+import CreatePost from '@/components/dashboard/CreatePost'
+import HomeFeed from '@/components/dashboard/HomeFeed'
+import RightSidebar from '@/components/dashboard/RightSidebar'
 
 function FeedPage() {
   const router = useRouter()
@@ -268,12 +257,14 @@ function FeedPage() {
       setShowCreatePost(false)
       success('Post created successfully!')
       fetchFeedPosts()
-    } catch (err) {
+    } catch (err: unknown) {
       console.error('Error creating post:', err)
       if (err instanceof ValidationError) {
         error(err.message)
       } else if (err instanceof NetworkError) {
         error('Failed to create post. Please try again.')
+      } else if (err instanceof Error) {
+        error(err.message)
       } else {
         error('Unable to create post right now.')
       }
@@ -370,6 +361,8 @@ function FeedPage() {
         setActivitySubTab={() => {}}
         chatSubTab="all"
         setChatSubTab={() => {}}
+        eventsSubTab="upcoming"
+        setEventsSubTab={() => {}}
         chatUnreadAll={0}
         chatUnreadDirect={0}
         chatUnreadGroups={0}
@@ -445,7 +438,7 @@ function FeedPage() {
         followingUsers={following}
         followersUsers={followers}
         trendingTopics={trendingTopics}
-        onUserClick={(user) => {
+        onUserClick={(user: { id: number }) => {
           router.push(`/profile/${user.id}`)
         }}
         currentUser={currentUser}
@@ -457,12 +450,10 @@ function FeedPage() {
 }
 
 // Wrap the entire component with ProtectedRoute
-function ProtectedFeedPage() {
+export default function ProtectedFeedPage() {
   return (
     <ProtectedRoute>
       <FeedPage />
     </ProtectedRoute>
   )
 }
-
-export default ProtectedFeedPage

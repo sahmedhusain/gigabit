@@ -39,7 +39,7 @@ export default function CommunitySection({
     setOptimisticEvents(events)
   }, [events])
 
-  const handleEventResponse = async (eventId: number, option: 'going' | 'not_going') => {
+  const handleEventResponse = async (eventId: number, option: 'going' | 'not_going' ) => {
     const previousResponse = optimisticEvents.find(e => e.id === eventId)?.user_response
     
     // Optimistically update the UI immediately
@@ -235,7 +235,7 @@ export default function CommunitySection({
                     <span className="text-white/80 text-sm font-medium">{event.going_count}</span>
                     <span className="text-white/60 text-xs">going</span>
                   </div>
-                  <div className="flex items-center space-x-2">
+                  <div className="flex items-center space-x-2">     
                     <X className="w-4 h-4 text-red-400" />
                     <span className="text-white/80 text-sm font-medium">{event.not_going_count}</span>
                     <span className="text-white/60 text-xs">not going</span>

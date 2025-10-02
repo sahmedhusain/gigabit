@@ -312,6 +312,8 @@ function ChatsFilterPage() {
         setFeedSubTab={() => {}}
         activitySubTab="liked"
         setActivitySubTab={() => {}}
+        eventsSubTab="all"
+        setEventsSubTab={() => {}}
         chatSubTab={chatSubTab}
         setChatSubTab={setChatSubTab}
         chatUnreadAll={chatUnreadAll}
@@ -360,9 +362,9 @@ function ChatsFilterPage() {
       />
 
       {/* Main Content */}
-      <div className={`main-content-layout p-2 lg:p-4 relative z-10 has-fixed-sidebar ${isSidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
+      <div className={`main-content-layout p-4 lg:p-6 relative z-10 has-fixed-sidebar ${isSidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
         <div className="max-w-7xl mx-auto h-full">
-          <div className="flex flex-col lg:flex-row gap-6 h-full">
+          <div className="flex flex-col lg:flex-row gap-6 h-full pt-2">
             {/* Main Content Area */}
             <div className="flex-1 min-w-0 h-full">
               {openChatWindow ? (
@@ -377,11 +379,35 @@ function ChatsFilterPage() {
                 <ChatsSection
                   chatSubTab={chatSubTab}
                   onChatClick={(chat) => {
-                    setOpenChatWindow({
-                      conversationId: parseInt(chat.conversationId),
+                    console.log('🖱️ [ChatsFilterPage] Chat clicked:', chat)
+                    
+                    // chat.conversationId is the string format ("private_5" or "group_3")
+                    // Extract the numeric ID based on type
+                    let conversationId: number
+                    let participantId: number | undefined
+                    
+                    if (chat.type === 'private') {
+                      // For private chats, use the already-extracted participantId
+                      conversationId = chat.participantId || parseInt(chat.conversationId.replace('private_', ''))
+                      participantId = conversationId
+                    } else {
+                      // For group chats, extract group ID
+                      conversationId = parseInt(chat.conversationId.replace('group_', ''))
+                      participantId = undefined
+                    }
+                    
+                    console.log('📤 [ChatsFilterPage] Opening chat window with:', {
+                      conversationId,
                       type: chat.type,
                       name: chat.name,
-                      participantId: chat.participantId
+                      participantId
+                    })
+                    
+                    setOpenChatWindow({
+                      conversationId: conversationId,
+                      type: chat.type,
+                      name: chat.name,
+                      participantId: participantId
                     });
                   }}
                   isUserOnline={isUserOnline}

@@ -72,6 +72,12 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
   // Load conversation messages when component mounts or conversation changes
   React.useEffect(() => {
     if (conversationId && conversationType) {
+      console.log('🎯 [ChatWindow] Mounting/Loading messages for conversation:', {
+        conversationId,
+        conversationType,
+        participantId,
+        currentMessagesInMap: Array.from(messages.keys())
+      })
       fetchConversationMessages(conversationId, conversationType, participantId)
     }
   }, [conversationId, conversationType, participantId, fetchConversationMessages])
@@ -199,9 +205,9 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
   }
 
   return (
-    <div className="h-full flex flex-col bg-white/5 backdrop-blur-xl rounded-2xl border border-white/20 overflow-hidden">
+    <div className="h-full max-h-full flex flex-col bg-white/5 backdrop-blur-xl rounded-2xl border border-white/20 overflow-hidden shadow-2xl">
       {/* Header */}
-      <div className="bg-white/10 backdrop-blur-xl border-b border-white/20 p-4 flex items-center justify-between flex-shrink-0">
+      <div className="bg-white/10 backdrop-blur-xl border-b border-white/20 p-3 flex items-center justify-between flex-shrink-0 z-10">
         <div className="flex items-center space-x-4">
           <div>
             <h1 className="text-white text-xl font-bold">{participantName}</h1>
@@ -231,14 +237,26 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-6 space-y-4 min-h-0">
+      <div className="flex-1 overflow-y-auto p-4 space-y-3 min-h-0">
           {isLoading ? (
             <div className="flex items-center justify-center h-full">
               <div className="text-white/60 text-lg">Loading messages...</div>
             </div>
           ) : (
             <>
-              {Array.from(messages.get(conversationId) || []).length === 0 ? (
+              {(() => {
+                const conversationMessages = messages.get(conversationId) || []
+                console.log('🎨 [ChatWindow] Render - Attempting to display messages:', {
+                  lookingForConversationId: conversationId,
+                  foundMessagesCount: conversationMessages.length,
+                  allConversationIdsInMap: Array.from(messages.keys()),
+                  fullMessagesMap: Array.from(messages.entries()).map(([id, msgs]) => ({
+                    conversationId: id,
+                    messageCount: msgs.length
+                  }))
+                })
+                return conversationMessages.length === 0
+              })() ? (
                 <div className="flex items-center justify-center h-full">
                   <div className="text-center">
                     <div className="text-white/40 text-6xl mb-4">💬</div>
@@ -246,13 +264,13 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
                     <div className="text-white/40 text-sm mt-2">Start the conversation!</div>
                     <div className="text-white/30 text-xs mt-4">
                       Conversation ID: {conversationId}<br/>
-                      Messages count: {Array.from(messages.get(conversationId) || []).length}
+                      Conversation Type: {conversationType}<br/>
+                      Available conversation IDs: {Array.from(messages.keys()).join(', ')}
                     </div>
                   </div>
                 </div>
               ) : (
                 Array.from(messages.get(conversationId) || []).map((message) => {
-                  console.log('Rendering message:', message)
                   return (
                   <div
                     key={message.id}
@@ -265,9 +283,13 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
                           : 'bg-white/10 text-white border border-white/20'
                       }`}
                     >
-                      {conversationType === 'group' && message.sender_id !== user?.id && (
-                        <div className="text-xs text-white/60 mb-2 font-medium">
-                          {message.sender.first_name} {message.sender.last_name}
+                      {conversationType === 'group' && (
+                        <div className={`text-xs mb-2 font-medium ${
+                          message.sender_id === user?.id ? 'text-white/90' : 'text-white/60'
+                        }`}>
+                          {message.sender_id === user?.id 
+                            ? 'You' 
+                            : `${message.sender.first_name} ${message.sender.last_name}`}
                         </div>
                       )}
                       {renderSimpleMessageContent(message)}
@@ -306,7 +328,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
       </div>
 
       {/* Input */}
-      <div className="bg-white/5 backdrop-blur-xl border-t border-white/20 p-6 flex-shrink-0">
+      <div className="bg-white/5 backdrop-blur-xl border-t border-white/20 p-4 flex-shrink-0">
         {/* Selected File Display */}
         {selectedFile && (
           <div className="mb-4 p-3 bg-white/10 rounded-lg border border-white/20">

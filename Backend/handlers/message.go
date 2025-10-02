@@ -73,6 +73,17 @@ func (h *MessageHandler) SendMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Get sender information for WebSocket broadcast
+	var senderFirstName, senderLastName, senderAvatar string
+	senderQuery := `SELECT first_name, last_name, avatar FROM users WHERE id = ?`
+	db := h.messageService.GetDB()
+	err = db.QueryRow(senderQuery, userID).Scan(&senderFirstName, &senderLastName, &senderAvatar)
+	if err != nil {
+		// Log error but don't fail the message send
+		senderFirstName = "Unknown"
+		senderLastName = "User"
+	}
+
 	// Send real-time message via websocket
 	wsMessage := websocket.Message{
 		Type:      websocket.MessageTypePrivateMessage,
@@ -83,6 +94,12 @@ func (h *MessageHandler) SendMessage(w http.ResponseWriter, r *http.Request) {
 			"id":           message.ID,
 			"message_type": req.MessageType,
 			"image_url":    req.ImageURL,
+			"sender": map[string]interface{}{
+				"id":         userID,
+				"first_name": senderFirstName,
+				"last_name":  senderLastName,
+				"avatar":     senderAvatar,
+			},
 		},
 	}
 

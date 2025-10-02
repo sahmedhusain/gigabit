@@ -11,6 +11,10 @@ type EventService struct {
 	db *sql.DB
 }
 
+func (s *EventService) DeleteEventResponse(u uint, userID uint) any {
+	panic("unimplemented")
+}
+
 func NewEventService(db *sql.DB) *EventService {
 	return &EventService{db: db}
 }
@@ -88,7 +92,7 @@ WHERE e.id = ?
 	}
 
 	// Get current user's response
-	event.UserResponse, err = s.getUserEventResponse(eventID, currentUserID)
+	event.UserResponse, err = s.GetUserEventResponse(eventID, currentUserID)
 	if err != nil && err != sql.ErrNoRows {
 		return nil, err
 	}
@@ -228,9 +232,14 @@ func (s *EventService) RespondToEvent(eventID, userID uint, option string) error
 	}
 
 	// Check if user already responded
-	existingResponse, err := s.getUserEventResponse(eventID, userID)
+	existingResponse, err := s.GetUserEventResponse(eventID, userID)
 	if err != nil && err != sql.ErrNoRows {
 		return err
+	}
+
+	// If clicking the same option again, remove the response
+	if existingResponse == option {
+		return s.RemoveEventResponse(eventID, userID)
 	}
 
 	now := time.Now()
@@ -251,6 +260,23 @@ func (s *EventService) RespondToEvent(eventID, userID uint, option string) error
 		_, err = s.db.Exec(query, eventID, userID, option, now, now)
 	}
 
+	return err
+}
+
+func (s *EventService) RemoveEventResponse(eventID, userID uint) error {
+	// Check if user is a member of the group that owns this event
+	groupID, err := s.getEventGroupID(eventID)
+	if err != nil {
+		return err
+	}
+
+	isMember, err := s.isUserGroupMember(groupID, userID)
+	if err != nil || !isMember {
+		return sql.ErrNoRows // Unauthorized
+	}
+
+	query := `DELETE FROM event_responses WHERE event_id = ? AND user_id = ?`
+	_, err = s.db.Exec(query, eventID, userID)
 	return err
 }
 
@@ -363,7 +389,7 @@ LIMIT ? OFFSET ?
 		}
 
 		// Get current user's response
-		event.UserResponse, err = s.getUserEventResponse(event.ID, userID)
+		event.UserResponse, err = s.GetUserEventResponse(event.ID, userID)
 		if err != nil && err != sql.ErrNoRows {
 			log.Printf("Error getting user event response for event %d, user %d: %v", event.ID, userID, err)
 			return nil, err
@@ -390,7 +416,7 @@ func (s *EventService) getEventResponseCounts(eventID uint) (going, notGoing int
 	return
 }
 
-func (s *EventService) getUserEventResponse(eventID, userID uint) (string, error) {
+func (s *EventService) GetUserEventResponse(eventID, userID uint) (string, error) {
 	query := `SELECT response FROM event_responses WHERE event_id = ? AND user_id = ?`
 
 	var option string

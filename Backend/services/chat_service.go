@@ -119,7 +119,7 @@ func (s *ChatService) getGroupChats(userID uint) ([]models.UnifiedChatItem, erro
         JOIN group_members gm ON g.id = gm.group_id
         LEFT JOIN group_conversations gc ON g.id = gc.group_id
         LEFT JOIN messages m ON gc.last_message_id = m.id
-        WHERE gm.user_id = ? AND gm.status = 'member'
+        WHERE gm.user_id = ? AND gm.status = 'accepted'
         ORDER BY COALESCE(m.created_at, g.created_at) DESC
 	`
 

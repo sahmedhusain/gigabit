@@ -263,6 +263,10 @@ func (h *EventHandler) RespondToEvent(w http.ResponseWriter, r *http.Request, ev
 		return
 	}
 
+	// Get current response to check if it's being removed
+	currentResponse, _ := h.eventService.GetUserEventResponse(uint(eventID), userID)
+	wasRemoved := currentResponse == req.Option
+
 	if err := h.eventService.RespondToEvent(uint(eventID), userID, req.Option); err != nil {
 		if err == sql.ErrNoRows {
 			writeError(w, http.StatusForbidden, "Cannot respond to this event")
@@ -272,9 +276,17 @@ func (h *EventHandler) RespondToEvent(w http.ResponseWriter, r *http.Request, ev
 		return
 	}
 
+	responseValue := req.Option
+	message := "Response recorded successfully"
+	if wasRemoved {
+		responseValue = ""
+		message = "Response removed successfully"
+	}
+
 	writeJSON(w, http.StatusOK, map[string]interface{}{
-		"message":  "Response recorded successfully",
-		"response": req.Option,
+		"message":  message,
+		"response": responseValue,
+		"removed":  wasRemoved,
 	})
 }
 

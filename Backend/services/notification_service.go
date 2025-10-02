@@ -539,7 +539,7 @@ func (s *NotificationService) getEventInfo(eventID uint) (*models.EventResponse,
 func (s *NotificationService) getGroupMemberIDs(groupID, excludeUserID uint) ([]uint, error) {
 	query := `
 		SELECT user_id FROM group_members 
-		WHERE group_id = ? AND user_id != ? AND status = 'member'
+		WHERE group_id = ? AND user_id != ? AND status = 'accepted'
 	`
 
 	rows, err := s.db.Query(query, groupID, excludeUserID)

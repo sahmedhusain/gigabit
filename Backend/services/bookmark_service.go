@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+
 	"social/models"
 	"social/websocket"
 )
@@ -74,16 +75,25 @@ func (s *BookmarkService) GetUserBookmarks(userID uint, limit, offset int) ([]mo
 	query := `
 		SELECT b.id, b.user_id, b.post_id, b.created_at, b.updated_at,
 			   p.id, p.user_id, p.content, p.image_url, p.privacy, p.created_at, p.updated_at,
-			   u.id, u.email, u.first_name, u.last_name, u.avatar, u.nickname
+			   u.id, u.email, u.first_name, u.last_name, u.avatar, u.nickname,
+			   COUNT(DISTINCT l.id) as like_count,
+			   COUNT(DISTINCT c.id) as comment_count,
+			   CASE WHEN ul.id IS NOT NULL THEN 1 ELSE 0 END as is_liked,
+			   CASE WHEN ub.id IS NOT NULL THEN 1 ELSE 0 END as is_bookmarked
 		FROM bookmarks b
 		JOIN posts p ON b.post_id = p.id
 		JOIN users u ON p.user_id = u.id
+		LEFT JOIN likes l ON p.id = l.post_id
+		LEFT JOIN comments c ON p.id = c.post_id
+		LEFT JOIN likes ul ON p.id = ul.post_id AND ul.user_id = ?
+		LEFT JOIN bookmarks ub ON p.id = ub.post_id AND ub.user_id = ?
 		WHERE b.user_id = ?
+		GROUP BY b.id, p.id, u.id
 		ORDER BY b.created_at DESC
 		LIMIT ? OFFSET ?
 	`
 
-	rows, err := s.db.Query(query, userID, limit, offset)
+	rows, err := s.db.Query(query, userID, userID, userID, limit, offset)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get bookmarks: %v", err)
 	}
@@ -95,11 +105,24 @@ func (s *BookmarkService) GetUserBookmarks(userID uint, limit, offset int) ([]mo
 		var post models.PostResponse
 		var user models.UserResponse
 
+		var avatar, nickname sql.NullString
 		err := rows.Scan(
 			&bookmark.ID, &bookmark.UserID, &bookmark.PostID, &bookmark.CreatedAt, &bookmark.UpdatedAt,
 			&post.ID, &post.UserID, &post.Content, &post.ImageURL, &post.Privacy, &post.CreatedAt, &post.UpdatedAt,
-			&user.ID, &user.Email, &user.FirstName, &user.LastName, &user.Avatar, &user.Nickname,
+			&user.ID, &user.Email, &user.FirstName, &user.LastName, &avatar, &nickname,
+			&post.LikeCount, &post.CommentCount, &post.IsLiked, &post.IsBookmarked,
 		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan bookmark: %v", err)
+		}
+
+		// Handle nullable fields
+		if avatar.Valid {
+			user.Avatar = &avatar.String
+		}
+		if nickname.Valid {
+			user.Nickname = &nickname.String
+		}
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan bookmark: %v", err)
 		}

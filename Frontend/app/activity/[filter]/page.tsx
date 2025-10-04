@@ -135,42 +135,57 @@ function ActivityFilterPage() {
     }
       }, [activitySubTab, error])
 
+  // Fetch activity posts on mount and when filter changes
+  useEffect(() => {
+    fetchActivityPosts()
+  }, [fetchActivityPosts])
+
       // WebSocket real-time notifications
       useEffect(() => {
         if (!isConnected) return
 
-        const removeListener = addMessageListener((message) => {
-          switch (message.type) {
-            case 'post_update':
-              console.log('Post update received:', message.data)
-              fetchActivityPosts()
-              break
+    const removeListener = addMessageListener((message) => {
+      switch (message.type) {
+        case 'post_update':
+        case 'like_update':
+        case 'comment_update':
+          console.log(`${message.type} received:`, message.data)
+          // Refetch activity posts when any activity-related update occurs
+          if (message.data?.user_id === user?.id) {
+            console.log('Activity update for current user, refetching posts...')
+            fetchActivityPosts()
+          }
+          break
 
-            case 'like':
-              // Update like count in real-time for other users
-              if (message.data?.post_id && message.data?.user_id !== user?.id) {
-                setPosts(prevPosts =>
-                  prevPosts.map(post =>
-                    post.id === message.data.post_id
-                      ? {
-                        ...post,
-                        likes: message.data.like_count || post.likes
-                      }
-                      : post
-                  )
-                )
-              }
-              break
+        case 'like':
+          // Update like count in real-time
+          if (message.data?.post_id) {
+            setPosts(prevPosts =>
+              prevPosts.map(post =>
+                post.id === message.data.post_id
+                  ? {
+                    ...post,
+                    likes: message.data.like_count || post.likes,
+                    isLiked: message.data.user_id === user?.id ? message.data.is_liked : post.isLiked
+                  }
+                  : post
+              )
+            )
+            
+            // If this is the current user's action, also refetch to ensure data consistency
+            if (message.data.user_id === user?.id) {
+              fetchActivityPosts()
+            }
+          }
+          break
 
             default:
               console.log('Received WebSocket message:', message)
           }
         })
 
-        return removeListener
-      }, [isConnected, addMessageListener, user?.id, fetchActivityPosts])
-
-  // ...formatTimeAgo is defined at module scope
+    return removeListener
+  }, [isConnected, addMessageListener, user?.id, fetchActivityPosts])
 
   const handleLikePost = async (postId: number) => {
     try {
@@ -210,13 +225,20 @@ function ActivityFilterPage() {
         await api.toggleBookmark(postId)
       }
 
+      // Optimistically update the post
       setPosts(posts.map(p =>
         p.id === postId
           ? { ...p, isBookmarked: !p.isBookmarked }
           : p
       ))
+      
+      // If we're on the saved tab, refetch to update the list
+      if (activitySubTab === 'saved') {
+        setTimeout(() => fetchActivityPosts(), 500) // Small delay to ensure backend is updated
+      }
     } catch (err) {
       console.error('Error toggling bookmark:', err)
+      // Revert optimistic update
       setPosts(posts.map(p =>
         p.id === postId
           ? { ...p, isBookmarked: !p.isBookmarked }

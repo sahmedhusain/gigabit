@@ -41,6 +41,7 @@ export default function ProfilePage() {
     isPrivate: currentUser.is_private,
     followers: followers.length,
     following: following.length,
+    posts: 0, // Add posts count
     status: 'online',
     lastStatusChange: new Date().toISOString()
   } : null;

@@ -35,13 +35,14 @@ function FeedFilterPage() {
   // Post Creation State
   const [newPostContent, setNewPostContent] = useState('')
   const [newPostImage, setNewPostImage] = useState<File | null>(null)
-  const [postPrivacy, setPostPrivacy] = useState('public')
+  const [postPrivacy, setPostPrivacy] = useState<'public' | 'followers' | 'friends' | 'listed'>('public')
   const [selectedUsers, setSelectedUsers] = useState<number[]>([])
   const [availableUsers, setAvailableUsers] = useState<{ id: number; email: string; first_name: string; last_name: string; avatar?: string; nickname?: string; display_name?: string; }[]>([])
   const [loadingUsers, setLoadingUsers] = useState(false)
 
   // Data State
   const [posts, setPosts] = useState<Post[]>([])
+  const [, setIsLoadingPosts] = useState(true)
 
   // Update URL when filter changes
   useEffect(() => {
@@ -52,24 +53,27 @@ function FeedFilterPage() {
 
   const fetchFeedPosts = useCallback(async () => {
     try {
+      setIsLoadingPosts(true)
       console.log('Fetching feed posts...')
-  let response: unknown
+      let response: unknown
 
       switch (feedSubTab) {
         case 'following':
           // Fetch posts from users the current user is following
-          response = await api.getFeed(20, 0) // This should be filtered on backend
+          response = await api.getFollowingFeed(20, 0)
           break
         case 'friends':
           // Fetch posts from friends (mutual follows)
-          response = await api.getFeed(20, 0) // This should be filtered on backend
+          response = await api.getFriendsFeed(20, 0)
           break
         default: // 'all'
-          response = await api.getFeed(20, 0)
+          response = await api.getAllFeed(20, 0)
       }
 
-  const respRec = response as Record<string, unknown>
-  const postsArr = Array.isArray(respRec['data'] as unknown) ? respRec['data'] as unknown[] : [];
+      const respRec = response as Record<string, unknown>
+      const postsArr = Array.isArray(respRec['data'] as unknown) ? respRec['data'] as unknown[] : [];
+      
+      console.log('Feed response:', { total: postsArr.length, sample: postsArr[0] })
       
       if (!postsArr.length) {
         setPosts([])
@@ -81,7 +85,7 @@ function FeedFilterPage() {
         const userObj = p['user'] as Record<string, unknown> | undefined
         const imageUrl = typeof p['image_url'] === 'string' ? String(p['image_url']) : undefined
 
-        return {
+        const mappedPost = {
           id: Number(p['id']) || 0,
           user: {
             name: userObj ? `${String(userObj['first_name'] ?? '')} ${String(userObj['last_name'] ?? '')}` : 'Unknown',
@@ -95,8 +99,12 @@ function FeedFilterPage() {
           shares: 0,
           timeAgo: formatTimeAgo(String(p['created_at'] ?? '')),
           privacy: String(p['privacy'] ?? ''),
-          isLiked: Boolean(p['is_liked'])
+          isLiked: Boolean(p['is_liked']),
+          isBookmarked: Boolean(p['is_bookmarked'])
         }
+        
+        console.log(`Post ${mappedPost.id}: likes=${mappedPost.likes}, comments=${mappedPost.comments}, isLiked=${mappedPost.isLiked}, isBookmarked=${mappedPost.isBookmarked}`)
+        return mappedPost
       })
       
       setPosts(mappedPosts)
@@ -110,8 +118,14 @@ function FeedFilterPage() {
         error('Unable to load posts right now.')
       }
     } finally {
+      setIsLoadingPosts(false)
     }
   }, [feedSubTab, error])
+
+  // Fetch posts on mount and when filter changes
+  useEffect(() => {
+    fetchFeedPosts()
+  }, [fetchFeedPosts])
 
   // WebSocket real-time notifications
   useEffect(() => {
@@ -147,14 +161,6 @@ function FeedFilterPage() {
 
     return removeListener
   }, [isConnected, addMessageListener, user?.id, fetchFeedPosts])
-
-  // Fetch data when component loads
-  useEffect(() => {
-    if (user) {
-      fetchFeedPosts()
-      fetchUsers()
-    }
-  }, [user, feedSubTab, fetchFeedPosts])
 
   const fetchUsers = async () => {
     try {
@@ -216,11 +222,11 @@ function FeedFilterPage() {
 
       const postData: CreatePostRequest = {
         content: newPostContent,
-        privacy: postPrivacy === 'followers' ? 'almost_private' : postPrivacy,
+        privacy: postPrivacy, // Use the privacy value directly (public, followers, friends, listed)
         image_url: imageUrl
       }
 
-      if (postPrivacy === 'private' && selectedUsers.length > 0) {
+      if (postPrivacy === 'listed' && selectedUsers.length > 0) {
         postData.specific_user_ids = selectedUsers
       }
 

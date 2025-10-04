@@ -131,7 +131,7 @@ export function useRealTimeGroups() {
       setErr(null)
       
       const res = await api.getUserGroups(user.id)
-      const groupsData = Array.isArray(res?.data) ? res.data : []
+      const groupsData = Array.isArray(res?.groups) ? res.groups : []
       
       setGroups(groupsData)
       lastFetchTime.current = Date.now()

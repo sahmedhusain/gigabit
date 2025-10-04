@@ -25,7 +25,7 @@ function FeedPage() {
   // Post Creation State
   const [newPostContent, setNewPostContent] = useState('')
   const [newPostImage, setNewPostImage] = useState<File | null>(null)
-  const [postPrivacy, setPostPrivacy] = useState('public')
+  const [postPrivacy, setPostPrivacy] = useState<'public' | 'followers' | 'friends' | 'listed'>('public')
   const [selectedUsers, setSelectedUsers] = useState<number[]>([])
   const [availableUsers, setAvailableUsers] = useState<{ id: number; email: string; first_name: string; last_name: string; avatar?: string; nickname?: string; display_name?: string; }[]>([])
   const [loadingUsers, setLoadingUsers] = useState(false)
@@ -159,11 +159,11 @@ function FeedPage() {
 
       const postData: CreatePostRequest = {
         content: newPostContent,
-        privacy: postPrivacy === 'followers' ? 'almost_private' : postPrivacy,
+        privacy: postPrivacy, // Use the privacy value directly (public, followers, friends, listed)
         image_url: imageUrl
       }
 
-      if (postPrivacy === 'private' && selectedUsers.length > 0) {
+      if (postPrivacy === 'listed' && selectedUsers.length > 0) {
         postData.specific_user_ids = selectedUsers
       }
 

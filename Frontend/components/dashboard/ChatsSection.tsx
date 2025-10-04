@@ -407,7 +407,7 @@ export default function ChatsSection({
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: index * 0.1 }}
                   >
-                    {stat.pulse && <div className="w-2 h-2 bg-current rounded-full animate-pulse"></div>}
+                    {'pulse' in stat && stat.pulse && <div className="w-2 h-2 bg-current rounded-full animate-pulse"></div>}
                     <span className={`text-sm font-medium ${stat.color}`}>
                       {stat.label}
                     </span>

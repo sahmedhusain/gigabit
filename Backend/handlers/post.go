@@ -17,16 +17,20 @@ import (
 )
 
 type PostHandler struct {
-	postService    *services.PostService
-	commentService *services.CommentService
-	likeService    *services.LikeService
+	postService         *services.PostService
+	commentService      *services.CommentService
+	likeService         *services.LikeService
+	notificationService *services.NotificationService
+	hub                 *websocket.Hub
 }
 
 func NewPostHandler(db *sql.DB, hub *websocket.Hub) *PostHandler {
 	return &PostHandler{
-		postService:    services.NewPostService(db, hub),
-		commentService: services.NewCommentService(db, hub),
-		likeService:    services.NewLikeService(db, hub),
+		postService:         services.NewPostService(db, hub),
+		commentService:      services.NewCommentService(db, hub),
+		likeService:         services.NewLikeService(db, hub),
+		notificationService: services.NewNotificationService(db, hub),
+		hub:                 hub,
 	}
 }
 
@@ -367,6 +371,13 @@ func (h *PostHandler) LikePost(w http.ResponseWriter, r *http.Request, postIDStr
 		return
 	}
 
+	// Get post owner to send notification
+	post, err := h.postService.GetPostByID(uint(postID), userID.(uint))
+	if err == nil && post != nil {
+		// Send notification to post owner (async, don't wait for it)
+		go h.notificationService.NotifyPostLiked(userID.(uint), post.UserID, uint(postID))
+	}
+
 	log.Printf("Post %d liked successfully by user %v", postID, userID)
 	writeJSON(w, http.StatusOK, map[string]string{"message": "Post liked successfully"})
 }
@@ -397,7 +408,7 @@ func (h *PostHandler) UnlikePost(w http.ResponseWriter, r *http.Request, postIDS
 
 	log.Printf("Post %d unliked successfully by user %v", postID, userID)
 	writeJSON(w, http.StatusOK, map[string]string{"message": "Post unliked successfully"})
-}// CreateComment handles creating a new comment on a post
+} // CreateComment handles creating a new comment on a post
 func (h *PostHandler) CreateComment(w http.ResponseWriter, r *http.Request, postIDStr string) {
 	if r.Method != http.MethodPost {
 		writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
@@ -438,6 +449,13 @@ func (h *PostHandler) CreateComment(w http.ResponseWriter, r *http.Request, post
 		return
 	}
 
+	// Get post owner to send notification
+	post, err := h.postService.GetPostByID(uint(postID), userID.(uint))
+	if err == nil && post != nil {
+		// Send notification to post owner (async, don't wait for it)
+		go h.notificationService.NotifyPostCommented(userID.(uint), post.UserID, uint(postID))
+	}
+
 	writeJSON(w, http.StatusCreated, map[string]interface{}{
 		"message": "Comment created successfully",
 		"comment": comment,
@@ -446,140 +464,140 @@ func (h *PostHandler) CreateComment(w http.ResponseWriter, r *http.Request, post
 
 // GetPostComments handles getting comments for a specific post
 func (h *PostHandler) GetPostComments(w http.ResponseWriter, r *http.Request, postIDStr string) {
-if r.Method != http.MethodGet {
-writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
-return
-}
+	if r.Method != http.MethodGet {
+		writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
 
-postID, err := strconv.ParseUint(postIDStr, 10, 32)
-if err != nil {
-writeError(w, http.StatusBadRequest, "Invalid post ID")
-return
-}
+	postID, err := strconv.ParseUint(postIDStr, 10, 32)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "Invalid post ID")
+		return
+	}
 
-// Get pagination parameters
-limitStr := r.URL.Query().Get("limit")
-if limitStr == "" {
-limitStr = "20"
-}
-offsetStr := r.URL.Query().Get("offset")
-if offsetStr == "" {
-offsetStr = "0"
-}
+	// Get pagination parameters
+	limitStr := r.URL.Query().Get("limit")
+	if limitStr == "" {
+		limitStr = "20"
+	}
+	offsetStr := r.URL.Query().Get("offset")
+	if offsetStr == "" {
+		offsetStr = "0"
+	}
 
-limit, err := strconv.Atoi(limitStr)
-if err != nil || limit > 100 {
-limit = 20
-}
+	limit, err := strconv.Atoi(limitStr)
+	if err != nil || limit > 100 {
+		limit = 20
+	}
 
-offset, err := strconv.Atoi(offsetStr)
-if err != nil || offset < 0 {
-offset = 0
-}
+	offset, err := strconv.Atoi(offsetStr)
+	if err != nil || offset < 0 {
+		offset = 0
+	}
 
-comments, err := h.commentService.GetPostComments(uint(postID), limit, offset)
-if err != nil {
-writeError(w, http.StatusInternalServerError, "Failed to get comments")
-return
-}
+	comments, err := h.commentService.GetPostComments(uint(postID), limit, offset)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "Failed to get comments")
+		return
+	}
 
-writeJSON(w, http.StatusOK, map[string]interface{}{
-"comments": comments,
-"count":    len(comments),
-"limit":    limit,
-"offset":   offset,
-"post_id":  postID,
-})
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"comments": comments,
+		"count":    len(comments),
+		"limit":    limit,
+		"offset":   offset,
+		"post_id":  postID,
+	})
 }
 
 func (h *PostHandler) GetUserLikedPosts(w http.ResponseWriter, r *http.Request) {
-if r.Method != http.MethodGet {
-writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
-return
-}
+	if r.Method != http.MethodGet {
+		writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
 
-userID := r.Context().Value("user_id")
-if userID == nil {
-writeError(w, http.StatusUnauthorized, "User not authenticated")
-return
-}
+	userID := r.Context().Value("user_id")
+	if userID == nil {
+		writeError(w, http.StatusUnauthorized, "User not authenticated")
+		return
+	}
 
-// Get pagination parameters
-limitStr := r.URL.Query().Get("limit")
-if limitStr == "" {
-limitStr = "20"
-}
-offsetStr := r.URL.Query().Get("offset")
-if offsetStr == "" {
-offsetStr = "0"
-}
+	// Get pagination parameters
+	limitStr := r.URL.Query().Get("limit")
+	if limitStr == "" {
+		limitStr = "20"
+	}
+	offsetStr := r.URL.Query().Get("offset")
+	if offsetStr == "" {
+		offsetStr = "0"
+	}
 
-limit, err := strconv.Atoi(limitStr)
-if err != nil || limit > 50 {
-limit = 20
-}
+	limit, err := strconv.Atoi(limitStr)
+	if err != nil || limit > 50 {
+		limit = 20
+	}
 
-offset, err := strconv.Atoi(offsetStr)
-if err != nil || offset < 0 {
-offset = 0
-}
+	offset, err := strconv.Atoi(offsetStr)
+	if err != nil || offset < 0 {
+		offset = 0
+	}
 
-posts, err := h.postService.GetUserLikedPosts(userID.(uint), limit, offset)
-if err != nil {
-writeError(w, http.StatusInternalServerError, "Failed to get liked posts")
-return
-}
+	posts, err := h.postService.GetUserLikedPosts(userID.(uint), limit, offset)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "Failed to get liked posts")
+		return
+	}
 
-writeJSON(w, http.StatusOK, map[string]interface{}{
-"posts":  posts,
-"count":  len(posts),
-"limit":  limit,
-"offset": offset,
-})
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"posts":  posts,
+		"count":  len(posts),
+		"limit":  limit,
+		"offset": offset,
+	})
 }
 
 func (h *PostHandler) GetUserCommentedPosts(w http.ResponseWriter, r *http.Request) {
-if r.Method != http.MethodGet {
-writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
-return
-}
+	if r.Method != http.MethodGet {
+		writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
 
-userID := r.Context().Value("user_id")
-if userID == nil {
-writeError(w, http.StatusUnauthorized, "User not authenticated")
-return
-}
+	userID := r.Context().Value("user_id")
+	if userID == nil {
+		writeError(w, http.StatusUnauthorized, "User not authenticated")
+		return
+	}
 
-// Get pagination parameters
-limitStr := r.URL.Query().Get("limit")
-if limitStr == "" {
-limitStr = "20"
-}
-offsetStr := r.URL.Query().Get("offset")
-if offsetStr == "" {
-offsetStr = "0"
-}
+	// Get pagination parameters
+	limitStr := r.URL.Query().Get("limit")
+	if limitStr == "" {
+		limitStr = "20"
+	}
+	offsetStr := r.URL.Query().Get("offset")
+	if offsetStr == "" {
+		offsetStr = "0"
+	}
 
-limit, err := strconv.Atoi(limitStr)
-if err != nil || limit > 50 {
-limit = 20
-}
+	limit, err := strconv.Atoi(limitStr)
+	if err != nil || limit > 50 {
+		limit = 20
+	}
 
-offset, err := strconv.Atoi(offsetStr)
-if err != nil || offset < 0 {
-offset = 0
-}
+	offset, err := strconv.Atoi(offsetStr)
+	if err != nil || offset < 0 {
+		offset = 0
+	}
 
-posts, err := h.postService.GetUserCommentedPosts(userID.(uint), limit, offset)
-if err != nil {
-writeError(w, http.StatusInternalServerError, "Failed to get commented posts")
-return
-}
+	posts, err := h.postService.GetUserCommentedPosts(userID.(uint), limit, offset)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "Failed to get commented posts")
+		return
+	}
 
-writeJSON(w, http.StatusOK, map[string]interface{}{
-"posts":  posts,
-"count":  len(posts),
-"limit":  limit,
-"offset": offset,
-})
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"posts":  posts,
+		"count":  len(posts),
+		"limit":  limit,
+		"offset": offset,
+	})
 }

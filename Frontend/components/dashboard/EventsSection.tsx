@@ -331,8 +331,12 @@ const EventDetailsModal: React.FC<EventDetailsModalProps> = ({
     if (!event) return;
     setIsRespondingToEvent(true);
     try {
-      await api.respondToEvent(event.id, option);
-      success(`Marked as ${option === 'going' ? 'going' : 'not going'}!`);
+      const res = await api.respondToEvent(event.id, option);
+      if (res.removed) {
+        success('Response removed');
+      } else {
+        success(`Marked as ${option === 'going' ? 'going' : 'not going'}!`);
+      }
       await loadEventResponses();
       onEventUpdated();
     } catch (err) {

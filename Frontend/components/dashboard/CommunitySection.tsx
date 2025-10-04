@@ -41,24 +41,40 @@ export default function CommunitySection({
 
   const handleEventResponse = async (eventId: number, option: 'going' | 'not_going' ) => {
     const previousResponse = optimisticEvents.find(e => e.id === eventId)?.user_response
+    const isRemovingResponse = previousResponse === option
     
     // Optimistically update the UI immediately
     setOptimisticEvents(prevEvents => 
       prevEvents.map(event => {
         if (event.id === eventId) {
-          const newEvent = { ...event, user_response: option }
+          const newEvent = { ...event }
           
-          // Update counts based on previous and new response
-          if (previousResponse === 'going' && option !== 'going') {
-            newEvent.going_count = Math.max(0, newEvent.going_count - 1)
-          } else if (previousResponse !== 'going' && option === 'going') {
-            newEvent.going_count = newEvent.going_count + 1
-          }
-          
-          if (previousResponse === 'not_going' && option !== 'not_going') {
-            newEvent.not_going_count = Math.max(0, newEvent.not_going_count - 1)
-          } else if (previousResponse !== 'not_going' && option === 'not_going') {
-            newEvent.not_going_count = newEvent.not_going_count + 1
+          if (isRemovingResponse) {
+            // Remove the response
+            newEvent.user_response = 'none'
+            
+            // Decrement the count
+            if (option === 'going') {
+              newEvent.going_count = Math.max(0, newEvent.going_count - 1)
+            } else {
+              newEvent.not_going_count = Math.max(0, newEvent.not_going_count - 1)
+            }
+          } else {
+            // Update to new response
+            newEvent.user_response = option
+            
+            // Update counts based on previous and new response
+            if (previousResponse === 'going' && option !== 'going') {
+              newEvent.going_count = Math.max(0, newEvent.going_count - 1)
+            } else if (previousResponse !== 'going' && option === 'going') {
+              newEvent.going_count = newEvent.going_count + 1
+            }
+            
+            if (previousResponse === 'not_going' && option !== 'not_going') {
+              newEvent.not_going_count = Math.max(0, newEvent.not_going_count - 1)
+            } else if (previousResponse !== 'not_going' && option === 'not_going') {
+              newEvent.not_going_count = newEvent.not_going_count + 1
+            }
           }
           
           return newEvent
@@ -72,8 +88,12 @@ export default function CommunitySection({
       if (onEventRespond) {
         await onEventRespond(eventId, option)
       } else {
-        await api.respondToEvent(eventId, option)
-        success(`Marked as ${option === 'going' ? 'Going' : 'Not Going'}`)
+        const res = await api.respondToEvent(eventId, option)
+        if (res.removed) {
+          success('Response removed')
+        } else {
+          success(`Marked as ${option === 'going' ? 'Going' : 'Not Going'}`)
+        }
       }
       // Real-time updates will sync the state, no need to call onEventsUpdate
     } catch (err: any) {
@@ -246,7 +266,7 @@ export default function CommunitySection({
                 <div className="flex flex-col sm:flex-row gap-2 w-full lg:w-auto">
                   {event.user_response === 'going' ? (
                     <button
-                      onClick={() => handleEventResponse(event.id, 'not_going')}
+                      onClick={() => handleEventResponse(event.id, 'going')}
                       disabled={respondingToEvent === event.id}
                       className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 flex items-center justify-center space-x-2 disabled:opacity-50 shadow-lg"
                     >
@@ -266,7 +286,7 @@ export default function CommunitySection({
 
                   {event.user_response === 'not_going' ? (
                     <button
-                      onClick={() => handleEventResponse(event.id, 'going')}
+                      onClick={() => handleEventResponse(event.id, 'not_going')}
                       disabled={respondingToEvent === event.id}
                       className="flex-1 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 flex items-center justify-center space-x-2 disabled:opacity-50 shadow-lg"
                     >

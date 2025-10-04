@@ -164,7 +164,7 @@ LIMIT ? OFFSET ?
 		}
 
 		// Get current user's response
-		event.UserResponse, err = s.getUserEventResponse(event.ID, currentUserID)
+		event.UserResponse, err = s.GetUserEventResponse(event.ID, currentUserID)
 		if err != nil && err != sql.ErrNoRows {
 			return nil, err
 		}

@@ -205,23 +205,38 @@ export function useRealTimeEvents(groupId?: number) {
             const updatedEvent = { ...event }
             const previousResponse = event.user_response
             
-            // Update user response
-            updatedEvent.user_response = option
+            // Check if clicking the same option (toggle to remove)
+            const isRemovingResponse = previousResponse === option
             
-            // Update counts
-            if (option === 'going') {
-              if (previousResponse === 'not_going') {
+            if (isRemovingResponse) {
+              // Remove response
+              updatedEvent.user_response = 'none'
+              
+              // Decrement count
+              if (option === 'going') {
+                updatedEvent.going_count = Math.max(0, updatedEvent.going_count - 1)
+              } else {
                 updatedEvent.not_going_count = Math.max(0, updatedEvent.not_going_count - 1)
               }
-              if (previousResponse !== 'going') {
-                updatedEvent.going_count = updatedEvent.going_count + 1
-              }
-            } else if (option === 'not_going') {
-              if (previousResponse === 'going') {
-                updatedEvent.going_count = Math.max(0, updatedEvent.going_count - 1)
-              }
-              if (previousResponse !== 'not_going') {
-                updatedEvent.not_going_count = updatedEvent.not_going_count + 1
+            } else {
+              // Update user response
+              updatedEvent.user_response = option
+              
+              // Update counts
+              if (option === 'going') {
+                if (previousResponse === 'not_going') {
+                  updatedEvent.not_going_count = Math.max(0, updatedEvent.not_going_count - 1)
+                }
+                if (previousResponse !== 'going') {
+                  updatedEvent.going_count = updatedEvent.going_count + 1
+                }
+              } else if (option === 'not_going') {
+                if (previousResponse === 'going') {
+                  updatedEvent.going_count = Math.max(0, updatedEvent.going_count - 1)
+                }
+                if (previousResponse !== 'not_going') {
+                  updatedEvent.not_going_count = updatedEvent.not_going_count + 1
+                }
               }
             }
             
@@ -231,7 +246,11 @@ export function useRealTimeEvents(groupId?: number) {
         }),
         async () => {
           const res = await api.respondToEvent(eventId, option)
-          success(`Marked as ${option === 'going' ? 'going' : 'not going'}`)
+          if (res.removed) {
+            success('Response removed')
+          } else {
+            success(`Marked as ${option === 'going' ? 'going' : 'not going'}`)
+          }
           return res
         }
       )

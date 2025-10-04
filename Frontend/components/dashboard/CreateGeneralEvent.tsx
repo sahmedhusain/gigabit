@@ -30,9 +30,12 @@ export default function CreateGeneralEvent({
   const { groups, loading: groupsLoading } = useGroups()
   const { user } = useAuth()
 
-  // For now, show all groups the user is a member of
-  // The backend will handle permissions for creating events
-  const eligibleGroups = groups
+  // Only show groups where user is admin or creator
+  const eligibleGroups = groups.filter(group => {
+    if (!user) return false
+    // User is creator or has admin role
+    return group.creator_id === user.id || group.role === 'admin'
+  })
 
   useEffect(() => {
     if (show && eligibleGroups.length === 1) {
@@ -174,6 +177,11 @@ export default function CreateGeneralEvent({
                 <div className="w-2 h-2 bg-emerald-400 rounded-full"></div>
                 <span>Select Group</span>
                 <span className="text-red-400">*</span>
+                {eligibleGroups.length === 0 && !groupsLoading && (
+                  <span className="ml-2 text-xs text-yellow-400/80 font-normal">
+                    (Admin/Creator only)
+                  </span>
+                )}
               </label>
               {groupsLoading ? (
                 <div className="w-full bg-white/10 border border-white/20 rounded-2xl p-4 text-white/50 animate-pulse">
@@ -194,13 +202,14 @@ export default function CreateGeneralEvent({
                   onChange={(e) => setSelectedGroupId(e.target.value)}
                   title="Select a group for this event"
                   className="w-full bg-white/10 border border-white/20 rounded-2xl p-4 text-white focus:outline-none focus:ring-2 focus:ring-emerald-400/50 focus:border-emerald-400/50 transition-all duration-300 text-sm lg:text-base hover:bg-white/15"
+                  disabled={eligibleGroups.length === 0}
                 >
                   <option value="" className="bg-gray-800 text-gray-200">
-                    Choose a group...
+                    {eligibleGroups.length === 0 ? 'No groups available (admin/creator only)' : 'Choose a group...'}
                   </option>
                   {eligibleGroups.map((group) => (
                     <option key={group.id} value={group.id} className="bg-gray-800 text-gray-200">
-                      {group.title}
+                      {group.title} {group.creator_id === user?.id ? '(Creator)' : '(Admin)'}
                     </option>
                   ))}
                 </select>
@@ -341,9 +350,10 @@ export default function CreateGeneralEvent({
               disabled={isLoading || !eventTitle.trim() || !eventDate || !eventTime || !selectedGroupId || eligibleGroups.length === 0}
               className={`w-full sm:w-auto px-6 py-3 rounded-2xl text-white font-semibold text-sm lg:text-base transition-all duration-300 hover:scale-105 shadow-lg ${
                 isLoading || !eventTitle.trim() || !eventDate || !eventTime || !selectedGroupId || eligibleGroups.length === 0
-                  ? 'bg-white/20 cursor-not-allowed'
+                  ? 'bg-white/20 cursor-not-allowed opacity-50'
                   : 'bg-gradient-to-r from-emerald-500 via-teal-600 to-cyan-600 hover:from-emerald-600 hover:via-teal-700 hover:to-cyan-700 shadow-emerald-500/25'
               }`}
+              title={eligibleGroups.length === 0 ? 'You must be a group admin or creator to create events' : ''}
             >
               {isLoading ? (
                 <div className="flex items-center justify-center space-x-2">

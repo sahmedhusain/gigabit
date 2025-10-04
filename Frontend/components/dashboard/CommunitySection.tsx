@@ -471,6 +471,7 @@ export default function CommunitySection({
               <ArrowUpDown className="absolute right-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-white/60 pointer-events-none" />
             </div>
 
+            {/* Note: CreateGeneralEvent component will check admin/creator permissions internally */}
             <button 
               onClick={() => setShowCreateEvent(true)}
               className="bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white px-4 py-2 rounded-lg transition-all flex items-center space-x-2"

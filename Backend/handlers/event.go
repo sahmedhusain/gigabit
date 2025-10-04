@@ -6,18 +6,21 @@ import (
 	"net/http"
 	"social/models"
 	"social/services"
+	"social/websocket"
 	"strconv"
 )
 
 type EventHandler struct {
-	eventService *services.EventService
-	groupService *services.GroupService
+	eventService        *services.EventService
+	groupService        *services.GroupService
+	notificationService *services.NotificationService
 }
 
-func NewEventHandler(db *sql.DB) *EventHandler {
+func NewEventHandler(db *sql.DB, hub *websocket.Hub) *EventHandler {
 	return &EventHandler{
-		eventService: services.NewEventService(db),
-		groupService: services.NewGroupService(db),
+		eventService:        services.NewEventService(db),
+		groupService:        services.NewGroupService(db),
+		notificationService: services.NewNotificationService(db, hub),
 	}
 }
 
@@ -67,6 +70,9 @@ func (h *EventHandler) CreateEvent(w http.ResponseWriter, r *http.Request, group
 		writeError(w, http.StatusInternalServerError, "Failed to create event")
 		return
 	}
+
+	// Send notifications to all group members (async, don't wait for it)
+	go h.notificationService.NotifyEventCreated(userID, uint(groupID), event.ID)
 
 	writeJSON(w, http.StatusCreated, map[string]interface{}{
 		"message": "Event created successfully",

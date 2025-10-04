@@ -104,7 +104,7 @@ func (s *Server) setupRoutes() {
 	followHandler := handlers.NewFollowHandler(s.DB.GetDB(), s.Hub)
 	postHandler := handlers.NewPostHandler(s.DB.GetDB(), s.Hub)
 	groupHandler := handlers.NewGroupHandler(s.DB.GetDB(), s.Hub)
-	eventHandler := handlers.NewEventHandler(s.DB.GetDB())
+	eventHandler := handlers.NewEventHandler(s.DB.GetDB(), s.Hub)
 	messageHandler := handlers.NewMessageHandler(s.DB.GetDB(), s.Hub)
 	notificationHandler := handlers.NewNotificationHandler(s.DB.GetDB(), s.Hub)
 	bookmarkHandler := handlers.NewBookmarkHandler(s.DB.GetDB(), s.Hub)
@@ -145,14 +145,14 @@ func (s *Server) setupRoutes() {
 	s.router.HandleFunc("/api/users", s.handleRoute(userHandler.GetAllUsers, true))
 	s.router.HandleFunc("/api/users/", s.handleUserRoute(followHandler, wsHandler))
 
-// Post routes
-s.router.HandleFunc("/api/posts", s.handlePostsRoute(postHandler))
-s.router.HandleFunc("/api/posts/", s.handlePostRoute(postHandler))
-s.router.HandleFunc("/api/feed", s.handleRoute(postHandler.GetFeedPosts, true))
+	// Post routes
+	s.router.HandleFunc("/api/posts", s.handlePostsRoute(postHandler))
+	s.router.HandleFunc("/api/posts/", s.handlePostRoute(postHandler))
+	s.router.HandleFunc("/api/feed", s.handleRoute(postHandler.GetFeedPosts, true))
 
-// Activity routes
-s.router.HandleFunc("/api/posts/liked", s.handleRoute(postHandler.GetUserLikedPosts, true))
-s.router.HandleFunc("/api/posts/commented", s.handleRoute(postHandler.GetUserCommentedPosts, true))
+	// Activity routes
+	s.router.HandleFunc("/api/posts/liked", s.handleRoute(postHandler.GetUserLikedPosts, true))
+	s.router.HandleFunc("/api/posts/commented", s.handleRoute(postHandler.GetUserCommentedPosts, true))
 
 	// Bookmark routes
 	s.router.HandleFunc("/api/bookmarks", s.handleRoute(bookmarkHandler.GetUserBookmarks, true))

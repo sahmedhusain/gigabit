@@ -18,7 +18,20 @@ export function useGroups() {
       const res = await api.getUserGroups(user.id)
       const dataAny: any = res
       const arr: GroupResponse[] = Array.isArray(dataAny?.data) ? dataAny.data : (Array.isArray(dataAny?.groups) ? dataAny.groups : [])
-      setGroups(arr)
+      
+      // Fetch role for each group
+      const groupsWithRoles = await Promise.all(
+        arr.map(async (group) => {
+          try {
+            const roleData = await api.getUserRole(group.id)
+            return { ...group, role: roleData.role, is_admin_or_creator: roleData.is_admin_or_creator }
+          } catch {
+            return group
+          }
+        })
+      )
+      
+      setGroups(groupsWithRoles)
     } catch (e: any) {
       const msg = e?.message || 'Failed to load groups'
       setErr(msg)

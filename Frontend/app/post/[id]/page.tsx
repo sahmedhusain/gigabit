@@ -17,6 +17,7 @@ import RightSidebar from '@/components/dashboard/RightSidebar'
 
 interface CommentWithUser extends CommentType {
     timeAgo: string
+    image_url?: string | null
 }
 
 function PostDetailPage() {
@@ -39,6 +40,7 @@ function PostDetailPage() {
   const [isLoadingPost, setIsLoadingPost] = useState(true)
   const [isLoadingComments, setIsLoadingComments] = useState(false)
   const [newComment, setNewComment] = useState('')
+  const [newCommentImage, setNewCommentImage] = useState<File | null>(null)
   const [isSubmittingComment, setIsSubmittingComment] = useState(false)
 
     // Real-time optimistic updates for likes
@@ -191,38 +193,63 @@ function PostDetailPage() {
     }
 
     // Handle comment submission via WebSocket
-    const handleSubmitComment = async () => {
-        if (!newComment.trim() || !post || !user || !isConnected) return
+  const handleSubmitComment = async () => {
+    if (!newComment.trim() && !newCommentImage) return
+    if (!post || !user || !isConnected) return
 
-        if (newComment.length > 500) {
-            error('Comment is too long. Maximum 500 characters.')
-            return
-        }
-
-        try {
-            setIsSubmittingComment(true)
-
-            // Send comment via WebSocket
-            sendMessage({
-                type: 'comment_update',
-                from: user.id,
-                post_id: post.id,
-                action: 'create',
-                data: {
-                    content: newComment.trim(),
-                }
-            })
-
-            // Clear the input (optimistically)
-            setNewComment('')
-            success('Comment posted!')
-        } catch (err) {
-            console.error('Error submitting comment:', err)
-            error('Failed to post comment. Please try again.')
-        } finally {
-            setIsSubmittingComment(false)
-        }
+    if (newComment.length > 500) {
+      error('Comment is too long. Maximum 500 characters.')
+      return
     }
+
+    try {
+      setIsSubmittingComment(true)
+      let imageUrl = ''
+
+      if (newCommentImage) {
+        const formData = new FormData()
+        formData.append('image', newCommentImage)
+        const token = localStorage.getItem('token')
+        const uploadResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/api/uploads`, {
+          method: 'POST',
+          body: formData,
+          headers: {
+            ...(token ? { Authorization: `Bearer ${token}` } : {})
+          },
+          credentials: 'include'
+        })
+        if (uploadResponse.ok) {
+          const uploadData = await uploadResponse.json()
+          imageUrl = `/api/images/${uploadData.filename}`
+        } else {
+          const errorData = await uploadResponse.json()
+          throw new Error(errorData.error || 'Failed to upload image')
+        }
+      }
+
+      // Send comment via WebSocket
+      sendMessage({
+        type: 'comment_update',
+        from: user.id,
+        post_id: post.id,
+        action: 'create',
+        data: {
+          content: newComment.trim(),
+          image_url: imageUrl
+        }
+      })
+
+      // Clear the input (optimistically)
+      setNewComment('')
+      setNewCommentImage(null)
+      success('Comment posted!')
+    } catch (err) {
+      console.error('Error submitting comment:', err)
+      error('Failed to post comment. Please try again.')
+    } finally {
+      setIsSubmittingComment(false)
+    }
+  }
 
     // WebSocket message listener
     useEffect(() => {
@@ -239,6 +266,7 @@ function PostDetailPage() {
                                 user_id: message.data.user_id,
                                 post_id: message.data.post_id,
                                 content: message.data.content,
+                                image_url: message.data.image_url,
                                 created_at: message.data.created_at,
                                 updated_at: message.data.updated_at,
                                 user: message.data.user || {
@@ -548,14 +576,14 @@ function PostDetailPage() {
 
                   {/* Post Image */}
                   {post.image_url && (
-                    <div className="mb-6 rounded-2xl overflow-hidden bg-gradient-to-br from-white/5 to-transparent border border-white/10 group-hover:border-emerald-400/30 transition-all duration-300">
+                    <div className="mb-6 rounded-2xl overflow-hidden bg-gradient-to-br from-white/5 to-transparent border border-white/10 group-hover:border-emerald-400/30 transition-all duration-300 max-w-md mx-auto">
                       <img
                         src={post.image_url.startsWith('http') ?
                           post.image_url :
                           `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}${post.image_url}`
                         }
                         alt="Post image"
-                        className="w-full h-auto object-cover hover:scale-105 transition-transform duration-500"
+                        className="w-full h-auto max-h-80 object-contain hover:scale-105 transition-transform duration-500"
                         onError={(e) => {
                           // Fallback to placeholder on error
                           const target = e.target as HTMLImageElement;
@@ -563,7 +591,7 @@ function PostDetailPage() {
                           target.nextElementSibling?.classList.remove('hidden');
                         }}
                       />
-                      <div className="aspect-video bg-gradient-to-br from-emerald-500/20 to-teal-500/20 flex items-center justify-center">
+                      <div className="aspect-video bg-gradient-to-br from-emerald-500/20 to-teal-500/20 flex items-center justify-center hidden">
                         <ImageIcon className="w-16 h-16 text-white/50" />
                         <span className="ml-3 text-white/70 font-medium">Image failed to load</span>
                       </div>
@@ -648,6 +676,41 @@ function PostDetailPage() {
                         rows={3}
                         maxLength={500}
                       />
+                      <input
+                        id="comment-image-input"
+                        type="file"
+                        accept="image/*"
+                        onChange={e => setNewCommentImage(e.target.files?.[0] || null)}
+                        className="hidden"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => document.getElementById('comment-image-input')?.click()}
+                        className="mt-2 flex items-center space-x-2 px-3 py-2 text-white/70 hover:text-white hover:bg-white/10 border border-white/20 rounded-lg transition-all duration-200"
+                      >
+                        <ImageIcon className="w-4 h-4" />
+                        <span className="text-sm">Add Image</span>
+                      </button>
+                      {newCommentImage && (
+                        <div className="mt-2 relative">
+                          <div className="relative inline-block">
+                            <img 
+                              src={URL.createObjectURL(newCommentImage)} 
+                              alt="Comment preview" 
+                              className="max-w-48 max-h-32 object-contain rounded-lg border border-white/20" 
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setNewCommentImage(null)}
+                              className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 hover:bg-red-600 rounded-full flex items-center justify-center text-white text-xs transition-colors"
+                              title="Remove image"
+                            >
+                              ×
+                            </button>
+                          </div>
+                          <p className="text-white/60 text-xs mt-1">{newCommentImage.name}</p>
+                        </div>
+                      )}
                       <div className="flex items-center justify-between mt-2">
                         <div className="flex items-center space-x-3">
                           <span className="text-white/60 text-xs">
@@ -662,7 +725,7 @@ function PostDetailPage() {
                         </div>
                         <button
                           onClick={handleSubmitComment}
-                          disabled={!newComment.trim() || isSubmittingComment || !isConnected}
+                          disabled={(!newComment.trim() && !newCommentImage) || isSubmittingComment || !isConnected}
                           className="bg-emerald-600 hover:bg-emerald-700 disabled:bg-white/10 disabled:text-white/50 text-white px-4 py-2 rounded-lg flex items-center space-x-2 transition-all duration-200"
                         >
                           <Send className="w-4 h-4" />
@@ -727,6 +790,22 @@ function PostDetailPage() {
                             <p className="text-white/90 text-sm leading-relaxed whitespace-pre-wrap">
                               {comment.content}
                             </p>
+                            {comment.image_url && (
+                              <div className="mt-2">
+                                <img
+                                  src={comment.image_url.startsWith('http') ?
+                                    comment.image_url :
+                                    `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}${comment.image_url}`
+                                  }
+                                  alt="Comment image"
+                                  className="max-w-48 max-h-48 object-contain rounded-lg border border-white/20"
+                                  onError={(e) => {
+                                    const target = e.target as HTMLImageElement;
+                                    target.style.display = 'none';
+                                  }}
+                                />
+                              </div>
+                            )}
                           </div>
                         </div>
                       ))}

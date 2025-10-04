@@ -439,6 +439,12 @@ func (h *PostHandler) CreateComment(w http.ResponseWriter, r *http.Request, post
 		return
 	}
 
+	// Require either content or image
+	if req.Content == "" && req.ImageURL == "" {
+		writeError(w, http.StatusBadRequest, "Comment must have either text or image")
+		return
+	}
+
 	comment := &models.Comment{
 		PostID:  uint(postID),
 		UserID:  userID.(uint),

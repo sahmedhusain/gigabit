@@ -26,11 +26,11 @@ type CommentResponse struct {
 }
 
 type CreateCommentRequest struct {
-	Content  string `json:"content" binding:"required,min=1,max=500"`
+	Content  string `json:"content" binding:"omitempty,max=500"`
 	ImageURL string `json:"image_url"`
 }
 
 type UpdateCommentRequest struct {
-	Content  string `json:"content" binding:"required,min=1,max=500"`
+	Content  string `json:"content" binding:"omitempty,max=500"`
 	ImageURL string `json:"image_url"`
 }

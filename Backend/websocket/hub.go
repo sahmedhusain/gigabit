@@ -585,15 +585,23 @@ func (h *Hub) handleCommentCreate(message Message) {
 		postID := message.PostID
 		userID := message.From
 
-		content, contentOk := commentData["content"].(string)
-		if !contentOk || content == "" {
-			log.Printf("Invalid comment content from user %d", userID)
+		content, _ := commentData["content"].(string)
+
+		// Check if we have either content or image_url
+		var imageURL *string
+		if imgURL, ok := commentData["image_url"].(string); ok && imgURL != "" {
+			imageURL = &imgURL
+		}
+
+		// Require either content or image
+		if content == "" && imageURL == nil {
+			log.Printf("Comment must have either content or image from user %d", userID)
 			// Send error back to client
 			errorMsg := Message{
 				Type:      MessageTypeError,
 				From:      0, // System message
 				To:        userID,
-				Content:   "Invalid comment content",
+				Content:   "Comment must have either text or image",
 				Timestamp: time.Now().Unix(),
 			}
 			h.SendToUser(userID, errorMsg)
@@ -605,11 +613,6 @@ func (h *Hub) handleCommentCreate(message Message) {
 			INSERT INTO comments (post_id, user_id, content, image_url, created_at, updated_at)
 			VALUES (?, ?, ?, ?, ?, ?)
 		`
-
-		var imageURL *string
-		if imgURL, ok := commentData["image_url"].(string); ok && imgURL != "" {
-			imageURL = &imgURL
-		}
 
 		now := time.Now()
 		result, err := h.db.Exec(query, postID, userID, content, imageURL, now, now)

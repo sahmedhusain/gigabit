@@ -93,13 +93,13 @@ export default function PostCard({ post, onLike, onBookmark }: PostCardProps) {
 
       {/* Post Image */}
       {post.image && (
-        <div className="mb-3 lg:mb-4 rounded-xl lg:rounded-2xl overflow-hidden bg-white/5">
+        <div className="mb-3 lg:mb-4 rounded-xl lg:rounded-2xl overflow-hidden bg-white/5 max-w-sm mx-auto">
           <img 
             src={post.image.startsWith('http') ? 
               post.image : `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}${post.image}`
             } 
             alt="Post image" 
-            className="w-full h-auto object-cover"
+            className="w-full h-auto max-h-64 object-contain"
             onError={(e) => {
               // Fallback to placeholder on error
               const target = e.target as HTMLImageElement;
@@ -107,7 +107,7 @@ export default function PostCard({ post, onLike, onBookmark }: PostCardProps) {
               target.nextElementSibling?.classList.remove('hidden');
             }}
           />
-          <div className="aspect-video bg-gradient-to-br from-emerald-500/20 to-teal-500/20 flex items-center justify-center">
+          <div className="aspect-video bg-gradient-to-br from-emerald-500/20 to-teal-500/20 flex items-center justify-center hidden">
             <ImageIcon className="w-8 h-8 lg:w-12 lg:h-12 text-white/50" />
           </div>
         </div>

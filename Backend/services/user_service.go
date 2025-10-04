@@ -2,9 +2,11 @@ package services
 
 import (
 	"database/sql"
+	"fmt"
 	"log"
-	"social/models"
 	"time"
+
+	"social/models"
 )
 
 func min(a, b int) int {
@@ -66,7 +68,6 @@ func (s *UserService) GetUserByEmail(email string) (*models.User, error) {
 	err := row.Scan(&user.ID, &user.Email, &user.Password, &user.FirstName, &user.LastName,
 		&user.DateOfBirth, &user.Avatar, &user.Nickname, &user.AboutMe, &user.IsPrivate,
 		&user.CreatedAt, &user.UpdatedAt)
-
 	if err != nil {
 		return nil, err
 	}
@@ -86,7 +87,6 @@ func (s *UserService) GetUserByNickname(nickname string) (*models.User, error) {
 	err := row.Scan(&user.ID, &user.Email, &user.Password, &user.FirstName, &user.LastName,
 		&user.DateOfBirth, &user.Avatar, &user.Nickname, &user.AboutMe, &user.IsPrivate,
 		&user.CreatedAt, &user.UpdatedAt)
-
 	if err != nil {
 		return nil, err
 	}
@@ -105,7 +105,6 @@ func (s *UserService) GetUserByID(id uint) (*models.User, error) {
 	err := row.Scan(&user.ID, &user.Email, &user.Password, &user.FirstName, &user.LastName,
 		&user.DateOfBirth, &user.Avatar, &user.Nickname, &user.AboutMe, &user.IsPrivate,
 		&user.CreatedAt, &user.UpdatedAt)
-
 	if err != nil {
 		return nil, err
 	}
@@ -210,4 +209,56 @@ func (s *UserService) UpdateUserPrivacy(userID uint, isPrivate bool) error {
 	}
 
 	return nil
+}
+
+// GenerateUniqueNickname generates a unique nickname from email
+// If the base nickname (part before @) is taken, it adds a counter
+func (s *UserService) GenerateUniqueNickname(email string) (string, error) {
+	// Extract the part before @ from email
+	atIndex := -1
+	for i, char := range email {
+		if char == '@' {
+			atIndex = i
+			break
+		}
+	}
+
+	if atIndex == -1 {
+		return "", fmt.Errorf("invalid email format")
+	}
+
+	baseNickname := email[:atIndex]
+
+	// Check if the base nickname is available
+	_, err := s.GetUserByNickname(baseNickname)
+	if err != nil {
+		// If user not found, nickname is available
+		if err == sql.ErrNoRows {
+			return baseNickname, nil
+		}
+		// If other error, return it
+		return "", err
+	}
+
+	// Base nickname is taken, try with counter
+	counter := 2
+	for {
+		candidateNickname := fmt.Sprintf("%s%d", baseNickname, counter)
+
+		_, err := s.GetUserByNickname(candidateNickname)
+		if err != nil {
+			if err == sql.ErrNoRows {
+				// Nickname with counter is available
+				return candidateNickname, nil
+			}
+			// If other error, return it
+			return "", err
+		}
+
+		counter++
+		// Prevent infinite loop - reasonable limit
+		if counter > 9999 {
+			return "", fmt.Errorf("unable to generate unique nickname")
+		}
+	}
 }

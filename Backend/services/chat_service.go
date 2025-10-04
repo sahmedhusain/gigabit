@@ -61,7 +61,7 @@ func (s *ChatService) getPrivateChats(userID uint) ([]models.UnifiedChatItem, er
 		JOIN users u1 ON c.participant1_id = u1.id
 		JOIN users u2 ON c.participant2_id = u2.id
 		LEFT JOIN private_messages m ON c.last_message_id = m.id
-		WHERE (c.participant1_id = ? OR c.participant2_id = ?)
+		WHERE ((c.participant1_id = ? AND c.participant1_deleted = FALSE) OR (c.participant2_id = ? AND c.participant2_deleted = FALSE))
 		ORDER BY c.updated_at DESC
 	`
 
@@ -216,4 +216,17 @@ func (s *ChatService) getGroupChats(userID uint) ([]models.UnifiedChatItem, erro
 	}
 
 	return chats, nil
+}
+
+func (s *ChatService) DeleteConversation(conversationID, userID uint) error {
+	query := `
+		UPDATE private_conversations
+		SET participant1_deleted = CASE WHEN participant1_id = ? THEN TRUE ELSE participant1_deleted END,
+		    participant2_deleted = CASE WHEN participant2_id = ? THEN TRUE ELSE participant2_deleted END,
+		    updated_at = CURRENT_TIMESTAMP
+		WHERE id = ?
+	`
+
+	_, err := s.db.Exec(query, userID, userID, conversationID)
+	return err
 }

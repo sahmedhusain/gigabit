@@ -479,3 +479,73 @@ func (h *GroupHandler) GetUserInvitations(w http.ResponseWriter, r *http.Request
 		"count":       len(invitations),
 	})
 }
+
+func (h *GroupHandler) PromoteToAdmin(w http.ResponseWriter, r *http.Request, groupIDStr string) {
+	groupID, err := strconv.ParseUint(groupIDStr, 10, 32)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "Invalid group ID")
+		return
+	}
+
+	userID, ok := r.Context().Value("user_id").(uint)
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "User not authenticated")
+		return
+	}
+
+	var req struct {
+		UserID uint `json:"user_id" binding:"required"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "Invalid request body")
+		return
+	}
+
+	if err := h.groupService.PromoteToAdmin(uint(groupID), userID, req.UserID); err != nil {
+		if err == sql.ErrNoRows {
+			writeError(w, http.StatusForbidden, "You don't have permission to promote users or invalid user")
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "Failed to promote user")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]string{
+		"message": "User promoted to admin successfully",
+	})
+}
+
+func (h *GroupHandler) DemoteAdmin(w http.ResponseWriter, r *http.Request, groupIDStr string) {
+	groupID, err := strconv.ParseUint(groupIDStr, 10, 32)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "Invalid group ID")
+		return
+	}
+
+	userID, ok := r.Context().Value("user_id").(uint)
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "User not authenticated")
+		return
+	}
+
+	var req struct {
+		UserID uint `json:"user_id" binding:"required"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "Invalid request body")
+		return
+	}
+
+	if err := h.groupService.DemoteAdmin(uint(groupID), userID, req.UserID); err != nil {
+		if err == sql.ErrNoRows {
+			writeError(w, http.StatusForbidden, "You don't have permission to demote admins or invalid user")
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "Failed to demote admin")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]string{
+		"message": "Admin demoted to member successfully",
+	})
+}

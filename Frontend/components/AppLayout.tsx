@@ -1,10 +1,11 @@
 'use client'
-import { useState, ReactNode } from 'react'
+import { useState, useEffect, ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
 import { useWebSocket } from '@/context/WebSocketContext'
 import { useSidebarData } from '@/context/SidebarDataContext'
 import { useNotifications } from '@/hooks'
+import { api } from '@/lib/api'
 import { Sparkles } from 'lucide-react'
 
 // Import layout components
@@ -55,6 +56,23 @@ export default function AppLayout({
   const [activeTab, setActiveTab] = useState(initialActiveTab)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [isSidebarCollapsed] = useState(false)
+  const [postsCount, setPostsCount] = useState(0)
+
+  // Fetch posts count when user changes
+  useEffect(() => {
+    const fetchPostsCount = async () => {
+      if (user?.id) {
+        try {
+          const response = await api.getUserPosts(user.id) // Use default limit to get posts array
+          setPostsCount(response.posts.length) // Use actual posts count like profile page
+        } catch (error) {
+          console.error('Failed to fetch posts count:', error)
+          setPostsCount(0)
+        }
+      }
+    }
+    fetchPostsCount()
+  }, [user?.id])
 
   // Current User Processing
   const currentUser = user ? {
@@ -72,6 +90,7 @@ export default function AppLayout({
     memberSince: user.created_at,
     followers: followers.length,
     following: following.length,
+    posts: postsCount,
     status: user.status || 'online',
     lastStatusChange: user.last_status_change
   } : null

@@ -535,3 +535,75 @@ ORDER BY gm.created_at DESC
 
 	return invitations, nil
 }
+
+func (s *GroupService) PromoteToAdmin(groupID, requesterID, targetUserID uint) error {
+	// Check if requester is admin or creator
+	isAdmin, err := s.IsUserAdminOrCreator(groupID, requesterID)
+	if err != nil {
+		return err
+	}
+	if !isAdmin {
+		return sql.ErrNoRows // Forbidden
+	}
+
+	// Check if target user is a member
+	isMember, err := s.IsUserMember(groupID, targetUserID)
+	if err != nil {
+		return err
+	}
+	if !isMember {
+		return sql.ErrNoRows // Not a member
+	}
+
+	// Cannot promote creator (they're already creator)
+	requesterRole, err := s.GetUserRole(groupID, requesterID)
+	if err != nil {
+		return err
+	}
+	if requesterRole == "creator" && targetUserID == requesterID {
+		return sql.ErrNoRows // Cannot change own role if creator
+	}
+
+	// Update role to admin
+	query := `
+		UPDATE group_members
+		SET role = 'admin', updated_at = ?
+		WHERE group_id = ? AND user_id = ?
+	`
+	_, err = s.db.Exec(query, time.Now(), groupID, targetUserID)
+	return err
+}
+
+func (s *GroupService) DemoteAdmin(groupID, requesterID, targetUserID uint) error {
+	// Check if requester is creator (only creators can demote admins)
+	requesterRole, err := s.GetUserRole(groupID, requesterID)
+	if err != nil {
+		return err
+	}
+	if requesterRole != "creator" {
+		return sql.ErrNoRows // Forbidden
+	}
+
+	// Cannot demote yourself
+	if requesterID == targetUserID {
+		return sql.ErrNoRows // Cannot demote yourself
+	}
+
+	// Check if target user is an admin
+	targetRole, err := s.GetUserRole(groupID, targetUserID)
+	if err != nil {
+		return err
+	}
+	if targetRole != "admin" {
+		return sql.ErrNoRows // Not an admin
+	}
+
+	// Update role to member
+	query := `
+		UPDATE group_members
+		SET role = 'member', updated_at = ?
+		WHERE group_id = ? AND user_id = ?
+	`
+	_, err = s.db.Exec(query, time.Now(), groupID, targetUserID)
+	return err
+}

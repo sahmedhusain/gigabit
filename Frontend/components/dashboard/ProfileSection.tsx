@@ -119,16 +119,16 @@ export default function ProfileSection({
   const displayFollowing = isConnected ? liveFollowing : following
 
   // Use real-time counts when connected, but prioritize initial counts for private profiles
-  const followersCount = (initialFollowerCount !== undefined) 
+  const followersCount = (initialFollowerCount !== undefined)
     ? initialFollowerCount // Use provided initial count for private profiles
-    : (countsConnected 
-        ? followerCounts.followers_count 
-        : (displayFollowers?.length ?? followers?.length ?? 0))
+    : (countsConnected
+      ? followerCounts.followers_count
+      : (displayFollowers?.length ?? followers?.length ?? 0))
   const followingCount = (initialFollowingCount !== undefined)
     ? initialFollowingCount // Use provided initial count for private profiles
-    : (countsConnected 
-        ? followerCounts.following_count 
-        : (displayFollowing?.length ?? following?.length ?? 0))
+    : (countsConnected
+      ? followerCounts.following_count
+      : (displayFollowing?.length ?? following?.length ?? 0))
 
   const handlePostClick = (postId: number) => {
     const url = `/post/${postId}?from=profile&userId=${currentUser?.id || ''}`
@@ -201,32 +201,24 @@ export default function ProfileSection({
             <p className="text-white/60 text-xs">✉️ {currentUser?.email || 'No email'}</p>
 
             <div className="flex justify-center lg:justify-start space-x-6 lg:space-x-8 mb-4 lg:mb-6 mt-6">
+
               <div className="text-center">
                 <div className="text-xl lg:text-2xl font-bold text-white">
-                  {followersCount}
-                  {connectionStatus && (
-                    <span className="ml-1 text-xs text-emerald-400">●</span>
-                  )}
+                  {displayPosts?.length ?? 0}
                 </div>
-                <div className="text-white/60 text-sm lg:text-base">Followers</div>
+                <div className="text-white/60 text-sm lg:text-base">Posts</div>
               </div>
               <div className="text-center">
                 <div className="text-xl lg:text-2xl font-bold text-white">
                   {followingCount}
-                  {connectionStatus && (
-                    <span className="ml-1 text-xs text-emerald-400">●</span>
-                  )}
                 </div>
                 <div className="text-white/60 text-sm lg:text-base">Following</div>
               </div>
               <div className="text-center">
                 <div className="text-xl lg:text-2xl font-bold text-white">
-                  {displayPosts?.length ?? 0}
-                  {connectionStatus && (
-                    <span className="ml-1 text-xs text-emerald-400">●</span>
-                  )}
+                  {followersCount}
                 </div>
-                <div className="text-white/60 text-sm lg:text-base">Posts</div>
+                <div className="text-white/60 text-sm lg:text-base">Followers</div>
               </div>
             </div>
 
@@ -307,7 +299,7 @@ export default function ProfileSection({
                   <span className="text-xs text-red-400">Offline</span>
                 )}
               </div>
-              
+
               <div className="space-y-3 lg:space-y-4">
                 {displayPosts.map((post) => (
                   <div

@@ -42,13 +42,22 @@ export function useRealTimeMessages() {
         // Get conversation ID from message data
         const conversationId = (message as any).data?.conversation_id || 0
 
+        // Always sanitize created_at to a valid ISO string
+        let createdAt = (message as any).data?.created_at || message.timestamp || '';
+        let parsedDate = createdAt ? new Date(createdAt) : null;
+        if (!parsedDate || isNaN(parsedDate.getTime()) || parsedDate.getTime() === 0) {
+          createdAt = new Date().toISOString();
+        } else {
+          createdAt = parsedDate.toISOString();
+        }
+
         const newMessage: Message = {
           id: (message as any).data?.id || Date.now(), // Use real ID if available
           conversation_id: conversationId,
           sender_id: message.from || 0,
           content: message.content || '',
           message_type: 'text',
-          created_at: message.timestamp ? new Date(message.timestamp).toISOString() : new Date().toISOString(),
+          created_at: createdAt,
           is_read: false,
           sender: {
             id: message.from || 0,
@@ -286,7 +295,26 @@ export function useRealTimeMessages() {
           apiData.receiver_id = recipientId
         }
 
-        await api.sendMessage(apiData)
+        const apiResponse = await api.sendMessage(apiData)
+        
+        // If this is a new conversation, update the conversation ID
+        if (apiResponse.conversation_id && apiResponse.conversation_id !== conversationId) {
+          console.log(`Conversation ID updated from ${conversationId} to ${apiResponse.conversation_id}`)
+          // Update the optimistic message with correct conversation ID
+          setMessages(prev => {
+            const conversationMessages = prev.get(conversationId) || []
+            const updated = new Map(prev)
+            const messageIndex = conversationMessages.findIndex(msg => msg.id === optimisticMessage.id)
+            if (messageIndex !== -1) {
+              conversationMessages[messageIndex].conversation_id = apiResponse.conversation_id
+              // Move message to correct conversation
+              const correctConversationMessages = updated.get(apiResponse.conversation_id) || []
+              updated.set(apiResponse.conversation_id, [...correctConversationMessages.filter(msg => msg.id !== optimisticMessage.id), conversationMessages[messageIndex]])
+              updated.set(conversationId, conversationMessages.filter(msg => msg.id !== optimisticMessage.id))
+            }
+            return updated
+          })
+        }
       } catch (apiError) {
         console.error('Failed to persist message to backend:', apiError)
         // Don't throw here as WebSocket might have succeeded
@@ -352,10 +380,8 @@ export function useRealTimeMessages() {
     fetchConversations()
   }, [fetchConversations])
 
-  // Scroll to bottom when new messages arrive
-  useEffect(() => {
-    scrollToBottom()
-  }, [messages, scrollToBottom])
+  // Note: Scroll management is now handled by individual components (ChatWindow)
+  // to provide better control over when to scroll (e.g., not when loading historical messages)
 
   return {
     conversations,

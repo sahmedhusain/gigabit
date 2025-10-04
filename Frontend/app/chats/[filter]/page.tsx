@@ -11,7 +11,8 @@ import {
   api,
   Group,
   Chat,
-  NetworkError
+  NetworkError,
+  ConversationResponse
 } from '@/lib/api'
 
 // Import AppLayout instead of individual components
@@ -38,11 +39,12 @@ function ChatsFilterPage() {
 
   // Data State
   const [chats, setChats] = useState<Chat[]>([])
+  const [conversations, setConversations] = useState<ConversationResponse[]>([])
   const [_groups, setGroups] = useState<Group[]>([])
   const [_isLoadingChats, setIsLoadingChats] = useState(false)
   const [_isLoadingGroups, setIsLoadingGroups] = useState(false)
   const [followers, setFollowers] = useState<{ id: number; email: string; first_name: string; last_name: string; avatar?: string; nickname?: string; }[]>([])
-  const [_following, setFollowing] = useState<{ id: number; email: string; first_name: string; last_name: string; avatar?: string; nickname?: string; }[]>([])
+  const [following, setFollowing] = useState<{ id: number; email: string; first_name: string; last_name: string; avatar?: string; nickname?: string; }[]>([])
   const [isLoadingFollowers, setIsLoadingFollowers] = useState(false)
 
   // Chat window state
@@ -126,8 +128,10 @@ function ChatsFilterPage() {
     try {
       setIsLoadingChats(true)
       const data = await api.getConversations()
-      const dataObj = data as unknown as Record<string, unknown> | undefined
-      const convsRaw: unknown[] = dataObj && Array.isArray(dataObj['conversations']) ? dataObj['conversations'] as unknown[] : []
+      const conversationsData = data.conversations || []
+      setConversations(conversationsData)
+
+      const convsRaw: unknown[] = conversationsData as unknown[]
 
       setChats(convsRaw.map((convRaw) => {
         const conv = convRaw as Record<string, unknown>
@@ -267,30 +271,19 @@ function ChatsFilterPage() {
           participantId: userId
         })
       } else {
-        // Send an initial message to create the conversation automatically
-        await api.sendMessage({
-          content: "Hi!", // Initial greeting message
-          message_type: 'private',
-          receiver_id: userId
+        // Create a temporary conversation ID for the chat window
+        // The actual conversation will be created when the first message is sent
+        const tempConversationId = `temp_private_${userId}_${Date.now()}`
+
+        setOpenChatWindow({
+          conversationId: parseInt(tempConversationId.split('_')[2]), // Use userId as conversation ID temporarily
+          type: 'private',
+          name: userName,
+          participantId: userId
         })
 
-        // Find the newly created conversation
-        const updatedConversations = await api.getConversations()
-        const newConversation = updatedConversations.conversations.find(
-          conv => conv.type === 'private' && conv.participant?.id === userId
-        )
-
-        if (newConversation) {
-          setOpenChatWindow({
-            conversationId: newConversation.id,
-            type: 'private',
-            name: userName,
-            participantId: userId
-          })
-        } else {
-          error('Failed to create conversation. Please try again.')
-          return
-        }
+        // Refresh conversations after opening chat to get any updates
+        await fetchConversations()
       }
 
       // Close the create direct message modal
@@ -325,7 +318,6 @@ function ChatsFilterPage() {
   void _groups
   void _isLoadingChats
   void _isLoadingGroups
-  void _following
   void _currentUser
   void _trendingTopics
   void _handleTabChange
@@ -342,11 +334,12 @@ function ChatsFilterPage() {
       <CreateDirectMessage
         show={showCreateDirectMessage}
         onClose={() => setShowCreateDirectMessage(false)}
-        followers={followers}
+        followings={following}
+        conversations={conversations}
         isLoading={isLoadingFollowers}
         getUserStatus={getUserStatus}
         onStartChat={(followerId: number) => {
-          const follower = followers.find(f => f.id === followerId)
+          const follower = following.find(f => f.id === followerId)
           if (follower) {
             const userName = `${follower.first_name} ${follower.last_name}`.trim() || follower.nickname || follower.email
             handleStartDirectMessage(followerId, userName)

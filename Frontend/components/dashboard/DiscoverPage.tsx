@@ -120,7 +120,7 @@ export default function DiscoverPage() {
       // Check which groups the current user is a member of
       try {
         const userGroupsResponse = await api.getUserGroups(currentUser!.id)
-        const userGroupIds = new Set(userGroupsResponse.data?.map((g: GroupResponse) => g.id) || [])
+        const userGroupIds = new Set(userGroupsResponse.groups?.map((g: GroupResponse) => g.id) || [])
         
         const groupsWithStatus: GroupWithJoinStatus[] = (response.groups || []).map(group => ({
           ...group,

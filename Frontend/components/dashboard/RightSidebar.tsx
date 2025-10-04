@@ -2,9 +2,9 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
-import { 
-  Users, 
-  Calendar, 
+import {
+  Users,
+  Calendar,
   ChevronRight,
   ChevronLeft,
   MapPin,
@@ -79,6 +79,7 @@ interface RightSidebarProps {
     isPrivate: boolean
     followers: number
     following: number
+    posts: number
     status: string
     lastStatusChange: string
   } | null
@@ -110,7 +111,7 @@ export default function RightSidebar({
   const [userStatus, setUserStatus] = useState('online')
   const [isClient, setIsClient] = useState(false)
   const [expandedSection, setExpandedSection] = useState<'calendar' | 'following' | 'invitations' | null>('calendar')
-  
+
   // Calendar state
   const [selectedDate, setSelectedDate] = useState(new Date())
   const [calendarDate, setCalendarDate] = useState(new Date())
@@ -168,15 +169,15 @@ export default function RightSidebar({
 
       try {
         setLoadingInvitations(true)
-        
+
         // Fetch follow requests
         const followResponse = await api.getFollowRequests()
         setFollowRequests(followResponse.requests || [])
-        
+
         // Fetch group invitations
         const groupResponse = await api.getGroupInvitations()
         setGroupInvitations(groupResponse.invitations || [])
-        
+
       } catch (err) {
         console.error('Failed to fetch invitations:', err)
         error('Failed to load invitations')
@@ -195,10 +196,10 @@ export default function RightSidebar({
     try {
       // Call API to update status
       await api.updateUserStatus(newStatus)
-      
+
       // Update local state
       setUserStatus(newStatus)
-      
+
       // Send WebSocket message to broadcast status change
       sendMessage({
         type: 'user_status',
@@ -208,7 +209,7 @@ export default function RightSidebar({
           timestamp: new Date().toISOString()
         }
       })
-      
+
       success(`Status updated to ${statusOptions.find(s => s.id === newStatus)?.label}`)
     } catch (err) {
       console.error('Failed to update status:', err)
@@ -295,8 +296,8 @@ export default function RightSidebar({
         const eventDate = new Date(event.event_time)
         // Compare dates in local timezone to avoid timezone shift issues
         return eventDate.getFullYear() === date.getFullYear() &&
-               eventDate.getMonth() === date.getMonth() &&
-               eventDate.getDate() === date.getDate()
+          eventDate.getMonth() === date.getMonth() &&
+          eventDate.getDate() === date.getDate()
       })
       .map(event => ({
         id: event.id,
@@ -334,8 +335,8 @@ export default function RightSidebar({
     return events.some(event => {
       const eventDate = new Date(event.event_time)
       return eventDate.getFullYear() === date.getFullYear() &&
-             eventDate.getMonth() === date.getMonth() &&
-             eventDate.getDate() === date.getDate()
+        eventDate.getMonth() === date.getMonth() &&
+        eventDate.getDate() === date.getDate()
     })
   }
 
@@ -347,7 +348,7 @@ export default function RightSidebar({
     <div className="fixed-right-sidebar">
       <div className="space-y-4">
         {/* User Profile Dropdown Container */}
-  <div className="rounded-2xl">
+        <div className="rounded-2xl">
           <div className="p-4">
             {/* User Profile Dropdown - Integrated */}
             <button
@@ -357,9 +358,9 @@ export default function RightSidebar({
               <div className="flex items-center space-x-3 p-2 rounded-xl hover:bg-white/10 transition-all duration-300">
                 <div className="relative">
                   <div className={`w-12 h-12 rounded-full p-0.5 flex-shrink-0 transition-all duration-300 hover:scale-105 ${userStatus === 'online' ? 'bg-gradient-to-r from-green-400 to-emerald-500' :
-                      userStatus === 'busy' ? 'bg-gradient-to-r from-red-400 to-red-500' :
-                        userStatus === 'away' ? 'bg-gradient-to-r from-yellow-400 to-amber-500' :
-                          'bg-gradient-to-r from-gray-400 to-gray-500'
+                    userStatus === 'busy' ? 'bg-gradient-to-r from-red-400 to-red-500' :
+                      userStatus === 'away' ? 'bg-gradient-to-r from-yellow-400 to-amber-500' :
+                        'bg-gradient-to-r from-gray-400 to-gray-500'
                     }`}>
                     {currentUser?.avatar ? (
                       <Image
@@ -397,10 +398,13 @@ export default function RightSidebar({
                   <p className="text-xs text-white/60 truncate">@{currentUser?.username || 'username'}</p>
                   <div className="flex items-center space-x-3 mt-1">
                     <span className="text-xs text-white/60">
-                      <span className="font-medium text-white">{currentUser?.followers || 0}</span> followers
+                      <span className="font-medium text-white">{currentUser?.posts || 0}</span> Posts
                     </span>
                     <span className="text-xs text-white/60">
                       <span className="font-medium text-white">{currentUser?.following || 0}</span> following
+                    </span>
+                    <span className="text-xs text-white/60">
+                      <span className="font-medium text-white">{currentUser?.followers || 0}</span> followers
                     </span>
                   </div>
                 </div>
@@ -424,8 +428,8 @@ export default function RightSidebar({
                         key={status.id}
                         onClick={() => handleStatusChange(status.id)}
                         className={`flex items-center space-x-2 p-2 rounded-lg text-xs transition-all duration-200 ${userStatus === status.id
-                            ? 'bg-white/20 text-white'
-                            : 'text-white/70 hover:bg-white/10 hover:text-white'
+                          ? 'bg-white/20 text-white'
+                          : 'text-white/70 hover:bg-white/10 hover:text-white'
                           }`}
                       >
                         <div className={`w-2 h-2 rounded-full ${status.color}`}></div>
@@ -479,12 +483,11 @@ export default function RightSidebar({
         </div>
 
         {/* Time, Greeting, and Calendar Container */}
-        <div className={`sidebar-section bg-gradient-to-br from-blue-500/10 via-white/10 to-white/5 backdrop-blur-xl rounded-2xl border border-blue-400/20 shadow-xl ${
-          expandedSection === 'calendar' ? 'expandable' : 'collapsed'
-        }`}>
+        <div className={`sidebar-section bg-gradient-to-br from-blue-500/10 via-white/10 to-white/5 backdrop-blur-xl rounded-2xl border border-blue-400/20 shadow-xl ${expandedSection === 'calendar' ? 'expandable' : 'collapsed'
+          }`}>
           <div className="p-4">
             {/* Header with collapse toggle */}
-            <div 
+            <div
               className={`flex items-center justify-between cursor-pointer ${expandedSection === 'calendar' ? 'mb-4' : 'mb-2 h-16'}`}
               onClick={() => toggleSection('calendar')}
             >
@@ -513,17 +516,17 @@ export default function RightSidebar({
                   const selectedDateEvents = events.filter(event => {
                     const eventDate = new Date(event.event_time)
                     return eventDate.getFullYear() === selectedDate.getFullYear() &&
-                           eventDate.getMonth() === selectedDate.getMonth() &&
-                           eventDate.getDate() === selectedDate.getDate()
+                      eventDate.getMonth() === selectedDate.getMonth() &&
+                      eventDate.getDate() === selectedDate.getDate()
                   })
                   if (selectedDateEvents.length === 0) {
                     const isSameDay = (date1: Date, date2: Date) => {
-                      return date1.getDate() === date2.getDate() && 
-                             date1.getMonth() === date2.getMonth() && 
-                             date1.getFullYear() === date2.getFullYear();
+                      return date1.getDate() === date2.getDate() &&
+                        date1.getMonth() === date2.getMonth() &&
+                        date1.getFullYear() === date2.getFullYear();
                     };
-                    return isSameDay(selectedDate, new Date()) 
-                      ? "No events for today" 
+                    return isSameDay(selectedDate, new Date())
+                      ? "No events for today"
                       : `No events for ${selectedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
                   } else if (selectedDateEvents.length === 1) {
                     return `1 event on ${selectedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
@@ -550,9 +553,9 @@ export default function RightSidebar({
                       <ChevronLeft className="w-4 h-4 text-blue-400" />
                     </button>
                     <button
-                      onClick={(e) => { 
-                        e.stopPropagation(); 
-                        openMonthYearPicker(); 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openMonthYearPicker();
                       }}
                       className="text-blue-400 text-xs font-medium min-w-[80px] text-center hover:bg-white/10 px-2 py-1 rounded-lg transition-colors cursor-pointer"
                       title="Select month and year"
@@ -568,7 +571,7 @@ export default function RightSidebar({
                     </button>
                   </div>
                 </div>
-                
+
                 {/* Month/Year Picker */}
                 {showMonthYearPicker && (
                   <div className="mb-3 bg-white/5 rounded-xl p-3 border border-white/10 month-year-picker">
@@ -594,7 +597,7 @@ export default function RightSidebar({
                           })}
                         </select>
                       </div>
-                      
+
                       {/* Month Selector */}
                       <div>
                         <label className="text-white/70 text-xs font-medium mb-2 block">Month</label>
@@ -617,7 +620,7 @@ export default function RightSidebar({
                         </select>
                       </div>
                     </div>
-                    
+
                     {/* Quick Navigation Buttons */}
                     <div className="flex items-center justify-between mt-3 pt-3 border-t border-white/10">
                       <button
@@ -629,7 +632,7 @@ export default function RightSidebar({
                         }}
                         className="text-blue-400 hover:text-blue-300 text-xs font-medium transition-colors"
                       >
-                      Today
+                        Today
                       </button>
                       <button
                         onClick={applyMonthYearSelection}
@@ -640,7 +643,7 @@ export default function RightSidebar({
                     </div>
                   </div>
                 )}
-                
+
                 {/* Mini Calendar - Fixed size */}
                 <div className="flex-shrink-0">
                   {/* Calendar Header */}
@@ -651,7 +654,7 @@ export default function RightSidebar({
                       </div>
                     ))}
                   </div>
-                  
+
                   {/* Calendar Days */}
                   <div className="grid grid-cols-7 gap-1 mb-3">
                     {(() => {
@@ -659,30 +662,30 @@ export default function RightSidebar({
                       const firstDay = new Date(calendarDate.getFullYear(), calendarDate.getMonth(), 1);
                       const startDate = new Date(firstDay);
                       startDate.setDate(startDate.getDate() - firstDay.getDay());
-                      
+
                       const days = [];
                       for (let i = 0; i < 42; i++) {
                         const currentDate = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate() + i);
-                        
+
                         const isCurrentMonth = currentDate.getMonth() === calendarDate.getMonth();
                         const isToday = currentDate.toDateString() === today.toDateString();
                         const isSelected = currentDate.toDateString() === selectedDate.toDateString();
                         const hasEventDots = hasEvents(currentDate);
-                        
+
                         days.push(
                           <button
                             key={i}
-                            onClick={(e) => { 
-                              e.stopPropagation(); 
-                              handleDateClick(new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate())); 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDateClick(new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate()));
                             }}
                             className={`
                               relative text-center text-xs py-2 rounded-lg transition-all duration-200 cursor-pointer aspect-square flex items-center justify-center
-                              ${isCurrentMonth 
+                              ${isCurrentMonth
                                 ? isSelected
                                   ? 'bg-blue-500/50 text-blue-200 font-bold border border-blue-400'
-                                  : isToday 
-                                    ? 'bg-blue-500/30 text-blue-300 font-bold border border-blue-400/50' 
+                                  : isToday
+                                    ? 'bg-blue-500/30 text-blue-300 font-bold border border-blue-400/50'
                                     : 'text-white/80 hover:bg-white/10 hover:text-white'
                                 : 'text-white/30 hover:text-white/50'
                               }
@@ -695,12 +698,12 @@ export default function RightSidebar({
                           </button>
                         );
                       }
-                      
+
                       return days.slice(0, 35); // Show 5 weeks
                     })()}
                   </div>
                 </div>
-                
+
                 {/* Events Slide-Up Modal - Overflowing calendar container */}
                 {showEventsSlideUp && slideUpDate && (
                   <div className="events-overflow-modal transform transition-all duration-300 ease-out animate-slide-up">
@@ -709,76 +712,76 @@ export default function RightSidebar({
                       <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-white/5 rounded-2xl"></div>
                       {/* Content wrapper */}
                       <div className="relative z-10">
-                      {/* Header */}
-                      <div className="flex items-center justify-between p-4 border-b border-white/20">
-                        <div>
-                          <h3 className="text-white font-bold text-base">
-                            {(() => {
-                              const isSameDay = (date1: Date, date2: Date) => {
-                                return date1.getDate() === date2.getDate() &&
-                                       date1.getMonth() === date2.getMonth() &&
-                                       date1.getFullYear() === date2.getFullYear();
-                              };
+                        {/* Header */}
+                        <div className="flex items-center justify-between p-4 border-b border-white/20">
+                          <div>
+                            <h3 className="text-white font-bold text-base">
+                              {(() => {
+                                const isSameDay = (date1: Date, date2: Date) => {
+                                  return date1.getDate() === date2.getDate() &&
+                                    date1.getMonth() === date2.getMonth() &&
+                                    date1.getFullYear() === date2.getFullYear();
+                                };
 
-                              return isSameDay(slideUpDate, new Date())
-                                ? "Today's Events"
-                                : `Events for ${slideUpDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
-                            })()}
-                          </h3>
-                          <p className="text-white/80 text-xs mt-1">
-                            {slideUpDate.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
-                          </p>
+                                return isSameDay(slideUpDate, new Date())
+                                  ? "Today's Events"
+                                  : `Events for ${slideUpDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
+                              })()}
+                            </h3>
+                            <p className="text-white/80 text-xs mt-1">
+                              {slideUpDate.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                            </p>
+                          </div>
+                          <button
+                            onClick={closeEventsSlideUp}
+                            className="p-2 rounded-lg hover:bg-white/15 transition-colors"
+                            title="Close events"
+                          >
+                            <X className="w-5 h-5 text-white/80" />
+                          </button>
                         </div>
-                        <button
-                          onClick={closeEventsSlideUp}
-                          className="p-2 rounded-lg hover:bg-white/15 transition-colors"
-                          title="Close events"
-                        >
-                          <X className="w-5 h-5 text-white/80" />
-                        </button>
-                      </div>
 
-                      {/* Events List */}
-                      <div className="max-h-60 overflow-y-auto p-4 space-y-3">
-                        {(() => {
-                          const eventsForDate = getEventsForDate(slideUpDate);
-                          return eventsForDate.map((event) => {
-                            // Find the full event details
-                            const fullEvent = events.find(e => e.id === event.id);
-                            return (
-                              <div key={event.id} className="bg-white/15 rounded-lg p-3 border border-white/20 hover:bg-white/25 transition-colors">
-                                <div className="flex items-start justify-between mb-2">
-                                  <span className="text-sm text-white font-medium flex-1">{event.title}</span>
-                                  <span className="text-xs text-white/70 ml-2 flex-shrink-0">{event.time}</span>
-                                </div>
-                                {fullEvent?.location && (
-                                  <div className="flex items-center space-x-2 mb-2">
-                                    <MapPin className="w-3 h-3 text-white/60" />
-                                    <span className="text-xs text-white/80">{fullEvent.location}</span>
+                        {/* Events List */}
+                        <div className="max-h-60 overflow-y-auto p-4 space-y-3">
+                          {(() => {
+                            const eventsForDate = getEventsForDate(slideUpDate);
+                            return eventsForDate.map((event) => {
+                              // Find the full event details
+                              const fullEvent = events.find(e => e.id === event.id);
+                              return (
+                                <div key={event.id} className="bg-white/15 rounded-lg p-3 border border-white/20 hover:bg-white/25 transition-colors">
+                                  <div className="flex items-start justify-between mb-2">
+                                    <span className="text-sm text-white font-medium flex-1">{event.title}</span>
+                                    <span className="text-xs text-white/70 ml-2 flex-shrink-0">{event.time}</span>
                                   </div>
-                                )}
-                                {fullEvent?.group && (
-                                  <div className="flex items-center space-x-2 mb-2">
-                                    <Users className="w-3 h-3 text-white/60" />
-                                    <span className="text-xs text-white/80">{fullEvent.group.title}</span>
+                                  {fullEvent?.location && (
+                                    <div className="flex items-center space-x-2 mb-2">
+                                      <MapPin className="w-3 h-3 text-white/60" />
+                                      <span className="text-xs text-white/80">{fullEvent.location}</span>
+                                    </div>
+                                  )}
+                                  {fullEvent?.group && (
+                                    <div className="flex items-center space-x-2 mb-2">
+                                      <Users className="w-3 h-3 text-white/60" />
+                                      <span className="text-xs text-white/80">{fullEvent.group.title}</span>
+                                    </div>
+                                  )}
+                                  <div className="flex items-center space-x-2">
+                                    <div className={`w-2 h-2 ${event.color} rounded-full`}></div>
+                                    <span className="text-xs text-white/80">
+                                      {fullEvent?.going_count || 0} going • {fullEvent?.not_going_count || 0} not going
+                                    </span>
                                   </div>
-                                )}
-                                <div className="flex items-center space-x-2">
-                                  <div className={`w-2 h-2 ${event.color} rounded-full`}></div>
-                                  <span className="text-xs text-white/80">
-                                    {fullEvent?.going_count || 0} going • {fullEvent?.not_going_count || 0} not going
-                                  </span>
                                 </div>
-                              </div>
-                            );
-                          });
-                        })()}
-                      </div>
+                              );
+                            });
+                          })()}
+                        </div>
                       </div>
                     </div>
                   </div>
                 )}
-                
+
                 {/* Calendar is now non-scrollable - events shown in slide-up modal */}
               </div>
             )}
@@ -786,11 +789,10 @@ export default function RightSidebar({
         </div>
 
         {/* Enhanced Following Users Section */}
-        <div className={`sidebar-section bg-gradient-to-br from-emerald-500/10 via-white/10 to-white/5 backdrop-blur-xl rounded-2xl border border-emerald-400/20 shadow-xl ${
-          expandedSection === 'following' ? 'expandable' : 'collapsed'
-        }`}>
+        <div className={`sidebar-section bg-gradient-to-br from-emerald-500/10 via-white/10 to-white/5 backdrop-blur-xl rounded-2xl border border-emerald-400/20 shadow-xl ${expandedSection === 'following' ? 'expandable' : 'collapsed'
+          }`}>
           <div className="p-4">
-            <div 
+            <div
               className={`flex items-center justify-between cursor-pointer ${expandedSection === 'following' ? 'mb-4' : 'mb-2 h-12'}`}
               onClick={() => toggleSection('following')}
             >
@@ -808,13 +810,13 @@ export default function RightSidebar({
               <div className="flex items-center space-x-2">
                 {(() => {
                   // Count online users with status 'online' excluding current user
-                  const onlineCount = onlineUsers.filter(user => 
-                    (user.username !== currentUser?.username) && 
+                  const onlineCount = onlineUsers.filter(user =>
+                    (user.username !== currentUser?.username) &&
                     (user.id !== currentUser?.id) &&
                     (user.user_id !== currentUser?.id) &&
                     user.status === 'online'
                   ).length;
-                  
+
                   // Only show online indicator if there are online users
                   if (onlineCount > 0) {
                     return (
@@ -839,39 +841,39 @@ export default function RightSidebar({
                     {(() => {
                       // Use followingUsers if available, otherwise fall back to onlineUsers
                       const allFollowing = followingUsers.length > 0 ? followingUsers : onlineUsers;
-                      const filteredUsers = allFollowing.filter(user => 
-                        (user.username !== currentUser?.username) && 
+                      const filteredUsers = allFollowing.filter(user =>
+                        (user.username !== currentUser?.username) &&
                         (user.id !== currentUser?.id) &&
                         (user.user_id !== currentUser?.id)
                       );
-                      
+
                       // Create online users set for quick lookup
                       const onlineUserIds = new Set(onlineUsers.map(u => u.id || u.user_id));
-                      
+
                       // Create followers set for mutual friendship detection
                       const followerIds = new Set(followersUsers.map(u => u.id || u.user_id));
-                      
+
                       // Separate online and offline users
-                      const onlineFollowing = filteredUsers.filter(user => 
+                      const onlineFollowing = filteredUsers.filter(user =>
                         onlineUserIds.has(user.id || user.user_id)
                       );
-                      const offlineFollowing = filteredUsers.filter(user => 
+                      const offlineFollowing = filteredUsers.filter(user =>
                         !onlineUserIds.has(user.id || user.user_id)
                       );
-                      
+
                       // Sort both groups by name
                       const sortByName = (a: User, b: User) => {
                         const nameA = (a.display_name || a.name || a.first_name + ' ' + a.last_name || a.username || '').toLowerCase();
                         const nameB = (b.display_name || b.name || b.first_name + ' ' + b.last_name || b.username || '').toLowerCase();
                         return nameA.localeCompare(nameB);
                       };
-                      
+
                       const sortedOnline = onlineFollowing.sort(sortByName);
                       const sortedOffline = offlineFollowing.sort(sortByName);
-                      
+
                       // Combine: online first, then offline
                       const sortedUsers = [...sortedOnline, ...sortedOffline];
-                      
+
                       if (sortedUsers.length === 0) {
                         return (
                           <div className="flex flex-col items-center justify-center py-12 text-center">
@@ -890,7 +892,7 @@ export default function RightSidebar({
                           </div>
                         );
                       }
-                      
+
                       // Calculate users by status
                       const usersByStatus = {
                         online: sortedUsers.filter(user => {
@@ -910,7 +912,7 @@ export default function RightSidebar({
                           return !onlineUser || onlineUser.status === 'offline' || onlineUser.status === 'invisible'
                         })
                       }
-                      
+
                       return (
                         <>
                           {/* Online Users */}
@@ -925,13 +927,13 @@ export default function RightSidebar({
                               <div className="space-y-1">
                                 {usersByStatus.online.map((followingUser, index) => {
                                   const isMutualFriend = followerIds.has(followingUser.id || followingUser.user_id)
-                                  const userName = followingUser.display_name || 
-                                                 followingUser.name || 
-                                                 (followingUser.first_name && followingUser.last_name ? 
-                                                   `${followingUser.first_name} ${followingUser.last_name}` : '') ||
-                                                 followingUser.username || 
-                                                 'Unknown User'
-                                  
+                                  const userName = followingUser.display_name ||
+                                    followingUser.name ||
+                                    (followingUser.first_name && followingUser.last_name ?
+                                      `${followingUser.first_name} ${followingUser.last_name}` : '') ||
+                                    followingUser.username ||
+                                    'Unknown User'
+
                                   return (
                                     <div
                                       key={`online-${index}`}
@@ -984,13 +986,13 @@ export default function RightSidebar({
                               <div className="space-y-1">
                                 {usersByStatus.busy.map((followingUser, index) => {
                                   const isMutualFriend = followerIds.has(followingUser.id || followingUser.user_id)
-                                  const userName = followingUser.display_name || 
-                                                 followingUser.name || 
-                                                 (followingUser.first_name && followingUser.last_name ? 
-                                                   `${followingUser.first_name} ${followingUser.last_name}` : '') ||
-                                                 followingUser.username || 
-                                                 'Unknown User'
-                                  
+                                  const userName = followingUser.display_name ||
+                                    followingUser.name ||
+                                    (followingUser.first_name && followingUser.last_name ?
+                                      `${followingUser.first_name} ${followingUser.last_name}` : '') ||
+                                    followingUser.username ||
+                                    'Unknown User'
+
                                   return (
                                     <div
                                       key={`busy-${index}`}
@@ -1043,13 +1045,13 @@ export default function RightSidebar({
                               <div className="space-y-1">
                                 {usersByStatus.away.map((followingUser, index) => {
                                   const isMutualFriend = followerIds.has(followingUser.id || followingUser.user_id)
-                                  const userName = followingUser.display_name || 
-                                                 followingUser.name || 
-                                                 (followingUser.first_name && followingUser.last_name ? 
-                                                   `${followingUser.first_name} ${followingUser.last_name}` : '') ||
-                                                 followingUser.username || 
-                                                 'Unknown User'
-                                  
+                                  const userName = followingUser.display_name ||
+                                    followingUser.name ||
+                                    (followingUser.first_name && followingUser.last_name ?
+                                      `${followingUser.first_name} ${followingUser.last_name}` : '') ||
+                                    followingUser.username ||
+                                    'Unknown User'
+
                                   return (
                                     <div
                                       key={`away-${index}`}
@@ -1102,13 +1104,13 @@ export default function RightSidebar({
                               <div className="space-y-1">
                                 {usersByStatus.offline.map((followingUser, index) => {
                                   const isMutualFriend = followerIds.has(followingUser.id || followingUser.user_id)
-                                  const userName = followingUser.display_name || 
-                                                 followingUser.name || 
-                                                 (followingUser.first_name && followingUser.last_name ? 
-                                                   `${followingUser.first_name} ${followingUser.last_name}` : '') ||
-                                                 followingUser.username || 
-                                                 'Unknown User'
-                                  
+                                  const userName = followingUser.display_name ||
+                                    followingUser.name ||
+                                    (followingUser.first_name && followingUser.last_name ?
+                                      `${followingUser.first_name} ${followingUser.last_name}` : '') ||
+                                    followingUser.username ||
+                                    'Unknown User'
+
                                   return (
                                     <div
                                       key={`offline-${index}`}
@@ -1159,11 +1161,10 @@ export default function RightSidebar({
         </div>
 
         {/* Invitations Section */}
-        <div className={`sidebar-section bg-gradient-to-br from-orange-500/10 via-red-500/10 to-pink-500/10 backdrop-blur-xl rounded-2xl border border-orange-400/20 shadow-xl ${
-          expandedSection === 'invitations' ? 'expandable' : 'collapsed'
-        }`}>
+        <div className={`sidebar-section bg-gradient-to-br from-orange-500/10 via-red-500/10 to-pink-500/10 backdrop-blur-xl rounded-2xl border border-orange-400/20 shadow-xl ${expandedSection === 'invitations' ? 'expandable' : 'collapsed'
+          }`}>
           <div className="p-4">
-            <div 
+            <div
               className={`flex items-center justify-between cursor-pointer ${expandedSection === 'invitations' ? 'mb-4' : 'mb-2 h-12'}`}
               onClick={() => toggleSection('invitations')}
             >
@@ -1220,7 +1221,7 @@ export default function RightSidebar({
                                   <UserPlus className="w-2 h-2 text-white" />
                                 </div>
                               </div>
-                              
+
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-start justify-between mb-1">
                                   <div>
@@ -1235,11 +1236,11 @@ export default function RightSidebar({
                                     {new Date(request.created_at).toLocaleDateString()}
                                   </span>
                                 </div>
-                                
+
                                 <p className="text-xs text-white/70 mb-2">
                                   Wants to follow you
                                 </p>
-                                
+
                                 <div className="flex items-center space-x-2">
                                   <button
                                     onClick={async (e) => {
@@ -1303,7 +1304,7 @@ export default function RightSidebar({
                                   <Users className="w-2 h-2 text-white" />
                                 </div>
                               </div>
-                              
+
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-start justify-between mb-1">
                                   <div>
@@ -1318,11 +1319,11 @@ export default function RightSidebar({
                                     {new Date(invitation.created_at).toLocaleDateString()}
                                   </span>
                                 </div>
-                                
+
                                 <p className="text-xs text-white/70 mb-2">
                                   Invited you to join this group
                                 </p>
-                                
+
                                 <div className="flex items-center space-x-2">
                                   <button
                                     onClick={async (e) => {
@@ -1382,6 +1383,6 @@ export default function RightSidebar({
           </div>
         </div>
       </div>
-    </div>             
+    </div>
   )
 }

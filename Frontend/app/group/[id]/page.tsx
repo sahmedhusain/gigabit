@@ -5,7 +5,7 @@ import ProtectedRoute from '@/components/ProtectedRoute'
 import { useAuth } from '@/context/AuthContext'
 import { useToast } from '@/context/ToastContext'
 import { useConnectionStatus, useOnlineStatus } from '@/hooks'
-import { api, Event, API_BASE_URL, getToken } from '@/lib/api'
+import { api, Event, API_BASE_URL, Member } from '@/lib/api'
 import GroupChat from '@/components/GroupChat'
 import {
   Users,
@@ -17,7 +17,9 @@ import {
   Crown,
   Clock,
   ArrowLeft,
-  X
+  X,
+  Shield,
+  ShieldCheck
 } from 'lucide-react'
 import CreateEvent from '@/components/dashboard/CreateEvent'
 import CreateGroupPost from '@/components/dashboard/CreateGroupPost'
@@ -41,15 +43,7 @@ interface GroupDetails {
     last_name: string
     avatar: string
   }
-  members: Array<{
-    id: number
-    username: string
-    email: string
-    first_name: string
-    last_name: string
-    avatar: string
-    joined_at: string
-  }>
+  members: Member[]
   events: Event[]
 }
 
@@ -70,6 +64,9 @@ function GroupDetailsPage() {
   const [isInviting, setIsInviting] = useState(false)
   const [showCreateEvent, setShowCreateEvent] = useState(false)
 
+  // User role state
+  const [isAdminOrCreator, setIsAdminOrCreator] = useState(false)
+
   // Get online member count
   const onlineMemberCount = group?.members.filter(member => 
     onlineUsers.some(onlineUser => onlineUser.user_id === member.id && onlineUser.status === 'online')
@@ -84,15 +81,8 @@ function GroupDetailsPage() {
       const groupInfo = await api.getGroup(groupId)
 
       // Fetch group members
-      const membersData = await fetch(`${API_BASE_URL}/api/groups/${groupId}/members`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(getToken() && { Authorization: `Bearer ${getToken()}` }),
-        },
-        credentials: 'include'
-      })
-      const members = membersData.ok ? await membersData.json() : { members: [] }
+      const membersData = await api.getGroupMembers(groupId)
+      const members = membersData.members || []
 
       // Fetch group events
       const eventsData = await api.getUserEvents()
@@ -114,9 +104,18 @@ function GroupDetailsPage() {
           last_name: 'User',
           avatar: ''
         },
-        members: members.members || [],
+        members: members || [],
         events: groupEvents
       })
+
+      // Fetch user role
+      try {
+        const roleData = await api.getUserRole(groupId)
+        setIsAdminOrCreator(roleData.is_admin_or_creator)
+      } catch (roleError) {
+        console.error('Error fetching user role:', roleError)
+        setIsAdminOrCreator(false)
+      }
     } catch (err) {
       console.error('Error fetching group details:', err)
       error('Failed to load group details')
@@ -193,7 +192,31 @@ function GroupDetailsPage() {
     }
   }
 
+  const handlePromoteToAdmin = async (userId: number) => {
+    if (!group) return
 
+    try {
+      await api.promoteToAdmin(group.id, userId)
+      success('User promoted to admin successfully')
+      fetchGroupDetails() // Refresh to update roles
+    } catch (err) {
+      console.error('Error promoting user:', err)
+      error('Failed to promote user')
+    }
+  }
+
+  const handleDemoteAdmin = async (userId: number) => {
+    if (!group) return
+
+    try {
+      await api.demoteAdmin(group.id, userId)
+      success('Admin demoted to member successfully')
+      fetchGroupDetails() // Refresh to update roles
+    } catch (err) {
+      console.error('Error demoting admin:', err)
+      error('Failed to demote admin')
+    }
+  }
 
   const isGroupCreator = group && user && group.creator_id === user.id
 
@@ -365,16 +388,16 @@ function GroupDetailsPage() {
                       <div className="flex items-center space-x-3">
                         <div className="w-10 h-10 bg-gradient-to-r from-emerald-500 to-teal-600 rounded-full flex items-center justify-center">
                           <span className="text-white font-semibold text-sm">
-                            {member.first_name[0]}{member.last_name[0]}
+                            {member.user.first_name[0]}{member.user.last_name[0]}
                           </span>
                         </div>
                         <div>
-                          <div className="text-white font-medium">{member.first_name} {member.last_name}</div>
-                          <div className="text-white/50 text-sm">@{member.username}</div>
+                          <div className="text-white font-medium">{member.user.first_name} {member.user.last_name}</div>
+                          <div className="text-white/50 text-sm">@{member.user.nickname || 'user'}</div>
                         </div>
                       </div>
                       <div className="text-white/50 text-sm">
-                        Joined {new Date(member.joined_at).toLocaleDateString()}
+                        Joined {member.joined_at ? new Date(member.joined_at).toLocaleDateString() : 'Unknown'}
                       </div>
                     </div>
                   ))}
@@ -424,21 +447,49 @@ function GroupDetailsPage() {
                     <div className="flex items-center space-x-4">
                       <div className="w-12 h-12 bg-gradient-to-r from-emerald-500 to-teal-600 rounded-full flex items-center justify-center">
                         <span className="text-white font-semibold">
-                          {member.first_name[0]}{member.last_name[0]}
+                          {member.user.first_name[0]}{member.user.last_name[0]}
                         </span>
                       </div>
                       <div>
                         <div className="text-white font-medium flex items-center">
-                          {member.first_name} {member.last_name}
-                          {member.id === group.creator_id && (
+                          {member.user.first_name} {member.user.last_name}
+                          {member.role === 'creator' && (
                             <Crown className="w-4 h-4 ml-2 text-yellow-400" />
                           )}
+                          {member.role === 'admin' && (
+                            <Shield className="w-4 h-4 ml-2 text-blue-400" />
+                          )}
                         </div>
-                        <div className="text-white/50 text-sm">@{member.username}</div>
+                        <div className="text-white/50 text-sm">@{member.user.nickname || 'user'}</div>
                       </div>
                     </div>
-                    <div className="text-white/50 text-sm">
-                      Joined {new Date(member.joined_at).toLocaleDateString()}
+                    <div className="flex items-center space-x-3">
+                      <div className="text-white/50 text-sm">
+                        Joined {member.joined_at ? new Date(member.joined_at).toLocaleDateString() : 'Unknown'}
+                      </div>
+                      {isAdminOrCreator && member.role !== 'creator' && (
+                        <div className="flex space-x-2">
+                          {member.role !== 'admin' ? (
+                            <button
+                              onClick={() => handlePromoteToAdmin(member.user.id)}
+                              className="flex items-center px-3 py-1 bg-blue-500/20 hover:bg-blue-500/30 border border-blue-400/30 text-blue-300 rounded-lg text-xs transition-all duration-200"
+                              title="Promote to Admin"
+                            >
+                              <ShieldCheck className="w-3 h-3 mr-1" />
+                              Promote
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => handleDemoteAdmin(member.user.id)}
+                              className="flex items-center px-3 py-1 bg-red-500/20 hover:bg-red-500/30 border border-red-400/30 text-red-300 rounded-lg text-xs transition-all duration-200"
+                              title="Demote from Admin"
+                            >
+                              <Shield className="w-3 h-3 mr-1" />
+                              Demote
+                            </button>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
                 ))}

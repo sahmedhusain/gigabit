@@ -90,6 +90,7 @@ func (h *MessageHandler) SendMessage(w http.ResponseWriter, r *http.Request) {
 			"message_type":    req.MessageType,
 			"image_url":       req.ImageURL,
 			"conversation_id": conversationID,
+			"created_at":      message.CreatedAt.Format(time.RFC3339),
 		},
 	}
 
@@ -103,8 +104,9 @@ func (h *MessageHandler) SendMessage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusCreated, map[string]interface{}{
-		"message": "Message sent successfully",
-		"data":    message,
+		"message":         "Message sent successfully",
+		"data":            message,
+		"conversation_id": conversationID,
 	})
 }
 
@@ -271,7 +273,7 @@ func (h *MessageHandler) GetConversationMessages(w http.ResponseWriter, r *http.
 	// Get pagination parameters
 	limitStr := r.URL.Query().Get("limit")
 	if limitStr == "" {
-		limitStr = "50"
+		limitStr = "10"
 	}
 	offsetStr := r.URL.Query().Get("offset")
 	if offsetStr == "" {
@@ -280,7 +282,7 @@ func (h *MessageHandler) GetConversationMessages(w http.ResponseWriter, r *http.
 
 	limit, err := strconv.Atoi(limitStr)
 	if err != nil || limit > 100 {
-		limit = 50
+		limit = 10
 	}
 
 	offset, err := strconv.Atoi(offsetStr)

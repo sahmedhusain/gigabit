@@ -6,6 +6,8 @@ CREATE TABLE IF NOT EXISTS private_conversations (
     last_message_id INTEGER,
     unread_count1 INTEGER DEFAULT 0,
     unread_count2 INTEGER DEFAULT 0,
+    participant1_deleted BOOLEAN DEFAULT FALSE,
+    participant2_deleted BOOLEAN DEFAULT FALSE,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (participant1_id) REFERENCES users(id) ON DELETE CASCADE,

@@ -36,6 +36,18 @@ func (s *MessageService) SendPrivateMessage(message *models.Message) error {
 		return err
 	}
 
+	// Restore conversation for sender if they had deleted it
+	restoreQuery := `
+		UPDATE private_conversations
+		SET participant1_deleted = CASE WHEN participant1_id = ? THEN FALSE ELSE participant1_deleted END,
+		    participant2_deleted = CASE WHEN participant2_id = ? THEN FALSE ELSE participant2_deleted END
+		WHERE id = ?
+	`
+	_, err = s.db.Exec(restoreQuery, message.SenderID, message.SenderID, conversationID)
+	if err != nil {
+		return err
+	}
+
 	result, err := s.db.Exec(query, conversationID, message.SenderID, message.Content, now)
 	if err != nil {
 		return err

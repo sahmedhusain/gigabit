@@ -77,21 +77,10 @@ export function useConnectionStatus() {
   }, [isOnline, isConnected, connectionAttempts])
 
   const getStatusMessage = useCallback((): string => {
-    const quality = getConnectionQuality()
-    
-    switch (quality) {
-      case 'excellent':
-        return 'Connected'
-      case 'good':
-        return 'Connected (some issues)'
-      case 'poor':
-        return 'Connection unstable'
-      case 'offline':
-        return 'Offline'
-      default:
-        return 'Unknown'
-    }
-  }, [getConnectionQuality])
+    if (!isOnline) return 'Offline'
+    if (!isConnected) return 'Disconnected'
+    return 'Connected'
+  }, [isOnline, isConnected])
 
   const status: ConnectionStatus = {
     isOnline,
@@ -103,7 +92,6 @@ export function useConnectionStatus() {
 
   return {
     ...status,
-    connectionQuality: getConnectionQuality(),
     statusMessage: getStatusMessage()
   }
 }

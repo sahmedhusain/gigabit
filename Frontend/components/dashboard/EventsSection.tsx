@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { Calendar, Users, Plus, Edit, Trash2, X, Check, Wifi, WifiOff } from 'lucide-react';
+import { Calendar, Users, Plus, Edit, Trash2, X, Check, WifiOff } from 'lucide-react';
 import { api, Event, EventResponse, CreateEventRequest, UpdateEventRequest, GroupResponse } from '@/lib/api';
 import { useToast } from '@/context/ToastContext';
 import { useAuth } from '@/context/AuthContext';
@@ -502,13 +502,13 @@ export const EventsSection: React.FC<EventsSectionProps> = ({ events, onEventsUp
   useRealTimeEvents()
   
   // Connection status monitoring
-  const { isConnected, connectionQuality } = useConnectionStatus()
+  const { isConnected } = useConnectionStatus()
 
   const loadUserGroups = useCallback(async () => {
     if (!user) return;
     try {
       const data = await api.getUserGroups(user.id);
-      const userGroups = data.data || [];
+      const userGroups = data.groups || [];
       setGroups(userGroups);
       
       // Load user roles for each group
@@ -576,13 +576,6 @@ export const EventsSection: React.FC<EventsSectionProps> = ({ events, onEventsUp
           <div className="mb-4 flex items-center gap-2 text-orange-400 text-sm bg-orange-400/10 border border-orange-400/20 rounded-lg p-3">
             <WifiOff className="w-4 h-4 flex-shrink-0" />
             <span>Connection lost - events may not update in real-time</span>
-          </div>
-        )}
-        
-        {connectionQuality === 'poor' && isConnected && (
-          <div className="mb-4 flex items-center gap-2 text-yellow-400 text-sm bg-yellow-400/10 border border-yellow-400/20 rounded-lg p-3">
-            <Wifi className="w-4 h-4 flex-shrink-0" />
-            <span>Poor connection - real-time updates may be slow</span>
           </div>
         )}
         <div className="space-y-3 lg:space-y-4">

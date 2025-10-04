@@ -636,14 +636,10 @@ export class ApiClient {
   }
 
   // Groups endpoints
-  async getUserGroups(_userId: number): Promise<{ data: GroupResponse[] }> {
-    // _userId is accepted for API compatibility; mark as used to avoid lint warnings
-    void _userId;
-    const response = await this.request<{ groups: GroupResponse[], count: number, limit: number, offset: number }>(`/api/groups`, {
+  async getUserGroups(userId: number): Promise<{ groups: GroupResponse[], count: number, limit: number, offset: number }> {
+    return this.request<{ groups: GroupResponse[], count: number, limit: number, offset: number }>(`/api/groups/user/${userId}`, {
       method: 'GET',
     });
-    // Return only the groups the user is a member of (defensive filter)
-    return { data: (response.groups || []).filter(g => g.is_member) };
   }
 
   async getAllGroups(limit: number = 20, offset: number = 0): Promise<{ groups: GroupResponse[], count: number, limit: number, offset: number }> {
@@ -708,6 +704,20 @@ export class ApiClient {
   async getUserRole(groupId: number): Promise<{ role: string; is_admin_or_creator: boolean }> {
     return this.request<{ role: string; is_admin_or_creator: boolean }>(`/api/groups/${groupId}/role`, {
       method: 'GET',
+    });
+  }
+
+  async promoteToAdmin(groupId: number, userId: number): Promise<{ message: string }> {
+    return this.request<{ message: string }>(`/api/groups/${groupId}/promote`, {
+      method: 'POST',
+      body: JSON.stringify({ user_id: userId }),
+    });
+  }
+
+  async demoteAdmin(groupId: number, userId: number): Promise<{ message: string }> {
+    return this.request<{ message: string }>(`/api/groups/${groupId}/demote`, {
+      method: 'POST',
+      body: JSON.stringify({ user_id: userId }),
     });
   }
 
@@ -796,8 +806,8 @@ export class ApiClient {
     });
   }
 
-  async sendMessage(data: { receiver_id?: number; group_id?: number; content: string; message_type: 'private' | 'group'; image_url?: string }): Promise<{ message: string; data: MessageItem }> {
-    return this.request<{ message: string; data: MessageItem }>('/api/messages', {
+  async sendMessage(data: { receiver_id?: number; group_id?: number; content: string; message_type: 'private' | 'group'; image_url?: string }): Promise<{ message: string; data: MessageItem; conversation_id: number }> {
+    return this.request<{ message: string; data: MessageItem; conversation_id: number }>('/api/messages', {
       method: 'POST',
       body: JSON.stringify(data),
     });

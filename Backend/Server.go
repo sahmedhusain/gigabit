@@ -15,6 +15,10 @@ import (
 	"social/websocket"
 )
 
+type contextKey string
+
+const dbContextKey contextKey = "db"
+
 type Server struct {
 	router *http.ServeMux
 	DB     *customsqlite.DB
@@ -72,14 +76,10 @@ func writeError(w http.ResponseWriter, status int, message string) {
 	writeJSON(w, status, Response{Error: message})
 }
 
-func writeSuccess(w http.ResponseWriter, data interface{}, message string) {
-	writeJSON(w, http.StatusOK, Response{Data: data, Message: message})
-}
-
 // Database middleware
 func (s *Server) dbMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		ctx := context.WithValue(r.Context(), "db", s.DB.GetDB())
+		ctx := context.WithValue(r.Context(), dbContextKey, s.DB.GetDB())
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
@@ -110,6 +110,7 @@ func (s *Server) setupRoutes() {
 	bookmarkHandler := handlers.NewBookmarkHandler(s.DB.GetDB(), s.Hub)
 	wsHandler := handlers.NewWebSocketHandler(s.Hub)
 	chatHandler := handlers.NewChatHandler(s.DB.GetDB())
+	conversationHandler := handlers.NewConversationHandler(s.DB.GetDB())
 
 	// Health check
 	s.router.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
@@ -173,6 +174,7 @@ func (s *Server) setupRoutes() {
 	s.router.HandleFunc("/api/messages", s.handleMessagesRoute(messageHandler))
 	s.router.HandleFunc("/api/messages/", s.handleMessageRoute(messageHandler))
 	s.router.HandleFunc("/api/conversations", s.handleRoute(messageHandler.GetConversations, true))
+	s.router.HandleFunc("/api/conversations/", s.handleConversationRoute(conversationHandler))
 	s.router.HandleFunc("/api/chats", s.handleRoute(chatHandler.GetUnifiedChats, true))
 
 	// Notification routes
@@ -490,8 +492,27 @@ func (s *Server) handleGroupRoute(groupHandler *handlers.GroupHandler, eventHand
 			return
 		}
 
-		groupID := parts[0]
 		authMiddleware := middleware.AuthMiddleware(s.DB.GetDB())
+
+		// Special case for /api/groups/user/{userID}
+		if parts[0] == "user" {
+			if len(parts) >= 2 {
+				userID := parts[1]
+				if r.Method != http.MethodGet {
+					writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
+					return
+				}
+				authMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					groupHandler.GetUserGroups(w, r, userID)
+				})).ServeHTTP(w, r)
+			} else {
+				writeError(w, http.StatusNotFound, "User ID required")
+			}
+			return
+		}
+
+		// Regular group routes: /api/groups/{groupID} and /api/groups/{groupID}/{action}
+		groupID := parts[0]
 
 		if len(parts) == 1 {
 			switch r.Method {
@@ -569,6 +590,22 @@ func (s *Server) handleGroupRoute(groupHandler *handlers.GroupHandler, eventHand
 				authMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					groupHandler.GetUserRole(w, r, groupID)
 				})).ServeHTTP(w, r)
+			case "promote":
+				if r.Method != http.MethodPost {
+					writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
+					return
+				}
+				authMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					groupHandler.PromoteToAdmin(w, r, groupID)
+				})).ServeHTTP(w, r)
+			case "demote":
+				if r.Method != http.MethodPost {
+					writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
+					return
+				}
+				authMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					groupHandler.DemoteAdmin(w, r, groupID)
+				})).ServeHTTP(w, r)
 			case "events":
 				switch r.Method {
 				case http.MethodGet:
@@ -591,19 +628,6 @@ func (s *Server) handleGroupRoute(groupHandler *handlers.GroupHandler, eventHand
 					}
 					authMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 						groupHandler.RespondToJoinRequest(w, r, groupID, userID)
-					})).ServeHTTP(w, r)
-				} else {
-					writeError(w, http.StatusNotFound, "User ID required")
-				}
-			case "user":
-				if len(parts) >= 3 {
-					userID := parts[2]
-					if r.Method != http.MethodGet {
-						writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
-						return
-					}
-					authMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-						groupHandler.GetUserGroups(w, r, userID)
 					})).ServeHTTP(w, r)
 				} else {
 					writeError(w, http.StatusNotFound, "User ID required")
@@ -816,9 +840,30 @@ func (s *Server) Run(addr string) error {
 	return s.server.ListenAndServe()
 }
 
-func (s *Server) Shutdown(ctx context.Context) error {
-	if s.server != nil {
-		return s.server.Shutdown(ctx)
+func (s *Server) handleConversationRoute(handler *handlers.ConversationHandler) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		path := strings.TrimPrefix(r.URL.Path, "/api/conversations/")
+		parts := strings.Split(path, "/")
+
+		if len(parts) == 0 || parts[0] == "" {
+			writeError(w, http.StatusNotFound, "Conversation ID required")
+			return
+		}
+
+		conversationID := parts[0]
+		authMiddleware := middleware.AuthMiddleware(s.DB.GetDB())
+
+		if len(parts) == 1 {
+			switch r.Method {
+			case http.MethodDelete:
+				authMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					handler.DeleteConversation(w, r, conversationID)
+				})).ServeHTTP(w, r)
+			default:
+				writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
+			}
+		} else {
+			writeError(w, http.StatusNotFound, "Route not found")
+		}
 	}
-	return nil
 }

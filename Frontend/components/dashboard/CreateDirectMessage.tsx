@@ -2,6 +2,8 @@
 import { useState, useMemo } from 'react'
 import Image from 'next/image'
 import { X, Search, MessageSquarePlus, MessageCircle } from 'lucide-react'
+import { motion, AnimatePresence } from 'framer-motion'
+import { ConversationResponse } from '@/lib/api'
 
 interface Follower {
   id: number
@@ -15,7 +17,8 @@ interface Follower {
 interface CreateDirectMessageProps {
   show: boolean
   onClose: () => void
-  followers: Follower[]
+  followings: Follower[]
+  conversations: ConversationResponse[] // Add conversations prop
   onStartChat: (followerId: number) => void
   isLoading: boolean
   getUserStatus: (userId: number) => string
@@ -24,7 +27,8 @@ interface CreateDirectMessageProps {
 export default function CreateDirectMessage({
   show,
   onClose,
-  followers,
+  followings,
+  conversations,
   onStartChat,
   isLoading,
   getUserStatus
@@ -32,149 +36,302 @@ export default function CreateDirectMessage({
   const [searchQuery, setSearchQuery] = useState('')
 
   const filteredFollowers = useMemo(() => {
-    if (!searchQuery) return followers
-    return followers.filter(follower => {
-      const fullName = `${follower.first_name} ${follower.last_name}`.toLowerCase()
-      const nickname = follower.nickname?.toLowerCase() || ''
-      const query = searchQuery.toLowerCase()
-      return fullName.includes(query) || nickname.includes(query)
-    })
-  }, [followers, searchQuery])
+    let filtered = [] as Follower[];
+    if (!searchQuery) {
+      filtered = followings.filter(following => {
+        const hasExistingConversation = conversations.some(
+          conv => conv.type === 'private' && conv.participant?.id === following.id
+        )
+        return !hasExistingConversation
+      })
+    } else {
+      filtered = followings.filter(following => {
+        const fullName = `${following.first_name} ${following.last_name}`.toLowerCase()
+        const nickname = following.nickname?.toLowerCase() || ''
+        const query = searchQuery.toLowerCase()
+        const matchesSearch = fullName.includes(query) || nickname.includes(query)
+        const hasExistingConversation = conversations.some(
+          conv => conv.type === 'private' && conv.participant?.id === following.id
+        )
+        return matchesSearch && !hasExistingConversation
+      })
+    }
+    // Sort: online first, then alphabetically by name or nickname
+    return filtered.sort((a, b) => {
+      const aOnline = getUserStatus(a.id) === 'online';
+      const bOnline = getUserStatus(b.id) === 'online';
+      if (aOnline && !bOnline) return -1;
+      if (!aOnline && bOnline) return 1;
+      // Both online or both not online: sort alphabetically
+      const aName = (a.nickname || `${a.first_name} ${a.last_name}`).toLowerCase();
+      const bName = (b.nickname || `${b.first_name} ${b.last_name}`).toLowerCase();
+      return aName.localeCompare(bName);
+    });
+  }, [followings, conversations, searchQuery, getUserStatus])
 
   if (!show) return null
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-50 flex items-center justify-center p-4">
-      <div className="relative w-full max-w-lg h-[85vh] flex flex-col">
-        {/* Enhanced backdrop with multiple layers */}
-        <div className="absolute inset-0 bg-gradient-to-br from-blue-500/20 via-indigo-500/10 to-purple-500/20 backdrop-blur-2xl rounded-3xl border border-white/30 shadow-2xl"></div>
-        <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent rounded-3xl"></div>
-
-        {/* Fixed Header */}
-        <div className="relative flex-shrink-0 p-6 lg:p-8 pb-4">
-          <div className="flex items-center justify-between mb-8">
-            <div className="flex items-center space-x-4">
-              <div className="relative">
-                <div className="w-12 h-12 bg-gradient-to-br from-blue-400 via-indigo-500 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg">
-                  <MessageCircle className="w-6 h-6 text-white drop-shadow-sm" />
-                </div>
-                <div className="absolute -top-1 -right-1 w-4 h-4 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-full animate-pulse"></div>
-              </div>
-              <div>
-                <h3 className="text-xl lg:text-2xl font-bold text-white mb-1">New Message</h3>
-                <p className="text-white/60 text-sm">Start a conversation with a follower</p>
-              </div>
-            </div>
-            <button
-              onClick={onClose}
-              className="group p-3 text-white/70 hover:text-white hover:bg-white/10 rounded-2xl transition-all duration-300 hover:scale-105"
-              title="Close"
+    <AnimatePresence>
+      {show && (
+        <motion.div
+          className="fixed inset-0 bg-black/50 backdrop-blur-xl z-50 flex items-center justify-center p-4"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.3 }}
+        >
+          <motion.div
+            className="relative w-full max-w-lg h-[85vh] flex flex-col bg-white/5 backdrop-blur-2xl rounded-3xl border border-white/20 shadow-2xl overflow-hidden"
+            initial={{ opacity: 0, scale: 0.9, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.9, y: 20 }}
+            transition={{ duration: 0.3, ease: 'easeOut' }}
+          >
+            {/* Header */}
+            <motion.div
+              className="relative flex-shrink-0 p-6 lg:p-8 pb-4 bg-gradient-to-r from-white/10 to-white/5 border-b border-white/20"
+              initial={{ y: -20, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ delay: 0.1, duration: 0.3 }}
             >
-              <X className="w-5 h-5 group-hover:rotate-90 transition-transform duration-300" />
-            </button>
-          </div>
-        </div>
-
-        {/* Search Section */}
-        <div className="relative flex-shrink-0 px-6 lg:px-8 pb-4">
-          <div className="space-y-3">
-            <label className="text-white font-semibold text-sm lg:text-base flex items-center space-x-2">
-              <div className="w-2 h-2 bg-blue-400 rounded-full"></div>
-              <span>Search Followers</span>
-            </label>
-            <div className="relative">
-              <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-white/60 w-5 h-5" />
-              <input
-                type="text"
-                placeholder="Search by name or nickname..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-12 pr-4 py-3 bg-white/10 border border-white/20 rounded-2xl text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-blue-400/50 focus:border-blue-400/50 transition-all duration-300 hover:bg-white/15 text-sm lg:text-base"
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* Scrollable Content Area */}
-        <div className="relative flex-1 overflow-y-auto px-6 lg:px-8">
-          <div className="space-y-4">
-            {isLoading ? (
-              <div className="flex items-center justify-center h-64">
-                <div className="flex items-center space-x-3">
-                  <div className="w-6 h-6 bg-white/20 rounded-full animate-spin"></div>
-                  <span className="text-white/70 text-sm lg:text-base">Loading followers...</span>
-                </div>
-              </div>
-            ) : filteredFollowers.length > 0 ? (
-              <div className="space-y-2">
-                {filteredFollowers.map(follower => (
-                  <button
-                    key={follower.id}
-                    onClick={() => onStartChat(follower.id)}
-                    className="w-full flex items-center space-x-4 p-4 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 rounded-2xl transition-all duration-300 hover:scale-[1.02] group"
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center space-x-4">
+                  <motion.div
+                    className="relative"
+                    whileHover={{ scale: 1.05 }}
+                    transition={{ type: 'spring', stiffness: 400, damping: 17 }}
                   >
-                    <div className="relative">
-                      <div className="w-12 h-12 bg-gradient-to-br from-blue-500 via-indigo-600 to-purple-600 rounded-2xl flex items-center justify-center text-white font-bold shadow-lg group-hover:shadow-xl transition-all duration-300">
-                        {follower.avatar ? (
-                          <Image src={follower.avatar} alt={follower.first_name} width={48} height={48} unoptimized={follower.avatar.includes('/svg')} className="w-full h-full rounded-2xl object-cover" />
-                        ) : (
-                          follower.first_name[0]?.toUpperCase()
-                        )}
-                      </div>
-                      <div className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-white ${
-                        getUserStatus(follower.id) === 'online' ? 'bg-green-500' :
-                        getUserStatus(follower.id) === 'busy' ? 'bg-red-500' :
-                        getUserStatus(follower.id) === 'away' ? 'bg-yellow-500' :
-                        'bg-gray-500'
-                      }`}></div>
+                    <div className="w-12 h-12 bg-gradient-to-br from-emerald-400 via-teal-500 to-cyan-600 rounded-2xl flex items-center justify-center shadow-lg">
+                      <MessageCircle className="w-6 h-6 text-white drop-shadow-sm" />
                     </div>
-                    <div className="flex-1 min-w-0 text-left">
-                      <p className="text-white font-semibold text-sm lg:text-base truncate group-hover:text-white/90">
-                        {`${follower.first_name} ${follower.last_name}`}
-                      </p>
-                      {follower.nickname && (
-                        <p className="text-white/60 text-xs lg:text-sm truncate group-hover:text-white/70">
-                          @{follower.nickname}
-                        </p>
-                      )}
-                    </div>
-                    <div className="flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                      <MessageSquarePlus className="w-5 h-5 text-blue-400" />
-                    </div>
-                  </button>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-16">
-                <div className="w-16 h-16 bg-white/10 rounded-2xl flex items-center justify-center mx-auto mb-6">
-                  <MessageSquarePlus className="w-8 h-8 text-white/40" />
+                    <motion.div
+                      className="absolute -top-1 -right-1 w-4 h-4 bg-gradient-to-br from-emerald-400 to-teal-500 rounded-full"
+                      animate={{ scale: [1, 1.2, 1] }}
+                    />
+                  </motion.div>
+                  <div>
+                    <motion.h3
+                      className="text-xl lg:text-2xl font-bold text-white mb-1"
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: 0.2, duration: 0.3 }}
+                    >
+                      New Message
+                    </motion.h3>
+                    <motion.p
+                      className="text-white/60 text-sm"
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: 0.3, duration: 0.3 }}
+                    >
+                      Start a conversation with a following
+                    </motion.p>
+                  </div>
                 </div>
-                <h3 className="text-lg lg:text-xl font-semibold text-white mb-2">
-                  {searchQuery ? 'No followers found' : 'No followers to message'}
-                </h3>
-                <p className="text-white/60 text-sm lg:text-base">
-                  {searchQuery
-                    ? 'Try searching with a different name or nickname.'
-                    : 'Follow some users to start messaging them.'
-                  }
-                </p>
+                <motion.button
+                  onClick={onClose}
+                  className="group p-3 text-white/70 hover:text-white hover:bg-white/10 rounded-xl transition-all duration-200"
+                  title="Close"
+                  whileHover={{ scale: 1.1, rotate: 90 }}
+                  whileTap={{ scale: 0.9 }}
+                  initial={{ opacity: 0, x: 10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: 0.4, duration: 0.3, type: 'spring', stiffness: 400, damping: 17 }}
+                >
+                  <X className="w-5 h-5 group-hover:rotate-90 transition-transform duration-200" />
+                </motion.button>
               </div>
-            )}
-          </div>
-        </div>
+            </motion.div>
 
-        {/* Fixed Footer */}
-        <div className="relative flex-shrink-0 p-6 lg:p-8 pt-4">
-          <div className="flex justify-end pt-6 border-t border-white/10">
-            <button
-              onClick={onClose}
-              className="px-6 py-3 border border-white/30 rounded-2xl text-white hover:bg-white/10 hover:border-white/50 transition-all duration-300 text-sm lg:text-base font-medium hover:scale-105"
+            {/* Search Section */}
+            <motion.div
+              className="relative flex-shrink-0 px-6 lg:px-8 py-6 border-b border-white/10"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2, duration: 0.3 }}
             >
-              Cancel
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
+              <div className="space-y-3">
+                <motion.label
+                  className="text-white font-semibold text-sm lg:text-base flex items-center space-x-2"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: 0.3, duration: 0.3 }}
+                >
+                  <div className="w-2 h-2 bg-emerald-400 rounded-full"></div>
+                  <span>Search Followings</span>
+                </motion.label>
+                <div className="relative">
+                  <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-white/60 w-5 h-5" />
+                  <motion.input
+                    type="text"
+                    placeholder="Search by name or nickname..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full pl-12 pr-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-emerald-400/50 focus:border-emerald-400/50 transition-all duration-300 hover:bg-white/15 text-sm lg:text-base"
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ delay: 0.4, duration: 0.3 }}
+                  />
+                </div>
+              </div>
+            </motion.div>
+
+            {/* Scrollable Content Area */}
+            <motion.div
+              className="relative flex-1 overflow-y-auto px-6 lg:px-8 py-4"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.3, duration: 0.3 }}
+            >
+              <div className="space-y-4">
+                {isLoading ? (
+                  <motion.div
+                    className="flex items-center justify-center h-64"
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ duration: 0.3 }}
+                  >
+                    <div className="flex items-center space-x-3">
+                      <motion.div
+                        className="w-6 h-6 border-2 border-emerald-500/30 border-t-emerald-500 rounded-full"
+                        animate={{ rotate: 360 }}
+                        transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
+                      />
+                      <span className="text-white/70 text-sm lg:text-base">Loading followers...</span>
+                    </div>
+                  </motion.div>
+                ) : filteredFollowers.length > 0 ? (
+                  <motion.div
+                    className="space-y-2"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: 0.4, duration: 0.3 }}
+                  >
+                    {filteredFollowers.map((follower, index) => (
+                      <motion.button
+                        key={follower.id}
+                        onClick={() => onStartChat(follower.id)}
+                        className="w-full flex items-center space-x-4 p-4 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 rounded-xl transition-all duration-300 group"
+                        whileHover={{ scale: 1.02, backgroundColor: 'rgba(255, 255, 255, 0.1)' }}
+                        whileTap={{ scale: 0.98 }}
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.1 * index, duration: 0.3 }}
+                      >
+                        <div className="relative">
+                          <motion.div
+                            className="w-12 h-12 bg-gradient-to-br from-emerald-400 via-teal-500 to-cyan-600 rounded-xl flex items-center justify-center text-white font-bold shadow-lg group-hover:shadow-xl transition-all duration-300"
+                            whileHover={{ scale: 1.05 }}
+                            transition={{ type: 'spring', stiffness: 400, damping: 17 }}
+                          >
+                            {follower.avatar ? (
+                              <Image src={follower.avatar} alt={follower.first_name} width={48} height={48} unoptimized={follower.avatar.includes('/svg')} className="w-full h-full rounded-xl object-cover" />
+                            ) : (
+                              follower.first_name[0]?.toUpperCase()
+                            )}
+                          </motion.div>
+                          <motion.div
+                            className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-white shadow-lg ${
+                              getUserStatus(follower.id) === 'online' ? 'bg-green-500' :
+                              getUserStatus(follower.id) === 'busy' ? 'bg-red-500' :
+                              getUserStatus(follower.id) === 'away' ? 'bg-yellow-500' :
+                              'bg-gray-500'
+                            }`}
+                            animate={{ scale: [1, 1.2, 1] }}
+                          />
+                        </div>
+                        <div className="flex-1 min-w-0 text-left">
+                          <motion.p
+                            className="text-white font-semibold text-sm lg:text-base truncate group-hover:text-white/90"
+                            initial={{ opacity: 0, x: -10 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            transition={{ delay: 0.2, duration: 0.3 }}
+                          >
+                            {`${follower.first_name} ${follower.last_name}`}
+                          </motion.p>
+                          {follower.nickname && (
+                            <motion.p
+                            className="text-white/60 text-xs lg:text-sm truncate group-hover:text-white/70"
+                              initial={{ opacity: 0, x: -10 }}
+                              animate={{ opacity: 1, x: 0 }}
+                              transition={{ delay: 0.3, duration: 0.3 }}
+                            >
+                              @{follower.nickname}
+                            </motion.p>
+                          )}
+                        </div>
+                        <motion.div
+                          className="flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+                          initial={{ opacity: 0, scale: 0.8 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          transition={{ delay: 0.4, duration: 0.3 }}
+                        >
+                          <MessageSquarePlus className="w-5 h-5 text-emerald-400" />
+                        </motion.div>
+                      </motion.button>
+                    ))}
+                  </motion.div>
+                ) : (
+                  <motion.div
+                    className="text-center py-16"
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ duration: 0.5 }}
+                  >
+                    <motion.div
+                      animate={{ scale: [1, 1.1, 1] }}
+                      transition={{ duration: 2, repeat: Infinity }}
+                      className="text-white/40 text-6xl mb-4"
+                    >
+                      💬
+                    </motion.div>
+                    <motion.h3
+                      className="text-lg lg:text-xl font-semibold text-white mb-2"
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.2, duration: 0.3 }}
+                    >
+                      {searchQuery ? 'No followings found' : 'No followings to message'}
+                    </motion.h3>
+                    <motion.p
+                      className="text-white/60 text-sm lg:text-base"
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.3, duration: 0.3 }}
+                    >
+                      {searchQuery
+                        ? 'Try searching with a different name or nickname.'
+                        : 'Follow some users to start messaging them.'
+                      }
+                    </motion.p>
+                  </motion.div>
+                )}
+              </div>
+            </motion.div>
+
+            {/* Footer */}
+            <motion.div
+              className="relative flex-shrink-0 p-6 lg:p-8 pt-4 bg-gradient-to-r from-white/5 to-white/10 border-t border-white/20"
+              initial={{ y: 20, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ delay: 0.4, duration: 0.3 }}
+            >
+              <div className="flex justify-end">
+                <motion.button
+                  onClick={onClose}
+                  className="px-6 py-3 border border-white/30 rounded-xl text-white hover:bg-white/10 hover:border-white/50 transition-all duration-300 text-sm lg:text-base font-medium"
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  transition={{ type: 'spring', stiffness: 400, damping: 17 }}
+                >
+                  Cancel
+                </motion.button>
+              </div>
+            </motion.div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
   )
 }

@@ -1,18 +1,41 @@
 'use client'
-import React, { useState, useRef } from 'react'
-import { X, Send, Smile, Paperclip, Image as ImageIcon, Check, CheckCheck, Clock } from 'lucide-react'
+import React, { useState, useRef, useEffect } from 'react'
+import { X, Send, Smile, Check, CheckCheck, Clock, ChevronDown } from 'lucide-react'
 import Image from 'next/image'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useAuth } from '@/context/AuthContext'
 import { useWebSocket } from '@/context/WebSocketContext'
-import { useRealTimeMessages, useTypingIndicator, useConnectionStatus } from '@/hooks'
+import { useRealTimeMessages, useTypingIndicator } from '@/hooks'
 import { api, User } from '@/lib/api'
+import EmojiPicker from 'emoji-picker-react'
+
+interface EmojiData {
+  emoji: string
+  names: string[]
+  activeSkinTone: string
+}
+
+interface Message {
+  id: number
+  conversation_id: number
+  sender_id: number
+  content: string
+  message_type: 'text' | 'image' | 'file'
+  created_at: string
+  is_read: boolean
+  sender: {
+    id: number
+    first_name: string
+    last_name: string
+    avatar: string
+  }
+}
 
 interface ChatWindowProps {
   conversationId: number
   conversationType: 'private' | 'group'
-  participantId?: number
   participantName: string
+  participantId?: number
   onClose: () => void
 }
 
@@ -25,14 +48,14 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
 }) => {
   const [newMessage, setNewMessage] = useState('')
   const [showEmojiPicker, setShowEmojiPicker] = useState(false)
-  const [selectedFile, setSelectedFile] = useState<File | null>(null)
-  const [isUploading, setIsUploading] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const messagesContainerRef = useRef<HTMLDivElement>(null)
-  const fileInputRef = useRef<HTMLInputElement>(null)
   const timeoutIdRef = useRef<NodeJS.Timeout | null>(null)
   const [participantData, setParticipantData] = useState<User | null>(null)
   const [lastScrollTop, setLastScrollTop] = useState(0)
+  const [wasAtBottom, setWasAtBottom] = useState(true)
+  const [savedScrollPosition, setSavedScrollPosition] = useState(0)
+  const [isLoadingHistorical, setIsLoadingHistorical] = useState(false)
   const { user } = useAuth()
 
   // Real-time messaging integration
@@ -54,17 +77,16 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
 
   // Connection status monitoring
   const { isConnected, onlineUsers } = useWebSocket()
-  const { connectionQuality } = useConnectionStatus()
 
   // Load conversation messages when component mounts or conversation changes
-  React.useEffect(() => {
+  useEffect(() => {
     if (conversationId && conversationType) {
       fetchConversationMessages(conversationId, conversationType, participantId, 20, 0, false)
     }
   }, [conversationId, conversationType, participantId, fetchConversationMessages])
 
   // Fetch participant data for private chats
-  React.useEffect(() => {
+  useEffect(() => {
     if (conversationType === 'private' && participantId) {
       const fetchParticipantData = async () => {
         try {
@@ -83,78 +105,86 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
     if (timeoutIdRef.current) return
     timeoutIdRef.current = setTimeout(async () => {
       if (conversationId && conversationType && hasMoreMessages.get(conversationId) && !isLoadingMore.get(conversationId)) {
+        setIsLoadingHistorical(true)
         await loadMoreMessages(conversationId, conversationType, participantId)
+        setIsLoadingHistorical(false)
       }
       timeoutIdRef.current = null
     }, 500) // 500ms throttle
   }, [conversationId, conversationType, participantId, hasMoreMessages, isLoadingMore, loadMoreMessages])
 
-  // Handle scroll to load more messages
+  // Function to load previous messages when button is clicked
+  const handleLoadPreviousMessages = React.useCallback(async () => {
+    if (conversationId && conversationType && hasMoreMessages.get(conversationId) && !isLoadingMore.get(conversationId)) {
+      // Save current scroll position before loading
+      const currentScrollTop = messagesContainerRef.current?.scrollTop || 0
+      setSavedScrollPosition(currentScrollTop)
+      setIsLoadingHistorical(true)
+
+      await loadMoreMessages(conversationId, conversationType, participantId)
+
+      // Restore scroll position after loading
+      setTimeout(() => {
+        if (messagesContainerRef.current) {
+          messagesContainerRef.current.scrollTop = currentScrollTop
+        }
+        setIsLoadingHistorical(false)
+      }, 50)
+    }
+  }, [conversationId, conversationType, participantId, hasMoreMessages, isLoadingMore, loadMoreMessages])
+
+  // Handle scroll to track position (no longer loads messages automatically)
   const handleScroll = React.useCallback((e: React.UIEvent<HTMLDivElement>) => {
     const target = e.currentTarget
     const scrollTop = target.scrollTop
+    const scrollHeight = target.scrollHeight
+    const clientHeight = target.clientHeight
 
-    // Detect scrolling up near the top (within 100px of top)
-    if (scrollTop < 100 && scrollTop < lastScrollTop) {
-      throttledLoadMore()
-    }
+    // Check if user is at the bottom (within 50px)
+    const atBottom = scrollTop + clientHeight >= scrollHeight - 50
+    setWasAtBottom(atBottom)
 
     setLastScrollTop(scrollTop)
-  }, [lastScrollTop, throttledLoadMore])
+  }, [lastScrollTop])
 
   // Scroll to bottom when new messages arrive
-  const scrollToBottom = () => {
+  const scrollToBottom = React.useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }
+  }, [])
 
-  React.useEffect(() => {
-    scrollToBottom()
-  }, [messages])
+  // Smart scroll management - only scroll to bottom when appropriate
+  const handleMessagesChange = React.useCallback(() => {
+    if (isLoadingHistorical) {
+      // When loading historical messages, scroll position is manually restored
+      // in handleLoadPreviousMessages, so we don't do anything here
+      return
+    }
+
+    if (wasAtBottom) {
+      // Only scroll to bottom if user was already at the bottom
+      setTimeout(() => scrollToBottom(), 100)
+    }
+  }, [isLoadingHistorical, wasAtBottom, scrollToBottom])
+
+  useEffect(() => {
+    handleMessagesChange()
+  }, [messages, handleMessagesChange])
 
   const handleSendMessage = async () => {
-    if ((!newMessage.trim() && !selectedFile) || !isConnected) return
+    if (!newMessage.trim() || !isConnected) return
 
     try {
-      let messageContent = newMessage.trim()
-      let messageType: 'text' | 'image' | 'file' = 'text'
-
-      if (selectedFile) {
-        setIsUploading(true)
-        const formData = new FormData()
-        formData.append('file', selectedFile)
-
-        const uploadResponse = await fetch('/api/uploads', {
-          method: 'POST',
-          body: formData,
-          credentials: 'include'
-        })
-
-        if (uploadResponse.ok) {
-          messageType = selectedFile.type.startsWith('image/') ? 'image' : 'file'
-          if (!messageContent) {
-            messageContent = selectedFile.name
-          }
-        } else {
-          console.error('Failed to upload file')
-          setIsUploading(false)
-          return
-        }
-        setIsUploading(false)
-      }
-
       await sendRealTimeMessage(
         conversationId,
-        messageContent,
-        messageType,
+        newMessage.trim(),
+        'text',
         conversationType === 'private' ? participantId : undefined,
         conversationType === 'group' ? conversationId : undefined
       )
 
       setNewMessage('')
-      setSelectedFile(null)
     } catch (error) {
       console.error('Error sending message:', error)
-      setIsUploading(false)
     }
   }
 
@@ -171,27 +201,9 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
     }
   }
 
-  const handleEmojiClick = (emoji: string) => {
-    setNewMessage(prev => prev + emoji)
+  const handleEmojiClick = (emojiData: EmojiData) => {
+    setNewMessage(prev => prev + emojiData.emoji)
     setShowEmojiPicker(false)
-  }
-
-  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
-    if (file) {
-      if (file.size > 10 * 1024 * 1024) {
-        alert('File size must be less than 10MB')
-        return
-      }
-      setSelectedFile(file)
-    }
-  }
-
-  const removeSelectedFile = () => {
-    setSelectedFile(null)
-    if (fileInputRef.current) {
-      fileInputRef.current.value = ''
-    }
   }
 
   const getParticipantStatus = (): string => {
@@ -200,6 +212,72 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
     if (!onlineUser) return 'offline'
     if (onlineUser.status === 'invisible' || onlineUser.status === 'offline') return 'offline'
     return onlineUser.status // 'online', 'busy', 'away'
+  }
+
+  // Parse various timestamp formats robustly: ISO strings, milliseconds, or seconds
+  const parseDate = (value: string | number | undefined | null): Date => {
+    if (!value && value !== 0) return new Date(0)
+    const raw = typeof value === 'number' ? value : String(value).trim()
+
+    // If purely numeric string, attempt to detect units (seconds, milliseconds, microseconds)
+    if (/^\d+$/.test(String(raw))) {
+      const n = Number(raw)
+      // Try as milliseconds first
+      const asMs = new Date(n)
+      if (asMs.getFullYear() >= 2000) return asMs
+
+      // Try as seconds
+      const asSeconds = new Date(n * 1000)
+      if (asSeconds.getFullYear() >= 2000) return asSeconds
+
+      // Try as microseconds (divide by 1000)
+      const asMicros = new Date(Math.floor(n / 1000))
+      if (asMicros.getFullYear() >= 2000) return asMicros
+
+      // Fallback: prefer asSeconds if it looks reasonable, else asMs
+      if (asSeconds.getTime() !== 0) return asSeconds
+      // Log suspicious value
+      console.warn('parseDate: suspicious numeric date value', value, '->', asMs)
+      return asMs
+    }
+
+    // Fallback: let Date parse ISO-like strings
+    const d = new Date(String(raw))
+    if (isNaN(d.getTime())) {
+      // If parsing failed, log and return epoch 0
+      console.warn('parseDate: failed to parse date', value)
+      return new Date(0)
+    }
+    return d
+  }
+
+  const formatLastOnlineTime = (lastStatusChange: string | number | undefined | null): string => {
+    const date = parseDate(lastStatusChange)
+    const now = new Date()
+
+    // Compare only the date parts to determine today / yesterday
+    const dateDate = new Date(date.getFullYear(), date.getMonth(), date.getDate())
+    const todayDate = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+    const yesterdayDate = new Date(todayDate)
+    yesterdayDate.setDate(yesterdayDate.getDate() - 1)
+
+    let timeString = ''
+    if (dateDate.getTime() === todayDate.getTime()) {
+      timeString = date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true })
+    } else if (dateDate.getTime() === yesterdayDate.getTime()) {
+      timeString = `yesterday ${date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true })}`
+    } else {
+      timeString = date.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true
+      })
+    }
+
+    return `last seen ${timeString}`
   }
 
   const renderMessageStatus = (status?: string) => {
@@ -219,28 +297,72 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
     }
   }
 
-  // Helper function to format time
-  const formatTime = (dateString: string) => {
-    const date = new Date(dateString)
-    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+  // Helper function to format time for messages
+  const formatTime = (dateString: string | number) => {
+    const date = parseDate(dateString)
+    if (isNaN(date.getTime()) || date.getTime() === 0) return ''
+    return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true })
+  }
+
+  // Helper function to check if messages should be grouped by date
+  const shouldShowDateSeparator = (message: Message, index: number): boolean => {
+    if (index === 0) return true
+    const prevMessage = Array.from(messages.get(conversationId) || [])[index - 1]
+    if (!prevMessage) return true
+
+    // Fallback to now if created_at is missing/invalid
+    const getValidDate = (val: string | number | undefined) => {
+      const d = parseDate(val)
+      if (isNaN(d.getTime()) || d.getTime() === 0) return new Date()
+      return d
+    }
+
+    const messageDate = getValidDate(message.created_at)
+    const prevMessageDate = getValidDate(prevMessage.created_at)
+    return messageDate.toDateString() !== prevMessageDate.toDateString()
+  }
+
+  // Helper function to format date separator
+  const formatDateSeparator = (dateString: string | number): string => {
+    const messageDate = parseDate(dateString)
+    if (isNaN(messageDate.getTime()) || messageDate.getTime() === 0) return ''
+    const today = new Date()
+    const yesterday = new Date(today)
+    yesterday.setDate(yesterday.getDate() - 1)
+
+    if (messageDate.toDateString() === today.toDateString()) {
+      return 'Today'
+    } else if (messageDate.toDateString() === yesterday.toDateString()) {
+      return 'Yesterday'
+    } else {
+      return messageDate.toLocaleDateString('en-US', {
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric'
+      })
+    }
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const renderMessage = (message: any, index: number) => {
+  const renderMessage = (message: Message, index: number) => {
     const isCurrentUser = message.sender_id === user?.id
     const showAvatar = conversationType === 'group' && !isCurrentUser
     const showSenderName = conversationType === 'group' && !isCurrentUser
 
-    // Check if we should show timestamp (every 5 messages or time gap > 10 minutes)
-    const prevMessage = index > 0 ? Array.from(messages.get(conversationId) || [])[index - 1] : null
-    const timeDiff = prevMessage ? 
-      new Date(message.created_at).getTime() - new Date(prevMessage.created_at).getTime() : 0
-    const showTimestamp = index === 0 || timeDiff > 10 * 60 * 1000 || index % 5 === 0
+    // Fallback: if created_at is missing or invalid, use now
+    let createdAt = message.created_at
+    const parsedDate = parseDate(createdAt)
+    if (isNaN(parsedDate.getTime()) || parsedDate.getTime() === 0) {
+      console.warn('renderMessage: invalid or missing created_at, using now', message)
+      createdAt = new Date().toISOString()
+    }
+
+    const showDateSeparator = shouldShowDateSeparator({ ...message, created_at: createdAt }, index)
 
     return (
       <div key={message.id} className="space-y-2">
-        {/* Timestamp separator */}
-        {showTimestamp && (
+        {/* Date separator */}
+        {showDateSeparator && (
           <motion.div
             className="flex items-center justify-center py-4"
             initial={{ opacity: 0, scale: 0.8 }}
@@ -249,22 +371,14 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
           >
             <div className="bg-gradient-to-r from-emerald-500/20 to-teal-500/20 backdrop-blur-sm rounded-full px-4 py-2 border border-white/10">
               <span className="text-xs text-white/60 font-medium">
-                {new Date(message.created_at).toLocaleDateString([], { 
-                  month: 'short', 
-                  day: 'numeric',
-                  hour: '2-digit',
-                  minute: '2-digit'
-                })}
+                {formatDateSeparator(createdAt)}
               </span>
             </div>
           </motion.div>
         )}
 
-        <motion.div
+        <div
           className={`flex items-end space-x-3 ${isCurrentUser ? 'justify-end' : 'justify-start'}`}
-          initial={{ opacity: 0, y: 20, scale: 0.95 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          transition={{ duration: 0.3, delay: index * 0.05 }}
         >
           {/* Avatar for group chats */}
           {showAvatar && (
@@ -293,14 +407,12 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
             )}
 
             {/* Message bubble */}
-            <motion.div
+            <div
               className={`relative px-4 py-3 rounded-2xl shadow-lg backdrop-blur-sm border transition-all duration-300 hover:shadow-xl ${
                 isCurrentUser
                   ? 'bg-gradient-to-r from-emerald-500 to-teal-600 text-white border-emerald-400/30 rounded-br-md'
                   : 'bg-white/10 text-white border-white/20 rounded-bl-md hover:bg-white/15'
               }`}
-              whileHover={{ scale: 1.02 }}
-              transition={{ type: 'spring', stiffness: 400, damping: 17 }}
             >
               {/* Message content */}
               <div className="text-sm leading-relaxed break-words">
@@ -317,7 +429,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
                 transition={{ delay: 0.3 }}
               >
                 <span className="text-xs opacity-75">
-                  {formatTime(message.created_at)}
+                  {formatTime(createdAt)}
                 </span>
                 {isCurrentUser && (
                   <div className="flex items-center space-x-1">
@@ -328,8 +440,8 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
 
               {/* Message tail */}
               <div className={`absolute bottom-0 ${
-                isCurrentUser 
-                  ? '-right-2 border-l-emerald-400 border-l-8 border-t-8 border-t-transparent border-b-8 border-b-transparent' 
+                isCurrentUser
+                  ? '-right-2 border-l-emerald-400 border-l-8 border-t-8 border-t-transparent border-b-8 border-b-transparent'
                   : '-left-2 border-r-white/20 border-r-8 border-t-8 border-t-transparent border-b-8 border-b-transparent'
               }`}></div>
 
@@ -339,9 +451,9 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
                 whileHover={{ opacity: 1 }}
                 transition={{ duration: 0.2 }}
               />
-            </motion.div>
+            </div>
           </div>
-        </motion.div>
+        </div>
       </div>
     )
   }
@@ -384,7 +496,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
             {/* Online status indicator */}
             <motion.div
               className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-white/10 ${
-                conversationType === 'private' && participantId 
+                conversationType === 'private' && participantId
                   ? (getParticipantStatus() === 'online' ? 'bg-green-500' :
                      getParticipantStatus() === 'busy' ? 'bg-red-500' :
                      getParticipantStatus() === 'away' ? 'bg-yellow-500' :
@@ -392,7 +504,6 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
                   : (isConnected ? 'bg-green-500' : 'bg-red-500')
               } shadow-lg`}
               animate={{ scale: [1, 1.2, 1] }}
-              transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
             />
           </motion.div>
 
@@ -411,33 +522,22 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: 0.3, duration: 0.3 }}
             >
-              <motion.div
-                className={`w-2 h-2 rounded-full ${
-                  conversationType === 'private' && participantId 
-                    ? (getParticipantStatus() === 'online' ? 'bg-green-500' :
-                       getParticipantStatus() === 'busy' ? 'bg-red-500' :
-                       getParticipantStatus() === 'away' ? 'bg-yellow-500' :
-                       'bg-gray-500')
-                    : (isConnected ? 'bg-green-500' : 'bg-red-500')
-                }`}
-                animate={{ scale: [1, 1.5, 1] }}
-                transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
-              />
-              <span className="text-xs text-white/60 font-medium">
-                {conversationType === 'private' && participantId 
+              <span className={`text-xs font-medium ${
+                conversationType === 'private' && participantId
+                  ? (getParticipantStatus() === 'online' ? 'text-green-400' :
+                     getParticipantStatus() === 'busy' ? 'text-red-400' :
+                     getParticipantStatus() === 'away' ? 'text-yellow-400' :
+                     'text-gray-400')
+                  : (isConnected ? 'text-green-400' : 'text-red-400')
+              }`}>
+                {conversationType === 'private' && participantId
                   ? (getParticipantStatus() === 'online' ? 'Online' :
                      getParticipantStatus() === 'busy' ? 'Busy' :
                      getParticipantStatus() === 'away' ? 'Away' :
-                     'Offline')
+                     participantData?.last_status_change ? formatLastOnlineTime(participantData.last_status_change) : 'Offline')
                   : (isConnected ? 'Connected' : 'Disconnected')
                 }
               </span>
-              {connectionQuality && (
-                <>
-                  <span className="text-white/40">•</span>
-                  <span className="text-xs text-white/50">{connectionQuality}</span>
-                </>
-              )}
               {conversationType === 'group' && (
                 <>
                   <span className="text-white/40">•</span>
@@ -452,21 +552,6 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
 
         <div className="flex items-center space-x-2">
           {/* Connection indicator */}
-          <motion.div
-            className="flex items-center space-x-2"
-            initial={{ opacity: 0, x: 10 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 0.4, duration: 0.3 }}
-          >
-            <motion.div
-              className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'} animate-pulse`}
-              animate={{ scale: isConnected ? [1, 1.2, 1] : 1 }}
-              transition={{ duration: 1, repeat: Infinity }}
-            />
-            <span className="text-xs text-white/60 hidden sm:inline">
-              {isConnected ? 'Online' : 'Offline'}
-            </span>
-          </motion.div>
 
           <motion.button
             onClick={onClose}
@@ -490,6 +575,33 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
         transition={{ delay: 0.2, duration: 0.3 }}
         onScroll={handleScroll}
       >
+          {/* Load Previous Messages Button */}
+          {hasMoreMessages.get(conversationId) && !isLoadingMore.get(conversationId) && Array.from(messages.get(conversationId) || []).length > 0 && !isLoadingHistorical && (
+            <motion.div
+              className="flex justify-center py-4"
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.3 }}
+            >
+              <motion.button
+                onClick={handleLoadPreviousMessages}
+                className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-emerald-500/20 to-teal-500/20 hover:from-emerald-500/30 hover:to-teal-500/30 backdrop-blur-sm border border-white/20 rounded-xl text-white/80 hover:text-white transition-all duration-200 shadow-lg"
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                title="Load previous messages"
+              >
+                <motion.div
+                  animate={{ rotate: 180 }}
+                  transition={{ duration: 0.3 }}
+                >
+                  <ChevronDown className="w-4 h-4" />
+                </motion.div>
+                <span className="text-sm font-medium">Load Previous Messages</span>
+              </motion.button>
+            </motion.div>
+          )}
+
           {isLoading ? (
             <motion.div
               className="flex items-center justify-center h-full"
@@ -551,7 +663,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
                   </div>
                 </motion.div>
               ) : (
-                Array.from(messages.get(conversationId) || []).map((message, index) => 
+                Array.from(messages.get(conversationId) || []).map((message, index) =>
                   renderMessage(message, index)
                 )
               )}
@@ -602,64 +714,26 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
         animate={{ y: 0, opacity: 1 }}
         transition={{ delay: 0.3, duration: 0.3 }}
       >
-        {/* Selected File Display */}
-        <AnimatePresence>
-          {selectedFile && (
-            <motion.div
-              className="mb-4 p-3 bg-white/10 rounded-lg border border-white/20"
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              exit={{ opacity: 0, height: 0 }}
-              transition={{ duration: 0.3 }}
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-3">
-                  {selectedFile.type.startsWith('image/') ? (
-                    <ImageIcon className="w-5 h-5 text-white/70" aria-label="Image file" />
-                  ) : (
-                    <Paperclip className="w-5 h-5 text-white/70" />
-                  )}
-                  <span className="text-white/80 text-sm truncate">{selectedFile.name}</span>
-                  <span className="text-white/50 text-xs">
-                    ({((selectedFile as File).size / 1024 / 1024).toFixed(1)}MB)
-                  </span>
-                </div>
-                <motion.button
-                  onClick={removeSelectedFile}
-                  className="p-2 text-white/60 hover:text-white transition-colors"
-                  title="Remove file"
-                  whileHover={{ scale: 1.1 }}
-                  whileTap={{ scale: 0.9 }}
-                >
-                  <X className="w-4 h-4" />
-                </motion.button>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
         <div className="flex items-end space-x-4">
-          {/* File Input */}
-          <input
-            ref={fileInputRef}
-            type="file"
-            onChange={handleFileSelect}
-            accept="image/*,.pdf,.doc,.docx,.txt,.zip,.rar"
-            className="hidden"
-            title="Attach file"
-          />
+          {/* Emoji Picker Button */}
           <motion.button
-            onClick={() => fileInputRef.current?.click()}
+            onClick={() => setShowEmojiPicker(!showEmojiPicker)}
             className="p-3 text-white/60 hover:text-white hover:bg-white/10 rounded-xl transition-colors"
-            title="Attach file"
+            title="Add emoji"
             whileHover={{ scale: 1.1 }}
             whileTap={{ scale: 0.9 }}
           >
-            <Paperclip className="w-5 h-5" />
+            <Smile className="w-5 h-5" />
           </motion.button>
 
           <div className="flex-1 relative">
             <textarea
+              ref={(el) => {
+                if (el) {
+                  el.style.height = 'auto'
+                  el.style.height = Math.min(el.scrollHeight, 128) + 'px'
+                }
+              }}
               value={newMessage}
               onChange={(e) => {
                 setNewMessage(e.target.value)
@@ -667,31 +741,20 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
               }}
               onKeyPress={handleKeyPress}
               placeholder={`Message ${conversationType === 'group' ? `#${participantName}` : participantName}...`}
-              className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 pr-24 text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-emerald-400/50 resize-none min-h-[44px] max-h-32 text-sm overflow-y-auto"
+              className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-emerald-400/50 resize-none min-h-[44px] max-h-32 text-sm overflow-y-auto"
               rows={1}
             />
-            
-            {/* Emoji Picker Button */}
-            <motion.button
-              onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-              className="absolute right-16 top-1/2 transform -translate-y-1/2 p-2 text-white/60 hover:text-white transition-colors"
-              title="Add emoji"
-              whileHover={{ scale: 1.1 }}
-              whileTap={{ scale: 0.9 }}
-            >
-              <Smile className="w-5 h-5" />
-            </motion.button>
           </div>
 
           <motion.button
             onClick={handleSendMessage}
-            disabled={(!newMessage.trim() && !selectedFile) || !isConnected || isUploading}
+            disabled={!newMessage.trim() || !isConnected}
             className="p-3 bg-gradient-to-r from-emerald-500 to-teal-600 rounded-xl text-white hover:from-emerald-600 hover:to-teal-700 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
             title="Send message"
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
           >
-            {isUploading ? <Clock className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
+            <Send className="w-5 h-5" />
           </motion.button>
         </div>
 
@@ -699,33 +762,27 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
         <AnimatePresence>
           {showEmojiPicker && (
             <motion.div
-              className="absolute bottom-full right-6 mb-4 z-50"
+              className="absolute bottom-full left-6 mb-4 z-50"
               initial={{ opacity: 0, scale: 0.8, y: 10 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.8, y: 10 }}
               transition={{ duration: 0.2 }}
             >
-              <div className="bg-white/95 backdrop-blur-xl rounded-xl border border-white/20 shadow-xl p-3">
-                <div className="grid grid-cols-8 gap-2 max-w-sm">
-                  {['😀', '😂', '❤️', '👍', '👎', '🔥', '💯', '🎉', '🤔', '😢', '😮', '🙌', '👏', '💪', '🤝', '✨'].map((emoji) => (
-                    <motion.button
-                      key={emoji}
-                      onClick={() => handleEmojiClick(emoji)}
-                      className="w-10 h-10 hover:bg-gray-100 rounded-lg flex items-center justify-center text-xl transition-colors"
-                      whileHover={{ scale: 1.2 }}
-                      whileTap={{ scale: 0.9 }}
-                    >
-                      {emoji}
-                    </motion.button>
-                  ))}
-                </div>
-              </div>
+              <EmojiPicker
+                onEmojiClick={handleEmojiClick}
+                searchPlaceHolder="Search emojis..."
+                width={350}
+                height={400}
+                previewConfig={{
+                  showPreview: false
+                }}
+              />
             </motion.div>
           )}
         </AnimatePresence>
 
         <AnimatePresence>
-          {(newMessage.length > 0 || selectedFile) && (
+          {newMessage.length > 0 && (
             <motion.div
               className="text-xs text-white/50 mt-3 text-right"
               initial={{ opacity: 0, y: 5 }}

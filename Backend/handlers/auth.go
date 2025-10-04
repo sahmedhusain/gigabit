@@ -136,6 +136,10 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		user.Avatar = &req.Avatar
 	}
 
+	if req.Gender != "" {
+		user.Gender = &req.Gender
+	}
+
 	if err := h.userService.CreateUser(user); err != nil {
 		writeError(w, http.StatusInternalServerError, "Failed to create user")
 		return

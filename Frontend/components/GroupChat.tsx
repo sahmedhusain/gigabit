@@ -5,6 +5,8 @@ import { API_BASE_URL, api } from '@/lib/api'
 import ChatWindow from '@/components/ChatWindow'
 import { MessageCircle, Users, Hash } from 'lucide-react'
 import { useRealTimeMessages, useOnlineStatus, useConnectionStatus } from '@/hooks'
+import { getAvatarUrl } from '@/utils/avatarUtils'
+import Image from 'next/image'
 
 interface GroupChatProps {
   groupId: number
@@ -211,13 +213,28 @@ const GroupChat: React.FC<GroupChatProps> = ({ groupId, groupTitle }) => {
 
                           const createdAt = typeof m.created_at === 'string' ? new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
                           const content = typeof m.content === 'string' ? m.content : '';
+                          const senderAvatar = typeof sender.avatar === 'string' ? sender.avatar : null;
 
                           return (
                             <div key={(m.id as string) || index} className="bg-white/5 rounded-lg p-3 border border-white/10">
                               <div className="flex items-center space-x-2 mb-1">
-                                <div className="w-6 h-6 bg-gradient-to-r from-emerald-500 to-teal-600 rounded-full flex items-center justify-center">
-                                  <span className="text-white text-xs font-semibold">{senderInitial}</span>
-                                </div>
+                                {(() => {
+                                  const avatarUrl = senderAvatar ? getAvatarUrl(senderAvatar) : null;
+                                  return avatarUrl ? (
+                                    <Image
+                                      src={avatarUrl}
+                                      alt={senderName}
+                                      width={24}
+                                      height={24}
+                                      unoptimized={avatarUrl.includes('/svg')}
+                                      className="w-6 h-6 rounded-full object-cover"
+                                    />
+                                  ) : (
+                                    <div className="w-6 h-6 bg-gradient-to-r from-emerald-500 to-teal-600 rounded-full flex items-center justify-center">
+                                      <span className="text-white text-xs font-semibold">{senderInitial}</span>
+                                    </div>
+                                  );
+                                })()}
                                 <span className="text-white/80 text-sm font-medium">{senderName}</span>
                                 <span className="text-white/50 text-xs">{createdAt}</span>
                               </div>

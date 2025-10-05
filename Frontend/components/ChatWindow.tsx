@@ -8,6 +8,7 @@ import { useWebSocket } from '@/context/WebSocketContext'
 import { useRealTimeMessages, useTypingIndicator } from '@/hooks'
 import { api, User } from '@/lib/api'
 import EmojiPicker from 'emoji-picker-react'
+import { getAvatarUrl } from '@/utils/avatarUtils'
 
 interface EmojiData {
   emoji: string
@@ -421,9 +422,23 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
               whileHover={{ scale: 1.1 }}
               transition={{ type: 'spring', stiffness: 400, damping: 17 }}
             >
-              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center text-white text-sm font-semibold shadow-lg ring-2 ring-white/10">
-                {message.sender.first_name[0]}{message.sender.last_name[0]}
-              </div>
+              {(() => {
+                const avatarUrl = message.sender.avatar ? getAvatarUrl(message.sender.avatar) : null;
+                return avatarUrl ? (
+                  <Image
+                    src={avatarUrl}
+                    alt={`${message.sender.first_name} ${message.sender.last_name}`}
+                    width={32}
+                    height={32}
+                    unoptimized={avatarUrl.includes('/svg')}
+                    className="w-8 h-8 rounded-full object-cover shadow-lg ring-2 ring-white/10"
+                  />
+                ) : (
+                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center text-white text-sm font-semibold shadow-lg ring-2 ring-white/10">
+                    {message.sender.first_name[0]}{message.sender.last_name[0]}
+                  </div>
+                );
+              })()}
             </motion.div>
           )}
 

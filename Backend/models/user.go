@@ -2,6 +2,7 @@ package models
 
 import (
 	"fmt"
+	"strings"
 	"time"
 )
 
@@ -15,7 +16,7 @@ type User struct {
 	Avatar           *string   `json:"avatar"`
 	Nickname         *string   `json:"nickname"`
 	AboutMe          *string   `json:"about_me"`
-	Gender      *string   `json:"gender"`
+	Gender           *string   `json:"gender"`
 	IsPrivate        bool      `json:"is_private"`
 	Status           string    `json:"status"`
 	LastStatusChange time.Time `json:"last_status_change"`
@@ -32,7 +33,7 @@ type UserResponse struct {
 	Avatar           *string   `json:"avatar"`
 	Nickname         *string   `json:"nickname"`
 	AboutMe          *string   `json:"about_me"`
-	Gender      *string   `json:"gender"`
+	Gender           *string   `json:"gender"`
 	IsPrivate        bool      `json:"is_private"`
 	Status           string    `json:"status"`
 	LastStatusChange time.Time `json:"last_status_change"`
@@ -43,7 +44,19 @@ type UserResponse struct {
 func (u *User) ToResponse() UserResponse {
 	avatarURL := ""
 	if u.Avatar != nil && *u.Avatar != "" {
-		avatarURL = fmt.Sprintf("http://localhost:8080/api/uploads/%s", *u.Avatar)
+		// If it's already a full URL, use as is
+		if strings.HasPrefix(*u.Avatar, "http") {
+			avatarURL = *u.Avatar
+		} else if strings.HasPrefix(*u.Avatar, "/avatars/") {
+			// For built-in avatars, use as is
+			avatarURL = *u.Avatar
+		} else if strings.HasPrefix(*u.Avatar, "image:") {
+			// Invalid avatar format, return empty
+			avatarURL = ""
+		} else {
+			// For uploaded files, prepend the uploads path
+			avatarURL = fmt.Sprintf("http://localhost:8080/api/uploads/%s", *u.Avatar)
+		}
 	}
 
 	return UserResponse{
@@ -55,7 +68,7 @@ func (u *User) ToResponse() UserResponse {
 		Avatar:           &avatarURL,
 		Nickname:         u.Nickname,
 		AboutMe:          u.AboutMe,
-		Gender:      u.Gender,
+		Gender:           u.Gender,
 		IsPrivate:        u.IsPrivate,
 		Status:           u.Status,
 		LastStatusChange: u.LastStatusChange,

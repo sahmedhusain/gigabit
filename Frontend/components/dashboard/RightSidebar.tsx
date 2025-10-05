@@ -23,6 +23,7 @@ import {
 import { useWebSocket } from '@/context/WebSocketContext'
 import { api, Event } from '@/lib/api'
 import { useToast } from '@/context/ToastContext'
+import { getAvatarUrl } from '@/utils/avatarUtils'
 
 interface User {
   id?: number
@@ -362,20 +363,23 @@ export default function RightSidebar({
                       userStatus === 'away' ? 'bg-gradient-to-r from-yellow-400 to-amber-500' :
                         'bg-gradient-to-r from-gray-400 to-gray-500'
                     }`}>
-                    {currentUser?.avatar ? (
-                      <Image
-                        src={currentUser.avatar}
-                        alt={currentUser.name}
-                        width={48}
-                        height={48}
-                        unoptimized={currentUser.avatar.includes('/svg')}
-                        className="w-full h-full rounded-full object-cover"
-                      />
-                    ) : (
-                      <div className="w-full h-full rounded-full bg-gradient-to-r from-emerald-400 to-teal-500 flex items-center justify-center text-white font-bold">
-                        {currentUser?.name?.[0]?.toUpperCase() || <User className="w-5 h-5" />}
-                      </div>
-                    )}
+                    {(() => {
+                      const avatarUrl = currentUser?.avatar ? getAvatarUrl(currentUser.avatar) : null;
+                      return avatarUrl ? (
+                        <Image
+                          src={avatarUrl}
+                          alt={currentUser?.name || 'User'}
+                          width={48}
+                          height={48}
+                          unoptimized={avatarUrl.includes('/svg')}
+                          className="w-full h-full rounded-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-full rounded-full bg-gradient-to-r from-emerald-400 to-teal-500 flex items-center justify-center text-white font-bold">
+                          {currentUser?.name?.[0]?.toUpperCase() || <User className="w-5 h-5" />}
+                        </div>
+                      );
+                    })()}
                   </div>
                   {/* Status indicator */}
                   <div className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-white flex items-center justify-center ${statusOptions.find(s => s.id === userStatus)?.color || 'bg-gray-500'

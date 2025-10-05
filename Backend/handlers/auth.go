@@ -98,21 +98,33 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if len(req.Nickname) > 16 {
-		writeError(w, http.StatusBadRequest, "Nickname is too long")
-		return
-	}
-
 	if len(req.AboutMe) > 128 {
 		writeError(w, http.StatusBadRequest, "Your bio is too long")
 		return
 	}
 
-	// Check if nickname already exists
-	existingUser, err = h.userService.GetUserByNickname(req.Nickname)
-	if err == nil && existingUser != nil {
-		writeError(w, http.StatusConflict, "User with this nickname already exists")
-		return
+	// Generate nickname from email if not provided
+	nickname := req.Nickname
+	if nickname == "" {
+		generatedNickname, err := h.userService.GenerateUniqueNickname(req.Email)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "Failed to generate username")
+			return
+		}
+		nickname = generatedNickname
+	} else {
+		// Validate user-provided nickname length
+		if len(nickname) > 16 {
+			writeError(w, http.StatusBadRequest, "Nickname is too long")
+			return
+		}
+
+		// Check if nickname already exists (only if user provided one)
+		existingUser, err = h.userService.GetUserByNickname(nickname)
+		if err == nil && existingUser != nil {
+			writeError(w, http.StatusConflict, "User with this nickname already exists")
+			return
+		}
 	}
 
 	// Create user
@@ -125,8 +137,8 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Handle optional fields
-	if req.Nickname != "" {
-		user.Nickname = &req.Nickname
+	if nickname != "" {
+		user.Nickname = &nickname
 	}
 	if req.AboutMe != "" {
 		user.AboutMe = &req.AboutMe

@@ -124,6 +124,7 @@ export interface Comment {
   user_id: number;
   post_id: number;
   content: string;
+  image_url?: string | null;
   created_at: string;
   updated_at: string;
   user: User;

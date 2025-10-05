@@ -131,7 +131,7 @@ function RegisterPage() {
         throw new Error(returnValue)
       }
       
-      if (formData.nickname.length > 16) {
+      if (formData.nickname && formData.nickname.length > 16) {
         throw new Error('Nickname is too long')
       }
 

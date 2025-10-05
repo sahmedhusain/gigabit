@@ -66,14 +66,14 @@ export default function ActivitySection({
           <p className="text-white/80 mb-4 leading-relaxed">{post.content}</p>
           
           {post.image && (
-            <div className="mb-4 rounded-lg overflow-hidden">
+            <div className="mb-4 rounded-lg overflow-hidden max-w-sm mx-auto">
               <Image
                 src={post.image}
                 alt="Post content"
                 width={400}
                 height={256}
                 unoptimized={post.image.includes('/svg')}
-                className="w-full h-64 object-cover"
+                className="w-full h-auto max-h-64 object-contain"
               />
             </div>
           )}

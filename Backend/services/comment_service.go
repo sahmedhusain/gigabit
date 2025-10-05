@@ -2,9 +2,10 @@ package services
 
 import (
 	"database/sql"
+	"time"
+
 	"social/models"
 	"social/websocket"
-	"time"
 )
 
 type CommentService struct {
@@ -59,7 +60,7 @@ func (s *CommentService) CreateComment(comment *models.Comment) error {
 func (s *CommentService) GetPostComments(postID uint, limit, offset int) ([]models.CommentResponse, error) {
 	query := `
 		SELECT c.id, c.post_id, c.user_id, c.content, c.image_url, c.created_at, c.updated_at,
-			   u.first_name, u.last_name, u.avatar, u.nickname
+			   u.id, u.email, u.first_name, u.last_name, u.avatar, u.nickname, u.date_of_birth, u.about_me, u.is_private, u.created_at, u.updated_at
 		FROM comments c
 		JOIN users u ON c.user_id = u.id
 		WHERE c.post_id = ?
@@ -77,17 +78,29 @@ func (s *CommentService) GetPostComments(postID uint, limit, offset int) ([]mode
 	for rows.Next() {
 		var comment models.CommentResponse
 		var user models.UserResponse
+		var avatar, nickname, aboutMe sql.NullString
 
 		err := rows.Scan(
 			&comment.ID, &comment.PostID, &comment.UserID, &comment.Content, &comment.ImageURL,
 			&comment.CreatedAt, &comment.UpdatedAt,
-			&user.FirstName, &user.LastName, &user.Avatar, &user.Nickname,
+			&user.ID, &user.Email, &user.FirstName, &user.LastName, &avatar, &nickname,
+			&user.DateOfBirth, &aboutMe, &user.IsPrivate, &user.CreatedAt, &user.UpdatedAt,
 		)
 		if err != nil {
 			return nil, err
 		}
 
-		user.ID = comment.UserID
+		// Handle nullable fields
+		if avatar.Valid {
+			user.Avatar = &avatar.String
+		}
+		if nickname.Valid {
+			user.Nickname = &nickname.String
+		}
+		if aboutMe.Valid {
+			user.AboutMe = &aboutMe.String
+		}
+
 		comment.User = user
 		comments = append(comments, comment)
 	}

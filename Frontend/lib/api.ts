@@ -797,8 +797,8 @@ export class ApiClient {
     });
   }
 
-  async respondToEvent(eventId: number, option: 'going' | 'not_going'): Promise<{ message: string; response: string }> {
-    return this.request<{ message: string; response: string }>(`/api/events/${eventId}/respond`, {
+  async respondToEvent(eventId: number, option: 'going' | 'not_going'): Promise<{ message: string; response: string; removed: boolean }> {
+    return this.request<{ message: string; response: string; removed: boolean }>(`/api/events/${eventId}/respond`, {
       method: 'POST',
       body: JSON.stringify({ option }),
     });

@@ -123,9 +123,6 @@ func (s *BookmarkService) GetUserBookmarks(userID uint, limit, offset int) ([]mo
 		if nickname.Valid {
 			user.Nickname = &nickname.String
 		}
-		if err != nil {
-			return nil, fmt.Errorf("failed to scan bookmark: %v", err)
-		}
 
 		post.User = user
 		bookmark.Post = post

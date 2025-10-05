@@ -9,3 +9,5 @@ INSERT INTO group_conversations (id, group_id, created_at, updated_at) VALUES
 (6, 6, datetime('now', '-4 days'), datetime('now', '-2 days')), -- Photography Lovers
 (7, 7, datetime('now', '-5 days'), datetime('now', '-1 day')), -- Entrepreneurship Hub
 (8, 8, datetime('now', '-3 days'), datetime('now', '-1 day')); -- Music & Arts
+
+UPDATE group_conversations SET last_message_id = (SELECT MAX(id) FROM group_messages WHERE conversation_id = group_conversations.id) WHERE EXISTS (SELECT 1 FROM group_messages WHERE conversation_id = group_conversations.id);

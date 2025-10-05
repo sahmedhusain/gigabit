@@ -1,7 +1,7 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
-import { API_BASE_URL } from '@/lib/api'
+import React, { useState, useEffect, useCallback } from 'react'
+import { API_BASE_URL, api } from '@/lib/api'
 import ChatWindow from '@/components/ChatWindow'
 import { MessageCircle, Users, Hash } from 'lucide-react'
 import { useRealTimeMessages, useOnlineStatus, useConnectionStatus } from '@/hooks'
@@ -19,6 +19,8 @@ const GroupChat: React.FC<GroupChatProps> = ({ groupId, groupTitle }) => {
   const [showChat, setShowChat] = useState(false)
   const [memberCount, setMemberCount] = useState(0)
   const [recentMessages, setRecentMessages] = useState<unknown[]>([])
+  const [conversationId, setConversationId] = useState<number | null>(null)
+  const [isResolvingConversation, setIsResolvingConversation] = useState(false)
 
   // Calculate online member count from real-time data
   const onlineMemberCount = liveOnlineUsers.filter(user => user.status === 'online').length
@@ -61,12 +63,40 @@ const GroupChat: React.FC<GroupChatProps> = ({ groupId, groupTitle }) => {
           console.error('Error fetching recent messages:', error)
         }
       }
-
       fetchRecentMessages()
     }
   }, [showChat, groupId])
 
+  // Resolve the conversation ID associated with this group (if it exists)
+  const resolveConversationId = useCallback(async () => {
+    try {
+      setIsResolvingConversation(true)
+      const convs = await api.getConversations()
+      const match = (convs.conversations || []).find(c => c.type === 'group' && c.group && c.group.id === groupId)
+      if (match) {
+        setConversationId(match.id)
+      } else {
+        // No conversation yet (no messages). We'll fall back to using the groupId until a message creates one.
+        setConversationId(null)
+      }
+    } catch (err) {
+      console.error('Failed to resolve group conversation ID:', err)
+    } finally {
+      setIsResolvingConversation(false)
+    }
+  }, [groupId])
+
+  useEffect(() => {
+    // Attempt to resolve on mount and when groupId changes
+    resolveConversationId()
+  }, [resolveConversationId])
+
   const handleOpenChat = () => {
+    // Ensure we have attempted to resolve the conversation before opening
+    if (conversationId === null && !isResolvingConversation) {
+      // It's okay if this doesn't find one; ChatWindow will still allow sending the first message
+      resolveConversationId()
+    }
     setShowChat(true)
   }
 
@@ -129,12 +159,29 @@ const GroupChat: React.FC<GroupChatProps> = ({ groupId, groupTitle }) => {
       <div className="flex-1 relative">
         {showChat ? (
           <div className="absolute inset-0 z-10">
-            <ChatWindow
-              conversationId={groupId}
-              conversationType="group"
-              participantName={groupTitle}
-              onClose={handleCloseChat}
-            />
+            {isResolvingConversation && !conversationId && (
+              <div className="flex items-center justify-center h-full text-white/60 text-sm">
+                Resolving conversation...
+              </div>
+            )}
+            {!isResolvingConversation && (
+              <ChatWindow
+                conversationId={conversationId || groupId}
+                conversationType="group"
+                participantName={groupTitle}
+                groupId={groupId}
+                onConversationResolved={(realId) => {
+                  if (realId !== conversationId) {
+                    setConversationId(realId)
+                  }
+                }}
+                onClose={() => {
+                  handleCloseChat()
+                  // Refresh conversation ID when closing so next open reflects new messages
+                  resolveConversationId()
+                }}
+              />
+            )}
           </div>
         ) : (
           <div className="h-full flex flex-col">
@@ -194,13 +241,15 @@ const GroupChat: React.FC<GroupChatProps> = ({ groupId, groupTitle }) => {
                   <MessageCircle className="w-5 h-5 mr-2" />
                   {connectionStatus 
                     ? (recentMessages.length > 0 ? 'Continue Chat' : 'Start Chatting')
-                    : 'Chat Offline'
-                  }
+                    : 'Chat Offline'}
                 </button>
                 {!connectionStatus && (
                   <p className="text-center text-white/50 text-xs mt-2">
                     Chat will be available when connection is restored
                   </p>
+                )}
+                {conversationId && !showChat && (
+                  <p className="text-center text-white/30 text-[10px] mt-2">Conversation ID: {conversationId}</p>
                 )}
               </div>
             </div>

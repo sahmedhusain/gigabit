@@ -17,6 +17,7 @@ export default function ChatItem({ item, onClick, onDelete, getUserStatus, typin
   const participantId = item.participantId;
   const [imageError, setImageError] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const lastMessageTimestamp = item.lastMessageTime || item.updated_at;
 
   // Robust timestamp parser: handles ISO strings, milliseconds, or seconds
   const parseDate = (value: string | number | undefined | null): Date => {
@@ -155,15 +156,22 @@ export default function ChatItem({ item, onClick, onDelete, getUserStatus, typin
         {/* Content */}
         <div className="flex-1 min-w-0 relative">
           <div className="flex items-center justify-between mb-1">
-            <motion.h3
-              className="text-white font-semibold text-lg truncate group-hover:text-emerald-300 transition-colors duration-300"
-              layoutId={`chat-name-${item.id}`}
-            >
-              {item.name}
-            </motion.h3>
+            <div className="flex items-center gap-2 min-w-0">
+              <motion.h3
+                className="text-white font-semibold text-lg truncate group-hover:text-emerald-300 transition-colors duration-300"
+                layoutId={`chat-name-${item.id}`}
+              >
+                {item.name}
+              </motion.h3>
+              {isGroup && (
+                <span className="hidden sm:inline-flex px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-purple-200 bg-purple-500/20 border border-purple-400/30 rounded-full">
+                  Group
+                </span>
+              )}
+            </div>
             <div className="flex items-center space-x-1 text-white/60 text-xs flex-shrink-0">
               <Clock className="w-3 h-3" />
-              <span>{formatTime(item.lastMessageTime)}</span>
+              <span>{formatTime(lastMessageTimestamp)}</span>
             </div>
           </div>
 

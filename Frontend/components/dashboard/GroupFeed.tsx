@@ -2,25 +2,10 @@
 
 import React, { useState, useEffect, useCallback } from 'react'
 import { useToast } from '../../context/ToastContext'
-import { Heart, MessageCircle, User } from 'lucide-react'
+import { Heart, MessageCircle, MoreHorizontal } from 'lucide-react'
 import { useConnectionStatus, useOnlineStatus } from '@/hooks'
+import { api, type PostResponse } from '@/lib/api'
 import Image from 'next/image'
-
-type GroupPost = {
-  id: string
-  content: string
-  image?: string
-  created_at: string
-  user: {
-    id: string
-    first_name: string
-    last_name: string
-    nickname?: string
-  }
-  likes_count: number
-  comments_count: number
-  is_liked: boolean
-}
 
 type Props = {
   groupId: string
@@ -28,7 +13,7 @@ type Props = {
 
 export default function GroupFeed({ groupId }: Props) {
   const toast = useToast()
-  const [posts, setPosts] = useState<GroupPost[]>([])
+  const [posts, setPosts] = useState<PostResponse[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   
@@ -36,18 +21,22 @@ export default function GroupFeed({ groupId }: Props) {
   const { isConnected } = useConnectionStatus()
   const { onlineUsers } = useOnlineStatus()
 
+  // Listen for real-time group post updates
+  useEffect(() => {
+    if (!isConnected) return
+
+    // Note: This is a simplified implementation. In a real app, you'd use the WebSocket context
+    // For now, we'll rely on manual refresh
+    
+    return () => {
+      // Cleanup if needed
+    }
+  }, [isConnected, groupId])
+
   const fetchPosts = useCallback(async () => {
     try {
       setLoading(true)
-      const res = await fetch(`/api/groups/${groupId}/posts`, {
-        credentials: 'include'
-      })
-
-      if (!res.ok) {
-        throw new Error(`Failed to fetch posts (${res.status})`)
-      }
-
-      const data = await res.json()
+      const data = await api.getGroupPosts(parseInt(groupId))
       setPosts(data.posts || [])
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Failed to load posts'
@@ -62,7 +51,7 @@ export default function GroupFeed({ groupId }: Props) {
     fetchPosts()
   }, [fetchPosts])
 
-  async function handleLike(postId: string) {
+  async function handleLike(postId: number) {
     if (!isConnected) return
 
     const post = posts.find(p => p.id === postId)
@@ -71,7 +60,7 @@ export default function GroupFeed({ groupId }: Props) {
     const optimisticPost = {
       ...post,
       is_liked: !post.is_liked,
-      likes_count: post.is_liked ? post.likes_count - 1 : post.likes_count + 1
+      like_count: post.is_liked ? post.like_count - 1 : post.like_count + 1
     }
 
     // Immediately update UI
@@ -80,13 +69,10 @@ export default function GroupFeed({ groupId }: Props) {
     ))
 
     try {
-      const res = await fetch(`/api/posts/${postId}/like`, {
-        method: 'POST',
-        credentials: 'include'
-      })
-
-      if (!res.ok) {
-        throw new Error('Failed to like post')
+      if (post.is_liked) {
+        await api.unlikePost(postId)
+      } else {
+        await api.likePost(postId)
       }
     } catch {
       // Revert on error
@@ -104,18 +90,18 @@ export default function GroupFeed({ groupId }: Props) {
 
   if (loading) {
     return (
-      <div className="space-y-4">
+      <div className="space-y-6">
         {/* Connection status indicator */}
         {!isConnected && (
-          <div className="bg-orange-100 border border-orange-400 text-orange-700 px-4 py-2 rounded">
+          <div className="bg-orange-500/10 border border-orange-400/20 text-orange-400 px-4 py-3 rounded-xl">
             Connection issues - posts may not update in real-time
           </div>
         )}
         {[...Array(3)].map((_, i) => (
-          <div key={i} className="animate-pulse">
-            <div className="bg-gray-200 h-4 rounded w-1/4 mb-2"></div>
-            <div className="bg-gray-200 h-16 rounded mb-2"></div>
-            <div className="bg-gray-200 h-4 rounded w-1/6"></div>
+          <div key={i} className="animate-pulse bg-white/5 backdrop-blur-xl rounded-2xl p-6 border border-white/10">
+            <div className="bg-white/10 h-4 rounded-xl w-1/4 mb-4"></div>
+            <div className="bg-white/10 h-16 rounded-xl mb-4"></div>
+            <div className="bg-white/10 h-4 rounded-xl w-1/6"></div>
           </div>
         ))}
       </div>
@@ -126,15 +112,15 @@ export default function GroupFeed({ groupId }: Props) {
     return (
       <div className="text-center py-8">
         {!isConnected && (
-          <div className="bg-orange-100 border border-orange-400 text-orange-700 px-4 py-2 rounded mb-4">
+          <div className="bg-orange-500/10 border border-orange-400/20 text-orange-400 px-4 py-3 rounded-xl mb-4">
             Connection issues detected
           </div>
         )}
-        <p className="text-red-600 mb-4">{error}</p>
+        <p className="text-red-400 mb-4">{error}</p>
         <button
           onClick={fetchPosts}
           disabled={!isConnected}
-          className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+          className="px-6 py-2 bg-emerald-500 text-white rounded-xl hover:bg-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
         >
           Try Again
         </button>
@@ -144,8 +130,10 @@ export default function GroupFeed({ groupId }: Props) {
 
   if (posts.length === 0) {
     return (
-      <div className="text-center py-8 text-gray-500">
-        <p>No posts yet. Be the first to share something with the group!</p>
+      <div className="text-center py-12">
+        <MessageCircle className="w-16 h-16 text-white/30 mx-auto mb-4" />
+        <h4 className="text-xl font-semibold text-white mb-2">No posts yet</h4>
+        <p className="text-white/70">Be the first to share something with the group!</p>
       </div>
     )
   }
@@ -154,81 +142,101 @@ export default function GroupFeed({ groupId }: Props) {
     <div className="space-y-6">
       {/* Connection status indicator */}
       {!isConnected && (
-        <div className="bg-orange-100 border border-orange-400 text-orange-700 px-4 py-2 rounded">
+        <div className="bg-orange-500/10 border border-orange-400/20 text-orange-400 px-4 py-3 rounded-xl">
           Connection lost - posts may not update in real-time
         </div>
       )}
       
       {posts.map(post => {
         // Check if post author is online
-        const isAuthorOnline = onlineUsers.some(u => u.user_id.toString() === post.user.id && u.status === 'online')
+        const isAuthorOnline = onlineUsers.some(u => u.user_id === post.user.id && u.status === 'online')
         
         return (
-          <div key={post.id} className="bg-white rounded-lg shadow p-4">
+          <div key={post.id} className="bg-white/5 backdrop-blur-xl rounded-2xl p-6 border border-white/10">
             {/* Post Header */}
-            <div className="flex items-center space-x-3 mb-3">
-              <div className="w-10 h-10 bg-gray-300 rounded-full flex items-center justify-center">
-                <User className="w-6 h-6 text-gray-600" />
-              </div>
-              <div className="flex-1">
-                <div className="flex items-center space-x-2">
-                  <p className="font-medium">
-                    {post.user.nickname || `${post.user.first_name} ${post.user.last_name}`}
-                  </p>
-                  {isAuthorOnline && (
-                    <div className="flex items-center space-x-1">
-                      <div className="w-2 h-2 bg-green-400 rounded-full"></div>
-                      <span className="text-green-600 text-xs">Online</span>
-                    </div>
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center space-x-3">
+                <div className="w-12 h-12 bg-gradient-to-r from-emerald-500 to-teal-600 rounded-full flex items-center justify-center">
+                  {post.user.avatar ? (
+                    <Image
+                      src={post.user.avatar}
+                      alt={`${post.user.first_name} ${post.user.last_name}`}
+                      width={48}
+                      height={48}
+                      className="w-full h-full rounded-full object-cover"
+                    />
+                  ) : (
+                    <span className="text-white font-semibold">
+                      {post.user.first_name[0]}{post.user.last_name[0]}
+                    </span>
                   )}
                 </div>
-                <p className="text-sm text-gray-500">
-                  {formatDate(post.created_at)}
-                </p>
+                <div>
+                  <div className="flex items-center space-x-2">
+                    <p className="font-semibold text-white">
+                      {post.user.nickname || `${post.user.first_name} ${post.user.last_name}`}
+                    </p>
+                    {isAuthorOnline && (
+                      <div className="flex items-center space-x-1">
+                        <div className="w-2 h-2 bg-green-400 rounded-full"></div>
+                        <span className="text-green-400 text-xs">Online</span>
+                      </div>
+                    )}
+                  </div>
+                  <p className="text-sm text-white/60">
+                    {formatDate(post.created_at)}
+                  </p>
+                </div>
               </div>
+              
+              <button className="p-2 text-white/50 hover:text-white hover:bg-white/10 rounded-xl transition-all duration-200">
+                <MoreHorizontal className="w-5 h-5" />
+              </button>
             </div>
 
-          {/* Post Content */}
-          <div className="mb-3">
-            <p className="whitespace-pre-wrap">{post.content}</p>
-            {post.image && (
-              <Image
-                src={post.image}
-                alt="Post image"
+            {/* Post Content */}
+            <div className="mb-4">
+              <p className="text-white whitespace-pre-wrap mb-3">{post.content}</p>
+              {post.image_url && (
+                <div className="rounded-xl overflow-hidden">
+                  <Image
+                    src={post.image_url}
+                    alt="Post image"
                 width={640}
                 height={256}
-                unoptimized={post.image.includes('/svg')}
-                className="mt-3 max-w-full h-auto rounded-lg"
-              />
-            )}
-          </div>
+                unoptimized={post.image_url?.includes('/svg')}
+                    className="w-full h-auto max-h-96 object-cover"
+                  />
+                </div>
+              )}
+            </div>
 
-          {/* Post Actions */}
-          <div className="flex items-center space-x-4 pt-3 border-t">
-            <button
-              onClick={() => handleLike(post.id)}
-              disabled={!isConnected}
-              className={`flex items-center space-x-1 px-3 py-1 rounded transition-colors ${
-                post.is_liked
-                  ? 'text-red-600 bg-red-50'
-                  : 'text-gray-600 hover:bg-gray-50'
-              } ${!isConnected ? 'opacity-50 cursor-not-allowed' : ''}`}
-              title={!isConnected ? 'Connection required to like posts' : ''}
-            >
-              <Heart className={`w-4 h-4 ${post.is_liked ? 'fill-current' : ''}`} />
-              <span className="text-sm">{post.likes_count}</span>
-            </button>
+            {/* Post Actions */}
+            <div className="flex items-center space-x-6 pt-4 border-t border-white/10">
+              <button
+                onClick={() => handleLike(post.id)}
+                disabled={!isConnected}
+                className={`flex items-center space-x-2 px-4 py-2 rounded-xl transition-all duration-200 ${
+                  post.is_liked
+                    ? 'text-red-400 bg-red-500/10'
+                    : 'text-white/70 hover:text-white hover:bg-white/10'
+                } ${!isConnected ? 'opacity-50 cursor-not-allowed' : ''}`}
+                title={!isConnected ? 'Connection required to like posts' : ''}
+              >
+                <Heart className={`w-5 h-5 ${post.is_liked ? 'fill-current' : ''}`} />
+                <span className="font-medium">{post.like_count}</span>
+              </button>
 
-            <button 
-              className="flex items-center space-x-1 px-3 py-1 rounded text-gray-600 hover:bg-gray-50"
-              disabled={!isConnected}
-              title={!isConnected ? 'Connection required to view comments' : ''}
-            >
-              <MessageCircle className="w-4 h-4" />
-              <span className="text-sm">{post.comments_count}</span>
-            </button>
+              <button 
+                className="flex items-center space-x-2 px-4 py-2 rounded-xl text-white/70 hover:text-white hover:bg-white/10 transition-all duration-200"
+                disabled={!isConnected}
+                title={!isConnected ? 'Connection required to view comments' : ''}
+              >
+                <MessageCircle className="w-5 h-5" />
+                <span className="font-medium">{post.comment_count}</span>
+              </button>
+            </div>
           </div>
-        </div>
         )
       })}
     </div>

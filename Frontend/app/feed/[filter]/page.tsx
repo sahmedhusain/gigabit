@@ -162,18 +162,6 @@ function FeedFilterPage() {
     return removeListener
   }, [isConnected, addMessageListener, user?.id, fetchFeedPosts])
 
-  const fetchUsers = async () => {
-    try {
-      setLoadingUsers(true)
-      const data = await api.getUsers()
-      setAvailableUsers(data.users || [])
-    } catch (err) {
-      console.error('Error fetching users:', err)
-    } finally {
-      setLoadingUsers(false)
-    }
-  }
-
   const formatTimeAgo = (dateString: string) => {
     const date = new Date(dateString)
     const now = new Date()

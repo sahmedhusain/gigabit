@@ -301,4 +301,87 @@ INSERT INTO follows (follower_id, following_id, status, created_at, updated_at) 
 (30, 7, 'accepted', datetime('now', '-200 days'), datetime('now', '-200 days')),
 (30, 8, 'accepted', datetime('now', '-195 days'), datetime('now', '-195 days')),
 (30, 13, 'accepted', datetime('now', '-190 days'), datetime('now', '-190 days')),
-(30, 17, 'accepted', datetime('now', '-185 days'), datetime('now', '-185 days'));
+(30, 17, 'accepted', datetime('now', '-185 days'), datetime('now', '-185 days')),
+
+-- Recent follows for new users (31-40)
+-- Nathan (31) follows tech/AI people
+(31, 1, 'accepted', datetime('now', '-60 days'), datetime('now', '-60 days')),
+(31, 5, 'accepted', datetime('now', '-59 days'), datetime('now', '-59 days')),
+(31, 7, 'accepted', datetime('now', '-58 days'), datetime('now', '-58 days')),
+(31, 13, 'accepted', datetime('now', '-57 days'), datetime('now', '-57 days')),
+(31, 16, 'accepted', datetime('now', '-56 days'), datetime('now', '-56 days')),
+
+-- Zoe (32) follows design/UX people
+(32, 2, 'accepted', datetime('now', '-55 days'), datetime('now', '-55 days')),
+(32, 4, 'accepted', datetime('now', '-54 days'), datetime('now', '-54 days')),
+(32, 6, 'accepted', datetime('now', '-53 days'), datetime('now', '-53 days')),
+(32, 14, 'accepted', datetime('now', '-52 days'), datetime('now', '-52 days')),
+(32, 25, 'accepted', datetime('now', '-51 days'), datetime('now', '-51 days')),
+
+-- Carter (33) follows DevOps/tech people
+(33, 1, 'accepted', datetime('now', '-50 days'), datetime('now', '-50 days')),
+(33, 5, 'accepted', datetime('now', '-49 days'), datetime('now', '-49 days')),
+(33, 7, 'accepted', datetime('now', '-48 days'), datetime('now', '-48 days')),
+(33, 13, 'accepted', datetime('now', '-47 days'), datetime('now', '-47 days')),
+(33, 24, 'accepted', datetime('now', '-46 days'), datetime('now', '-46 days')),
+
+-- Luna (34) follows science/research people
+(34, 3, 'accepted', datetime('now', '-45 days'), datetime('now', '-45 days')),
+(34, 9, 'accepted', datetime('now', '-44 days'), datetime('now', '-44 days')),
+(34, 15, 'accepted', datetime('now', '-43 days'), datetime('now', '-43 days')),
+(34, 17, 'accepted', datetime('now', '-42 days'), datetime('now', '-42 days')),
+(34, 27, 'accepted', datetime('now', '-41 days'), datetime('now', '-41 days')),
+
+-- Aria (35) follows creative/artistic people
+(35, 4, 'accepted', datetime('now', '-40 days'), datetime('now', '-40 days')),
+(35, 6, 'accepted', datetime('now', '-39 days'), datetime('now', '-39 days')),
+(35, 10, 'accepted', datetime('now', '-38 days'), datetime('now', '-38 days')),
+(35, 14, 'accepted', datetime('now', '-37 days'), datetime('now', '-37 days')),
+(35, 18, 'accepted', datetime('now', '-36 days'), datetime('now', '-36 days')),
+
+-- Jackson (36) follows gaming/creative people
+(36, 7, 'accepted', datetime('now', '-35 days'), datetime('now', '-35 days')),
+(36, 11, 'accepted', datetime('now', '-34 days'), datetime('now', '-34 days')),
+(36, 15, 'accepted', datetime('now', '-33 days'), datetime('now', '-33 days')),
+(36, 19, 'accepted', datetime('now', '-32 days'), datetime('now', '-32 days')),
+(36, 23, 'accepted', datetime('now', '-31 days'), datetime('now', '-31 days')),
+
+-- Scarlett (37) follows social impact/health people
+(37, 2, 'accepted', datetime('now', '-30 days'), datetime('now', '-30 days')),
+(37, 8, 'accepted', datetime('now', '-29 days'), datetime('now', '-29 days')),
+(37, 12, 'accepted', datetime('now', '-28 days'), datetime('now', '-28 days')),
+(37, 20, 'accepted', datetime('now', '-27 days'), datetime('now', '-27 days')),
+(37, 26, 'accepted', datetime('now', '-26 days'), datetime('now', '-26 days')),
+
+-- Mason (38) follows data/analytics people
+(38, 1, 'accepted', datetime('now', '-25 days'), datetime('now', '-25 days')),
+(38, 5, 'accepted', datetime('now', '-24 days'), datetime('now', '-24 days')),
+(38, 13, 'accepted', datetime('now', '-23 days'), datetime('now', '-23 days')),
+(38, 16, 'accepted', datetime('now', '-22 days'), datetime('now', '-22 days')),
+(38, 24, 'accepted', datetime('now', '-21 days'), datetime('now', '-21 days')),
+
+-- Levi (39) follows security/tech people
+(39, 1, 'accepted', datetime('now', '-20 days'), datetime('now', '-20 days')),
+(39, 7, 'accepted', datetime('now', '-19 days'), datetime('now', '-19 days')),
+(39, 13, 'accepted', datetime('now', '-18 days'), datetime('now', '-18 days')),
+(39, 19, 'accepted', datetime('now', '-17 days'), datetime('now', '-17 days')),
+(39, 25, 'accepted', datetime('now', '-16 days'), datetime('now', '-16 days')),
+
+-- Aiden (40) follows creative/tech people
+(40, 3, 'accepted', datetime('now', '-15 days'), datetime('now', '-15 days')),
+(40, 9, 'accepted', datetime('now', '-14 days'), datetime('now', '-14 days')),
+(40, 15, 'accepted', datetime('now', '-13 days'), datetime('now', '-13 days')),
+(40, 21, 'accepted', datetime('now', '-12 days'), datetime('now', '-12 days')),
+(40, 27, 'accepted', datetime('now', '-11 days'), datetime('now', '-11 days')),
+
+-- Existing users following new users
+(1, 31, 'accepted', datetime('now', '-58 days'), datetime('now', '-58 days')),
+(2, 32, 'accepted', datetime('now', '-53 days'), datetime('now', '-53 days')),
+(3, 33, 'accepted', datetime('now', '-48 days'), datetime('now', '-48 days')),
+(4, 34, 'accepted', datetime('now', '-43 days'), datetime('now', '-43 days')),
+(5, 35, 'accepted', datetime('now', '-38 days'), datetime('now', '-38 days')),
+(6, 36, 'accepted', datetime('now', '-33 days'), datetime('now', '-33 days')),
+(7, 37, 'accepted', datetime('now', '-28 days'), datetime('now', '-28 days')),
+(8, 38, 'accepted', datetime('now', '-23 days'), datetime('now', '-23 days')),
+(9, 39, 'accepted', datetime('now', '-18 days'), datetime('now', '-18 days')),
+(10, 40, 'accepted', datetime('now', '-13 days'), datetime('now', '-13 days'));

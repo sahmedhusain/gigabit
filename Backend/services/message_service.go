@@ -16,6 +16,10 @@ func NewMessageService(db *sql.DB) *MessageService {
 	return &MessageService{db: db}
 }
 
+func (s *MessageService) GetDB() *sql.DB {
+	return s.db
+}
+
 func (s *MessageService) SendPrivateMessage(message *models.Message) error {
 	// Check if users are following each other or one has public profile
 	canMessage, err := s.canUsersMessage(message.SenderID, message.ReceiverID)
@@ -271,7 +275,7 @@ func (s *MessageService) canUsersMessage(userID1, userID2 uint) (bool, error) {
 func (s *MessageService) isUserGroupMember(groupID, userID uint) (bool, error) {
 	query := `
 		SELECT COUNT(*) FROM group_members 
-		WHERE group_id = ? AND user_id = ? AND status = 'member'
+		WHERE group_id = ? AND user_id = ? AND (status = 'member' OR status = 'accepted')
 	`
 
 	var count int

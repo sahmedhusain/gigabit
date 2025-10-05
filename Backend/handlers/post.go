@@ -17,16 +17,20 @@ import (
 )
 
 type PostHandler struct {
-	postService    *services.PostService
-	commentService *services.CommentService
-	likeService    *services.LikeService
+	postService         *services.PostService
+	commentService      *services.CommentService
+	likeService         *services.LikeService
+	notificationService *services.NotificationService
+	hub                 *websocket.Hub
 }
 
 func NewPostHandler(db *sql.DB, hub *websocket.Hub) *PostHandler {
 	return &PostHandler{
-		postService:    services.NewPostService(db, hub),
-		commentService: services.NewCommentService(db, hub),
-		likeService:    services.NewLikeService(db, hub),
+		postService:         services.NewPostService(db, hub),
+		commentService:      services.NewCommentService(db, hub),
+		likeService:         services.NewLikeService(db, hub),
+		notificationService: services.NewNotificationService(db, hub),
+		hub:                 hub,
 	}
 }
 
@@ -384,6 +388,13 @@ func (h *PostHandler) LikePost(w http.ResponseWriter, r *http.Request, postIDStr
 		return
 	}
 
+	// Get post owner to send notification
+	post, err := h.postService.GetPostByID(uint(postID), userID.(uint))
+	if err == nil && post != nil {
+		// Send notification to post owner (async, don't wait for it)
+		go h.notificationService.NotifyPostLiked(userID.(uint), post.UserID, uint(postID))
+	}
+
 	log.Printf("Post %d liked successfully by user %v", postID, userID)
 	writeJSON(w, http.StatusOK, map[string]string{"message": "Post liked successfully"})
 }
@@ -453,6 +464,13 @@ func (h *PostHandler) CreateComment(w http.ResponseWriter, r *http.Request, post
 		log.Printf("Failed to create comment: %v", err)
 		writeError(w, http.StatusInternalServerError, "Failed to create comment")
 		return
+	}
+
+	// Get post owner to send notification
+	post, err := h.postService.GetPostByID(uint(postID), userID.(uint))
+	if err == nil && post != nil {
+		// Send notification to post owner (async, don't wait for it)
+		go h.notificationService.NotifyPostCommented(userID.(uint), post.UserID, uint(postID))
 	}
 
 	writeJSON(w, http.StatusCreated, map[string]interface{}{

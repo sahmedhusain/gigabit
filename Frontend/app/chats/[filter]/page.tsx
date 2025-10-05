@@ -43,7 +43,6 @@ function ChatsFilterPage() {
   const [_groups, setGroups] = useState<Group[]>([])
   const [_isLoadingChats, setIsLoadingChats] = useState(false)
   const [_isLoadingGroups, setIsLoadingGroups] = useState(false)
-  const [followers, setFollowers] = useState<{ id: number; email: string; first_name: string; last_name: string; avatar?: string; nickname?: string; }[]>([])
   const [following, setFollowing] = useState<{ id: number; email: string; first_name: string; last_name: string; avatar?: string; nickname?: string; }[]>([])
   const [isLoadingFollowers, setIsLoadingFollowers] = useState(false)
 
@@ -223,7 +222,6 @@ function ChatsFilterPage() {
         api.getFollowing(user.id)
       ])
 
-      setFollowers(Array.isArray(followersData?.followers) ? followersData.followers : [])
       setFollowing(Array.isArray(followingData?.following) ? followingData.following : [])
     } catch (err) {
       console.error('Error fetching followers:', err)

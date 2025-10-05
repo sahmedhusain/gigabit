@@ -109,31 +109,6 @@ export default function CreatePost({
     }
   }
 
-  const uploadImage = async (file: File): Promise<string | null> => {
-    try {
-      const formData = new FormData()
-      formData.append('image', file)
-
-      const response = await fetch('/api/uploads', {
-        method: 'POST',
-        body: formData,
-        credentials: 'include'
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || "Failed to upload image")
-      }
-
-      const data = await response.json()
-      return data.filename
-    } catch (error) {
-      console.error("Image upload error:", error)
-      // Error handling - the error will be shown in the parent component
-      return null
-    }
-  }
-
   if (!show) return null
 
   return (

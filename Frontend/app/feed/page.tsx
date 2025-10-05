@@ -175,12 +175,14 @@ function FeedPage() {
       setShowCreatePost(false)
       success('Post created successfully!')
       fetchFeedPosts()
-    } catch (err) {
+    } catch (err: unknown) {
       console.error('Error creating post:', err)
       if (err instanceof ValidationError) {
         error(err.message)
       } else if (err instanceof NetworkError) {
         error('Failed to create post. Please try again.')
+      } else if (err instanceof Error) {
+        error(err.message)
       } else {
         error('Unable to create post right now.')
       }
@@ -287,12 +289,10 @@ function FeedPage() {
 }
 
 // Wrap the entire component with ProtectedRoute
-function ProtectedFeedPage() {
+export default function ProtectedFeedPage() {
   return (
     <ProtectedRoute>
       <FeedPage />
     </ProtectedRoute>
   )
 }
-
-export default ProtectedFeedPage

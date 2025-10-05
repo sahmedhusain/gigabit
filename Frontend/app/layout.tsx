@@ -3,9 +3,11 @@ import "./globals.css";
 import { AuthProvider } from "@/context/AuthContext";
 import { WebSocketProvider } from "@/context/WebSocketContext";
 import { ToastProvider } from "@/context/ToastContext";
+import { NotificationToastProvider } from "@/context/NotificationToastContext";
 import { SidebarDataProvider } from "@/context/SidebarDataContext";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import ThemeProvider from "@/components/ThemeProvider";
+import NotificationToastContainer from "@/components/NotificationToastContainer";
 
 export const metadata: Metadata = {
   title: "Gigabit",
@@ -29,7 +31,10 @@ export default function RootLayout({
               <WebSocketProvider>
                 <SidebarDataProvider>
                   <ToastProvider>
-                    {children}
+                  <NotificationToastProvider>
+                      {children}
+                    <NotificationToastContainer />
+                  </NotificationToastProvider>
                   </ToastProvider>
                 </SidebarDataProvider>
               </WebSocketProvider>

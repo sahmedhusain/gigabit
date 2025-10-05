@@ -1,15 +1,8 @@
-'use client'
-import { useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { redirect } from 'next/navigation'
 import ProtectedRoute from '@/components/ProtectedRoute'
 
 function ActivityPage() {
-  const router = useRouter()
-
-  useEffect(() => {
-    router.replace('/activity/liked')
-  }, [router])
-
+  redirect('/activity/liked')
   return null
 }
 

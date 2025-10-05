@@ -237,7 +237,7 @@ function GroupDetailsPage() {
   }
 
   return (
-    <AppLayout>
+    <AppLayout activeTab="chats" chatSubTab="groups">
       <div className="min-h-screen bg-gradient-to-br from-emerald-900 via-teal-900 to-cyan-800">
         {/* Header */}
         <div className="bg-black/20 backdrop-blur-xl border-b border-white/10">

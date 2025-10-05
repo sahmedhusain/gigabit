@@ -128,7 +128,8 @@ export default function Sidebar({
           onClick: () => {
             router.push('/chats/groups')
           },
-          isActive: activeTab === 'chats' && (typeof chatSubTab !== 'undefined' ? chatSubTab === 'groups' : false)
+          // Accept both singular 'group' and plural 'groups'
+          isActive: activeTab === 'chats' && (typeof chatSubTab !== 'undefined' ? (chatSubTab === 'groups' || chatSubTab === 'group') : false)
         }
       ]
     },

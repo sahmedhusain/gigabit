@@ -59,7 +59,7 @@ export default function HomeFeed({
     markAsRead
   } = useRealTimePosts()
 
-  const { statusMessage } = useConnectionStatus()
+  const { isConnected } = useConnectionStatus()
 
   // Update document title with unread count
   const { setUnread, setPageTitle } = useDocumentTitle()

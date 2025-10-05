@@ -9,6 +9,7 @@ import { User as UserType } from '@/lib/api'
 import { useWebSocket } from '@/context/WebSocketContext'
 import { motion, AnimatePresence, LayoutGroup } from 'framer-motion'
 import { mutate } from 'swr'
+import { normalizeConversation } from '@/utils/chatUtils'
 
 interface ChatsSectionProps {
   chatSubTab: string
@@ -26,12 +27,15 @@ export default function ChatsSection({
   chatSubTab,
   onChatClick,
   getUserStatus,
+  currentUser,
   setShowCreateDirectMessage,
   setShowCreateGroup
 }: ChatsSectionProps) {
+  // Normalize plural form so 'groups' maps to internal 'group'
+  const normalizedSubTab = chatSubTab === 'groups' ? 'group' : chatSubTab
   const [searchQuery, setSearchQuery] = useState('')
   const [filterType, setFilterType] = useState<'all' | 'unread' | 'online'>('all')
-  const { data: chats, error, isLoading } = useSWR('chats', fetcher, { refreshInterval: 5000 })
+  const { data: chats, isLoading } = useSWR('chats', fetcher, { refreshInterval: 5000 })
   const { addMessageListener } = useWebSocket()
   const [typingChats, setTypingChats] = useState<Record<string, string[]>>({})
 
@@ -90,43 +94,42 @@ export default function ChatsSection({
     return cleanup
   }, [addMessageListener])
 
-  const filteredChats = chats?.filter(chat => {
-    if (!chat.last_message) return false;
+  // Normalize chats for consistent preview formatting
+  const normalizedChats = (chats || []).map(chat => normalizeConversation(chat, currentUser?.id))
 
-    const chatName = chat.type === 'private' && chat.participant
-      ? `${chat.participant.first_name} ${chat.participant.last_name}`.trim()
-      : chat.type === 'group' && chat.group
-      ? chat.group.title
-      : 'Unknown';
+  const filteredChats = normalizedChats.filter(chat => {
+    // Allow groups without messages to be shown, but filter out private chats without messages
+    if (!chat.lastMessage && chat.type === 'private') return false;
 
-    const matchesSearch = chatName.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesTab = chatSubTab === 'all' || chat.type === chatSubTab;
+    const matchesSearch = chat.name.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesTab = normalizedSubTab === 'all' || chat.type === normalizedSubTab;
     const matchesFilter =
       filterType === 'all' ||
-      (filterType === 'unread' && chat.unread_count > 0) ||
-      (filterType === 'online' && chat.type === 'private' && chat.participant && getUserStatus(chat.participant.id) !== 'offline');
+      (filterType === 'unread' && (chat.unread || 0) > 0) ||
+      (filterType === 'online' && chat.type === 'private' && chat.participantId && getUserStatus(chat.participantId) !== 'offline');
 
     return matchesSearch && matchesTab && matchesFilter;
-  }) || []
+  })
 
   const uniqueChats = filteredChats.filter((chat, index, self) =>
     self.findIndex(c => c.id === chat.id) === index
   )
 
+  // Calculate base stats
+  const baseStats = {
+    online: normalizedChats.filter(chat => chat.type === 'private' && chat.participantId && getUserStatus(chat.participantId) !== 'offline').length,
+    total: uniqueChats.length,
+    unread: uniqueChats.reduce((sum, chat) => sum + (chat.unread || 0), 0)
+  }
+
   // Dynamic header configuration based on sub-tab
   const getTabConfig = () => {
-    const baseStats = {
-      total: uniqueChats.length,
-      unread: uniqueChats.reduce((sum, chat) => sum + (chat.unread_count || 0), 0),
-      online: uniqueChats.filter(chat => chat.type === 'private' && chat.participant && getUserStatus(chat.participant.id) === 'online').length
-    }
-
-    switch (chatSubTab) {
+    switch (normalizedSubTab) {
       case 'private':
         return {
-          title: 'Direct Messages',
-          subtitle: 'Private conversations',
-          icon: UserCheck,
+          title: 'Private Chats',
+          subtitle: 'Direct conversations',
+          icon: User,
           gradient: 'from-blue-500/20 to-indigo-500/20',
           iconColor: 'text-blue-400',
           stats: [
@@ -134,19 +137,19 @@ export default function ChatsSection({
             { label: `${baseStats.total} chats`, color: 'text-white/50' },
             { label: `${baseStats.unread} unread`, color: 'text-white/40' }
           ],
-          searchPlaceholder: 'Search direct messages...',
+          searchPlaceholder: 'Search private chats...',
           filters: [
             { key: 'all', label: 'All', icon: MessageCircle, count: uniqueChats.length },
-            { key: 'unread', label: 'Unread', icon: MessageSquarePlus, count: uniqueChats.filter(chat => chat.unread_count > 0).length },
-            { key: 'online', label: 'Online', icon: User, count: baseStats.online }
+            { key: 'unread', label: 'Unread', icon: MessageSquarePlus, count: uniqueChats.filter(chat => (chat.unread || 0) > 0).length },
+            { key: 'online', label: 'Online', icon: UserCheck, count: baseStats.online }
           ],
           showNewChat: true,
           showNewGroup: false,
-          newChatLabel: 'New Message',
+          newChatLabel: 'New Chat',
           emptyState: {
-            title: 'No direct messages',
-            description: 'Start a private conversation',
-            buttonText: 'Send Message'
+            title: 'No private chats',
+            description: 'Start a conversation with someone',
+            buttonText: 'Start Chat'
           }
         }
       case 'group':
@@ -162,8 +165,8 @@ export default function ChatsSection({
           ],
           searchPlaceholder: 'Search group chats...',
           filters: [
-            { key: 'all', label: 'All', icon: Users, count: uniqueChats.length },
-            { key: 'unread', label: 'Unread', icon: MessageSquarePlus, count: uniqueChats.filter(chat => chat.unread_count > 0).length }
+            { key: 'all', label: 'All', icon: MessageCircle, count: uniqueChats.length },
+            { key: 'unread', label: 'Unread', icon: MessageSquarePlus, count: uniqueChats.filter(chat => (chat.unread || 0) > 0).length }
           ],
           showNewChat: false,
           showNewGroup: true,
@@ -189,7 +192,7 @@ export default function ChatsSection({
           searchPlaceholder: 'Search conversations, people, or messages...',
           filters: [
             { key: 'all', label: 'All', icon: MessageCircle, count: uniqueChats.length },
-            { key: 'unread', label: 'Unread', icon: MessageSquarePlus, count: uniqueChats.filter(chat => chat.unread_count > 0).length },
+            { key: 'unread', label: 'Unread', icon: MessageSquarePlus, count: uniqueChats.filter(chat => (chat.unread || 0) > 0).length },
             { key: 'online', label: 'Online', icon: User, count: baseStats.online }
           ],
           showNewChat: true,
@@ -241,71 +244,20 @@ export default function ChatsSection({
   const renderContent = () => {
     if (isLoading) {
       return (
-        <motion.div
-          className="space-y-4"
-          variants={containerVariants}
-          initial="hidden"
-          animate="visible"
-        >
-          {[...Array(5)].map((_, i) => (
-            <motion.div key={i} variants={itemVariants}>
-              <ChatSkeleton />
-            </motion.div>
-          ))}
-        </motion.div>
+        <ChatSkeleton />
       )
     }
 
-    if (error) {
-      return (
-        <motion.div
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="text-center py-12"
-        >
-          <motion.div
-            animate={{ rotate: [0, 10, -10, 0] }}
-            transition={{ duration: 0.5, repeat: Infinity, repeatDelay: 3 }}
-          >
-            <MessageCircle className="w-16 h-16 text-red-500/70 mx-auto mb-4" />
-          </motion.div>
-          <h2 className="text-xl font-semibold text-white mb-2">Connection Error</h2>
-          <p className="text-white/60">Failed to load conversations. Please try again later.</p>
-        </motion.div>
-      )
-    }
-
-    if (filteredChats.length === 0) {
+    if (uniqueChats.length === 0) {
       return (
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="text-center py-12"
+          className="flex flex-col items-center justify-center py-12 text-center"
         >
-          <motion.div
-            animate={{ scale: [1, 1.1, 1] }}
-            transition={{ duration: 2, repeat: Infinity }}
-          >
-            <tabConfig.icon className={`w-16 h-16 mx-auto mb-4 ${tabConfig.iconColor.replace('text-', 'text-').replace('400', '500/70')}`} />
-          </motion.div>
-          <h2 className="text-xl font-semibold text-white">{tabConfig.emptyState.title}</h2>
-          <p className="text-white/60 mt-2">
-            {searchQuery || filterType !== 'all'
-              ? 'Try adjusting your search or filters'
-              : tabConfig.emptyState.description
-            }
-          </p>
-          {!searchQuery && filterType === 'all' && (
-            <motion.button
-              onClick={() => tabConfig.showNewChat ? setShowCreateDirectMessage(true) : setShowCreateGroup(true)}
-              className="mt-6 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-bold py-3 px-6 rounded-xl transition-all flex items-center space-x-2 mx-auto shadow-lg hover:shadow-xl"
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-            >
-              <MessageSquarePlus className="w-5 h-5" />
-              <span>{tabConfig.emptyState.buttonText}</span>
-            </motion.button>
-          )}
+          <tabConfig.icon className={`w-16 h-16 ${tabConfig.iconColor} mb-4`} />
+          <h3 className="text-xl font-semibold text-white mb-2">{tabConfig.emptyState.title}</h3>
+          <p className="text-white/60 mb-6">{tabConfig.emptyState.description}</p>
         </motion.div>
       )
     }
@@ -319,61 +271,46 @@ export default function ChatsSection({
           animate="visible"
         >
           <AnimatePresence mode="popLayout">
-            {uniqueChats.map((chat) => (
-              <motion.div
-                key={chat.id}
-                variants={itemVariants}
-                layout
-                exit="exit"
-              >
-                <ChatItem
-                  item={{
-                    id: chat.id,
-                    type: chat.type,
-                    name: chat.type === 'private' && chat.participant
-                      ? `${chat.participant.first_name} ${chat.participant.last_name}`.trim()
-                      : chat.type === 'group' && chat.group
-                      ? chat.group.title
-                      : 'Unknown',
-                    avatar: chat.type === 'private' && chat.participant ? chat.participant.avatar : undefined,
-                    lastMessage: chat.last_message?.content,
-                    lastMessageTime: chat.last_message?.created_at || chat.updated_at,
-                    hasUnread: chat.unread_count > 0,
-                    unreadCount: chat.unread_count,
-                    unread_count: chat.unread_count,
-                    participant: chat.participant,
-                    group: chat.group,
-                    conversationId: chat.id,
-                    participantId: chat.type === 'private' && chat.participant ? chat.participant.id : undefined,
-                    updated_at: chat.updated_at
-                  }}
-                  getUserStatus={getUserStatus}
-                  typingUsers={typingChats[chat.id.toString()] || []}
-                  onDelete={handleDeleteConversation}
-                  onClick={() => onChatClick({
-                    conversationId: chat.id,
-                    type: chat.type,
-                    name: chat.type === 'private' && chat.participant
-                      ? `${chat.participant.first_name} ${chat.participant.last_name}`.trim()
-                      : chat.type === 'group' && chat.group
-                      ? chat.group.title
-                      : 'Unknown',
-                    participantId: chat.type === 'private' && chat.participant ? chat.participant.id : undefined
-                  })}
-                />
-              </motion.div>
-            ))}
+            {uniqueChats.map((chat) => {
+              const chatIdNum = typeof chat.id === 'string' ? parseInt(chat.id.replace(/\D/g, '')) : chat.id;
+              const avatar = chat.avatar && typeof chat.avatar === 'string' ? chat.avatar : undefined;
+              return (
+                <motion.div
+                  key={chatIdNum}
+                  variants={itemVariants}
+                  layout
+                  exit="exit"
+                >
+                  <ChatItem
+                    item={{
+                      ...chat,
+                      id: chatIdNum,
+                      avatar,
+                      unread_count: chat.unread || 0,
+                      updated_at: chat.timestamp || '',
+                    }}
+                    getUserStatus={getUserStatus}
+                    typingUsers={typingChats[chatIdNum.toString()] || []}
+                    onDelete={handleDeleteConversation}
+                    onClick={() => onChatClick({
+                      conversationId: chatIdNum,
+                      type: chat.type,
+                      name: chat.name,
+                      participantId: chat.participantId
+                    })}
+                  />
+                </motion.div>
+              );
+            })}
           </AnimatePresence>
         </motion.div>
       </LayoutGroup>
-    )
+    );
   }
 
   return (
-    <div className="h-full flex flex-col">
-      {/* Enhanced Dynamic Header */}
+    <div className="flex flex-col h-full">
       <motion.div
-        className="flex-shrink-0 mb-8"
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
@@ -447,7 +384,7 @@ export default function ChatsSection({
             {tabConfig.showNewGroup && (
               <motion.button
                 onClick={() => setShowCreateGroup(true)}
-                className={`group relative overflow-hidden bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white px-6 py-3 rounded-2xl transition-all duration-300 flex items-center space-x-3 shadow-lg hover:shadow-xl ${chatSubTab === 'group' ? 'bg-gradient-to-r from-purple-500 to-pink-600 hover:from-purple-600 hover:to-pink-700' : ''}`}
+                className={`group relative overflow-hidden bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white px-6 py-3 rounded-2xl transition-all duration-300 flex items-center space-x-3 shadow-lg hover:shadow-xl ${normalizedSubTab === 'group' ? 'bg-gradient-to-r from-purple-500 to-pink-600 hover:from-purple-600 hover:to-pink-700' : ''}`}
                 whileHover={{ scale: 1.02, y: -1 }}
                 whileTap={{ scale: 0.98 }}
               >
@@ -547,7 +484,7 @@ export default function ChatsSection({
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-2 text-white/70 text-sm">
-                    <span>Showing {filteredChats.length} of {uniqueChats.length} {chatSubTab === 'private' ? 'chats' : chatSubTab === 'group' ? 'groups' : 'conversations'}</span>
+                    <span>Showing {filteredChats.length} of {uniqueChats.length} {normalizedSubTab === 'private' ? 'chats' : normalizedSubTab === 'group' ? 'groups' : 'conversations'}</span>
                     <span className="text-white/40">•</span>
                     <span>Filter: {filterType === 'unread' ? 'Unread messages' : filterType === 'online' ? 'Online contacts' : 'All conversations'}</span>
                   </div>

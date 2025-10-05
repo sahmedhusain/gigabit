@@ -1133,5 +1133,57 @@ INSERT INTO private_messages (conversation_id, sender_id, content, created_at, i
 (25, 24, 'Thanks! This healthy cooking journey is rewarding.', datetime('now', '-65 days'), true),
 (25, 25, 'It really is! Keep experimenting. You''ve got this.', datetime('now', '-65 days'), true);
 
--- Update last_message_id in private_conversations
+-- Recent messages for new users (31-40)
+INSERT INTO private_messages (conversation_id, sender_id, content, created_at, is_read) VALUES
+(26, 31, 'Hey Nathan, your AI research paper looks fascinating!', datetime('now', '-60 days'), true),
+(26, 32, 'Thanks Zoe! I''m excited about the implications for UX design.', datetime('now', '-60 days'), true),
+(26, 31, 'Absolutely! AI could revolutionize user research methods.', datetime('now', '-59 days'), true),
+(26, 32, 'Definitely. Imagine automated usability testing at scale.', datetime('now', '-59 days'), true),
+(27, 33, 'Carter, your DevOps setup is impressive. Any tips for beginners?', datetime('now', '-55 days'), true),
+(27, 34, 'Start with GitHub Actions and Docker. Build incrementally.', datetime('now', '-55 days'), true),
+(27, 33, 'Good advice! I''m just getting started with CI/CD.', datetime('now', '-54 days'), true),
+(27, 34, 'You''ll love it once it''s set up. The automation is freeing.', datetime('now', '-54 days'), true),
+(28, 35, 'Luna, your biotech work sounds cutting-edge!', datetime('now', '-50 days'), true),
+(28, 36, 'Thanks Aria! CRISPR advancements are happening so fast.', datetime('now', '-50 days'), true),
+(28, 35, 'I can imagine. How do you stay updated on the field?', datetime('now', '-49 days'), true),
+(28, 36, 'Nature journals and conferences. The research is exponential.', datetime('now', '-49 days'), true),
+(29, 37, 'Jackson, your indie game is addictive! Great work.', datetime('now', '-45 days'), true),
+(29, 38, 'Thanks Scarlett! Your social impact work inspires me.', datetime('now', '-45 days'), true),
+(29, 37, 'Likewise! Games can drive positive change too.', datetime('now', '-44 days'), true),
+(29, 38, 'Absolutely. Looking forward to your next project.', datetime('now', '-44 days'), true),
+(30, 39, 'Mason, your data viz skills are incredible!', datetime('now', '-40 days'), true),
+(30, 40, 'Thanks Levi! Cybersecurity keeps me on my toes.', datetime('now', '-40 days'), true),
+(30, 39, 'I bet! Data security is crucial in our field.', datetime('now', '-39 days'), true),
+(30, 40, 'Definitely. Zero-trust is the way forward.', datetime('now', '-39 days'), true),
+
+-- More recent messages across conversations
+(1, 1, 'John, how''s the new project going?', datetime('now', '-30 days'), true),
+(1, 2, 'Great! Just launched the beta. Your feedback was invaluable.', datetime('now', '-30 days'), true),
+(1, 1, 'Happy to help! The UX improvements really shine.', datetime('now', '-29 days'), true),
+(1, 2, 'Thanks! Coffee next week to celebrate?', datetime('now', '-29 days'), true),
+(2, 3, 'Mike, your fitness app idea sounds amazing!', datetime('now', '-25 days'), true),
+(2, 1, 'Thanks John! Working on the prototype now.', datetime('now', '-25 days'), true),
+(2, 3, 'Can''t wait to see it. Need any design help?', datetime('now', '-24 days'), true),
+(2, 1, 'Actually yes! Let''s schedule a call.', datetime('now', '-24 days'), true),
+(3, 4, 'Alice, your latest design is stunning!', datetime('now', '-20 days'), true),
+(3, 2, 'Thanks Sarah! The client loved it too.', datetime('now', '-20 days'), true),
+(3, 4, 'Great! Ready for our next collaboration?', datetime('now', '-19 days'), true),
+(3, 2, 'Absolutely! What''s the concept?', datetime('now', '-19 days'), true),
+(4, 5, 'David, your product strategy insights are gold!', datetime('now', '-15 days'), true),
+(4, 3, 'Thanks Mike! Just implemented RICE scoring.', datetime('now', '-15 days'), true),
+(4, 5, 'It''s transformative. How''s the roadmap looking?', datetime('now', '-14 days'), true),
+(4, 3, 'Much clearer! Prioritization is easier now.', datetime('now', '-14 days'), true),
+(5, 6, 'Emma, your accessibility work is inspiring!', datetime('now', '-10 days'), true),
+(5, 4, 'Thanks Alice! WCAG compliance saves lives.', datetime('now', '-10 days'), true),
+(5, 6, 'So true. Any new tools you recommend?', datetime('now', '-9 days'), true),
+(5, 4, 'Try Axe DevTools. Game changer for testing.', datetime('now', '-9 days'), true),
+(6, 7, 'James, your collaborative platform is genius!', datetime('now', '-5 days'), true),
+(6, 5, 'Thanks David! Real-time editing is working well.', datetime('now', '-5 days'), true),
+(6, 7, 'Amazing! How''s the user adoption?', datetime('now', '-4 days'), true),
+(6, 5, 'Growing steadily. Early feedback is positive.', datetime('now', '-4 days'), true),
+(7, 8, 'Lisa, your ML models are impressive!', datetime('now', '-2 days'), true),
+(7, 6, 'Thanks Emma! Just deployed a new recommendation system.', datetime('now', '-2 days'), true),
+(7, 8, 'Exciting! How''s the accuracy?', datetime('now', '-1 day'), true),
+(7, 6, '95% and climbing. User engagement is up 30%.', datetime('now', '-1 day'), true);
+
 UPDATE private_conversations SET last_message_id = (SELECT MAX(id) FROM private_messages WHERE conversation_id = private_conversations.id) WHERE EXISTS (SELECT 1 FROM private_messages WHERE conversation_id = private_conversations.id);

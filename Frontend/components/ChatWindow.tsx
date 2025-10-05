@@ -36,6 +36,10 @@ interface ChatWindowProps {
   conversationType: 'private' | 'group'
   participantName: string
   participantId?: number
+  // For group chats we pass the raw groupId so we can resolve the true conversation ID after first message
+  groupId?: number
+  // Notify parent (GroupChat) when we discover/upgrade to the real conversation ID
+  onConversationResolved?: (conversationId: number) => void
   onClose: () => void
 }
 
@@ -44,17 +48,16 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
   conversationType,
   participantId,
   participantName,
+  groupId,
+  onConversationResolved,
   onClose
 }) => {
   const [newMessage, setNewMessage] = useState('')
   const [showEmojiPicker, setShowEmojiPicker] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const messagesContainerRef = useRef<HTMLDivElement>(null)
-  const timeoutIdRef = useRef<NodeJS.Timeout | null>(null)
   const [participantData, setParticipantData] = useState<User | null>(null)
-  const [lastScrollTop, setLastScrollTop] = useState(0)
   const [wasAtBottom, setWasAtBottom] = useState(true)
-  const [savedScrollPosition, setSavedScrollPosition] = useState(0)
   const [isLoadingHistorical, setIsLoadingHistorical] = useState(false)
   const { user } = useAuth()
 
@@ -66,8 +69,24 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
     isLoadingMore,
     hasMoreMessages,
     loadMoreMessages,
-    fetchConversationMessages
+    fetchConversationMessages,
+    refreshConversations,
+    conversations
   } = useRealTimeMessages()
+
+  // Internal effective conversation ID (can upgrade from placeholder groupId to real conversation ID)
+  const [effectiveConversationId, setEffectiveConversationId] = useState<number>(conversationId)
+
+  // If prop conversationId changes (parent already resolved) update effective ID
+  useEffect(() => {
+    if (conversationType === 'group') {
+      if (conversationId !== effectiveConversationId) {
+        setEffectiveConversationId(conversationId)
+      }
+    } else {
+      setEffectiveConversationId(conversationId)
+    }
+  }, [conversationId, conversationType])
 
   // Typing indicator integration
   const {
@@ -80,10 +99,27 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
 
   // Load conversation messages when component mounts or conversation changes
   useEffect(() => {
-    if (conversationId && conversationType) {
-      fetchConversationMessages(conversationId, conversationType, participantId, 20, 0, false)
+    if (effectiveConversationId && conversationType) {
+      fetchConversationMessages(effectiveConversationId, conversationType, participantId, 20, 0, false)
     }
-  }, [conversationId, conversationType, participantId, fetchConversationMessages])
+  }, [effectiveConversationId, conversationType, participantId, fetchConversationMessages])
+
+  // Attempt to resolve real group conversation ID if we only have the raw groupId placeholder
+  useEffect(() => {
+    if (conversationType !== 'group') return
+    if (!groupId) return
+    // If effectiveConversationId equals raw groupId, it might be a placeholder
+    if (effectiveConversationId === groupId) {
+      // Look through loaded conversations for a matching group
+      const match = conversations.find(c => c.type === 'group' && c.group && c.group.id === groupId)
+      if (match && match.id !== effectiveConversationId) {
+        setEffectiveConversationId(match.id)
+        onConversationResolved?.(match.id)
+        // Fetch messages for the real ID
+        fetchConversationMessages(match.id, 'group', undefined, 20, 0, false)
+      }
+    }
+  }, [conversations, effectiveConversationId, groupId, conversationType, fetchConversationMessages, onConversationResolved])
 
   // Fetch participant data for private chats
   useEffect(() => {
@@ -100,25 +136,11 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
     }
   }, [conversationType, participantId])
 
-  // Throttled function to load more messages
-  const throttledLoadMore = React.useCallback(() => {
-    if (timeoutIdRef.current) return
-    timeoutIdRef.current = setTimeout(async () => {
-      if (conversationId && conversationType && hasMoreMessages.get(conversationId) && !isLoadingMore.get(conversationId)) {
-        setIsLoadingHistorical(true)
-        await loadMoreMessages(conversationId, conversationType, participantId)
-        setIsLoadingHistorical(false)
-      }
-      timeoutIdRef.current = null
-    }, 500) // 500ms throttle
-  }, [conversationId, conversationType, participantId, hasMoreMessages, isLoadingMore, loadMoreMessages])
-
   // Function to load previous messages when button is clicked
   const handleLoadPreviousMessages = React.useCallback(async () => {
     if (conversationId && conversationType && hasMoreMessages.get(conversationId) && !isLoadingMore.get(conversationId)) {
       // Save current scroll position before loading
       const currentScrollTop = messagesContainerRef.current?.scrollTop || 0
-      setSavedScrollPosition(currentScrollTop)
       setIsLoadingHistorical(true)
 
       await loadMoreMessages(conversationId, conversationType, participantId)
@@ -143,9 +165,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
     // Check if user is at the bottom (within 50px)
     const atBottom = scrollTop + clientHeight >= scrollHeight - 50
     setWasAtBottom(atBottom)
-
-    setLastScrollTop(scrollTop)
-  }, [lastScrollTop])
+  }, [])
 
   // Scroll to bottom when new messages arrive
   const scrollToBottom = React.useCallback(() => {
@@ -168,21 +188,35 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
 
   useEffect(() => {
     handleMessagesChange()
-  }, [messages, handleMessagesChange])
+  }, [messages, handleMessagesChange, effectiveConversationId])
 
   const handleSendMessage = async () => {
     if (!newMessage.trim() || !isConnected) return
 
     try {
       await sendRealTimeMessage(
-        conversationId,
+        effectiveConversationId,
         newMessage.trim(),
         'text',
         conversationType === 'private' ? participantId : undefined,
-        conversationType === 'group' ? conversationId : undefined
+        conversationType === 'group' ? groupId || effectiveConversationId : undefined
       )
 
       setNewMessage('')
+
+      // If this is the first message in a group and we used a placeholder, try to resolve real conversation
+      if (conversationType === 'group' && groupId && effectiveConversationId === groupId) {
+        // Refresh conversations after a short delay to allow backend to create conversation
+        setTimeout(async () => {
+          await refreshConversations()
+          const match = conversations.find(c => c.type === 'group' && c.group && c.group.id === groupId)
+          if (match && match.id !== effectiveConversationId) {
+            setEffectiveConversationId(match.id)
+            onConversationResolved?.(match.id)
+            fetchConversationMessages(match.id, 'group', undefined, 20, 0, false)
+          }
+        }, 500)
+      }
     } catch (error) {
       console.error('Error sending message:', error)
     }
@@ -307,7 +341,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
   // Helper function to check if messages should be grouped by date
   const shouldShowDateSeparator = (message: Message, index: number): boolean => {
     if (index === 0) return true
-    const prevMessage = Array.from(messages.get(conversationId) || [])[index - 1]
+  const prevMessage = Array.from(messages.get(effectiveConversationId) || [])[index - 1]
     if (!prevMessage) return true
 
     // Fallback to now if created_at is missing/invalid
@@ -576,7 +610,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
         onScroll={handleScroll}
       >
           {/* Load Previous Messages Button */}
-          {hasMoreMessages.get(conversationId) && !isLoadingMore.get(conversationId) && Array.from(messages.get(conversationId) || []).length > 0 && !isLoadingHistorical && (
+              {hasMoreMessages.get(effectiveConversationId) && !isLoadingMore.get(effectiveConversationId) && Array.from(messages.get(effectiveConversationId) || []).length > 0 && !isLoadingHistorical && (
             <motion.div
               className="flex justify-center py-4"
               initial={{ opacity: 0, y: -10 }}
@@ -621,7 +655,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
           ) : (
             <>
               {/* Loading more indicator */}
-              {isLoadingMore.get(conversationId) && (
+              {isLoadingMore.get(effectiveConversationId) && (
                 <motion.div
                   className="flex items-center justify-center py-4"
                   initial={{ opacity: 0, y: -10 }}
@@ -639,7 +673,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
                 </motion.div>
               )}
 
-              {Array.from(messages.get(conversationId) || []).length === 0 ? (
+              {Array.from(messages.get(effectiveConversationId) || []).length === 0 ? (
                 <motion.div
                   className="flex items-center justify-center h-full"
                   initial={{ opacity: 0, scale: 0.9 }}
@@ -657,13 +691,14 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
                     <div className="text-white/60 text-lg">No messages yet</div>
                     <div className="text-white/40 text-sm mt-2">Start the conversation!</div>
                     <div className="text-white/30 text-xs mt-4">
-                      Conversation ID: {conversationId}<br/>
-                      Messages count: {Array.from(messages.get(conversationId) || []).length}
+                      Conversation ID: {effectiveConversationId}<br/>
+                      Conversation Type: {conversationType}<br/>
+                      Available conversation IDs: {Array.from(messages.keys()).join(', ')}
                     </div>
                   </div>
                 </motion.div>
               ) : (
-                Array.from(messages.get(conversationId) || []).map((message, index) =>
+                Array.from(messages.get(effectiveConversationId) || []).map((message, index) =>
                   renderMessage(message, index)
                 )
               )}

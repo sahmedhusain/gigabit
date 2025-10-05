@@ -174,7 +174,7 @@ LIMIT ? OFFSET ?
 
 		creator.ID = group.CreatorID
 		group.Creator = creator
-		group.MemberStatus = "member"
+		group.MemberStatus = "accepted"
 		group.IsMember = true
 
 		groups = append(groups, group)
@@ -284,7 +284,7 @@ func (s *GroupService) RespondToInvitation(groupID, userID uint, accept bool) er
 	if accept {
 		// Accept invitation - become member
 		query := `
-UPDATE group_members SET status = 'member', created_at = ?, updated_at = ?
+UPDATE group_members SET status = 'accepted', created_at = ?, updated_at = ?
 WHERE group_id = ? AND user_id = ? AND status = 'invited'
 `
 		now := time.Now()
@@ -319,7 +319,7 @@ func (s *GroupService) RespondToJoinRequest(groupID, requestUserID, responderID 
 	if accept {
 		// Accept request - make user member
 		query := `
-UPDATE group_members SET status = 'member', created_at = ?, updated_at = ?
+UPDATE group_members SET status = 'accepted', created_at = ?, updated_at = ?
 WHERE group_id = ? AND user_id = ? AND status = 'pending'
 `
 		now := time.Now()
@@ -492,6 +492,171 @@ func (s *GroupService) IsUserAdminOrCreator(groupID, userID uint) (bool, error) 
 		return false, err
 	}
 	return role == "admin" || role == "creator", nil
+}
+
+// CreateGroupPost creates a new post in a group
+func (s *GroupService) CreateGroupPost(groupPost *models.GroupPost) error {
+	query := `
+INSERT INTO group_posts (group_id, user_id, content, image_url, created_at, updated_at)
+VALUES (?, ?, ?, ?, ?, ?)
+`
+
+	now := time.Now()
+	result, err := s.db.Exec(query, groupPost.GroupID, groupPost.UserID, groupPost.Content, groupPost.ImageURL, now, now)
+	if err != nil {
+		return err
+	}
+
+	id, err := result.LastInsertId()
+	if err != nil {
+		return err
+	}
+
+	groupPost.ID = uint(id)
+	groupPost.CreatedAt = now
+	groupPost.UpdatedAt = now
+
+	return nil
+}
+
+// GetGroupPostByID retrieves a group post by ID with user details
+func (s *GroupService) GetGroupPostByID(postID, currentUserID uint) (*models.GroupPostResponse, error) {
+	query := `
+SELECT gp.id, gp.group_id, gp.user_id, gp.content, gp.image_url, gp.created_at, gp.updated_at,
+       u.first_name, u.last_name, u.avatar, u.nickname,
+       (SELECT COUNT(*) FROM likes WHERE entity_type = 'group_post' AND entity_id = gp.id) as like_count,
+       (SELECT COUNT(*) FROM comments WHERE post_id = gp.id) as comment_count,
+       (SELECT COUNT(*) > 0 FROM likes WHERE entity_type = 'group_post' AND entity_id = gp.id AND user_id = ?) as is_liked
+FROM group_posts gp
+JOIN users u ON gp.user_id = u.id
+WHERE gp.id = ?
+`
+
+	var post models.GroupPostResponse
+	var firstName, lastName string
+	var avatar, nickname *string
+
+	err := s.db.QueryRow(query, currentUserID, postID).Scan(
+		&post.ID, &post.GroupID, &post.UserID, &post.Content, &post.ImageURL, &post.CreatedAt, &post.UpdatedAt,
+		&firstName, &lastName, &avatar, &nickname,
+		&post.LikeCount, &post.CommentCount, &post.IsLiked,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	// Set user details
+	post.User = models.UserResponse{
+		ID:        post.UserID,
+		FirstName: firstName,
+		LastName:  lastName,
+		Avatar:    avatar,
+		Nickname:  nickname,
+	}
+
+	return &post, nil
+}
+
+// GetGroupPosts retrieves all posts in a group with pagination
+func (s *GroupService) GetGroupPosts(groupID, currentUserID uint, limit, offset int) ([]models.GroupPostResponse, error) {
+	query := `
+SELECT gp.id, gp.group_id, gp.user_id, gp.content, gp.image_url, gp.created_at, gp.updated_at,
+       u.first_name, u.last_name, u.avatar, u.nickname,
+       (SELECT COUNT(*) FROM likes WHERE entity_type = 'group_post' AND entity_id = gp.id) as like_count,
+       (SELECT COUNT(*) FROM comments WHERE post_id = gp.id) as comment_count,
+       (SELECT COUNT(*) > 0 FROM likes WHERE entity_type = 'group_post' AND entity_id = gp.id AND user_id = ?) as is_liked
+FROM group_posts gp
+JOIN users u ON gp.user_id = u.id
+WHERE gp.group_id = ?
+ORDER BY gp.created_at DESC
+LIMIT ? OFFSET ?
+`
+
+	rows, err := s.db.Query(query, currentUserID, groupID, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var posts []models.GroupPostResponse
+	for rows.Next() {
+		var post models.GroupPostResponse
+		var firstName, lastName string
+		var avatar, nickname *string
+
+		err := rows.Scan(
+			&post.ID, &post.GroupID, &post.UserID, &post.Content, &post.ImageURL, &post.CreatedAt, &post.UpdatedAt,
+			&firstName, &lastName, &avatar, &nickname,
+			&post.LikeCount, &post.CommentCount, &post.IsLiked,
+		)
+		if err != nil {
+			continue
+		}
+
+		// Set user details
+		post.User = models.UserResponse{
+			ID:        post.UserID,
+			FirstName: firstName,
+			LastName:  lastName,
+			Avatar:    avatar,
+			Nickname:  nickname,
+		}
+
+		posts = append(posts, post)
+	}
+
+	return posts, nil
+}
+
+// DeleteGroupPost deletes a group post
+func (s *GroupService) DeleteGroupPost(postID, groupID, userID uint) error {
+	// Check if user owns the post or is admin/creator of the group
+	checkQuery := `
+SELECT gp.user_id, gm.role
+FROM group_posts gp
+JOIN group_members gm ON gp.group_id = gm.group_id
+WHERE gp.id = ? AND gp.group_id = ? AND gm.user_id = ? AND gm.status = 'accepted'
+`
+
+	var postOwnerID uint
+	var userRole string
+	err := s.db.QueryRow(checkQuery, postID, groupID, userID).Scan(&postOwnerID, &userRole)
+	if err != nil {
+		return err
+	}
+
+	// User can delete if they own the post or are admin/creator
+	if postOwnerID != userID && userRole != "admin" && userRole != "creator" {
+		return sql.ErrNoRows
+	}
+
+	// Delete associated comments and likes first
+	_, err = s.db.Exec("DELETE FROM comments WHERE post_id = ?", postID)
+	if err != nil {
+		return err
+	}
+
+	_, err = s.db.Exec("DELETE FROM likes WHERE entity_type = 'group_post' AND entity_id = ?", postID)
+	if err != nil {
+		return err
+	}
+
+	// Delete the post
+	result, err := s.db.Exec("DELETE FROM group_posts WHERE id = ? AND group_id = ?", postID, groupID)
+	if err != nil {
+		return err
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+
+	if rowsAffected == 0 {
+		return sql.ErrNoRows
+	}
+
+	return nil
 }
 
 func (s *GroupService) GetUserInvitations(userID uint) ([]models.GroupInvitationResponse, error) {

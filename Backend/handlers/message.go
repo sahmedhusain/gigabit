@@ -79,6 +79,17 @@ func (h *MessageHandler) SendMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Get sender information for WebSocket broadcast
+	var senderFirstName, senderLastName, senderAvatar string
+	senderQuery := `SELECT first_name, last_name, avatar FROM users WHERE id = ?`
+	db := h.messageService.GetDB()
+	err = db.QueryRow(senderQuery, userID).Scan(&senderFirstName, &senderLastName, &senderAvatar)
+	if err != nil {
+		// Log error but don't fail the message send
+		senderFirstName = "Unknown"
+		senderLastName = "User"
+	}
+
 	// Send real-time message via websocket
 	wsMessage := websocket.Message{
 		Type:      websocket.MessageTypePrivateMessage,
@@ -86,9 +97,15 @@ func (h *MessageHandler) SendMessage(w http.ResponseWriter, r *http.Request) {
 		Content:   req.Content,
 		Timestamp: time.Now().Unix(),
 		Data: map[string]interface{}{
-			"id":              message.ID,
-			"message_type":    req.MessageType,
-			"image_url":       req.ImageURL,
+			"id":           message.ID,
+			"message_type": req.MessageType,
+			"image_url":    req.ImageURL,
+			"sender": map[string]interface{}{
+				"id":         userID,
+				"first_name": senderFirstName,
+				"last_name":  senderLastName,
+				"avatar":     senderAvatar,
+			},
 			"conversation_id": conversationID,
 			"created_at":      message.CreatedAt.Format(time.RFC3339),
 		},
@@ -204,6 +221,17 @@ func (h *MessageHandler) GetGroupMessages(w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	// Mark messages as read for this user
+	var messageIDs []uint
+	for _, msg := range messages {
+		if !msg.IsRead && msg.SenderID != userID {
+			messageIDs = append(messageIDs, msg.ID)
+		}
+	}
+	if len(messageIDs) > 0 {
+		_ = h.messageService.MarkMessagesAsRead(messageIDs, userID)
+	}
+
 	writeJSON(w, http.StatusOK, map[string]interface{}{
 		"messages": messages,
 		"count":    len(messages),
@@ -236,10 +264,22 @@ func (h *MessageHandler) GetConversations(w http.ResponseWriter, r *http.Request
 		}
 
 		if chat.LastMessage != nil {
-			conversation.LastMessage = &models.MessageSummary{
+			messageSummary := &models.MessageSummary{
 				Content:   *chat.LastMessage,
 				CreatedAt: chat.LastMessageTime.Format(time.RFC3339),
 			}
+
+			// Add sender information if available
+			if chat.LastMessageSender != nil {
+				messageSummary.SenderID = chat.LastMessageSender.ID
+				messageSummary.Sender = chat.LastMessageSender
+			} else if chat.Participant != nil {
+				// For private chats, the participant is the sender (if not current user)
+				messageSummary.SenderID = chat.Participant.ID
+				messageSummary.Sender = chat.Participant
+			}
+
+			conversation.LastMessage = messageSummary
 		}
 
 		if chat.Type == "private" {

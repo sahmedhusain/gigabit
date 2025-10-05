@@ -6,18 +6,21 @@ import (
 	"net/http"
 	"social/models"
 	"social/services"
+	"social/websocket"
 	"strconv"
 )
 
 type EventHandler struct {
-	eventService *services.EventService
-	groupService *services.GroupService
+	eventService        *services.EventService
+	groupService        *services.GroupService
+	notificationService *services.NotificationService
 }
 
-func NewEventHandler(db *sql.DB) *EventHandler {
+func NewEventHandler(db *sql.DB, hub *websocket.Hub) *EventHandler {
 	return &EventHandler{
-		eventService: services.NewEventService(db),
-		groupService: services.NewGroupService(db),
+		eventService:        services.NewEventService(db),
+		groupService:        services.NewGroupService(db),
+		notificationService: services.NewNotificationService(db, hub),
 	}
 }
 
@@ -67,6 +70,9 @@ func (h *EventHandler) CreateEvent(w http.ResponseWriter, r *http.Request, group
 		writeError(w, http.StatusInternalServerError, "Failed to create event")
 		return
 	}
+
+	// Send notifications to all group members (async, don't wait for it)
+	go h.notificationService.NotifyEventCreated(userID, uint(groupID), event.ID)
 
 	writeJSON(w, http.StatusCreated, map[string]interface{}{
 		"message": "Event created successfully",
@@ -263,6 +269,10 @@ func (h *EventHandler) RespondToEvent(w http.ResponseWriter, r *http.Request, ev
 		return
 	}
 
+	// Get current response to check if it's being removed
+	currentResponse, _ := h.eventService.GetUserEventResponse(uint(eventID), userID)
+	wasRemoved := currentResponse == req.Option
+
 	if err := h.eventService.RespondToEvent(uint(eventID), userID, req.Option); err != nil {
 		if err == sql.ErrNoRows {
 			writeError(w, http.StatusForbidden, "Cannot respond to this event")
@@ -272,9 +282,17 @@ func (h *EventHandler) RespondToEvent(w http.ResponseWriter, r *http.Request, ev
 		return
 	}
 
+	responseValue := req.Option
+	message := "Response recorded successfully"
+	if wasRemoved {
+		responseValue = ""
+		message = "Response removed successfully"
+	}
+
 	writeJSON(w, http.StatusOK, map[string]interface{}{
-		"message":  "Response recorded successfully",
-		"response": req.Option,
+		"message":  message,
+		"response": responseValue,
+		"removed":  wasRemoved,
 	})
 }
 

@@ -74,19 +74,26 @@ export function useRealTimeMessages() {
           const conversationMessages = prev.get(conversationId) || []
           const updated = new Map(prev)
           
-          // Check if message already exists to prevent duplicates (by content and sender for better matching)
-          const messageExists = conversationMessages.some(msg => 
-            (msg.id === newMessage.id) || 
-            (msg.content === newMessage.content && 
-             msg.sender_id === newMessage.sender_id && 
-             Math.abs(new Date(msg.created_at).getTime() - new Date(newMessage.created_at).getTime()) < 5000) // Within 5 seconds
-          )
+          // Check if message already exists to prevent duplicates
+          // Match by ID first, then by content+sender+time window
+          const messageExists = conversationMessages.some(msg => {
+            // If both have real IDs (not timestamps), compare them
+            if (msg.id && newMessage.id && 
+                msg.id < 1000000000000 && newMessage.id < 1000000000000) {
+              return msg.id === newMessage.id
+            }
+            
+            // Otherwise, use content-based matching (for optimistic messages)
+            return msg.content === newMessage.content && 
+                   msg.sender_id === newMessage.sender_id && 
+                   Math.abs(new Date(msg.created_at).getTime() - new Date(newMessage.created_at).getTime()) < 10000 // Within 10 seconds
+          })
           
           if (!messageExists) {
             updated.set(conversationId, [...conversationMessages, newMessage])
-            console.log(`Added new message to conversation ${conversationId}:`, newMessage.content)
+            console.log(`✅ Added new message to conversation ${conversationId}:`, newMessage.content.substring(0, 50))
           } else {
-            console.log(`Duplicate message prevented for conversation ${conversationId}:`, newMessage.content)
+            console.log(`⛔ Duplicate message prevented for conversation ${conversationId}:`, newMessage.content.substring(0, 50))
           }
           
           return updated
@@ -147,9 +154,14 @@ export function useRealTimeMessages() {
 
       let response: { messages: any[]; count: number; limit: number; offset: number }
 
-      // Use conversation-specific endpoint
-      console.log('Fetching messages for conversation ID:', conversationId)
-      response = await api.getConversationMessages(conversationId, limit, offset)
+      // Fallback: if group chat and conversationId is a raw groupId (no conversation yet), use group endpoint
+      if (conversationType === 'group' && participantId === undefined) {
+        // participantId is not used for group, so we can use it as a signal
+        // If conversationId matches a groupId (i.e., no conversation yet), use group endpoint
+        response = await api.getGroupMessages(conversationId, limit, offset)
+      } else {
+        response = await api.getConversationMessages(conversationId, limit, offset)
+      }
 
       console.log('API response:', response)
 
@@ -267,34 +279,19 @@ export function useRealTimeMessages() {
         return updated
       })
 
-      // Send via WebSocket
-      const wsMessage: any = {
-        type: groupId ? 'group_message' : 'private_message',
+      // Send to backend API - the backend will handle WebSocket broadcast
+      const apiData: any = {
         content,
-        message_type: messageType
+        message_type: groupId ? 'group' : 'private'
       }
 
       if (groupId) {
-        wsMessage.group_id = groupId
+        apiData.group_id = groupId
       } else if (recipientId) {
-        wsMessage.to = recipientId
+        apiData.receiver_id = recipientId
       }
 
-      send(wsMessage)
-
-      // Also send to backend API for persistence
       try {
-        const apiData: any = {
-          content,
-          message_type: groupId ? 'group' : 'private'
-        }
-
-        if (groupId) {
-          apiData.group_id = groupId
-        } else if (recipientId) {
-          apiData.receiver_id = recipientId
-        }
-
         const apiResponse = await api.sendMessage(apiData)
         
         // If this is a new conversation, update the conversation ID

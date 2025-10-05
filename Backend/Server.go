@@ -103,8 +103,8 @@ func (s *Server) setupRoutes() {
 	userHandler := handlers.NewUserHandler(s.DB.GetDB(), s.Hub)
 	followHandler := handlers.NewFollowHandler(s.DB.GetDB(), s.Hub)
 	postHandler := handlers.NewPostHandler(s.DB.GetDB(), s.Hub)
-	groupHandler := handlers.NewGroupHandler(s.DB.GetDB())
-	eventHandler := handlers.NewEventHandler(s.DB.GetDB())
+	groupHandler := handlers.NewGroupHandler(s.DB.GetDB(), s.Hub)
+	eventHandler := handlers.NewEventHandler(s.DB.GetDB(), s.Hub)
 	messageHandler := handlers.NewMessageHandler(s.DB.GetDB(), s.Hub)
 	notificationHandler := handlers.NewNotificationHandler(s.DB.GetDB(), s.Hub)
 	bookmarkHandler := handlers.NewBookmarkHandler(s.DB.GetDB(), s.Hub)
@@ -631,6 +631,45 @@ func (s *Server) handleGroupRoute(groupHandler *handlers.GroupHandler, eventHand
 					})).ServeHTTP(w, r)
 				} else {
 					writeError(w, http.StatusNotFound, "User ID required")
+				}
+			case "user":
+				if len(parts) >= 3 {
+					userID := parts[2]
+					if r.Method != http.MethodGet {
+						writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
+						return
+					}
+					authMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+						groupHandler.GetUserGroups(w, r, userID)
+					})).ServeHTTP(w, r)
+				} else {
+					writeError(w, http.StatusNotFound, "User ID required")
+				}
+			case "posts":
+				if len(parts) >= 3 {
+					// Handle individual post operations: /api/groups/{groupID}/posts/{postID}
+					postID := parts[2]
+					if r.Method != http.MethodDelete {
+						writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
+						return
+					}
+					authMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+						groupHandler.DeleteGroupPost(w, r, groupID, postID)
+					})).ServeHTTP(w, r)
+				} else {
+					// Handle group posts collection: /api/groups/{groupID}/posts
+					switch r.Method {
+					case http.MethodGet:
+						authMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+							groupHandler.GetGroupPosts(w, r, groupID)
+						})).ServeHTTP(w, r)
+					case http.MethodPost:
+						authMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+							groupHandler.CreateGroupPost(w, r, groupID)
+						})).ServeHTTP(w, r)
+					default:
+						writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
+					}
 				}
 			default:
 				writeError(w, http.StatusNotFound, "Route not found")

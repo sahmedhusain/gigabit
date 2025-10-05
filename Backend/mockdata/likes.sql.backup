@@ -1358,4 +1358,16 @@ INSERT INTO likes (user_id, post_id, comment_id, created_at) VALUES
 (37, 7, NULL, datetime('now', '-4 days')),
 (38, 8, NULL, datetime('now', '-3 days')),
 (39, 9, NULL, datetime('now', '-2 days')),
-(40, 10, NULL, datetime('now', '-1 day'));
+(40, 10, NULL, datetime('now', '-1 day')),
+
+-- Some comment likes for recent comments
+(1, NULL, 401, datetime('now', '-60 days')),
+(2, NULL, 402, datetime('now', '-59 days')),
+(31, NULL, 403, datetime('now', '-58 days')),
+(32, NULL, 404, datetime('now', '-55 days')),
+(33, NULL, 405, datetime('now', '-50 days')),
+(34, NULL, 406, datetime('now', '-45 days')),
+(35, NULL, 407, datetime('now', '-40 days')),
+(36, NULL, 408, datetime('now', '-35 days')),
+(37, NULL, 409, datetime('now', '-30 days')),
+(38, NULL, 410, datetime('now', '-25 days'));

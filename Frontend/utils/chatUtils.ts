@@ -1,5 +1,5 @@
 'use client'
-import { ConversationResponse, Group } from '@/lib/api'
+import { ConversationResponse, Group, User } from '@/lib/api'
 
 export interface UnifiedChatItem {
   id: string | number
@@ -24,7 +24,7 @@ export function normalizeConversation(conv: ConversationResponse, currentUserId?
     ? (conv.group?.title || 'Group')
     : `${conv.participant?.first_name || ''} ${conv.participant?.last_name || ''}`.trim() || 'Unknown'
   const avatar = conv.participant?.avatar ?? null
-  const lastMsg = conv.last_message?.content ?? ''
+  const lastMsg = formatConversationPreview(conv, currentUserId)
   const lastMessageTime = conv.last_message?.created_at ?? conv.updated_at ?? undefined
   const unread = conv.unread_count ?? 0
   const participantId = conv.participant?.id
@@ -43,6 +43,46 @@ export function normalizeConversation(conv: ConversationResponse, currentUserId?
     participantId,
     lastMessageSenderId: lastMessageSenderId ?? undefined
   }
+}
+
+const getDisplayName = (user?: User | null): string => {
+  if (!user) return ''
+  const fullName = `${user.first_name || ''} ${user.last_name || ''}`.trim()
+  if (fullName) return fullName
+  if (user.nickname) return user.nickname
+  if (user.email) return user.email.split('@')[0] || ''
+  return ''
+}
+
+export function formatConversationPreview(conv: ConversationResponse, currentUserId?: number): string {
+  const content = conv.last_message?.content?.trim()
+  if (!content) return ''
+
+  const senderId = conv.last_message?.sender_id
+  const isFromCurrentUser = currentUserId && senderId === currentUserId
+
+  // Remove any existing "You: " prefix to avoid duplication
+  const cleanContent = content.replace(/^You: /, '')
+
+  if (isFromCurrentUser) {
+    return `You: ${cleanContent}`
+  }
+
+  // For private chats: show the other user's name (participant)
+  if (conv.type === 'private') {
+    const senderName = getDisplayName(conv.participant)
+    if (senderName) return `${senderName}: ${cleanContent}`
+    return `Someone: ${cleanContent}`
+  }
+
+  // For group chats: show the sender's name
+  if (conv.type === 'group') {
+    const senderName = getDisplayName(conv.last_message?.sender)
+    if (senderName) return `${senderName}: ${cleanContent}`
+    return `Someone: ${cleanContent}`
+  }
+
+  return cleanContent
 }
 
 /**

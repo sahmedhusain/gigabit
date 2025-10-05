@@ -24,4 +24,10 @@ INSERT INTO private_conversations (id, participant1_id, participant2_id, last_me
 (22, 21, 23, NULL, 0, 0, datetime('now', '-140 days'), datetime('now', '-20 hours'), 0, 0), -- Elijah and Jackson
 (23, 22, 24, NULL, 0, 0, datetime('now', '-130 days'), datetime('now', '-21 hours'), 0, 0), -- Lucas and Aiden
 (24, 23, 25, NULL, 0, 0, datetime('now', '-120 days'), datetime('now', '-22 hours'), 0, 0), -- Jackson and Logan
-(25, 24, 26, NULL, 0, 0, datetime('now', '-110 days'), datetime('now', '-23 hours'), 0, 0); -- Aiden and Benjamin
+(25, 25, 30, NULL, 0, 0, datetime('now', '-110 days'), datetime('now', '-23 hours'), 0, 0), -- Benjamin and Olivia
+-- Additional conversations for expanded mock data
+(26, 31, 32, NULL, 0, 0, datetime('now', '-60 days'), datetime('now', '-5 minutes'), 0, 0), -- Nathan and Zoe
+(27, 33, 34, NULL, 0, 0, datetime('now', '-50 days'), datetime('now', '-10 minutes'), 0, 0), -- Carter and Luna
+(28, 35, 36, NULL, 0, 0, datetime('now', '-40 days'), datetime('now', '-20 minutes'), 0, 0), -- Luna and Aria
+(29, 37, 38, NULL, 0, 0, datetime('now', '-30 days'), datetime('now', '-3 minutes'), 0, 0), -- Mason and Scarlett
+(30, 39, 40, NULL, 0, 0, datetime('now', '-20 days'), datetime('now', '-2 minutes'), 0, 0); -- Hunter and Levi

@@ -6,16 +6,20 @@ import (
 	"net/http"
 	"social/models"
 	"social/services"
+	"social/websocket"
 	"strconv"
+	"time"
 )
 
 type GroupHandler struct {
 	groupService *services.GroupService
+	hub          *websocket.Hub
 }
 
-func NewGroupHandler(db *sql.DB) *GroupHandler {
+func NewGroupHandler(db *sql.DB, hub *websocket.Hub) *GroupHandler {
 	return &GroupHandler{
 		groupService: services.NewGroupService(db),
+		hub:          hub,
 	}
 }
 
@@ -459,6 +463,194 @@ func (h *GroupHandler) GetUserRole(w http.ResponseWriter, r *http.Request, group
 		"role":                role,
 		"is_admin_or_creator": isAdminOrCreator,
 	})
+}
+
+// CreateGroupPost creates a new post in a group
+func (h *GroupHandler) CreateGroupPost(w http.ResponseWriter, r *http.Request, groupIDStr string) {
+	groupID, err := strconv.ParseUint(groupIDStr, 10, 32)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "Invalid group ID")
+		return
+	}
+
+	userID, ok := r.Context().Value("user_id").(uint)
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "User not authenticated")
+		return
+	}
+
+	var req models.CreateGroupPostRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "Invalid request body")
+		return
+	}
+
+	// Check if user is a member of the group
+	role, err := h.groupService.GetUserRole(uint(groupID), userID)
+	if err != nil {
+		writeError(w, http.StatusForbidden, "User is not a member of this group")
+		return
+	}
+
+	// Only members can post (not pending or invited users)
+	if role == "" {
+		writeError(w, http.StatusForbidden, "User is not a member of this group")
+		return
+	}
+
+	// Create the group post
+	groupPost := &models.GroupPost{
+		GroupID:   uint(groupID),
+		UserID:    userID,
+		Content:   req.Content,
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
+	}
+
+	if req.ImageURL != "" {
+		groupPost.ImageURL = &req.ImageURL
+	}
+
+	if err := h.groupService.CreateGroupPost(groupPost); err != nil {
+		writeError(w, http.StatusInternalServerError, "Failed to create group post")
+		return
+	}
+
+	// Get the full post response with user details
+	postResponse, err := h.groupService.GetGroupPostByID(groupPost.ID, userID)
+	if err != nil {
+		// Post was created but we couldn't fetch the response, still return success
+		writeJSON(w, http.StatusCreated, map[string]interface{}{
+			"message": "Group post created successfully",
+			"post_id": groupPost.ID,
+		})
+		return
+	}
+
+	// Send real-time update to all group members via WebSocket
+	if h.hub != nil {
+		message := websocket.Message{
+			Type:      "group_post_update",
+			From:      userID,
+			GroupID:   uint(groupID),
+			PostID:    groupPost.ID,
+			Action:    "create",
+			Data:      postResponse,
+			Timestamp: time.Now().Unix(),
+		}
+		h.hub.SendToGroup(uint(groupID), message, userID)
+	}
+
+	writeJSON(w, http.StatusCreated, map[string]interface{}{
+		"message": "Group post created successfully",
+		"post":    postResponse,
+	})
+}
+
+// GetGroupPosts retrieves all posts in a group
+func (h *GroupHandler) GetGroupPosts(w http.ResponseWriter, r *http.Request, groupIDStr string) {
+	groupID, err := strconv.ParseUint(groupIDStr, 10, 32)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "Invalid group ID")
+		return
+	}
+
+	userID, ok := r.Context().Value("user_id").(uint)
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "User not authenticated")
+		return
+	}
+
+	// Check if user is a member of the group
+	role, err := h.groupService.GetUserRole(uint(groupID), userID)
+	if err != nil {
+		writeError(w, http.StatusForbidden, "User is not a member of this group")
+		return
+	}
+
+	if role == "" {
+		writeError(w, http.StatusForbidden, "User is not a member of this group")
+		return
+	}
+
+	// Get pagination parameters
+	limitStr := r.URL.Query().Get("limit")
+	if limitStr == "" {
+		limitStr = "20"
+	}
+	offsetStr := r.URL.Query().Get("offset")
+	if offsetStr == "" {
+		offsetStr = "0"
+	}
+
+	limit, err := strconv.Atoi(limitStr)
+	if err != nil || limit > 50 {
+		limit = 20
+	}
+
+	offset, err := strconv.Atoi(offsetStr)
+	if err != nil || offset < 0 {
+		offset = 0
+	}
+
+	posts, err := h.groupService.GetGroupPosts(uint(groupID), userID, limit, offset)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "Failed to get group posts")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"posts":  posts,
+		"count":  len(posts),
+		"limit":  limit,
+		"offset": offset,
+	})
+}
+
+// DeleteGroupPost deletes a group post
+func (h *GroupHandler) DeleteGroupPost(w http.ResponseWriter, r *http.Request, groupIDStr, postIDStr string) {
+	groupID, err := strconv.ParseUint(groupIDStr, 10, 32)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "Invalid group ID")
+		return
+	}
+
+	postID, err := strconv.ParseUint(postIDStr, 10, 32)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "Invalid post ID")
+		return
+	}
+
+	userID, ok := r.Context().Value("user_id").(uint)
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "User not authenticated")
+		return
+	}
+
+	if err := h.groupService.DeleteGroupPost(uint(postID), uint(groupID), userID); err != nil {
+		if err == sql.ErrNoRows {
+			writeError(w, http.StatusForbidden, "Cannot delete this post")
+		} else {
+			writeError(w, http.StatusInternalServerError, "Failed to delete post")
+		}
+		return
+	}
+
+	// Send real-time update to all group members via WebSocket
+	if h.hub != nil {
+		message := websocket.Message{
+			Type:      "group_post_update",
+			From:      userID,
+			GroupID:   uint(groupID),
+			PostID:    uint(postID),
+			Action:    "delete",
+			Data:      map[string]interface{}{"post_id": postID},
+			Timestamp: time.Now().Unix(),
+		}
+		h.hub.SendToGroup(uint(groupID), message, userID)
+	}
+
+	writeJSON(w, http.StatusOK, map[string]interface{}{"message": "Group post deleted successfully"})
 }
 
 func (h *GroupHandler) GetUserInvitations(w http.ResponseWriter, r *http.Request) {

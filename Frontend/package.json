@@ -13,7 +13,7 @@
     "@emotion/styled": "^11.14.1",
     "@mui/icons-material": "^7.3.2",
     "@mui/material": "^7.3.2",
-    "emoji-picker-react": "^4.13.3",
+    "emoji-picker-react": "^4.14.0",
     "framer-motion": "^12.23.22",
     "lucide-react": "^0.536.0",
     "next": "^15.5.3",

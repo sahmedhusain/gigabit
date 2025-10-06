@@ -35,8 +35,6 @@ interface ProfileSectionProps {
   isFollowing?: boolean
   initialFollowerCount?: number
   initialFollowingCount?: number
-  onShowFollowers?: () => void
-  onShowFollowing?: () => void
 }
 
 export default function ProfileSection({
@@ -69,11 +67,62 @@ export default function ProfileSection({
   const [isUpdatingPrivacy, setIsUpdatingPrivacy] = useState(false)
   const [currentPrivacySetting, setCurrentPrivacySetting] = useState(currentUser?.isPrivate || false)
   const { success, error } = useToast()
-  const [activeCounter, setActiveCounter] = useState<'followers' | 'following' | null>(null)
+  
+  // User list overlay state
+  const [showUserListOverlay, setShowUserListOverlay] = useState(false)
+  const [userListType, setUserListType] = useState<'followers' | 'following' | null>(null)
+  const [userListData, setUserListData] = useState<any[]>([])
+  const [isLoadingUserList, setIsLoadingUserList] = useState(false)
 
   // Handle follow status changes
   const handleFollowStatusChange = (newStatus: FollowStatus) => {
     setFollowStatus(newStatus)
+  }
+
+  // Handle user list overlay
+  const handleShowUserList = async (type: 'followers' | 'following') => {
+    if (!currentUser) return
+
+    // Check if profile is private and is not my own profile
+    if (currentUser.isPrivate && !isOwnProfile) {
+      setUserListType(type)
+      setUserListData([])
+      setShowUserListOverlay(true)
+      return
+    }
+
+    setIsLoadingUserList(true)
+    setUserListType(type)
+    setShowUserListOverlay(true)
+
+    try {
+      let response
+      if (type === 'followers') {
+        response = await api.getFollowers(currentUser.id)
+        setUserListData(response.followers || [])
+      } else {
+        response = await api.getFollowing(currentUser.id)
+        setUserListData(response.following || [])
+      }
+    } catch (err) {
+      console.error(`Error fetching ${type}:`, err)
+      error(`Failed to load ${type}`)
+      setUserListData([])
+    } finally {
+      setIsLoadingUserList(false)
+    }
+  }
+
+  const handleCloseUserList = () => {
+    setShowUserListOverlay(false)
+    setUserListType(null)
+    setUserListData([])
+    setIsLoadingUserList(false)
+  }
+
+  const handleUserClick = (user: any) => {
+    // Navigate to user's profile
+    router.push(`/profile/${user.id}`)
   }
 
   // Handle privacy toggle
@@ -205,22 +254,22 @@ export default function ProfileSection({
 
             <div className="flex justify-center lg:justify-start space-x-6 lg:space-x-8 mb-4 lg:mb-6 mt-6">
 
-              <div className="text-center">
+              <div className="text-center p-2">
                 <div className="text-xl lg:text-2xl font-bold text-white">
                   {displayPosts?.length ?? 0}
                 </div>
                 <div className="text-white/60 text-sm lg:text-base">Posts</div>
               </div>
 
-              <div className="text-center" onClick={() => setActiveCounter('following')}>
-                <div className="text-xl lg:text-2xl font-bold text-white cursor-pointer">
+              <div className="text-center cursor-pointer hover:bg-white/5 rounded-lg p-2 transition-colors" onClick={() => handleShowUserList('following')}>
+                <div className="text-xl lg:text-2xl font-bold text-white">
                   {followingCount}
                 </div>
                 <div className="text-white/60 text-sm lg:text-base">Following</div>
               </div>
 
-              <div className="text-center" onClick={() => setActiveCounter('followers')}>
-                <div className="text-xl lg:text-2xl font-bold text-white cursor-pointer">
+              <div className="text-center cursor-pointer hover:bg-white/5 rounded-lg p-2 transition-colors" onClick={() => handleShowUserList('followers')}>
+                <div className="text-xl lg:text-2xl font-bold text-white">
                   {followersCount}
                 </div>
                 <div className="text-white/60 text-sm lg:text-base">Followers</div>
@@ -280,35 +329,7 @@ export default function ProfileSection({
           </div>
         </div>
 
-        {/* Rendering the list */}
-        {activeCounter && (
-          <div className="mt-4 p-4 bg-white/10 rounded-xl text-white">
-            {activeCounter === 'followers' && (
-              <div>
-                <h3 className="text-lg font-bold mb-2">Followers</h3>
-                {/* Fetch the list here */}
-                {displayFollowers.map((user, index) => (
-                  <div key={index} className="mb-2">
-                    {user.name}
-                  </div>
-                ))}
-              </div>
-            )}
-            {activeCounter === 'following' && (
-              <div>
-                <h3 className="text-lg font-bold mb-2">Following</h3>
-                {/* Fetch the list here */}
-              </div>
-            )}
 
-            <button
-              onClick={() => setActiveCounter(null)}
-              className="mt-4 px-4 py-2 bg-red-500 text-white rounded-lg"  
-            >
-              Close
-            </button>
-          </div>
-        )}
 
 
 
@@ -384,6 +405,88 @@ export default function ProfileSection({
           </div>
         </div>
       </div>
+
+      {/* User List Overlay */}
+      {showUserListOverlay && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-gradient-to-r from-white/10 to-white/5 backdrop-blur-xl rounded-2xl border border-white/20 p-6 max-w-md w-full mx-4 max-h-[70vh] overflow-hidden">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-xl font-semibold text-white">
+                {userListType === 'followers' ? 'Followers' : 'Following'}
+              </h3>
+              <button
+                onClick={handleCloseUserList}
+                className="p-1 hover:bg-white/10 rounded-lg transition-colors"
+              >
+                <span className="text-white text-xl">×</span>
+              </button>
+            </div>
+
+            <div className="overflow-y-auto max-h-96">
+              {/* If its a private profile */}
+              {currentUser?.isPrivate && !isOwnProfile ? (
+                <div className="text-center py-8">
+                  <Lock className="w-12 h-12 text-white/70 mx-auto mb-4" />
+                  <p className="text-white/70 mb-2">Private Account</p>
+                  <p className="text-white/50 text-sm">
+                    We want to protect our community. {currentUser?.firstName + ' ' + currentUser?.lastName} has a private {userListType} list.
+                  </p>
+                </div>
+              ) : isLoadingUserList ? (
+                <div className="space-y-3">
+                  {[...Array(5)].map((_, i) => (
+                    <div key={i} className="flex items-center space-x-3 p-2 animate-pulse">
+                      <div className="w-10 h-10 bg-white/20 rounded-full"></div>
+                      <div className="flex-1">
+                        <div className="w-24 h-4 bg-white/20 rounded mb-1"></div>
+                        <div className="w-16 h-3 bg-white/20 rounded"></div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : userListData.length === 0 ? (
+                <div className="text-center py-8">
+                  <p className="text-white/70">
+                    No {userListType} yet
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {userListData.map((user) => (
+                    <div
+                      key={user.id}
+                      className="flex items-center space-x-3 p-3 hover:bg-white/10 rounded-lg cursor-pointer transition-colors"
+                      onClick={() => handleUserClick(user)}
+                    >
+                      <div className="w-10 h-10 bg-gradient-to-br from-emerald-400 to-teal-600 rounded-full flex items-center justify-center overflow-hidden">
+                        {user.avatar ? (
+                          <Image
+                            src={getAvatarUrl(user.avatar) || ''}
+                            alt={`${user.first_name} ${user.last_name}`}
+                            width={40}
+                            height={40}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <User className="w-5 h-5 text-white" />
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-white font-medium truncate">
+                          {user.first_name} {user.last_name}
+                        </p>
+                        <p className="text-white/60 text-sm truncate">
+                          @{user.nickname || user.email.split('@')[0]}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Privacy Confirmation Modal */}
       {showPrivacyConfirm && (

@@ -9,6 +9,7 @@ import { useRealTimeMessages, useTypingIndicator } from '@/hooks'
 import { api, User } from '@/lib/api'
 import EmojiPicker from 'emoji-picker-react'
 import { getAvatarUrl } from '@/utils/avatarUtils'
+import { useRouter } from 'next/navigation'
 
 interface EmojiData {
   emoji: string
@@ -61,6 +62,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
   const [wasAtBottom, setWasAtBottom] = useState(true)
   const [isLoadingHistorical, setIsLoadingHistorical] = useState(false)
   const { user } = useAuth()
+  const router = useRouter()
 
   // Real-time messaging integration
   const {
@@ -418,9 +420,12 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
           {/* Avatar for group chats */}
           {showAvatar && (
             <motion.div
-              className="flex-shrink-0"
+              className="flex-shrink-0 cursor-pointer"
               whileHover={{ scale: 1.1 }}
               transition={{ type: 'spring', stiffness: 400, damping: 17 }}
+              onClick={() => {
+                router.push(`/profile/${message.sender.id}`)
+              }}
             >
               {(() => {
                 const avatarUrl = message.sender.avatar ? getAvatarUrl(message.sender.avatar) : null;
@@ -431,10 +436,10 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
                     width={32}
                     height={32}
                     unoptimized={avatarUrl.includes('/svg')}
-                    className="w-8 h-8 rounded-full object-cover shadow-lg ring-2 ring-white/10"
+                    className="w-8 h-8 rounded-full object-cover shadow-lg ring-2 ring-white/10 hover:ring-emerald-400/50 transition-all duration-200"
                   />
                 ) : (
-                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center text-white text-sm font-semibold shadow-lg ring-2 ring-white/10">
+                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center text-white text-sm font-semibold shadow-lg ring-2 ring-white/10 hover:ring-emerald-400/50 transition-all duration-200">
                     {message.sender.first_name[0]}{message.sender.last_name[0]}
                   </div>
                 );
@@ -446,10 +451,13 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
             {/* Sender name for group chats */}
             {showSenderName && (
               <motion.span
-                className="text-xs text-white/60 mb-1 px-2 font-medium"
+                className="text-xs text-white/60 mb-1 px-2 font-medium cursor-pointer hover:text-emerald-300 transition-colors duration-200"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ delay: 0.2 }}
+                onClick={() => {
+                  window.location.href = `/profile/${message.sender.id}`
+                }}
               >
                 {message.sender.first_name} {message.sender.last_name}
               </motion.span>
@@ -523,23 +531,31 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
         transition={{ delay: 0.1, duration: 0.3 }}
       >
         <div className="flex items-center space-x-4">
-          {/* Avatar */}
+          {/* Clickable Avatar */}
           <motion.div
-            className="relative"
+            className={`relative ${conversationType === 'private' && participantId ? 'cursor-pointer' : ''}`}
             whileHover={{ scale: 1.05 }}
             transition={{ type: 'spring', stiffness: 400, damping: 17 }}
+            onClick={() => {
+              if (conversationType === 'private' && participantId) {
+                router.push(`/profile/${participantId}`)
+              }
+            }}
           >
             {conversationType === 'private' && participantData?.avatar ? (
               <Image
                 src={participantData.avatar}
-                `/profile/${user.id}`
                 alt={participantData.first_name + ' ' + participantData.last_name}
                 width={48}
                 height={48}
-                className="w-12 h-12 rounded-full object-cover shadow-xl ring-2 ring-white/20"
+                className={`w-12 h-12 rounded-full object-cover shadow-xl ring-2 ring-white/20 ${
+                  conversationType === 'private' && participantId ? 'hover:ring-emerald-400/50' : ''
+                } transition-all duration-200`}
               />
             ) : (
-              <div className="w-12 h-12 rounded-full bg-gradient-to-br from-emerald-400 via-teal-500 to-cyan-600 flex items-center justify-center text-white text-lg font-bold shadow-xl ring-2 ring-white/20">
+              <div className={`w-12 h-12 rounded-full bg-gradient-to-br from-emerald-400 via-teal-500 to-cyan-600 flex items-center justify-center text-white text-lg font-bold shadow-xl ring-2 ring-white/20 ${
+                conversationType === 'private' && participantId ? 'hover:ring-emerald-400/50' : ''
+              } transition-all duration-200`}>
                 {conversationType === 'private' ? participantName[0].toUpperCase() : '#'}
               </div>
             )}
@@ -558,11 +574,21 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
           </motion.div>
 
           <div className="flex-1 min-w-0">
+            {/* Clickable Username */}
             <motion.h1
-              className="text-white text-xl font-bold truncate leading-tight"
+              className={`text-white text-xl font-bold truncate leading-tight ${
+                conversationType === 'private' && participantId 
+                  ? 'cursor-pointer hover:text-emerald-300 transition-colors duration-200' 
+                  : ''
+              }`}
               initial={{ opacity: 0, x: -10 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: 0.2, duration: 0.3 }}
+              onClick={() => {
+                if (conversationType === 'private' && participantId) {
+                  router.push(`/profile/${participantId}`)
+                }
+              }}
             >
               {participantName}
             </motion.h1>

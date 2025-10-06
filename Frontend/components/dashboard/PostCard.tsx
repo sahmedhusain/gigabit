@@ -52,7 +52,14 @@ export default function PostCard({ post, onLike, onBookmark, currentSubTab }: Po
       {/* Post Header */}
       <div className="flex items-center justify-between mb-3 lg:mb-4">
         <div className="flex items-center space-x-3 flex-1 min-w-0">
-          <div className="w-8 h-8 lg:w-10 lg:h-10 bg-gradient-to-r from-emerald-500 to-teal-600 rounded-full flex items-center justify-center overflow-hidden">
+          {/* Clickable Avatar */}
+          <div 
+            className="w-8 h-8 lg:w-10 lg:h-10 bg-gradient-to-r from-emerald-500 to-teal-600 rounded-full flex items-center justify-center overflow-hidden cursor-pointer hover:ring-2 hover:ring-emerald-400/50 transition-all duration-200"
+            onClick={(e) => {
+              e.stopPropagation()
+              router.push(`/profile/${post.user.id}`)
+            }}
+          >
             {getAvatarUrl(post.user.avatar) ? (
               <>
                 <Image 
@@ -77,7 +84,16 @@ export default function PostCard({ post, onLike, onBookmark, currentSubTab }: Po
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center space-x-2 mb-1">
-              <h4 className="text-white font-medium text-sm lg:text-base truncate">{post.user.name}</h4>
+              {/* Clickable Name */}
+              <h4 
+                className="text-white font-medium text-sm lg:text-base truncate cursor-pointer hover:text-emerald-300 transition-colors duration-200"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  router.push(`/profile/${post.user.id}`)
+                }}
+              >
+                {post.user.name}
+              </h4>
             </div>
             <p className="text-white/60 text-xs lg:text-sm">@{post.user.username} • {post.timeAgo}</p>
           </div>

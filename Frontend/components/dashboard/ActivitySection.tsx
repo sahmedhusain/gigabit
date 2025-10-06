@@ -45,14 +45,28 @@ export default function ActivitySection({
       onClick={(e) => handlePostClick(post.id, e)}
     >
       <div className="flex items-start space-x-3">
-        <div className="w-12 h-12 bg-gradient-to-r from-emerald-400 to-teal-500 rounded-full flex items-center justify-center text-white font-bold">
+        <div 
+          className="w-12 h-12 bg-gradient-to-r from-emerald-400 to-teal-500 rounded-full flex items-center justify-center text-white font-bold cursor-pointer hover:ring-2 hover:ring-emerald-400/50 transition-all duration-200"
+          onClick={(e) => {
+            e.stopPropagation()
+            router.push(`/profile/${post.user.id}`)
+          }}
+        >
           {post.user.name[0]?.toUpperCase()}
         </div>
         
         <div className="flex-1">
           <div className="flex items-center justify-between mb-2">
             <div>
-              <h3 className="text-white font-medium">{post.user.name}</h3>
+              <h3 
+                className="text-white font-medium cursor-pointer hover:text-emerald-300 transition-colors duration-200"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  router.push(`/profile/${post.user.id}`)
+                }}
+              >
+                {post.user.name}
+              </h3>
               <p className="text-white/60 text-sm">@{post.user.username}</p>
             </div>
             <div className="flex items-center space-x-2 text-white/60 text-sm">

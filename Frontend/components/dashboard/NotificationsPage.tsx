@@ -16,6 +16,7 @@ import {
   Clock
 } from 'lucide-react'
 import { useNotifications } from '@/hooks/useNotifications'
+import { useRouter } from 'next/navigation'
 
 // Utility function for formatting time
 function formatTimeAgo(dateString: string) {
@@ -52,6 +53,7 @@ export default function NotificationsPage() {
     timeframe: 'all'
   })
   const [selectedNotifications, setSelectedNotifications] = useState<Set<number>>(new Set())
+  const router = useRouter()
 
   // Filter and search notifications
   const filteredNotifications = useMemo(() => {
@@ -356,7 +358,12 @@ export default function NotificationsPage() {
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
                           <p className="text-white font-medium leading-relaxed">
-                            <span className="text-emerald-400 font-semibold">
+                            <span 
+                              className="text-emerald-400 font-semibold cursor-pointer hover:text-emerald-300 transition-colors duration-200"
+                              onClick={() => {
+                                router.push(`/profile/${notification.actor.id}`)
+                              }}
+                            >
                               {notification.actor.first_name} {notification.actor.last_name}
                             </span>{' '}
                             {notification.message}

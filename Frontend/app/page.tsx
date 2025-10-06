@@ -3,38 +3,34 @@
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
+import Homepage from '@/components/Homepage';
 
-export default function HomePage() {
+export default function RootPage() {
   const { user, isLoading } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
-    if (!isLoading) {
-      if (user) {
-        router.push('/feed/all');
-      } else {
-        router.push('/login');
-      }
+    if (!isLoading && user) {
+      router.push('/feed/all');
     }
   }, [user, isLoading, router]);
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-emerald-900 via-teal-900 to-cyan-800">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading...</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-400 mx-auto"></div>
+          <p className="mt-4 text-white/80">Loading...</p>
         </div>
       </div>
     );
   }
 
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
-      <div className="text-center">
-        <h1 className="text-2xl font-bold text-gray-900 mb-4">Welcome to Gigabit</h1>
-        <p className="text-gray-600">Redirecting...</p>
-      </div>
-    </div>
-  );
+  // Show homepage for non-authenticated users
+  if (!user) {
+    return <Homepage />;
+  }
+
+  // This should not be reached due to the useEffect redirect, but just in case
+  return null;
 }

@@ -21,8 +21,26 @@ function ProfilePage() {
   const [isLoading, setIsLoading] = useState(true)
   const [isOwnProfile, setIsOwnProfile] = useState(false)
   const [isFollowing, setIsFollowing] = useState<boolean>(false)
+  const [isListVisible, setIsListVisible] = useState(false)
+  const [listType, setListType] = useState<'followers' | 'following' | null>(null)
 
   const userId = params.id as string
+
+  const handleShowFollowers = () => {
+    setListType('followers')
+    setIsListVisible(true)
+  }
+
+  const handleShowFollowing = () => {
+    setListType('following')
+    setIsListVisible(true)
+  }
+
+  const handleCloseList = () => {
+    setListType(null)
+    setIsListVisible(false)
+  } 
+
 
   const fetchUserProfile = useCallback(async (userIdNum: number) => {
     try {
@@ -32,9 +50,9 @@ function ProfilePage() {
       try {
         const profileData = await api.getProfile(userIdNum)
         setProfileUser(profileData)
-
+        console.log('Profile data:', profileData)
         // Check if profile data includes follower/following counts
-  const profileDataRec = profileData as unknown as Record<string, unknown>
+        const profileDataRec = profileData as unknown as Record<string, unknown>
         if (profileDataRec['follower_count'] !== undefined) {
           // followerCount not used, skip setting
         }
@@ -212,6 +230,8 @@ function ProfilePage() {
         isOwnProfile={isOwnProfile}
         showPrivacyOverlay={profileUser.is_private && !isOwnProfile}
         isFollowing={isFollowing}
+        onShowFollowers={handleShowFollowers}
+        onShowFollowing={handleShowFollowing}
       />
     </AppLayout>
   )

@@ -532,6 +532,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
             {conversationType === 'private' && participantData?.avatar ? (
               <Image
                 src={participantData.avatar}
+                `/profile/${user.id}`
                 alt={participantData.first_name + ' ' + participantData.last_name}
                 width={48}
                 height={48}

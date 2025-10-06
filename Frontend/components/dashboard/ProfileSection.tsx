@@ -35,6 +35,8 @@ interface ProfileSectionProps {
   isFollowing?: boolean
   initialFollowerCount?: number
   initialFollowingCount?: number
+  onShowFollowers?: () => void
+  onShowFollowing?: () => void
 }
 
 export default function ProfileSection({
@@ -67,6 +69,7 @@ export default function ProfileSection({
   const [isUpdatingPrivacy, setIsUpdatingPrivacy] = useState(false)
   const [currentPrivacySetting, setCurrentPrivacySetting] = useState(currentUser?.isPrivate || false)
   const { success, error } = useToast()
+  const [activeCounter, setActiveCounter] = useState<'followers' | 'following' | null>(null)
 
   // Handle follow status changes
   const handleFollowStatusChange = (newStatus: FollowStatus) => {
@@ -208,14 +211,16 @@ export default function ProfileSection({
                 </div>
                 <div className="text-white/60 text-sm lg:text-base">Posts</div>
               </div>
-              <div className="text-center">
-                <div className="text-xl lg:text-2xl font-bold text-white">
+
+              <div className="text-center" onClick={() => setActiveCounter('following')}>
+                <div className="text-xl lg:text-2xl font-bold text-white cursor-pointer">
                   {followingCount}
                 </div>
                 <div className="text-white/60 text-sm lg:text-base">Following</div>
               </div>
-              <div className="text-center">
-                <div className="text-xl lg:text-2xl font-bold text-white">
+
+              <div className="text-center" onClick={() => setActiveCounter('followers')}>
+                <div className="text-xl lg:text-2xl font-bold text-white cursor-pointer">
                   {followersCount}
                 </div>
                 <div className="text-white/60 text-sm lg:text-base">Followers</div>
@@ -274,6 +279,41 @@ export default function ProfileSection({
             </div>
           </div>
         </div>
+
+        {/* Rendering the list */}
+        {activeCounter && (
+          <div className="mt-4 p-4 bg-white/10 rounded-xl text-white">
+            {activeCounter === 'followers' && (
+              <div>
+                <h3 className="text-lg font-bold mb-2">Followers</h3>
+                {/* Fetch the list here */}
+                {displayFollowers.map((user, index) => (
+                  <div key={index} className="mb-2">
+                    {user.name}
+                  </div>
+                ))}
+              </div>
+            )}
+            {activeCounter === 'following' && (
+              <div>
+                <h3 className="text-lg font-bold mb-2">Following</h3>
+                {/* Fetch the list here */}
+              </div>
+            )}
+
+            <button
+              onClick={() => setActiveCounter(null)}
+              className="mt-4 px-4 py-2 bg-red-500 text-white rounded-lg"  
+            >
+              Close
+            </button>
+          </div>
+        )}
+
+
+
+
+
       </div>
 
       {/* Scrollable Content */}

@@ -30,46 +30,31 @@ func AuthMiddleware(db *sql.DB) func(http.Handler) http.Handler {
 				}
 			}
 
-			//log.Printf("AuthMiddleware - token: %s", tokenString)
-
-			// Validate the token
-			//log.Printf("AuthMiddleware - token present=%t len=%d", tokenString != "", len(tokenString))
-			claims, err := utils.ValidateToken(tokenString)
-			if err != nil {
-				if err.Error() == "token expired" {
-					//log.Printf("AuthMiddleware - token validation failed: expired")
-					writeErrorWithCode(w, http.StatusUnauthorized, "Token expired", "TOKEN_EXPIRED")
-				} else {
-					//log.Printf("AuthMiddleware - token validation failed: %v", err)
-					writeErrorWithCode(w, http.StatusUnauthorized, "Invalid token", "INVALID_TOKEN")
-				}
+			// Validate token format
+			if err := utils.ValidateTokenFormat(tokenString); err != nil {
+				writeErrorWithCode(w, http.StatusUnauthorized, "Invalid token format", "INVALID_TOKEN")
 				return
 			}
-			//log.Printf("AuthMiddleware - token validated, session=%v user=%v", claims.SessionID, claims.UserID)
 
-			// Verify session exists and is valid
-			session, err := sessionService.GetSessionByIDAndToken(claims.SessionID, tokenString)
+			// Look up session by token
+			session, err := sessionService.GetSessionByToken(tokenString)
 			if err != nil {
-				//log.Printf("AuthMiddleware - session lookup failed for session=%v err=%v", claims.SessionID, err)
 				writeErrorWithCode(w, http.StatusUnauthorized, "Invalid session", "INVALID_SESSION")
 				return
 			}
-			//log.Printf("AuthMiddleware - session lookup succeeded id=%v expires_at=%v", session.ID, session.ExpiresAt)
-			//log.Printf("AuthMiddleware - session: %+v", session)
 
 			// Check if session is expired
 			if session.ExpiresAt.Before(time.Now()) {
-				//log.Printf("AuthMiddleware - session expired id=%v expires_at=%v", session.ID, session.ExpiresAt)
 				// Delete expired session
 				sessionService.DeleteSession(session.ID)
 				writeErrorWithCode(w, http.StatusUnauthorized, "Session expired", "SESSION_EXPIRED")
 				return
 			}
 
-			// Set user information in context
-			ctx := context.WithValue(r.Context(), "user_id", claims.UserID)
-			ctx = context.WithValue(ctx, "user_email", claims.Email)
-			ctx = context.WithValue(ctx, "session_id", claims.SessionID)
+			// Get user email for context (optional - you can fetch from user service if needed)
+			// For now we'll just set the essential user_id and session_id
+			ctx := context.WithValue(r.Context(), "user_id", session.UserID)
+			ctx = context.WithValue(ctx, "session_id", session.ID)
 
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})

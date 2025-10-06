@@ -7,11 +7,10 @@ import (
 	"log"
 	"net/http"
 	"regexp"
-	"time"
-
 	"social/models"
 	"social/services"
 	"social/utils"
+	"time"
 )
 
 type AuthHandler struct {
@@ -157,43 +156,27 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Create session with temporary ID to generate token
-	tempSession := &models.Session{
-		UserID:    user.ID,
-		ExpiresAt: time.Now().Add(30 * time.Minute),
-	}
-
-	// Generate token - we'll use 0 as temporary session ID, then update
-	token, err := utils.GenerateToken(user.ID, user.Email, 0)
+	// Generate secure random token
+	token, err := utils.GenerateSecureToken()
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "Failed to generate token")
 		return
 	}
 
-	// Set token in session before creating
-	tempSession.Token = token
+	// Create session with token
+	session := &models.Session{
+		UserID:    user.ID,
+		Token:     token,
+		ExpiresAt: time.Now().Add(30 * time.Minute),
+	}
 
-	if err := h.sessionService.CreateSession(tempSession); err != nil {
+	if err := h.sessionService.CreateSession(session); err != nil {
 		writeError(w, http.StatusInternalServerError, "Failed to create session")
 		return
 	}
 
-	// Now generate the final token with correct session ID
-	finalToken, err := utils.GenerateToken(user.ID, user.Email, tempSession.ID)
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, "Failed to generate final token")
-		return
-	}
-
-	// Update session with final token
-	tempSession.Token = finalToken
-	if err := h.sessionService.UpdateSessionToken(tempSession); err != nil {
-		writeError(w, http.StatusInternalServerError, "Failed to save session")
-		return
-	}
-
 	response := models.AuthResponse{
-		Token: finalToken,
+		Token: token,
 		User:  user.ToResponse(),
 	}
 
@@ -234,42 +217,27 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	// Invalidate existing sessions for this user
 	h.sessionService.DeleteUserSessions(user.ID)
 
-	// Create new session with temporary token
-	tempSession := &models.Session{
-		UserID:    user.ID,
-		ExpiresAt: time.Now().Add(30 * time.Minute),
-	}
-
-	// Generate temporary token
-	tempToken, err := utils.GenerateToken(user.ID, user.Email, 0)
+	// Generate secure random token
+	token, err := utils.GenerateSecureToken()
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "Failed to generate token")
 		return
 	}
 
-	tempSession.Token = tempToken
+	// Create new session with token
+	session := &models.Session{
+		UserID:    user.ID,
+		Token:     token,
+		ExpiresAt: time.Now().Add(30 * time.Minute),
+	}
 
-	if err := h.sessionService.CreateSession(tempSession); err != nil {
+	if err := h.sessionService.CreateSession(session); err != nil {
 		writeError(w, http.StatusInternalServerError, "Failed to create session")
 		return
 	}
 
-	// Generate final token with correct session ID
-	finalToken, err := utils.GenerateToken(user.ID, user.Email, tempSession.ID)
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, "Failed to generate final token")
-		return
-	}
-
-	// Update session with final token
-	tempSession.Token = finalToken
-	if err := h.sessionService.UpdateSessionToken(tempSession); err != nil {
-		writeError(w, http.StatusInternalServerError, "Failed to save session")
-		return
-	}
-
 	response := models.AuthResponse{
-		Token: finalToken,
+		Token: token,
 		User:  user.ToResponse(),
 	}
 

@@ -83,6 +83,26 @@ func (s *SessionService) GetSessionByIDAndToken(sessionID uint, token string) (*
 	return session, nil
 }
 
+func (s *SessionService) GetSessionByToken(token string) (*models.Session, error) {
+	query := `
+        SELECT id, user_id, token, expires_at, created_at, updated_at
+        FROM sessions 
+        WHERE token = ?
+    `
+
+	session := &models.Session{}
+	row := s.db.QueryRow(query, token)
+
+	err := row.Scan(&session.ID, &session.UserID, &session.Token, &session.ExpiresAt,
+		&session.CreatedAt, &session.UpdatedAt)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return session, nil
+}
+
 func (s *SessionService) GetSessionByID(sessionID uint) (*models.Session, error) {
 	query := `
         SELECT id, user_id, token, expires_at, created_at, updated_at

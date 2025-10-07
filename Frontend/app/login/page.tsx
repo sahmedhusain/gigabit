@@ -10,7 +10,7 @@ import { Eye, EyeOff, Mail, Lock, ArrowRight, Sparkles } from 'lucide-react'
 function LoginPage() {
   const router = useRouter()
   const { login } = useAuth()
-  
+
   const [formData, setFormData] = useState({
     email: '',
     password: ''
@@ -30,7 +30,7 @@ function LoginPage() {
     e.preventDefault()
     setIsLoading(true)
     setError(null)
-    
+
     try {
       // Validate required fields
       if (!formData.email || !formData.password) {
@@ -58,7 +58,7 @@ function LoginPage() {
         <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-teal-500/20 rounded-full blur-3xl animate-pulse delay-1000"></div>
         <div className="absolute top-3/4 left-1/2 w-64 h-64 bg-cyan-500/20 rounded-full blur-3xl animate-pulse delay-2000"></div>
       </div>
-      
+
       {/* Floating Particles */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         {[...Array(15)].map((_, i) => {
@@ -66,7 +66,7 @@ function LoginPage() {
           const top = (i * 31 + 41) % 100;
           const delay = (i * 0.3) % 3;
           const duration = 3 + (i * 0.2) % 2;
-          
+
           return (
             <div
               key={i}
@@ -107,47 +107,71 @@ function LoginPage() {
               <h1 className="text-4xl lg:text-6xl xl:text-7xl font-bold bg-gradient-to-r from-white via-emerald-100 to-teal-200 bg-clip-text text-transparent mb-6 leading-tight">
                 Welcome Back
               </h1>
-              <p className="text-xl lg:text-2xl text-white/80 font-light leading-relaxed">
+              <p className="text-xl lg:text-2xl text-white/80 font-light leading-relaxed mb-6">
                 Sign in to continue your journey and connect with your community.
               </p>
+              
+              {/* Stats or Key Features */}
+              <div className="grid grid-cols-2 gap-4 mb-6">
+                <div className="flex items-center space-x-3">
+                  <div className="w-3 h-3 bg-emerald-400 rounded-full animate-pulse"></div>
+                  <span className="text-white/70 text-sm">10K+ Active Users</span>
+                </div>
+                <div className="flex items-center space-x-3">
+                  <div className="w-3 h-3 bg-teal-400 rounded-full animate-pulse delay-300"></div>
+                  <span className="text-white/70 text-sm">Real-time Chat</span>
+                </div>
+              </div>
             </div>
 
             {/* Features */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
-              <div className="flex items-center space-x-3">
-                <div className="w-2 h-2 bg-emerald-400 rounded-full"></div>
-                <span className="text-white/70 text-sm">Real-time messaging</span>
+              <div className="group p-4 bg-white/5 backdrop-blur-sm rounded-xl border border-white/10 hover:bg-white/10 hover:border-emerald-400/30 transition-all duration-300">
+                <div className="flex items-center space-x-3 mb-2">
+                  <div className="w-2 h-2 bg-emerald-400 rounded-full group-hover:animate-bounce"></div>
+                  <span className="text-white/80 text-sm font-medium">Real-time messaging</span>
+                </div>
+                <p className="text-white/60 text-xs">Connect instantly with friends</p>
               </div>
-              <div className="flex items-center space-x-3">
-                <div className="w-2 h-2 bg-teal-400 rounded-full"></div>
-                <span className="text-white/70 text-sm">Smart communities</span>
+              <div className="group p-4 bg-white/5 backdrop-blur-sm rounded-xl border border-white/10 hover:bg-white/10 hover:border-teal-400/30 transition-all duration-300">
+                <div className="flex items-center space-x-3 mb-2">
+                  <div className="w-2 h-2 bg-teal-400 rounded-full group-hover:animate-bounce delay-100"></div>
+                  <span className="text-white/80 text-sm font-medium">Smart communities</span>
+                </div>
+                <p className="text-white/60 text-xs">Join groups that matter</p>
               </div>
-              <div className="flex items-center space-x-3">
-                <div className="w-2 h-2 bg-cyan-400 rounded-full"></div>
-                <span className="text-white/70 text-sm">Event planning</span>
+              <div className="group p-4 bg-white/5 backdrop-blur-sm rounded-xl border border-white/10 hover:bg-white/10 hover:border-cyan-400/30 transition-all duration-300">
+                <div className="flex items-center space-x-3 mb-2">
+                  <div className="w-2 h-2 bg-cyan-400 rounded-full group-hover:animate-bounce delay-200"></div>
+                  <span className="text-white/80 text-sm font-medium">Event planning</span>
+                </div>
+                <p className="text-white/60 text-xs">Organize and discover events</p>
               </div>
-              <div className="flex items-center space-x-3">
-                <div className="w-2 h-2 bg-purple-400 rounded-full"></div>
-                <span className="text-white/70 text-sm">Privacy first</span>
+              <div className="group p-4 bg-white/5 backdrop-blur-sm rounded-xl border border-white/10 hover:bg-white/10 hover:border-purple-400/30 transition-all duration-300">
+                <div className="flex items-center space-x-3 mb-2">
+                  <div className="w-2 h-2 bg-purple-400 rounded-full group-hover:animate-bounce delay-300"></div>
+                  <span className="text-white/80 text-sm font-medium">Privacy first</span>
+                </div>
+                <p className="text-white/60 text-xs">Your data stays secure</p>
               </div>
             </div>
           </div>
         </div>
 
         {/* Right Side - Login Form */}
-        <div className="flex-1 flex items-center justify-center px-8 lg:px-16 xl:px-24">
-          <div className="w-full max-w-md">
+        <div className="flex-1 flex items-center justify-center px-4 sm:px-6 lg:px-8 xl:px-12">
+          <div className="w-full max-w-2xl">
             <div className="relative group">
               {/* Glassmorphism Background */}
               <div className="absolute inset-0 bg-gradient-to-r from-white/10 to-white/5 backdrop-blur-xl rounded-3xl border border-white/20 shadow-2xl shadow-black/20"></div>
               <div className="absolute inset-0 bg-gradient-to-b from-white/5 to-transparent rounded-3xl"></div>
-              
-              <div className="relative p-8">
-                <form onSubmit={handleSubmit} className="space-y-6">
+
+              <div className="relative p-6 sm:p-8 lg:p-10 xl:p-12">
+                <form onSubmit={handleSubmit} className="space-y-5">
                   {/* Form Header */}
-                  <div className="text-center mb-8">
-                    <h2 className="text-2xl font-bold text-white mb-2">Sign In</h2>
-                    <p className="text-white/60">Enter your credentials to continue</p>
+                  <div className="text-center mb-6">
+                    <h2 className="text-3xl font-bold bg-gradient-to-r from-white via-emerald-100 to-teal-200 bg-clip-text text-transparent mb-2">Sign In</h2>
+                    <p className="text-white/60 text-sm">Enter your credentials to continue</p>
                   </div>
 
                   {/* Error Message */}
@@ -159,8 +183,11 @@ function LoginPage() {
 
                   {/* Email Input */}
                   <div className="relative group">
-                    <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none z-10">
-                      <Mail className="h-5 w-5 text-white/70 group-focus-within:text-emerald-400 transition-colors" />
+                    <label htmlFor="email" className="block text-xs font-semibold text-white/90 mb-2 uppercase tracking-wide">
+                      Email Address
+                    </label>
+                    <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none z-10 top-7">
+                      <Mail className="h-4 w-4 text-emerald-400/70 group-focus-within:text-emerald-400 transition-colors duration-300" />
                     </div>
                     <input
                       id="email"
@@ -168,8 +195,8 @@ function LoginPage() {
                       type="email"
                       autoComplete="email"
                       required
-                      className="w-full pl-12 pr-4 py-4 bg-white/10 border border-white/20 rounded-2xl placeholder-white/50 text-white focus:outline-none focus:ring-2 focus:ring-emerald-400/50 focus:border-emerald-400/50 focus:bg-white/15 transition-all duration-300 backdrop-blur-sm"
-                      placeholder="Email address"
+                      className="w-full pl-11 pr-4 py-3.5 bg-white/10 border border-white/20 rounded-xl placeholder-white/40 text-white focus:outline-none focus:ring-2 focus:ring-emerald-400/50 focus:border-emerald-400/50 focus:bg-white/15 transition-all duration-300 backdrop-blur-sm hover:border-white/30"
+                      placeholder="Enter your email address"
                       value={formData.email}
                       onChange={handleInputChange}
                     />
@@ -177,8 +204,11 @@ function LoginPage() {
 
                   {/* Password Input */}
                   <div className="relative group">
-                    <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none z-10">
-                      <Lock className="h-5 w-5 text-white/70 group-focus-within:text-emerald-400 transition-colors" />
+                    <label htmlFor="password" className="block text-xs font-semibold text-white/90 mb-2 uppercase tracking-wide">
+                      Password
+                    </label>
+                    <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none z-10 top-7">
+                      <Lock className="h-4 w-4 text-emerald-400/70 group-focus-within:text-emerald-400 transition-colors duration-300" />
                     </div>
                     <input
                       id="password"
@@ -186,14 +216,14 @@ function LoginPage() {
                       type={showPassword ? "text" : "password"}
                       autoComplete="current-password"
                       required
-                      className="w-full pl-12 pr-12 py-4 bg-white/10 border border-white/20 rounded-2xl placeholder-white/50 text-white focus:outline-none focus:ring-2 focus:ring-emerald-400/50 focus:border-emerald-400/50 focus:bg-white/15 transition-all duration-300 backdrop-blur-sm"
-                      placeholder="Password"
+                      className="w-full pl-11 pr-12 py-3.5 bg-white/10 border border-white/20 rounded-xl placeholder-white/40 text-white focus:outline-none focus:ring-2 focus:ring-emerald-400/50 focus:border-emerald-400/50 focus:bg-white/15 transition-all duration-300 backdrop-blur-sm hover:border-white/30"
+                      placeholder="Enter your password"
                       value={formData.password}
                       onChange={handleInputChange}
                     />
                     <button
                       type="button"
-                      className="absolute inset-y-0 right-0 pr-4 flex items-center z-10"
+                      className="absolute inset-y-0 right-0 pr-3.5 flex items-center z-10 top-7 hover:scale-110 transition-transform duration-200"
                       onClick={() => setShowPassword(!showPassword)}
                     >
                       {showPassword ? (
@@ -208,10 +238,11 @@ function LoginPage() {
                   <button
                     type="submit"
                     disabled={isLoading}
-                    className="group relative w-full flex justify-center items-center py-4 px-6 text-lg font-semibold rounded-2xl text-white bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 hover:from-emerald-600 hover:via-teal-600 hover:to-cyan-600 focus:outline-none focus:ring-2 focus:ring-teal-400/50 transition-all duration-300 transform hover:scale-[1.02] hover:shadow-2xl hover:shadow-teal-500/25 disabled:opacity-70 disabled:cursor-not-allowed disabled:transform-none"
+                    className="group relative w-full flex justify-center items-center py-4 px-6 text-lg font-semibold rounded-2xl text-white bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 hover:from-emerald-600 hover:via-teal-600 hover:to-cyan-600 focus:outline-none focus:ring-2 focus:ring-teal-400/50 transition-all duration-300 transform hover:scale-[1.02] hover:shadow-2xl hover:shadow-teal-500/25 disabled:opacity-70 disabled:cursor-not-allowed disabled:transform-none overflow-hidden"
                   >
-                    <div className="absolute inset-0 bg-gradient-to-r from-emerald-400 to-teal-600 rounded-2xl blur opacity-30 group-hover:opacity-50 transition-opacity"></div>
-                    <span className="relative flex items-center">
+                    <div className="absolute inset-0 bg-gradient-to-r from-emerald-400 to-teal-600 rounded-2xl blur opacity-30 group-hover:opacity-50 transition-opacity duration-300"></div>
+                    <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/10 to-white/0 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                    <span className="relative flex items-center z-10">
                       {isLoading ? (
                         <>
                           <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
@@ -220,7 +251,7 @@ function LoginPage() {
                       ) : (
                         <>
                           Sign In
-                          <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
+                          <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform duration-300" />
                         </>
                       )}
                     </span>

@@ -290,16 +290,16 @@ function RegisterPage() {
               <div className="absolute inset-0 bg-gradient-to-b from-white/5 to-transparent rounded-3xl"></div>
               
               {/* Fixed Header */}
-              <div className="relative p-8 pb-4">
+              <div className="relative p-6 pb-4">
                 <div className="text-center">
-                  <h2 className="text-4xl font-bold text-white mb-3">Create Account</h2>
-                  <p className="text-white/70 text-lg">Fill in your details to get started</p>
+                  <h2 className="text-3xl font-bold bg-gradient-to-r from-white via-emerald-100 to-teal-200 bg-clip-text text-transparent mb-2">Create Account</h2>
+                  <p className="text-white/60 text-sm">Fill in your details to get started</p>
                 </div>
               </div>
               
               {/* Scrollable Content */}
-              <div className="relative h-[calc(100%-12rem)] overflow-y-auto px-8 pb-8">
-                <form onSubmit={(e) => { e.preventDefault(); handleSubmit(); }} className="space-y-6 h-full">
+              <div className="relative h-[calc(100%-9.5rem)] overflow-y-auto px-6 pb-1 custom-scrollbar">
+                <form onSubmit={(e) => { e.preventDefault(); handleSubmit(); }} className="space-y-4">
                   {/* Error Message */}
                   {error && (
                     <div className="bg-red-500/20 border border-red-500/30 rounded-2xl p-4 mb-6">
@@ -308,38 +308,44 @@ function RegisterPage() {
                   )}
 
                   {/* Two Container Layout - Side by Side */}
-                  <div className="flex gap-12">
+                  <div className="flex gap-6">
                     {/* Left Container - Required Fields */}
-                    <div className="flex-1 space-y-6">
+                    <div className="flex-1 space-y-4">
                       {/* Name Fields Row */}
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div className="relative group">
-                          <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none z-10">
-                            <User className="h-5 w-5 text-white/70 group-focus-within:text-emerald-400 transition-colors" />
+                          <label htmlFor="firstName" className="block text-xs font-semibold text-white/90 mb-2 uppercase tracking-wide">
+                            First Name
+                          </label>
+                          <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none z-10 top-7">
+                            <User className="h-4 w-4 text-emerald-400/70 group-focus-within:text-emerald-400 transition-colors" />
                           </div>
                           <input
                             id="firstName"
                             name="firstName"
                             type="text"
                             required
-                            className="w-full pl-12 pr-4 py-4 bg-white/10 border border-white/20 rounded-2xl placeholder-white/50 text-white focus:outline-none focus:ring-2 focus:ring-emerald-400/50 focus:border-emerald-400/50 focus:bg-white/15 transition-all duration-300 backdrop-blur-sm"
-                            placeholder="First Name"
+                            className="w-full pl-11 pr-4 py-3.5 bg-white/10 border border-white/20 rounded-xl placeholder-white/40 text-white focus:outline-none focus:ring-2 focus:ring-emerald-400/50 focus:border-emerald-400/50 focus:bg-white/15 transition-all duration-300 backdrop-blur-sm hover:border-white/30"
+                            placeholder="Enter first name"
                             value={formData.firstName}
                             onChange={handleInputChange}
                           />
                         </div>
 
                         <div className="relative group">
-                          <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none z-10">
-                            <User className="h-5 w-5 text-white/70 group-focus-within:text-emerald-400 transition-colors" />
+                          <label htmlFor="lastName" className="block text-xs font-semibold text-white/90 mb-2 uppercase tracking-wide">
+                            Last Name
+                          </label>
+                          <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none z-10 top-7">
+                            <User className="h-4 w-4 text-emerald-400/70 group-focus-within:text-emerald-400 transition-colors" />
                           </div>
                           <input
                             id="lastName"
                             name="lastName"
                             type="text"
                             required
-                            className="w-full pl-12 pr-4 py-4 bg-white/10 border border-white/20 rounded-2xl placeholder-white/50 text-white focus:outline-none focus:ring-2 focus:ring-emerald-400/50 focus:border-emerald-400/50 focus:bg-white/15 transition-all duration-300 backdrop-blur-sm"
-                            placeholder="Last Name"
+                            className="w-full pl-11 pr-4 py-3.5 bg-white/10 border border-white/20 rounded-xl placeholder-white/40 text-white focus:outline-none focus:ring-2 focus:ring-emerald-400/50 focus:border-emerald-400/50 focus:bg-white/15 transition-all duration-300 backdrop-blur-sm hover:border-white/30"
+                            placeholder="Enter last name"
                             value={formData.lastName}
                             onChange={handleInputChange}
                           />
@@ -348,8 +354,11 @@ function RegisterPage() {
 
                       {/* Email Input */}
                       <div className="relative group">
-                        <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none z-10">
-                          <Mail className="h-5 w-5 text-white/70 group-focus-within:text-emerald-400 transition-colors" />
+                        <label htmlFor="email" className="block text-xs font-semibold text-white/90 mb-2 uppercase tracking-wide">
+                          Email Address
+                        </label>
+                        <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none z-10 top-7">
+                          <Mail className="h-4 w-4 text-emerald-400/70 group-focus-within:text-emerald-400 transition-colors" />
                         </div>
                         <input
                           id="email"
@@ -357,8 +366,8 @@ function RegisterPage() {
                           type="email"
                           autoComplete="email"
                           required
-                          className="w-full pl-12 pr-4 py-4 bg-white/10 border border-white/20 rounded-2xl placeholder-white/50 text-white focus:outline-none focus:ring-2 focus:ring-emerald-400/50 focus:border-emerald-400/50 focus:bg-white/15 transition-all duration-300 backdrop-blur-sm"
-                          placeholder="Email address"
+                          className="w-full pl-11 pr-4 py-3.5 bg-white/10 border border-white/20 rounded-xl placeholder-white/40 text-white focus:outline-none focus:ring-2 focus:ring-emerald-400/50 focus:border-emerald-400/50 focus:bg-white/15 transition-all duration-300 backdrop-blur-sm hover:border-white/30"
+                          placeholder="Enter your email address"
                           value={formData.email}
                           onChange={handleInputChange}
                         />
@@ -366,8 +375,11 @@ function RegisterPage() {
 
                       {/* Password Input */}
                       <div className="relative group">
-                        <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none z-10">
-                          <Lock className="h-5 w-5 text-white/70 group-focus-within:text-emerald-400 transition-colors" />
+                        <label htmlFor="password" className="block text-xs font-semibold text-white/90 mb-2 uppercase tracking-wide">
+                          Password
+                        </label>
+                        <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none z-10 top-7">
+                          <Lock className="h-4 w-4 text-emerald-400/70 group-focus-within:text-emerald-400 transition-colors" />
                         </div>
                         <input
                           id="password"
@@ -375,14 +387,14 @@ function RegisterPage() {
                           type={showPassword ? "text" : "password"}
                           autoComplete="new-password"
                           required
-                          className="w-full pl-12 pr-12 py-4 bg-white/10 border border-white/20 rounded-2xl placeholder-white/50 text-white focus:outline-none focus:ring-2 focus:ring-emerald-400/50 focus:border-emerald-400/50 focus:bg-white/15 transition-all duration-300 backdrop-blur-sm"
-                          placeholder="Password"
+                          className="w-full pl-11 pr-12 py-3.5 bg-white/10 border border-white/20 rounded-xl placeholder-white/40 text-white focus:outline-none focus:ring-2 focus:ring-emerald-400/50 focus:border-emerald-400/50 focus:bg-white/15 transition-all duration-300 backdrop-blur-sm hover:border-white/30"
+                          placeholder="Create a strong password"
                           value={formData.password}
                           onChange={handleInputChange}
                         />
                         <button
                           type="button"
-                          className="absolute inset-y-0 right-0 pr-4 flex items-center z-10"
+                          className="absolute inset-y-0 right-0 pr-3.5 flex items-center z-10 top-7 hover:scale-110 transition-transform duration-200"
                           onClick={() => setShowPassword(!showPassword)}
                         >
                           {showPassword ? (
@@ -395,9 +407,9 @@ function RegisterPage() {
 
                       {/* Date of Birth */}
                       <div className="relative group">
-                        <label htmlFor="dateOfBirth" className="sr-only">Date of Birth</label>
-                        <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none z-10">
-                          <Calendar className="h-5 w-5 text-white/70 group-focus-within:text-emerald-400 transition-colors" />
+                        <label htmlFor="dateOfBirth" className="block text-xs font-semibold text-white/90 mb-2 uppercase tracking-wide">Date of Birth</label>
+                        <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none z-10 top-7">
+                          <Calendar className="h-4 w-4 text-emerald-400/70 group-focus-within:text-emerald-400 transition-colors" />
                         </div>
                         <input
                           id="dateOfBirth"
@@ -406,7 +418,7 @@ function RegisterPage() {
                           required
                           title="Date of Birth"
                           aria-label="Date of Birth"
-                          className="w-full pl-12 pr-4 py-4 bg-white/10 border border-white/20 rounded-2xl placeholder-white/50 text-white focus:outline-none focus:ring-2 focus:ring-emerald-400/50 focus:border-emerald-400/50 focus:bg-white/15 transition-all duration-300 backdrop-blur-sm [color-scheme:dark]"
+                          className="w-full pl-11 pr-4 py-3.5 bg-white/10 border border-white/20 rounded-xl placeholder-white/40 text-white focus:outline-none focus:ring-2 focus:ring-emerald-400/50 focus:border-emerald-400/50 focus:bg-white/15 transition-all duration-300 backdrop-blur-sm hover:border-white/30 [color-scheme:dark]"
                           value={formData.dateOfBirth}
                           onChange={handleInputChange}
                         />
@@ -414,15 +426,15 @@ function RegisterPage() {
                     </div>
 
                     {/* Right Container - Optional Fields */}
-                    <div className="flex-1 space-y-6">
+                    <div className="flex-1 space-y-4">
                       {/* Avatar Selection - Clickable Circle */}
-                      <div className="text-center space-y-4">
-                        <h4 className="text-sm font-medium text-white/80">Choose Your Avatar</h4>
-                        <div className="relative group cursor-pointer" onClick={() => setShowAvatarPopup(true)}>
-                          <div className="w-32 h-32 rounded-full bg-white/10 border-2 border-emerald-400/50 shadow-lg shadow-emerald-400/20 flex items-center justify-center overflow-hidden backdrop-blur-sm mx-auto hover:border-emerald-400/80 hover:shadow-emerald-400/30 transition-all duration-300">
+                      <div className="text-center space-y-3">
+                        <h4 className="text-xs font-semibold text-white/90 uppercase tracking-wide">Choose Your Avatar</h4>
+                        <div className="relative group cursor-pointer hover:scale-105 transition-transform duration-300" onClick={() => setShowAvatarPopup(true)}>
+                          <div className="w-28 h-28 rounded-full bg-white/10 border-2 border-emerald-400/50 shadow-lg shadow-emerald-400/20 flex items-center justify-center overflow-hidden backdrop-blur-sm mx-auto hover:border-emerald-400 hover:shadow-emerald-400/40 transition-all duration-300">
                             {avatarPreview ? (
                               avatarPreview.startsWith('/') || avatarPreview.startsWith('data:') ? (
-                                <Image src={avatarPreview} alt="Selected Avatar" width={120} height={120} className="w-full h-full object-cover rounded-full" />
+                                <Image src={avatarPreview} alt="Selected Avatar" width={112} height={112} className="w-full h-full object-cover rounded-full" />
                               ) : (
                                 // Show gradient for selected avatar ID
                                 (() => {
@@ -452,15 +464,18 @@ function RegisterPage() {
 
                       {/* Nickname (Optional) */}
                       <div className="relative group">
-                        <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none z-10">
-                          <Edit3 className="h-5 w-5 text-white/70 group-focus-within:text-emerald-400 transition-colors" />
+                        <label htmlFor="nickname" className="block text-xs font-semibold text-white/90 mb-2 uppercase tracking-wide">
+                          Nickname <span className="text-white/40 text-[10px] normal-case">(Optional)</span>
+                        </label>
+                        <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none z-10 top-7">
+                          <Edit3 className="h-4 w-4 text-emerald-400/70 group-focus-within:text-emerald-400 transition-colors" />
                         </div>
                         <input
                           id="nickname"
                           name="nickname"
                           type="text"
-                          className="w-full pl-12 pr-4 py-4 bg-white/10 border border-white/20 rounded-2xl placeholder-white/50 text-white focus:outline-none focus:ring-2 focus:ring-emerald-400/50 focus:border-emerald-400/50 focus:bg-white/15 transition-all duration-300 backdrop-blur-sm"
-                          placeholder="Nickname (Optional)"
+                          className="w-full pl-11 pr-4 py-3.5 bg-white/10 border border-white/20 rounded-xl placeholder-white/40 text-white focus:outline-none focus:ring-2 focus:ring-emerald-400/50 focus:border-emerald-400/50 focus:bg-white/15 transition-all duration-300 backdrop-blur-sm hover:border-white/30"
+                          placeholder="Choose a nickname"
                           value={formData.nickname}
                           onChange={handleInputChange}
                         />
@@ -468,15 +483,18 @@ function RegisterPage() {
 
                       {/* About Me (Optional) */}
                       <div className="relative group">
-                        <div className="absolute top-4 left-0 pl-4 flex items-start pointer-events-none z-10">
-                          <Edit3 className="h-5 w-5 text-white/70 group-focus-within:text-emerald-400 transition-colors mt-0.5" />
+                        <label htmlFor="aboutMe" className="block text-xs font-semibold text-white/90 mb-2 uppercase tracking-wide">
+                          About Me <span className="text-white/40 text-[10px] normal-case">(Optional)</span>
+                        </label>
+                        <div className="absolute top-7 left-0 pl-3.5 flex items-start pointer-events-none z-10">
+                          <Edit3 className="h-4 w-4 text-emerald-400/70 group-focus-within:text-emerald-400 transition-colors mt-3.5" />
                         </div>
                         <textarea
                           id="aboutMe"
                           name="aboutMe"
                           rows={3}
-                          className="w-full pl-12 pr-4 py-4 bg-white/10 border border-white/20 rounded-2xl placeholder-white/50 text-white focus:outline-none focus:ring-2 focus:ring-emerald-400/50 focus:border-emerald-400/50 focus:bg-white/15 transition-all duration-300 backdrop-blur-sm resize-none"
-                          placeholder="Tell us about yourself (Optional)"
+                          className="w-full pl-11 pr-4 py-3.5 bg-white/10 border border-white/20 rounded-xl placeholder-white/40 text-white focus:outline-none focus:ring-2 focus:ring-emerald-400/50 focus:border-emerald-400/50 focus:bg-white/15 transition-all duration-300 backdrop-blur-sm hover:border-white/30 resize-none"
+                          placeholder="Tell us about yourself..."
                           value={formData.aboutMe}
                           onChange={handleInputChange}
                         />
@@ -741,9 +759,9 @@ function RegisterPage() {
               </div>
 
               {/* Fixed Footer */}
-              <div className="absolute bottom-0 left-0 right-0 px-8 py-6 bg-gradient-to-t from-white/5 to-transparent border-t border-white/10">
+              <div className="absolute bottom-0 left-0 right-0 px-6 py-4 bg-gradient-to-t from-white/5 to-transparent border-t border-white/10">
                 {/* Register Button */}
-                <div className="mb-6">
+                <div className="mb-3">
                   <button
                     type="submit"
                     disabled={isLoading}
@@ -768,7 +786,7 @@ function RegisterPage() {
                 </div>
 
                 {/* Terms */}
-                <div className="text-center text-sm text-white/60 mb-4">
+                <div className="text-center text-xs text-white/60 mb-2">
                   By creating an account, you agree to our{' '}
                   <button className="text-emerald-300 hover:text-emerald-200 hover:underline transition-colors">
                     Terms of Service

@@ -9,6 +9,7 @@ type Group struct {
 	CreatorID   uint      `json:"creator_id"`
 	Title       string    `json:"title"`
 	Description string    `json:"description"`
+	Privacy     string    `json:"privacy"`
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
 }
@@ -18,17 +19,21 @@ type GroupResponse struct {
 	CreatorID    uint         `json:"creator_id"`
 	Title        string       `json:"title"`
 	Description  string       `json:"description"`
+	Privacy      string       `json:"privacy"`
 	CreatedAt    time.Time    `json:"created_at"`
 	UpdatedAt    time.Time    `json:"updated_at"`
 	Creator      UserResponse `json:"creator"`
 	MemberCount  int          `json:"member_count"`
 	IsMember     bool         `json:"is_member"`
-	MemberStatus string       `json:"member_status"` // "member", "pending", "invited", "none"
+	MemberStatus string       `json:"member_status"` // "member", "sent", "rejected", "requested", "none"
+	Role         string       `json:"role"`
 }
 
 type CreateGroupRequest struct {
-	Title       string `json:"title" binding:"required,min=1,max=100"`
-	Description string `json:"description" binding:"max=500"`
+	Title         string `json:"title" binding:"required,min=1,max=100"`
+	Description   string `json:"description" binding:"required,min=1,max=500"`
+	Privacy       string `json:"privacy" binding:"required,oneof=public private"`
+	InviteMembers []uint `json:"invite_members"`
 }
 
 type UpdateGroupRequest struct {
@@ -40,20 +45,24 @@ type GroupMember struct {
 	ID        uint      `json:"id"`
 	GroupID   uint      `json:"group_id"`
 	UserID    uint      `json:"user_id"`
-	Status    string    `json:"status"` // "member", "pending", "invited"
-	Role      string    `json:"role"`   // "member", "admin", "creator"
+	Status    string    `json:"status"` // "member", "sent", "rejected"
+	Role      string    `json:"role"`   // "member", "admin"
+	InvitedBy *uint     `json:"invited_by,omitempty"`
+	Requestor *uint     `json:"requestor,omitempty"`
 	JoinedAt  time.Time `json:"joined_at"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
 type GroupMemberResponse struct {
-	ID       uint         `json:"id"`
-	GroupID  uint         `json:"group_id"`
-	User     UserResponse `json:"user"`
-	Status   string       `json:"status"`
-	Role     string       `json:"role"`
-	JoinedAt time.Time    `json:"joined_at"`
+	ID        uint         `json:"id"`
+	GroupID   uint         `json:"group_id"`
+	User      UserResponse `json:"user"`
+	Status    string       `json:"status"`
+	Role      string       `json:"role"`
+	InvitedBy *uint        `json:"invited_by,omitempty"`
+	Requestor *uint        `json:"requestor,omitempty"`
+	JoinedAt  time.Time    `json:"joined_at"`
 }
 
 type GroupPost struct {

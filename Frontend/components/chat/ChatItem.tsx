@@ -1,8 +1,8 @@
 import { ChatItem as ChatItemType } from '@/types/chat';
-import { Users, MessageCircle, Clock, Trash2 } from 'lucide-react';
+import { Users, MessageCircle, Clock, Trash2, Check, Clock3, XCircle, ShieldCheck, Lock } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Image from 'next/image';
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 
 interface ChatItemProps {
   item: ChatItemType;
@@ -18,6 +18,84 @@ export default function ChatItem({ item, onClick, onDelete, getUserStatus, typin
   const [imageError, setImageError] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const lastMessageTimestamp = item.lastMessageTime || item.updated_at;
+  const resolvedGroupStatus = isGroup
+    ? (item.groupStatus ?? item.group?.member_status ?? (item.group?.is_member ? 'member' : undefined))
+    : undefined;
+  const resolvedGroupRole = isGroup ? (item.groupRole ?? item.group?.role ?? undefined) : undefined;
+  const resolvedGroupPrivacy = isGroup ? (item.groupPrivacy ?? item.group?.privacy ?? undefined) : undefined;
+
+  const groupStatusBadge = (() => {
+    switch (resolvedGroupStatus) {
+      case 'member':
+        return {
+          key: 'member-status',
+          label: resolvedGroupRole === 'admin' ? 'Admin' : 'Member',
+          className: 'bg-emerald-500/20 text-emerald-200 border border-emerald-400/30',
+          icon: resolvedGroupRole === 'admin'
+            ? <ShieldCheck className="w-3 h-3 mr-1" />
+            : <Check className="w-3 h-3 mr-1" />
+        }
+      case 'sent':
+        return {
+          key: 'member-status',
+          label: 'Pending approval',
+          className: 'bg-amber-500/20 text-amber-200 border border-amber-400/30',
+          icon: <Clock3 className="w-3 h-3 mr-1" />
+        }
+      case 'rejected':
+        return {
+          key: 'member-status',
+          label: 'Request declined',
+          className: 'bg-rose-500/20 text-rose-200 border border-rose-400/30',
+          icon: <XCircle className="w-3 h-3 mr-1" />
+        }
+      default:
+        return undefined
+    }
+  })();
+
+  const privacyBadge = (() => {
+    if (!isGroup || !resolvedGroupPrivacy) return undefined
+    if (resolvedGroupPrivacy === 'private') {
+      return {
+        key: 'privacy',
+        label: 'Private',
+        className: 'bg-slate-500/30 text-slate-200 border border-slate-400/30',
+        icon: <Lock className="w-3 h-3 mr-1" />
+      }
+    }
+    return {
+      key: 'privacy',
+      label: 'Public',
+      className: 'bg-cyan-500/20 text-cyan-200 border border-cyan-400/30',
+      icon: <Users className="w-3 h-3 mr-1" />
+    }
+  })();
+
+  const groupBadges = [groupStatusBadge, privacyBadge].filter(Boolean) as Array<{
+    key: string
+    label: string
+    className: string
+    icon?: ReactNode
+  }>;
+
+  const resolvedLastMessage = (() => {
+    if (!isGroup) {
+      return item.lastMessage || 'No messages yet'
+    }
+
+    if (resolvedGroupStatus === 'sent') {
+      return 'Waiting for approval to join'
+    }
+
+    if (resolvedGroupStatus === 'rejected') {
+      return 'Join request declined'
+    }
+
+    return item.lastMessage || 'Group created'
+  })();
+
+  const highlightStatus = isGroup && resolvedGroupStatus && resolvedGroupStatus !== 'member';
 
   // Robust timestamp parser: handles ISO strings, milliseconds, or seconds
   const parseDate = (value: string | number | undefined | null): Date => {
@@ -168,6 +246,15 @@ export default function ChatItem({ item, onClick, onDelete, getUserStatus, typin
                   Group
                 </span>
               )}
+              {isGroup && groupBadges.map(({ key, label, className, icon }) => (
+                <span
+                  key={key}
+                  className={`hidden sm:inline-flex items-center px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider rounded-full ${className}`}
+                >
+                  {icon}
+                  {label}
+                </span>
+              ))}
             </div>
             <div className="flex items-center space-x-1 text-white/60 text-xs flex-shrink-0">
               <Clock className="w-3 h-3" />
@@ -216,9 +303,9 @@ export default function ChatItem({ item, onClick, onDelete, getUserStatus, typin
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -10 }}
-                    className="text-white/70 text-sm truncate"
+                    className={`text-sm truncate ${highlightStatus ? 'text-amber-200' : 'text-white/70'}`}
                   >
-                    {item.lastMessage || (isGroup ? 'Group created' : 'No messages yet')}
+                    {resolvedLastMessage}
                   </motion.p>
                 )}
               </AnimatePresence>

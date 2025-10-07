@@ -143,16 +143,16 @@ func (s *ChatService) getPrivateChats(userID uint) ([]models.UnifiedChatItem, er
 
 func (s *ChatService) getGroupChats(userID uint) ([]models.UnifiedChatItem, error) {
 	query := `
-        SELECT g.id, g.name, gm.created_at, gc.id as conv_id,
-               m.content, m.created_at as last_message_time, m.sender_id,
-               u.id, u.first_name, u.last_name, u.avatar, u.nickname
-        FROM groups g
-        JOIN group_members gm ON g.id = gm.group_id
-        LEFT JOIN group_conversations gc ON g.id = gc.group_id
-        LEFT JOIN group_messages m ON gc.last_message_id = m.id
-        LEFT JOIN users u ON m.sender_id = u.id
-        WHERE gm.user_id = ? AND gm.status = 'accepted'
-        ORDER BY COALESCE(m.created_at, gm.created_at) DESC
+	        SELECT g.id, g.name, g.privacy, gm.created_at, gm.role, gc.id as conv_id,
+	               m.content, m.created_at as last_message_time, m.sender_id,
+	               u.id, u.first_name, u.last_name, u.avatar, u.nickname
+	        FROM groups g
+	        JOIN group_members gm ON g.id = gm.group_id
+	        LEFT JOIN group_conversations gc ON g.id = gc.group_id
+	        LEFT JOIN group_messages m ON gc.last_message_id = m.id
+	        LEFT JOIN users u ON m.sender_id = u.id
+	        WHERE gm.user_id = ? AND gm.status = 'member'
+	        ORDER BY COALESCE(m.created_at, gm.created_at) DESC
 	`
 
 	rows, err := s.db.Query(query, userID)
@@ -165,7 +165,9 @@ func (s *ChatService) getGroupChats(userID uint) ([]models.UnifiedChatItem, erro
 	for rows.Next() {
 		var groupID uint
 		var groupName string
+		var privacy string
 		var createdAt time.Time
+		var memberRole sql.NullString
 		var convID sql.NullInt64
 		var lastMessage sql.NullString
 		var lastMessageTime sql.NullTime
@@ -176,7 +178,7 @@ func (s *ChatService) getGroupChats(userID uint) ([]models.UnifiedChatItem, erro
 		var senderAvatar sql.NullString
 		var senderNickname sql.NullString
 
-		err := rows.Scan(&groupID, &groupName, &createdAt, &convID, &lastMessage, &lastMessageTime, &msgSenderID,
+		err := rows.Scan(&groupID, &groupName, &privacy, &createdAt, &memberRole, &convID, &lastMessage, &lastMessageTime, &msgSenderID,
 			&senderID, &senderFirstName, &senderLastName, &senderAvatar, &senderNickname)
 		if err != nil {
 			return nil, err
@@ -237,6 +239,11 @@ func (s *ChatService) getGroupChats(userID uint) ([]models.UnifiedChatItem, erro
 			s.db.QueryRow(unreadQuery, groupID, userID, convIDValue, userID).Scan(&unreadCount)
 		}
 
+		role := ""
+		if memberRole.Valid {
+			role = memberRole.String
+		}
+
 		chat := models.UnifiedChatItem{
 			ID:                fmt.Sprintf("group_%d", convIDValue),
 			Type:              "group",
@@ -247,8 +254,12 @@ func (s *ChatService) getGroupChats(userID uint) ([]models.UnifiedChatItem, erro
 			HasUnread:         unreadCount > 0,
 			UnreadCount:       unreadCount,
 			Group: &models.GroupResponse{
-				ID:    groupID,
-				Title: groupName,
+				ID:           groupID,
+				Title:        groupName,
+				Privacy:      privacy,
+				IsMember:     true,
+				MemberStatus: "member",
+				Role:         role,
 			},
 			ConversationID: convIDValue,
 		}

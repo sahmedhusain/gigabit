@@ -1,5 +1,5 @@
 'use client'
-import { ConversationResponse, Group, User } from '@/lib/api'
+import { ConversationResponse, Group, GroupResponse, User } from '@/lib/api'
 
 export interface UnifiedChatItem {
   id: string | number
@@ -13,6 +13,9 @@ export interface UnifiedChatItem {
   isGroup?: boolean
   participantId?: number
   lastMessageSenderId?: number
+  groupStatus?: Group['memberStatus'] | GroupResponse['member_status']
+  groupPrivacy?: Group['privacy'] | GroupResponse['privacy']
+  groupRole?: Group['role'] | GroupResponse['role']
 }
 
 /**
@@ -29,6 +32,9 @@ export function normalizeConversation(conv: ConversationResponse, currentUserId?
   const unread = conv.unread_count ?? 0
   const participantId = conv.participant?.id
   const lastMessageSenderId = conv.last_message?.sender_id
+  const groupStatus = conv.group?.member_status
+  const groupPrivacy = conv.group?.privacy
+  const groupRole = conv.group?.role
 
   return {
     id: conv.id,
@@ -41,7 +47,10 @@ export function normalizeConversation(conv: ConversationResponse, currentUserId?
     unread,
     isGroup,
     participantId,
-    lastMessageSenderId: lastMessageSenderId ?? undefined
+    lastMessageSenderId: lastMessageSenderId ?? undefined,
+    groupStatus,
+    groupPrivacy,
+    groupRole
   }
 }
 
@@ -100,7 +109,10 @@ export function normalizeGroupAsChatItem(group: Group): UnifiedChatItem {
     timestamp: group.timestamp ?? group.lastActivity ?? undefined,
     unread: 0,
     isGroup: true,
-    participantId: undefined
+    participantId: undefined,
+    groupStatus: group.memberStatus,
+    groupPrivacy: group.privacy,
+    groupRole: group.role
   }
 }
 

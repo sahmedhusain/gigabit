@@ -16,6 +16,9 @@ export interface ChatItem {
   participants?: User[];
   participant?: User;
   group?: GroupResponse;
+  groupStatus?: GroupResponse['member_status'];
+  groupPrivacy?: GroupResponse['privacy'];
+  groupRole?: GroupResponse['role'];
   conversationId?: number;
   participantId?: number;
   updated_at: string;

@@ -1,9 +1,11 @@
 'use client'
-import { X, Users } from 'lucide-react'
-import { CreateGroupRequest, api } from '@/lib/api'
-import { useState } from 'react'
+import Image from 'next/image'
+import { useState, useEffect, useMemo, useCallback } from 'react'
+import { X, Users, Globe, Lock, Search, Loader2, Check } from 'lucide-react'
+import { CreateGroupRequest, api, User } from '@/lib/api'
 import { useOptimisticUpdate, useConnectionStatus } from '@/hooks'
 import { useToast } from '@/context/ToastContext'
+import { useAuth } from '@/context/AuthContext'
 import { motion, AnimatePresence } from 'framer-motion'
 
 interface CreateGroupProps {
@@ -20,8 +22,15 @@ export default function CreateGroup({
   const [groupTitle, setGroupTitle] = useState('')
   const [groupDescription, setGroupDescription] = useState('')
   const [error, setError] = useState<string>('')
+  const [privacy, setPrivacy] = useState<'public' | 'private'>('public')
+  const [availableUsers, setAvailableUsers] = useState<User[]>([])
+  const [selectedMembers, setSelectedMembers] = useState<User[]>([])
+  const [searchQuery, setSearchQuery] = useState('')
+  const [isFetchingUsers, setIsFetchingUsers] = useState(false)
   const { success, error: showError } = useToast()
   const { isConnected } = useConnectionStatus()
+  const { user: currentUser } = useAuth()
+  const currentUserId = currentUser?.id ?? null
 
   const { isLoading, performUpdate } = useOptimisticUpdate({
     onSuccess: () => {
@@ -29,6 +38,9 @@ export default function CreateGroup({
       // Reset form
       setGroupTitle('')
       setGroupDescription('')
+      setPrivacy('public')
+      setSelectedMembers([])
+      setSearchQuery('')
       setError('')
       onGroupCreated?.()
       onClose()
@@ -38,6 +50,112 @@ export default function CreateGroup({
       showError(`Failed to create group: ${message}`)
     }
   })
+
+  const formatUserName = useCallback((user: User) => {
+    const nameParts = [user.first_name, user.last_name].filter(Boolean)
+    if (nameParts.length) {
+      return nameParts.join(' ')
+    }
+    if (user.nickname) {
+      return user.nickname
+    }
+    return user.email
+  }, [])
+
+  const getUserInitials = useCallback((user: User) => {
+    const initials = [user.first_name, user.last_name]
+      .filter(Boolean)
+      .map((part) => part.charAt(0)?.toUpperCase() ?? '')
+      .join('')
+    if (initials) {
+      return initials
+    }
+    if (user.nickname) {
+      return user.nickname.slice(0, 2).toUpperCase()
+    }
+    return user.email.slice(0, 2).toUpperCase()
+  }, [])
+
+  useEffect(() => {
+    if (!show) return
+
+    let isMounted = true
+
+    const loadUsers = async () => {
+      setIsFetchingUsers(true)
+      try {
+        const { users } = await api.getUsers()
+        if (!isMounted) return
+        const filteredUsers = currentUserId
+          ? users.filter((user) => user.id !== currentUserId)
+          : users
+        setAvailableUsers(filteredUsers)
+      } catch (err) {
+        if (!isMounted) return
+        console.error('Failed to load users for group invites', err)
+        showError('Unable to fetch members to invite right now.')
+      } finally {
+        if (isMounted) {
+          setIsFetchingUsers(false)
+        }
+      }
+    }
+
+    loadUsers()
+
+    return () => {
+      isMounted = false
+    }
+  }, [show, currentUserId, showError])
+
+  const filteredUsers = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase()
+
+    const baseList = availableUsers.filter((user) => {
+      if (currentUserId && user.id === currentUserId) return false
+      return true
+    })
+
+    if (!query) {
+      return baseList.sort((a, b) => formatUserName(a).localeCompare(formatUserName(b)))
+    }
+
+    return baseList
+      .filter((user) => {
+        const searchable = [
+          user.first_name,
+          user.last_name,
+          user.nickname,
+          user.email
+        ]
+          .filter(Boolean)
+          .join(' ')
+          .toLowerCase()
+        return searchable.includes(query)
+      })
+      .sort((a, b) => formatUserName(a).localeCompare(formatUserName(b)))
+  }, [availableUsers, currentUserId, searchQuery, formatUserName])
+
+  const displayedUsers = useMemo(() => filteredUsers.slice(0, 30), [filteredUsers])
+
+  const handleToggleMember = useCallback((user: User) => {
+    setSelectedMembers((prev) => {
+      const exists = prev.some((member) => member.id === user.id)
+      if (exists) {
+        return prev.filter((member) => member.id !== user.id)
+      }
+      return [...prev, user]
+    })
+  }, [])
+
+  const handleRemoveMember = useCallback((userId: number) => {
+    setSelectedMembers((prev) => prev.filter((member) => member.id !== userId))
+  }, [])
+
+  const inviteMemberIds = useMemo(
+    () => selectedMembers.map((member) => member.id),
+    [selectedMembers]
+  )
 
   const handleCreateGroup = async () => {
     // Validation
@@ -65,7 +183,9 @@ export default function CreateGroup({
 
     const groupData: CreateGroupRequest = {
       title: groupTitle.trim(),
-      description: groupDescription.trim()
+      description: groupDescription.trim(),
+      privacy,
+      invite_members: inviteMemberIds.length ? inviteMemberIds : undefined
     }
 
     performUpdate(
@@ -242,6 +362,223 @@ export default function CreateGroup({
                     >
                       {groupDescription.length}/500
                     </motion.div>
+                  </div>
+                </motion.div>
+
+                {/* Group Privacy */}
+                <motion.div
+                  className="space-y-3"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.5, duration: 0.3 }}
+                >
+                  <motion.div
+                    className="flex items-center justify-between"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: 0.6, duration: 0.3 }}
+                  >
+                    <span className="text-white font-semibold text-sm lg:text-base">Privacy Settings</span>
+                    <span className="text-white/50 text-xs">Choose who can discover your group</span>
+                  </motion.div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <motion.button
+                      type="button"
+                      onClick={() => setPrivacy('public')}
+                      className={`relative w-full text-left rounded-2xl border p-5 transition-all duration-300 backdrop-blur-lg ${
+                        privacy === 'public'
+                          ? 'border-emerald-400/60 bg-emerald-400/10 shadow-lg shadow-emerald-500/20'
+                          : 'border-white/10 bg-white/5 hover:border-emerald-400/40 hover:bg-emerald-400/5'
+                      }`}
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                    >
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-center space-x-3">
+                          <div className="w-11 h-11 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 flex items-center justify-center text-white shadow-lg">
+                            <Globe className="w-5 h-5" />
+                          </div>
+                          <div>
+                            <p className="text-white font-semibold">Public Group</p>
+                            <p className="text-white/60 text-sm">Anyone can find the group and request to join</p>
+                          </div>
+                        </div>
+                        {privacy === 'public' && (
+                          <motion.div
+                            className="w-6 h-6 rounded-full bg-emerald-500 flex items-center justify-center text-white shadow-md"
+                            initial={{ scale: 0.8, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                          >
+                            <Check className="w-4 h-4" />
+                          </motion.div>
+                        )}
+                      </div>
+                    </motion.button>
+                    <motion.button
+                      type="button"
+                      onClick={() => setPrivacy('private')}
+                      className={`relative w-full text-left rounded-2xl border p-5 transition-all duration-300 backdrop-blur-lg ${
+                        privacy === 'private'
+                          ? 'border-purple-400/60 bg-purple-400/10 shadow-lg shadow-purple-500/20'
+                          : 'border-white/10 bg-white/5 hover:border-purple-400/40 hover:bg-purple-400/5'
+                      }`}
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                    >
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-center space-x-3">
+                          <div className="w-11 h-11 rounded-xl bg-gradient-to-r from-purple-500 to-indigo-500 flex items-center justify-center text-white shadow-lg">
+                            <Lock className="w-5 h-5" />
+                          </div>
+                          <div>
+                            <p className="text-white font-semibold">Private Group</p>
+                            <p className="text-white/60 text-sm">Only invited members can join the group</p>
+                          </div>
+                        </div>
+                        {privacy === 'private' && (
+                          <motion.div
+                            className="w-6 h-6 rounded-full bg-purple-500 flex items-center justify-center text-white shadow-md"
+                            initial={{ scale: 0.8, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                          >
+                            <Check className="w-4 h-4" />
+                          </motion.div>
+                        )}
+                      </div>
+                    </motion.button>
+                  </div>
+                </motion.div>
+
+                {/* Invite Members */}
+                <motion.div
+                  className="space-y-4"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.6, duration: 0.3 }}
+                >
+                  <motion.div
+                    className="flex items-center justify-between"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: 0.7, duration: 0.3 }}
+                  >
+                    <span className="text-white font-semibold text-sm lg:text-base">Invite Members (Optional)</span>
+                    <span className="text-white/50 text-xs">We&apos;ll send invitations for you</span>
+                  </motion.div>
+                  <div className="relative">
+                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-white/40 w-4 h-4" />
+                    <motion.input
+                      type="text"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      placeholder="Search by name, nickname, or email..."
+                      className="w-full bg-white/10 border border-white/20 rounded-xl pl-12 pr-12 py-3 text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-emerald-400/50 focus:border-emerald-400/50 transition-all duration-300 hover:bg-white/15 text-sm"
+                      initial={{ opacity: 0, scale: 0.95 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                    />
+                    {isFetchingUsers && (
+                      <Loader2 className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/50 animate-spin" />
+                    )}
+                  </div>
+
+                  <AnimatePresence>
+                    {selectedMembers.length > 0 && (
+                      <motion.div
+                        className="flex flex-wrap gap-2"
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: 10 }}
+                      >
+                        {selectedMembers.map((member) => (
+                          <motion.div
+                            key={member.id}
+                            className="flex items-center space-x-2 bg-emerald-400/15 border border-emerald-400/40 rounded-full px-3 py-1 text-sm text-white"
+                            initial={{ scale: 0.9, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            exit={{ scale: 0.9, opacity: 0 }}
+                          >
+                            <span>{formatUserName(member)}</span>
+                            <motion.button
+                              type="button"
+                              onClick={() => handleRemoveMember(member.id)}
+                              className="text-white/70 hover:text-white"
+                              whileHover={{ scale: 1.1 }}
+                              whileTap={{ scale: 0.9 }}
+                            >
+                              <X className="w-3 h-3" />
+                            </motion.button>
+                          </motion.div>
+                        ))}
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+
+                  <div className="bg-white/5 border border-white/10 rounded-2xl p-3 max-h-64 overflow-y-auto space-y-2">
+                    {isFetchingUsers ? (
+                      <div className="flex items-center justify-center py-10">
+                        <Loader2 className="w-6 h-6 text-white/50 animate-spin" />
+                      </div>
+                    ) : displayedUsers.length === 0 ? (
+                      <p className="text-white/50 text-sm text-center py-6">
+                        {searchQuery.trim()
+                          ? 'No users match your search yet. Try a different name or email.'
+                          : 'No other users are available to invite right now.'}
+                      </p>
+                    ) : (
+                      displayedUsers.map((user) => {
+                        const isSelected = selectedMembers.some((member) => member.id === user.id)
+                        return (
+                          <motion.button
+                            key={user.id}
+                            type="button"
+                            onClick={() => handleToggleMember(user)}
+                            className={`w-full flex items-center justify-between rounded-2xl border p-3 transition-all duration-200 text-left ${
+                              isSelected
+                                ? 'border-emerald-400/60 bg-emerald-400/10 shadow-inner'
+                                : 'border-white/10 bg-white/5 hover:border-emerald-400/40 hover:bg-emerald-400/5'
+                            }`}
+                            whileHover={{ scale: 1.01 }}
+                            whileTap={{ scale: 0.99 }}
+                          >
+                            <div className="flex items-center space-x-3">
+                              {user.avatar ? (
+                                <Image
+                                  src={user.avatar}
+                                  alt={formatUserName(user)}
+                                  width={40}
+                                  height={40}
+                                  className="w-10 h-10 rounded-xl border border-white/20 object-cover"
+                                />
+                              ) : (
+                                <div className={`w-10 h-10 rounded-xl border border-white/10 bg-gradient-to-br ${
+                                  isSelected
+                                    ? 'from-emerald-500/40 to-teal-500/40'
+                                    : 'from-slate-500/30 to-slate-700/30'
+                                } flex items-center justify-center text-white font-semibold`}
+                                >
+                                  {getUserInitials(user)}
+                                </div>
+                              )}
+                              <div>
+                                <p className="text-white font-medium text-sm">{formatUserName(user)}</p>
+                                <p className="text-white/50 text-xs">{user.email}</p>
+                              </div>
+                            </div>
+                            {isSelected ? (
+                              <motion.div
+                                className="w-6 h-6 rounded-full bg-emerald-500 flex items-center justify-center text-white"
+                                initial={{ scale: 0.8, opacity: 0 }}
+                                animate={{ scale: 1, opacity: 1 }}
+                              >
+                                <Check className="w-4 h-4" />
+                              </motion.div>
+                            ) : (
+                              <span className="text-white/40 text-xs">Tap to invite</span>
+                            )}
+                          </motion.button>
+                        )
+                      })
+                    )}
                   </div>
                 </motion.div>
 

@@ -4,11 +4,13 @@ import (
 	"database/sql"
 	"encoding/json"
 	"net/http"
+	"strconv"
+	"strings"
+	"time"
+
 	"social/models"
 	"social/services"
 	"social/websocket"
-	"strconv"
-	"time"
 )
 
 type GroupHandler struct {
@@ -35,14 +37,27 @@ func (h *GroupHandler) CreateGroup(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "Invalid request body")
 		return
 	}
+	if strings.TrimSpace(req.Title) == "" {
+		writeError(w, http.StatusBadRequest, "Group title is required")
+		return
+	}
+	if strings.TrimSpace(req.Description) == "" {
+		writeError(w, http.StatusBadRequest, "Group description is required")
+		return
+	}
+	if req.Privacy != "public" && req.Privacy != "private" {
+		writeError(w, http.StatusBadRequest, "Invalid privacy option")
+		return
+	}
 
 	group := &models.Group{
 		CreatorID:   userID,
 		Title:       req.Title,
 		Description: req.Description,
+		Privacy:     req.Privacy,
 	}
 
-	if err := h.groupService.CreateGroup(group); err != nil {
+	if err := h.groupService.CreateGroup(group, req.InviteMembers); err != nil {
 		writeError(w, http.StatusInternalServerError, "Failed to create group")
 		return
 	}

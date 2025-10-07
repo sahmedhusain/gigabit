@@ -140,6 +140,8 @@ export interface Notification {
   isRead: boolean;
 }
 
+export type GroupMemberStatus = 'member' | 'sent' | 'rejected' | 'none'
+
 export interface Group {
   id: number;
   name: string;
@@ -148,6 +150,9 @@ export interface Group {
   isJoined: boolean;
   lastActivity: string;
   timestamp?: string; // Add timestamp for sorting
+  privacy?: 'public' | 'private';
+  memberStatus?: GroupMemberStatus;
+  role?: 'admin' | 'member';
 }
 
 export interface Event {
@@ -232,9 +237,12 @@ export interface GroupResponse {
   id: number;
   title: string;
   description: string;
+  privacy: 'public' | 'private';
   creator_id: number;
   member_count: number;
   is_member: boolean;
+  member_status?: GroupMemberStatus;
+  role?: 'admin' | 'member';
   created_at: string;
   updated_at: string;
 }
@@ -332,6 +340,8 @@ export interface UpdatePostRequest {
 export interface CreateGroupRequest {
   title: string;
   description: string;
+  privacy: 'public' | 'private';
+  invite_members?: number[];
 }
 
 export interface PostsResponse {

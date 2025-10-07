@@ -2,6 +2,10 @@ package services
 
 import (
 	"database/sql"
+	"errors"
+
+	sqlite3 "github.com/mattn/go-sqlite3"
+
 	"social/models"
 	"time"
 )
@@ -14,20 +18,33 @@ func NewGroupService(db *sql.DB) *GroupService {
 	return &GroupService{db: db}
 }
 
-func (s *GroupService) CreateGroup(group *models.Group) error {
-	query := `
-INSERT INTO groups (creator_id, name, description, created_at, updated_at)
-VALUES (?, ?, ?, ?, ?)
-`
-
-	now := time.Now()
-	result, err := s.db.Exec(query, group.CreatorID, group.Title, group.Description, now, now)
+func (s *GroupService) CreateGroup(group *models.Group, invitees []uint) error {
+	tx, err := s.db.Begin()
 	if err != nil {
 		return err
 	}
 
-	id, err := result.LastInsertId()
-	if err != nil {
+	defer func() {
+		if err != nil {
+			tx.Rollback()
+		}
+	}()
+
+	groupQuery := `
+INSERT INTO groups (creator_id, name, description, privacy, created_at, updated_at)
+VALUES (?, ?, ?, ?, ?, ?)
+`
+
+	now := time.Now()
+	result, execErr := tx.Exec(groupQuery, group.CreatorID, group.Title, group.Description, group.Privacy, now, now)
+	if execErr != nil {
+		err = execErr
+		return err
+	}
+
+	id, lastErr := result.LastInsertId()
+	if lastErr != nil {
+		err = lastErr
 		return err
 	}
 
@@ -35,24 +52,51 @@ VALUES (?, ?, ?, ?, ?)
 	group.CreatedAt = now
 	group.UpdatedAt = now
 
-	// Add creator as member automatically with creator role
 	memberQuery := `
-INSERT INTO group_members (group_id, user_id, status, role, created_at, updated_at)
-VALUES (?, ?, 'member', 'creator', ?, ?)
+INSERT INTO group_members (group_id, user_id, status, role, invited_by, requestor_id, created_at, updated_at)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 `
-	_, err = s.db.Exec(memberQuery, group.ID, group.CreatorID, now, now)
 
-	return err
+	// Creator is auto-member and admin
+	if _, execErr = tx.Exec(memberQuery, group.ID, group.CreatorID, "member", "admin", nil, nil, now, now); execErr != nil {
+		err = execErr
+		return err
+	}
+
+	// Seed invitations for selected users
+	inviteTime := now
+	for _, inviteeID := range invitees {
+		if inviteeID == group.CreatorID {
+			continue
+		}
+
+		if _, execErr = tx.Exec(memberQuery, group.ID, inviteeID, "sent", "member", group.CreatorID, nil, inviteTime, inviteTime); execErr != nil {
+			var sqliteErr sqlite3.Error
+			if errors.As(execErr, &sqliteErr) {
+				if sqliteErr.ExtendedCode == sqlite3.ErrConstraintUnique {
+					continue
+				}
+			}
+			err = execErr
+			return err
+		}
+	}
+
+	if commitErr := tx.Commit(); commitErr != nil {
+		return commitErr
+	}
+
+	return nil
 }
 
 func (s *GroupService) GetGroupByID(groupID, currentUserID uint) (*models.GroupResponse, error) {
 	query := `
-SELECT g.id, g.creator_id, g.name as title, g.description, g.created_at, g.updated_at,
+SELECT g.id, g.creator_id, g.name as title, g.description, g.privacy, g.created_at, g.updated_at,
 	u.first_name, u.last_name, u.avatar, u.nickname,
 	COUNT(DISTINCT gm.id) as member_count
 FROM groups g
 JOIN users u ON g.creator_id = u.id
-LEFT JOIN group_members gm ON g.id = gm.group_id AND gm.status IN ('member','accepted')
+LEFT JOIN group_members gm ON g.id = gm.group_id AND gm.status = 'member'
 WHERE g.id = ?
 GROUP BY g.id, u.id
 	`
@@ -62,6 +106,7 @@ GROUP BY g.id, u.id
 
 	err := s.db.QueryRow(query, groupID).Scan(
 		&group.ID, &group.CreatorID, &group.Title, &group.Description,
+		&group.Privacy,
 		&group.CreatedAt, &group.UpdatedAt,
 		&creator.FirstName, &creator.LastName, &creator.Avatar, &creator.Nickname,
 		&group.MemberCount,
@@ -80,19 +125,25 @@ GROUP BY g.id, u.id
 	}
 
 	group.MemberStatus = memberStatus
-	group.IsMember = memberStatus == "member" || memberStatus == "accepted"
+	group.IsMember = memberStatus == "member"
+
+	if group.IsMember {
+		if role, roleErr := s.GetUserRole(group.ID, currentUserID); roleErr == nil {
+			group.Role = role
+		}
+	}
 
 	return &group, nil
 }
 
 func (s *GroupService) GetAllGroups(currentUserID uint, limit, offset int) ([]models.GroupResponse, error) {
 	query := `
-SELECT g.id, g.creator_id, g.name as title, g.description, g.created_at, g.updated_at,
+SELECT g.id, g.creator_id, g.name as title, g.description, g.privacy, g.created_at, g.updated_at,
 	u.first_name, u.last_name, u.avatar, u.nickname,
 	COUNT(DISTINCT gm.id) as member_count
 FROM groups g
 JOIN users u ON g.creator_id = u.id
-LEFT JOIN group_members gm ON g.id = gm.group_id AND gm.status IN ('member','accepted')
+LEFT JOIN group_members gm ON g.id = gm.group_id AND gm.status = 'member'
 GROUP BY g.id, u.id
 ORDER BY g.created_at DESC
 LIMIT ? OFFSET ?
@@ -110,7 +161,7 @@ LIMIT ? OFFSET ?
 		var creator models.UserResponse
 
 		err := rows.Scan(
-			&group.ID, &group.CreatorID, &group.Title, &group.Description,
+			&group.ID, &group.CreatorID, &group.Title, &group.Description, &group.Privacy,
 			&group.CreatedAt, &group.UpdatedAt,
 			&creator.FirstName, &creator.LastName, &creator.Avatar, &creator.Nickname,
 			&group.MemberCount,
@@ -129,7 +180,12 @@ LIMIT ? OFFSET ?
 		}
 
 		group.MemberStatus = memberStatus
-		group.IsMember = memberStatus == "member" || memberStatus == "accepted"
+		group.IsMember = memberStatus == "member"
+		if group.IsMember {
+			if role, roleErr := s.GetUserRole(group.ID, currentUserID); roleErr == nil {
+				group.Role = role
+			}
+		}
 
 		groups = append(groups, group)
 	}
@@ -139,13 +195,13 @@ LIMIT ? OFFSET ?
 
 func (s *GroupService) GetUserGroups(userID uint, limit, offset int) ([]models.GroupResponse, error) {
 	query := `
-SELECT g.id, g.creator_id, g.name as title, g.description, g.created_at, g.updated_at,
+SELECT g.id, g.creator_id, g.name as title, g.description, g.privacy, g.created_at, g.updated_at,
 	u.first_name, u.last_name, u.avatar, u.nickname,
 	COUNT(DISTINCT gm2.id) as member_count
 FROM groups g
 JOIN users u ON g.creator_id = u.id
-JOIN group_members gm ON g.id = gm.group_id AND gm.user_id = ? AND gm.status IN ('member','accepted')
-LEFT JOIN group_members gm2 ON g.id = gm2.group_id AND gm2.status IN ('member','accepted')
+JOIN group_members gm ON g.id = gm.group_id AND gm.user_id = ? AND gm.status = 'member'
+LEFT JOIN group_members gm2 ON g.id = gm2.group_id AND gm2.status = 'member'
 GROUP BY g.id, u.id
 ORDER BY gm.created_at DESC
 LIMIT ? OFFSET ?
@@ -163,7 +219,7 @@ LIMIT ? OFFSET ?
 		var creator models.UserResponse
 
 		err := rows.Scan(
-			&group.ID, &group.CreatorID, &group.Title, &group.Description,
+			&group.ID, &group.CreatorID, &group.Title, &group.Description, &group.Privacy,
 			&group.CreatedAt, &group.UpdatedAt,
 			&creator.FirstName, &creator.LastName, &creator.Avatar, &creator.Nickname,
 			&group.MemberCount,
@@ -174,8 +230,11 @@ LIMIT ? OFFSET ?
 
 		creator.ID = group.CreatorID
 		group.Creator = creator
-		group.MemberStatus = "accepted"
+		group.MemberStatus = "member"
 		group.IsMember = true
+		if role, roleErr := s.GetUserRole(group.ID, userID); roleErr == nil {
+			group.Role = role
+		}
 
 		groups = append(groups, group)
 	}
@@ -228,29 +287,36 @@ func (s *GroupService) DeleteGroup(groupID, userID uint) error {
 }
 
 func (s *GroupService) InviteUsers(groupID, inviterID uint, userIDs []uint) error {
-	// Check if inviter is a member or creator
-	isMember, err := s.IsUserMember(groupID, inviterID)
-	if err != nil || !isMember {
-		return sql.ErrNoRows // Unauthorized or not a member
+	// Check if inviter has admin privileges
+	isAdmin, err := s.IsUserAdminOrCreator(groupID, inviterID)
+	if err != nil || !isAdmin {
+		return sql.ErrNoRows
 	}
 
 	now := time.Now()
 	query := `
-		INSERT INTO group_members (group_id, user_id, status, created_at, updated_at)
-		VALUES (?, ?, 'invited', ?, ?)
+		INSERT INTO group_members (group_id, user_id, status, role, invited_by, requestor_id, created_at, updated_at)
+		VALUES (?, ?, 'sent', 'member', ?, NULL, ?, ?)
 	`
 
 	for _, userID := range userIDs {
-		// Check if user is already a member or has pending invitation
-		status, err := s.GetUserMembershipStatus(groupID, userID)
-		if err == nil && (status == "member" || status == "invited" || status == "pending") {
-			continue // Skip if already exists
+		if userID == inviterID {
+			continue
 		}
 
-		_, err = s.db.Exec(query, groupID, userID, now, now)
-		if err != nil {
-			// Continue with other invitations even if one fails
+		status, statusErr := s.GetUserMembershipStatus(groupID, userID)
+		if statusErr == nil && (status == "member" || status == "sent") {
 			continue
+		}
+
+		if _, execErr := s.db.Exec(query, groupID, userID, inviterID, now, now); execErr != nil {
+			var sqliteErr sqlite3.Error
+			if errors.As(execErr, &sqliteErr) {
+				if sqliteErr.ExtendedCode == sqlite3.ErrConstraintUnique {
+					continue
+				}
+			}
+			return execErr
 		}
 	}
 
@@ -258,76 +324,90 @@ func (s *GroupService) InviteUsers(groupID, inviterID uint, userIDs []uint) erro
 }
 
 func (s *GroupService) RequestToJoin(groupID, userID uint) error {
-	// Check if user already has a relationship with the group
-	status, err := s.GetUserMembershipStatus(groupID, userID)
-	if err == nil && (status == "member" || status == "invited" || status == "pending") {
-		return sql.ErrNoRows // Already exists
+	// Ensure group is public
+	var privacy string
+	if err := s.db.QueryRow("SELECT privacy FROM groups WHERE id = ?", groupID).Scan(&privacy); err != nil {
+		return err
+	}
+	if privacy != "public" {
+		return sql.ErrNoRows
 	}
 
-	query := `
-		INSERT INTO group_members (group_id, user_id, status, created_at, updated_at)
-		VALUES (?, ?, 'pending', ?, ?)
-	`
+	status, err := s.GetUserMembershipStatus(groupID, userID)
+	if err == nil && (status == "member" || status == "sent") {
+		return sql.ErrNoRows
+	}
 
 	now := time.Now()
-	_, err = s.db.Exec(query, groupID, userID, now, now)
+	query := `
+		INSERT INTO group_members (group_id, user_id, status, role, invited_by, requestor_id, created_at, updated_at)
+		VALUES (?, ?, 'sent', 'member', NULL, ?, ?, ?)
+	`
+
+	_, err = s.db.Exec(query, groupID, userID, userID, now, now)
 	return err
 }
 
 func (s *GroupService) RespondToInvitation(groupID, userID uint, accept bool) error {
 	// Check if user has an invitation
 	status, err := s.GetUserMembershipStatus(groupID, userID)
-	if err != nil || status != "invited" {
+	if err != nil || status != "sent" {
 		return sql.ErrNoRows // No invitation found
 	}
 
 	if accept {
 		// Accept invitation - become member
 		query := `
-UPDATE group_members SET status = 'accepted', created_at = ?, updated_at = ?
-WHERE group_id = ? AND user_id = ? AND status = 'invited'
+UPDATE group_members SET status = 'member', role = 'member', updated_at = ?
+WHERE group_id = ? AND user_id = ? AND status = 'sent'
 `
 		now := time.Now()
-		_, err = s.db.Exec(query, now, now, groupID, userID)
+		_, err = s.db.Exec(query, now, groupID, userID)
 	} else {
-		// Decline invitation - remove record
-		query := `DELETE FROM group_members WHERE group_id = ? AND user_id = ? AND status = 'invited'`
-		_, err = s.db.Exec(query, groupID, userID)
+		// Decline invitation - mark as rejected
+		query := `
+UPDATE group_members SET status = 'rejected', updated_at = ?
+WHERE group_id = ? AND user_id = ? AND status = 'sent'
+`
+		_, err = s.db.Exec(query, time.Now(), groupID, userID)
 	}
 
 	return err
 }
 
 func (s *GroupService) RespondToJoinRequest(groupID, requestUserID, responderID uint, accept bool) error {
-	// Check if responder is creator
-	var creatorID uint
-	err := s.db.QueryRow("SELECT creator_id FROM groups WHERE id = ?", groupID).Scan(&creatorID)
-	if err != nil {
+	// Check if responder has admin rights
+	isAdmin, err := s.IsUserAdminOrCreator(groupID, responderID)
+	if err != nil || !isAdmin {
+		return sql.ErrNoRows
+	}
+
+	query := `SELECT status, requestor_id FROM group_members WHERE group_id = ? AND user_id = ?`
+	var status string
+	var requestor sql.NullInt64
+	if err := s.db.QueryRow(query, groupID, requestUserID).Scan(&status, &requestor); err != nil {
+		if err == sql.ErrNoRows {
+			return sql.ErrNoRows
+		}
 		return err
 	}
 
-	if creatorID != responderID {
-		return sql.ErrNoRows // Unauthorized
-	}
-
-	// Check if there's a pending request
-	status, err := s.GetUserMembershipStatus(groupID, requestUserID)
-	if err != nil || status != "pending" {
-		return sql.ErrNoRows // No pending request found
+	if status != "sent" || !requestor.Valid {
+		return sql.ErrNoRows
 	}
 
 	if accept {
-		// Accept request - make user member
-		query := `
-UPDATE group_members SET status = 'accepted', created_at = ?, updated_at = ?
-WHERE group_id = ? AND user_id = ? AND status = 'pending'
+		updateQuery := `
+UPDATE group_members SET status = 'member', role = 'member', requestor_id = NULL, updated_at = ?
+WHERE group_id = ? AND user_id = ?
 `
-		now := time.Now()
-		_, err = s.db.Exec(query, now, now, groupID, requestUserID)
+		_, err = s.db.Exec(updateQuery, time.Now(), groupID, requestUserID)
 	} else {
-		// Decline request - remove record
-		query := `DELETE FROM group_members WHERE group_id = ? AND user_id = ? AND status = 'pending'`
-		_, err = s.db.Exec(query, groupID, requestUserID)
+		updateQuery := `
+UPDATE group_members SET status = 'rejected', updated_at = ?
+WHERE group_id = ? AND user_id = ?
+`
+		_, err = s.db.Exec(updateQuery, time.Now(), groupID, requestUserID)
 	}
 
 	return err
@@ -358,11 +438,11 @@ func (s *GroupService) GetGroupMembers(groupID, currentUserID uint) ([]models.Gr
 	}
 
 	query := `
-SELECT gm.id, gm.group_id, gm.user_id, gm.status, gm.role, gm.created_at,
+SELECT gm.id, gm.group_id, gm.user_id, gm.status, gm.role, gm.invited_by, gm.requestor_id, gm.created_at,
    u.first_name, u.last_name, u.avatar, u.nickname
 FROM group_members gm
 JOIN users u ON gm.user_id = u.id
-WHERE gm.group_id = ? AND gm.status IN ('member','accepted')
+WHERE gm.group_id = ? AND gm.status = 'member'
 ORDER BY gm.created_at ASC
 	`
 
@@ -376,9 +456,11 @@ ORDER BY gm.created_at ASC
 	for rows.Next() {
 		var member models.GroupMemberResponse
 		var user models.UserResponse
+		var invitedBy sql.NullInt64
+		var requestorID sql.NullInt64
 
 		err := rows.Scan(
-			&member.ID, &member.GroupID, &user.ID, &member.Status, &member.Role, &member.JoinedAt,
+			&member.ID, &member.GroupID, &user.ID, &member.Status, &member.Role, &invitedBy, &requestorID, &member.JoinedAt,
 			&user.FirstName, &user.LastName, &user.Avatar, &user.Nickname,
 		)
 		if err != nil {
@@ -386,6 +468,14 @@ ORDER BY gm.created_at ASC
 		}
 
 		member.User = user
+		if invitedBy.Valid {
+			val := uint(invitedBy.Int64)
+			member.InvitedBy = &val
+		}
+		if requestorID.Valid {
+			val := uint(requestorID.Int64)
+			member.Requestor = &val
+		}
 		members = append(members, member)
 	}
 
@@ -393,23 +483,21 @@ ORDER BY gm.created_at ASC
 }
 
 func (s *GroupService) GetPendingRequests(groupID, userID uint) ([]models.GroupMemberResponse, error) {
-	// Check if user is the creator
-	var creatorID uint
-	err := s.db.QueryRow("SELECT creator_id FROM groups WHERE id = ?", groupID).Scan(&creatorID)
+	// Only admins can review join requests
+	isAdmin, err := s.IsUserAdminOrCreator(groupID, userID)
 	if err != nil {
 		return nil, err
 	}
-
-	if creatorID != userID {
-		return nil, sql.ErrNoRows // Unauthorized
+	if !isAdmin {
+		return nil, sql.ErrNoRows
 	}
 
 	query := `
-		SELECT gm.id, gm.group_id, gm.user_id, gm.status, gm.created_at,
+		SELECT gm.id, gm.group_id, gm.user_id, gm.status, gm.requestor_id, gm.created_at,
 			   u.first_name, u.last_name, u.avatar, u.nickname
 		FROM group_members gm
 		JOIN users u ON gm.user_id = u.id
-		WHERE gm.group_id = ? AND gm.status = 'pending'
+		WHERE gm.group_id = ? AND gm.status = 'sent' AND gm.requestor_id IS NOT NULL
 		ORDER BY gm.created_at DESC
 	`
 
@@ -423,9 +511,10 @@ func (s *GroupService) GetPendingRequests(groupID, userID uint) ([]models.GroupM
 	for rows.Next() {
 		var request models.GroupMemberResponse
 		var user models.UserResponse
+		var requestorID sql.NullInt64
 
 		err := rows.Scan(
-			&request.ID, &request.GroupID, &user.ID, &request.Status, &request.JoinedAt,
+			&request.ID, &request.GroupID, &user.ID, &request.Status, &requestorID, &request.JoinedAt,
 			&user.FirstName, &user.LastName, &user.Avatar, &user.Nickname,
 		)
 		if err != nil {
@@ -433,6 +522,10 @@ func (s *GroupService) GetPendingRequests(groupID, userID uint) ([]models.GroupM
 		}
 
 		request.User = user
+		if requestorID.Valid {
+			val := uint(requestorID.Int64)
+			request.Requestor = &val
+		}
 		requests = append(requests, request)
 	}
 
@@ -459,24 +552,15 @@ func (s *GroupService) IsUserMember(groupID, userID uint) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	return status == "member" || status == "accepted", nil
+	return status == "member", nil
 }
 
 func (s *GroupService) GetUserRole(groupID, userID uint) (string, error) {
-	query := `SELECT role FROM group_members WHERE group_id = ? AND user_id = ? AND status IN ('member','accepted')`
+	query := `SELECT role FROM group_members WHERE group_id = ? AND user_id = ? AND status = 'member'`
 
 	var role string
 	err := s.db.QueryRow(query, groupID, userID).Scan(&role)
 	if err == sql.ErrNoRows {
-		// Check if user is the group creator
-		var creatorID uint
-		err := s.db.QueryRow("SELECT creator_id FROM groups WHERE id = ?", groupID).Scan(&creatorID)
-		if err != nil {
-			return "", err
-		}
-		if creatorID == userID {
-			return "creator", nil
-		}
 		return "", sql.ErrNoRows
 	}
 	if err != nil {
@@ -491,7 +575,7 @@ func (s *GroupService) IsUserAdminOrCreator(groupID, userID uint) (bool, error) 
 	if err != nil {
 		return false, err
 	}
-	return role == "admin" || role == "creator", nil
+	return role == "admin", nil
 }
 
 // CreateGroupPost creates a new post in a group
@@ -615,7 +699,7 @@ func (s *GroupService) DeleteGroupPost(postID, groupID, userID uint) error {
 SELECT gp.user_id, gm.role
 FROM group_posts gp
 JOIN group_members gm ON gp.group_id = gm.group_id
-WHERE gp.id = ? AND gp.group_id = ? AND gm.user_id = ? AND gm.status = 'accepted'
+WHERE gp.id = ? AND gp.group_id = ? AND gm.user_id = ? AND gm.status = 'member'
 `
 
 	var postOwnerID uint
@@ -662,12 +746,12 @@ WHERE gp.id = ? AND gp.group_id = ? AND gm.user_id = ? AND gm.status = 'accepted
 func (s *GroupService) GetUserInvitations(userID uint) ([]models.GroupInvitationResponse, error) {
 	query := `
 SELECT gm.id, gm.group_id, gm.created_at,
-       g.name as group_name, g.description as group_description,
-       u.first_name, u.last_name, u.avatar, u.nickname
+	   g.name as group_name, g.description as group_description, g.privacy,
+	   u.first_name, u.last_name, u.avatar, u.nickname
 FROM group_members gm
 JOIN groups g ON gm.group_id = g.id
 JOIN users u ON g.creator_id = u.id
-WHERE gm.user_id = ? AND gm.status = 'invited'
+WHERE gm.user_id = ? AND gm.status = 'sent' AND gm.requestor_id IS NULL
 ORDER BY gm.created_at DESC
 	`
 
@@ -685,7 +769,7 @@ ORDER BY gm.created_at DESC
 
 		err := rows.Scan(
 			&invitation.ID, &group.ID, &invitation.CreatedAt,
-			&group.Title, &group.Description,
+			&group.Title, &group.Description, &group.Privacy,
 			&creator.FirstName, &creator.LastName, &creator.Avatar, &creator.Nickname,
 		)
 		if err != nil {
@@ -720,33 +804,48 @@ func (s *GroupService) PromoteToAdmin(groupID, requesterID, targetUserID uint) e
 		return sql.ErrNoRows // Not a member
 	}
 
-	// Cannot promote creator (they're already creator)
-	requesterRole, err := s.GetUserRole(groupID, requesterID)
-	if err != nil {
+	var creatorID uint
+	if err := s.db.QueryRow("SELECT creator_id FROM groups WHERE id = ?", groupID).Scan(&creatorID); err != nil {
 		return err
 	}
-	if requesterRole == "creator" && targetUserID == requesterID {
-		return sql.ErrNoRows // Cannot change own role if creator
+
+	// Creator is already admin by default
+	if targetUserID == creatorID {
+		return nil
 	}
 
-	// Update role to admin
+	// Ensure we do not exceed co-admin limit (3 besides creator)
+	var adminCount int
+	countQuery := `SELECT COUNT(*) FROM group_members WHERE group_id = ? AND role = 'admin' AND status = 'member' AND user_id != ?`
+	if err := s.db.QueryRow(countQuery, groupID, creatorID).Scan(&adminCount); err != nil {
+		return err
+	}
+	if adminCount >= 3 {
+		return sql.ErrNoRows
+	}
+
+	// Skip if already admin
+	if role, roleErr := s.GetUserRole(groupID, targetUserID); roleErr == nil && role == "admin" {
+		return nil
+	}
+
 	query := `
 		UPDATE group_members
 		SET role = 'admin', updated_at = ?
-		WHERE group_id = ? AND user_id = ?
+		WHERE group_id = ? AND user_id = ? AND status = 'member'
 	`
 	_, err = s.db.Exec(query, time.Now(), groupID, targetUserID)
 	return err
 }
 
 func (s *GroupService) DemoteAdmin(groupID, requesterID, targetUserID uint) error {
-	// Check if requester is creator (only creators can demote admins)
-	requesterRole, err := s.GetUserRole(groupID, requesterID)
-	if err != nil {
+	// Only the creator can demote admins
+	var creatorID uint
+	if err := s.db.QueryRow("SELECT creator_id FROM groups WHERE id = ?", groupID).Scan(&creatorID); err != nil {
 		return err
 	}
-	if requesterRole != "creator" {
-		return sql.ErrNoRows // Forbidden
+	if requesterID != creatorID {
+		return sql.ErrNoRows
 	}
 
 	// Cannot demote yourself
@@ -767,7 +866,7 @@ func (s *GroupService) DemoteAdmin(groupID, requesterID, targetUserID uint) erro
 	query := `
 		UPDATE group_members
 		SET role = 'member', updated_at = ?
-		WHERE group_id = ? AND user_id = ?
+		WHERE group_id = ? AND user_id = ? AND status = 'member'
 	`
 	_, err = s.db.Exec(query, time.Now(), groupID, targetUserID)
 	return err

@@ -18,6 +18,7 @@ interface CommentWithUser extends CommentType {
 }
 
 function PostDetailPage() {
+  const { user: currentUser } = useAuth()
   const { id } = useParams()
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -229,6 +230,19 @@ function PostDetailPage() {
     }
   }
 
+  const handleUserClick = (userId: number | undefined) => {
+    if (!currentUser) return
+    console.log("User clicked:", userId, "Current user:", currentUser.id)
+    // Check if clicking on own profile
+    if (userId === currentUser.id) {
+      // Navigate to own profile route
+      router.push(`/profile/${userId}`) // or router.push('/dashboard') to go to dashboard profile tab
+    } else {
+      // Navigate to other user's profile page
+      router.push(`/profile/${userId}`)
+    }
+  }
+
     // WebSocket message listener
     useEffect(() => {
         if (!isConnected || !post) return
@@ -352,35 +366,57 @@ function PostDetailPage() {
           {/* Post Header */}
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center space-x-4 flex-1">
-              <div className="relative">
+              {/* Clickable Avatar */}
+              <div
+                className="relative group cursor-pointer"
+                onClick={() => handleUserClick(post.user.id)}
+              >
                 <div className="w-12 h-12 bg-gradient-to-br from-emerald-400 via-teal-500 to-cyan-600 rounded-full flex items-center justify-center overflow-hidden ring-2 ring-white/20 group-hover:ring-emerald-400/50 transition-all duration-300">
                   {getAvatarUrl(post.user.avatar) ? (
-                    <Image
-                      src={getAvatarUrl(post.user.avatar)!}
-                      alt={`${post.user.first_name} ${post.user.last_name}'s avatar`}
-                      width={48}
-                      height={48}
-                      unoptimized={post.user.avatar.includes('/svg')}
-                      className="w-12 h-12 rounded-full object-cover"
-                    />
+                  <Image
+                    src={getAvatarUrl(post.user.avatar)!}
+                    alt={`${post.user.first_name} ${post.user.last_name}'s avatar`}
+                    width={48}
+                    height={48}
+                    unoptimized={post.user.avatar.includes('/svg')}
+                    className="w-12 h-12 rounded-full object-cover"
+                  />
                   ) : (
                     <User className="w-6 h-6 text-white" />
                   )}
                 </div>
                 {/* Online Status Indicator */}
                 <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-green-400 border-2 border-gray-900 rounded-full"></div>
-              </div>
-              <div className="flex-1">
-                <div className="flex items-center space-x-2 mb-1">
-                  <h3 className="text-white font-semibold text-lg hover:text-emerald-300 transition-colors duration-200">
-                    {post.user.first_name} {post.user.last_name}
-                  </h3>
                 </div>
-                <p className="text-white/70 text-sm">
+
+                <div className="flex-1">
+                  {/* Clickable Full Name */}
+                  <div
+                    key={post.user.id}
+                    className="group cursor-pointer"
+                    onClick={() => handleUserClick(post.user.id)}
+                  >
+                    <span
+                      className="text-white font-semibold text-lg hover:text-emerald-300 transition-colors duration-200"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleUserClick(post.user.id)
+                      }}
+                    >
+                      {post.user.first_name} {post.user.last_name}
+                    </span>
+                </div>
+
+                {/* Clickable Username */}
+                <p
+                  className="text-white/70 text-sm cursor-pointer hover:text-white/90 transition-colors duration-200"
+                  onClick={() => handleUserClick(post.user.id)}
+                >
                   @{post.user.nickname || post.user.email.split('@')[0]} • {formatTimeAgo(post.created_at)}
                 </p>
               </div>
             </div>
+
             <button
               className="p-3 text-white/70 hover:text-white hover:bg-white/10 rounded-xl transition-all duration-200 hover:scale-105"
               title="More options"
@@ -388,7 +424,7 @@ function PostDetailPage() {
             >
               <MoreHorizontal className="w-5 h-5" />
             </button>
-          </div>
+          </div>      
 
           {/* Post Content */}
           <div className="mb-6">

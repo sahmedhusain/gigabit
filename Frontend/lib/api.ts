@@ -87,6 +87,7 @@ export interface GroupInvitationItem {
 export interface Post {
   id: number;
   user: {
+    id: number;
     name: string;
     username: string;
     avatar: string;

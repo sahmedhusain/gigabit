@@ -207,6 +207,7 @@ export interface Chat {
   isGroup: boolean;
   participantId?: number;
   participantAvatar?: string; // Add participant avatar
+  groupId?: number; // Add group ID for group chats
 }
 
 // API Response types

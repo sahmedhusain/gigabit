@@ -6,7 +6,7 @@ import { useAuth } from '@/context/AuthContext'
 import { useToast } from '@/context/ToastContext'
 import { useConnectionStatus, useOnlineStatus } from '@/hooks'
 import { api, Event, API_BASE_URL, Member } from '@/lib/api'
-import GroupChat from '@/components/GroupChat'
+import GroupWindow from '@/components/GroupWindow'
 import {
   Users,
   Calendar,
@@ -57,12 +57,10 @@ function GroupDetailsPage() {
 
   const [group, setGroup] = useState<GroupDetails | null>(null)
   const [isLoading, setIsLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState('overview')
   const [isJoining, setIsJoining] = useState(false)
   const [showInviteModal, setShowInviteModal] = useState(false)
   const [inviteEmail, setInviteEmail] = useState('')
   const [isInviting, setIsInviting] = useState(false)
-  const [showCreateEvent, setShowCreateEvent] = useState(false)
 
   // User role state
   const [isAdminOrCreator, setIsAdminOrCreator] = useState(false)
@@ -307,252 +305,16 @@ function GroupDetailsPage() {
           </div>
         </div>
 
-        {/* Navigation Tabs */}
-        <div className="bg-black/10 backdrop-blur-xl border-b border-white/10">
-          <div className="max-w-6xl mx-auto px-4">
-            <div className="flex space-x-8">
-              {[
-                { id: 'overview', label: 'Overview', icon: Users },
-                { id: 'posts', label: 'Posts', icon: MessageCircle },
-                { id: 'members', label: 'Members', icon: Users },
-                { id: 'events', label: 'Events', icon: Calendar },
-                { id: 'chat', label: 'Chat', icon: MessageCircle }
-              ].map((tab) => (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`flex items-center px-4 py-4 border-b-2 transition-all duration-200 ${activeTab === tab.id
-                      ? 'border-emerald-400 text-emerald-400'
-                      : 'border-transparent text-white/70 hover:text-white'
-                    }`}
-                >
-                  <tab.icon className="w-4 h-4 mr-2" />
-                  {tab.label}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* Content */}
+        {/* Group Window */}
         <div className="max-w-6xl mx-auto px-4 py-8">
-          {activeTab === 'overview' && (
-            <div className="space-y-6">
-              {/* Group Stats */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="bg-white/5 backdrop-blur-xl rounded-2xl p-6 border border-white/10">
-                  <div className="flex items-center space-x-3">
-                    <Users className="w-8 h-8 text-emerald-400" />
-                    <div>
-                      <div className="text-2xl font-bold text-white flex items-center space-x-2">
-                        <span>{group.member_count}</span>
-                        {isConnected && onlineMemberCount > 0 && (
-                          <span className="text-sm text-green-400">({onlineMemberCount} online)</span>
-                        )}
-                      </div>
-                      <div className="text-white/70">Members</div>
-                      {!isConnected && (
-                        <div className="text-yellow-400 text-xs mt-1">Status offline</div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="bg-white/5 backdrop-blur-xl rounded-2xl p-6 border border-white/10">
-                  <div className="flex items-center space-x-3">
-                    <Calendar className="w-8 h-8 text-blue-400" />
-                    <div>
-                      <div className="text-2xl font-bold text-white">{group.events.length}</div>
-                      <div className="text-white/70">Events</div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="bg-white/5 backdrop-blur-xl rounded-2xl p-6 border border-white/10">
-                  <div className="flex items-center space-x-3">
-                    <Crown className="w-8 h-8 text-yellow-400" />
-                    <div>
-                      <div className="text-lg font-semibold text-white">{group.creator.first_name} {group.creator.last_name}</div>
-                      <div className="text-white/70">Creator</div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Recent Members */}
-              <div className="bg-white/5 backdrop-blur-xl rounded-2xl p-6 border border-white/10">
-                <h3 className="text-xl font-semibold text-white mb-4">Recent Members</h3>
-                <div className="space-y-3">
-                  {group.members.slice(0, 5).map((member) => (
-                    <div key={member.id} className="flex items-center justify-between">
-                      <div className="flex items-center space-x-3">
-                        <div className="w-10 h-10 bg-gradient-to-r from-emerald-500 to-teal-600 rounded-full flex items-center justify-center">
-                          <span className="text-white font-semibold text-sm">
-                            {member.user.first_name[0]}{member.user.last_name[0]}
-                          </span>
-                        </div>
-                        <div>
-                          <div className="text-white font-medium">{member.user.first_name} {member.user.last_name}</div>
-                          <div className="text-white/50 text-sm">@{member.user.nickname || 'user'}</div>
-                        </div>
-                      </div>
-                      <div className="text-white/50 text-sm">
-                        Joined {member.joined_at ? new Date(member.joined_at).toLocaleDateString() : 'Unknown'}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {activeTab === 'posts' && (
-            <div className="space-y-6">
-              <div className="flex items-center justify-between">
-                <h3 className="text-xl font-semibold text-white">Group Posts</h3>
-              </div>
-
-              {group.is_member && (
-                <CreateGroupPost
-                  groupId={group.id.toString()}
-                  onCreated={() => {
-                    // Refresh the feed
-                    fetchGroupDetails()
-                  }}
-                />
-              )}
-
-              <GroupFeed groupId={group.id.toString()} />
-            </div>
-          )}
-
-          {activeTab === 'members' && (
-            <div className="bg-white/5 backdrop-blur-xl rounded-2xl p-6 border border-white/10">
-              <div className="flex items-center justify-between mb-6">
-                <h3 className="text-xl font-semibold text-white">Group Members ({group.members.length})</h3>
-                {isGroupCreator && (
-                  <button
-                    onClick={() => setShowInviteModal(true)}
-                    className="flex items-center px-4 py-2 bg-emerald-500 hover:bg-emerald-600 rounded-xl text-white transition-all duration-200"
-                  >
-                    <UserPlus className="w-4 h-4 mr-2" />
-                    Invite Members
-                  </button>
-                )}
-              </div>
-
-              <div className="space-y-4">
-                {group.members.map((member) => (
-                  <div key={member.id} className="flex items-center justify-between p-4 bg-white/5 rounded-xl">
-                    <div className="flex items-center space-x-4">
-                      <div className="w-12 h-12 bg-gradient-to-r from-emerald-500 to-teal-600 rounded-full flex items-center justify-center">
-                        <span className="text-white font-semibold">
-                          {member.user.first_name[0]}{member.user.last_name[0]}
-                        </span>
-                      </div>
-                      <div>
-                        <div className="text-white font-medium flex items-center">
-                          {member.user.first_name} {member.user.last_name}
-                          {member.role === 'creator' && (
-                            <Crown className="w-4 h-4 ml-2 text-yellow-400" />
-                          )}
-                          {member.role === 'admin' && (
-                            <Shield className="w-4 h-4 ml-2 text-blue-400" />
-                          )}
-                        </div>
-                        <div className="text-white/50 text-sm">@{member.user.nickname || 'user'}</div>
-                      </div>
-                    </div>
-                    <div className="flex items-center space-x-3">
-                      <div className="text-white/50 text-sm">
-                        Joined {member.joined_at ? new Date(member.joined_at).toLocaleDateString() : 'Unknown'}
-                      </div>
-                      {isAdminOrCreator && member.role !== 'creator' && (
-                        <div className="flex space-x-2">
-                          {member.role !== 'admin' ? (
-                            <button
-                              onClick={() => handlePromoteToAdmin(member.user.id)}
-                              className="flex items-center px-3 py-1 bg-blue-500/20 hover:bg-blue-500/30 border border-blue-400/30 text-blue-300 rounded-lg text-xs transition-all duration-200"
-                              title="Promote to Admin"
-                            >
-                              <ShieldCheck className="w-3 h-3 mr-1" />
-                              Promote
-                            </button>
-                          ) : (
-                            <button
-                              onClick={() => handleDemoteAdmin(member.user.id)}
-                              className="flex items-center px-3 py-1 bg-red-500/20 hover:bg-red-500/30 border border-red-400/30 text-red-300 rounded-lg text-xs transition-all duration-200"
-                              title="Demote from Admin"
-                            >
-                              <Shield className="w-3 h-3 mr-1" />
-                              Demote
-                            </button>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {activeTab === 'events' && (
-            <div className="space-y-6">
-              <div className="flex items-center justify-between">
-                <h3 className="text-xl font-semibold text-white">Group Events</h3>
-                {isGroupCreator && (
-                  <button
-                    onClick={() => setShowCreateEvent(true)}
-                    className="flex items-center px-4 py-2 bg-blue-500 hover:bg-blue-600 rounded-xl text-white transition-all duration-200"
-                  >
-                    <Calendar className="w-4 h-4 mr-2" />
-                    Create Event
-                  </button>
-                )}
-              </div>
-
-              {group.events.length === 0 ? (
-                <div className="bg-white/5 backdrop-blur-xl rounded-2xl p-8 border border-white/10 text-center">
-                  <Calendar className="w-16 h-16 text-white/30 mx-auto mb-4" />
-                  <h4 className="text-xl font-semibold text-white mb-2">No events yet</h4>
-                  <p className="text-white/70">Create the first event for this group!</p>
-                </div>
-              ) : (
-                <div className="grid gap-6">
-                  {group.events.map((event) => (
-                    <div key={event.id} className="bg-white/5 backdrop-blur-xl rounded-2xl p-6 border border-white/10">
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <h4 className="text-xl font-semibold text-white mb-2">{event.title}</h4>
-                          <p className="text-white/70 mb-4">{event.description}</p>
-                          <div className="flex items-center space-x-4 text-sm text-white/60">
-                            <div className="flex items-center">
-                              <Clock className="w-4 h-4 mr-1" />
-                              {new Date(event.event_time).toLocaleDateString()} at {new Date(event.event_time).toLocaleTimeString()}
-                            </div>
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <div className="text-sm text-white/60 mb-2">Responses</div>
-                          <div className="space-y-1">
-                            <div className="text-emerald-400">Going: {event.going_count}</div>
-                            <div className="text-red-400">Not Going: {event.not_going_count}</div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          {activeTab === 'chat' && (
-            <div className="bg-white/5 backdrop-blur-xl rounded-2xl border border-white/10 h-[600px]">
-              <GroupChat groupId={parseInt(id as string)} groupTitle={group.title} />
-            </div>
-          )}
+          <div className="bg-white/5 backdrop-blur-xl rounded-2xl border border-white/10 h-[700px]">
+            <GroupWindow 
+              groupId={parseInt(id as string)} 
+              groupTitle={group.title}
+              isGroupMember={group.is_member}
+              userRole={isAdminOrCreator ? 'admin' : 'member'}
+            />
+          </div>
         </div>
 
         {/* Invite Members Modal */}
@@ -608,19 +370,6 @@ function GroupDetailsPage() {
 
 
 
-        {/* Create Event Modal */}
-        {showCreateEvent && (
-          <CreateEvent
-            show={showCreateEvent}
-            onClose={() => setShowCreateEvent(false)}
-            onEventCreated={() => {
-              fetchGroupDetails()
-              setShowCreateEvent(false)
-              success('Event created successfully!')
-            }}
-            groupId={parseInt(id as string)}
-          />
-        )}
       </div>
     </AppLayout>
   )

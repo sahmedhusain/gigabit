@@ -3,6 +3,7 @@ import Image from 'next/image'
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { X, Users, Globe, Lock, Search, Loader2, Check } from 'lucide-react'
 import { CreateGroupRequest, api, User } from '@/lib/api'
+import { v4 as uuidv4 } from 'uuid'
 import { useOptimisticUpdate, useConnectionStatus } from '@/hooks'
 import { useToast } from '@/context/ToastContext'
 import { useAuth } from '@/context/AuthContext'
@@ -27,6 +28,43 @@ export default function CreateGroup({
   const [selectedMembers, setSelectedMembers] = useState<User[]>([])
   const [searchQuery, setSearchQuery] = useState('')
   const [isFetchingUsers, setIsFetchingUsers] = useState(false)
+  const [avatarFile, setAvatarFile] = useState<File | null>(null)
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false)
+  // Handle avatar file selection and preview
+  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0] || null
+    setAvatarFile(file)
+    if (file) {
+      setAvatarPreview(URL.createObjectURL(file))
+    } else {
+      setAvatarPreview(null)
+    }
+  }
+
+  // Upload avatar to backend and get URL
+  const uploadAvatar = async (file: File): Promise<string> => {
+    setIsUploadingAvatar(true)
+    try {
+      const formData = new FormData()
+      formData.append('image', file)
+      const res = await fetch('/api/uploads', {
+        method: 'POST',
+        body: formData,
+        credentials: 'include',
+      })
+      if (!res.ok) throw new Error('Failed to upload avatar')
+      const data = await res.json()
+      // The backend returns { filename: ... }, so construct the URL
+      if (data.filename) {
+        return `/uploads/${data.filename}`
+      }
+      throw new Error('No filename returned from server')
+    } finally {
+      setIsUploadingAvatar(false)
+    }
+  }
   const { success, error: showError } = useToast()
   const { isConnected } = useConnectionStatus()
   const { user: currentUser } = useAuth()
@@ -181,11 +219,23 @@ export default function CreateGroup({
 
     setError('')
 
+    let avatar = avatarUrl
+    if (avatarFile && !avatarUrl) {
+      try {
+        avatar = await uploadAvatar(avatarFile)
+        setAvatarUrl(avatar)
+      } catch (err) {
+        showError('Failed to upload avatar')
+        return
+      }
+    }
+
     const groupData: CreateGroupRequest = {
       title: groupTitle.trim(),
       description: groupDescription.trim(),
       privacy,
-      invite_members: inviteMemberIds.length ? inviteMemberIds : undefined
+      invite_members: inviteMemberIds.length ? inviteMemberIds : undefined,
+      avatar: avatar || undefined
     }
 
     performUpdate(
@@ -287,6 +337,57 @@ export default function CreateGroup({
               transition={{ delay: 0.2, duration: 0.3 }}
             >
               <div className="space-y-6">
+                {/* Group Avatar Upload */}
+                <motion.div
+                  className="space-y-3"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.25, duration: 0.3 }}
+                >
+                  <motion.label
+                    className="text-white font-semibold text-sm lg:text-base flex items-center space-x-2"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: 0.3, duration: 0.3 }}
+                  >
+                    <div className="w-2 h-2 bg-emerald-400 rounded-full"></div>
+                    <span>Group Avatar</span>
+                  </motion.label>
+                  <div className="flex items-center space-x-4">
+                    <label className="relative cursor-pointer">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={handleAvatarChange}
+                        disabled={isUploadingAvatar}
+                      />
+                      <div className="w-16 h-16 rounded-2xl border border-white/20 bg-white/10 flex items-center justify-center overflow-hidden">
+                        {avatarPreview ? (
+                          <Image src={avatarPreview} alt="Avatar Preview" width={64} height={64} className="object-cover w-16 h-16" />
+                        ) : (
+                          <Users className="w-8 h-8 text-white/40" />
+                        )}
+                        {isUploadingAvatar && (
+                          <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                            <Loader2 className="w-6 h-6 text-white animate-spin" />
+                          </div>
+                        )}
+                      </div>
+                      <span className="block mt-2 text-xs text-white/60 text-center">Upload</span>
+                    </label>
+                    {avatarPreview && (
+                      <button
+                        type="button"
+                        className="text-xs text-red-400 hover:underline"
+                        onClick={() => { setAvatarFile(null); setAvatarPreview(null); setAvatarUrl(null); }}
+                      >
+                        Remove
+                      </button>
+                    )}
+                  </div>
+                </motion.div>
+
                 {/* Group Title */}
                 <motion.div
                   className="space-y-3"

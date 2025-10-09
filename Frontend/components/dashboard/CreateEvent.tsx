@@ -20,6 +20,7 @@ export default function CreateEvent({
 }: CreateEventProps) {
   const [eventTitle, setEventTitle] = useState('')
   const [eventDescription, setEventDescription] = useState('')
+  const [eventLocation, setEventLocation] = useState('')
   const [eventDate, setEventDate] = useState('')
   const [eventTime, setEventTime] = useState('')
   const [error, setError] = useState<string>('')
@@ -32,6 +33,7 @@ export default function CreateEvent({
       // Reset form
       setEventTitle('')
       setEventDescription('')
+      setEventLocation('')
       setEventDate('')
       setEventTime('')
       setError('')
@@ -87,6 +89,7 @@ export default function CreateEvent({
     const eventData = {
       title: eventTitle.trim(),
       description: eventDescription.trim(),
+      location: eventLocation.trim() || undefined,
       event_time: eventDateTime.toISOString()
     }
 
@@ -167,6 +170,23 @@ export default function CreateEvent({
               />
               <div className="text-xs text-white/50 text-right">
                 {eventDescription.length}/500
+              </div>
+            </div>
+
+            {/* Event Location */}
+            <div className="space-y-2">
+              <label className="text-white font-medium text-sm lg:text-base">Location (Optional)</label>
+              <input
+                type="text"
+                value={eventLocation}
+                onChange={(e) => setEventLocation(e.target.value)}
+                onKeyPress={handleKeyPress}
+                placeholder="Where will this event take place?"
+                className="w-full bg-white/10 border border-white/20 rounded-xl lg:rounded-2xl p-3 lg:p-4 text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-blue-400/50 text-sm lg:text-base"
+                maxLength={200}
+              />
+              <div className="text-xs text-white/50 text-right">
+                {eventLocation.length}/200
               </div>
             </div>
 

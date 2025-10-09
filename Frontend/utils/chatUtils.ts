@@ -16,6 +16,7 @@ export interface UnifiedChatItem {
   groupStatus?: Group['memberStatus'] | GroupResponse['member_status']
   groupPrivacy?: Group['privacy'] | GroupResponse['privacy']
   groupRole?: Group['role'] | GroupResponse['role']
+  groupId?: number // Add group ID for group chats
 }
 
 /**
@@ -50,7 +51,8 @@ export function normalizeConversation(conv: ConversationResponse, currentUserId?
     lastMessageSenderId: lastMessageSenderId ?? undefined,
     groupStatus,
     groupPrivacy,
-    groupRole
+    groupRole,
+    groupId: conv.group?.id
   }
 }
 
@@ -112,7 +114,8 @@ export function normalizeGroupAsChatItem(group: Group): UnifiedChatItem {
     participantId: undefined,
     groupStatus: group.memberStatus,
     groupPrivacy: group.privacy,
-    groupRole: group.role
+    groupRole: group.role,
+    groupId: group.id
   }
 }
 

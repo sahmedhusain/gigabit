@@ -3,10 +3,12 @@ import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import ProtectedRoute from '@/components/ProtectedRoute'
 import ChatWindow from '@/components/ChatWindow'
+import GroupWindow from '@/components/GroupWindow'
 import { useAuth } from '@/context/AuthContext'
 import { useWebSocket } from '@/context/WebSocketContext'
 import { useToast } from '@/context/ToastContext'
 import { useNotifications, useConversations } from '@/hooks'
+import { X } from 'lucide-react'
 import {
   api,
   Group,
@@ -52,6 +54,9 @@ function ChatsFilterPage() {
     type: 'private' | 'group',
     name: string
     participantId?: number
+    groupId?: number
+    isGroupMember?: boolean
+    userRole?: 'admin' | 'member'
   } | null>(null)
 
   // Current User Processing
@@ -161,7 +166,8 @@ function ChatsFilterPage() {
           participantId,
           participantAvatar: String(participant?.['avatar'] ?? ''),
           lastMessageSenderId: Number(last_message?.['sender_id'] ?? 0),
-          actualId: group?.['id'] ?? participant?.['id']
+          actualId: group?.['id'] ?? participant?.['id'],
+          groupId: group?.['id'] ? Number(group['id']) : undefined
         }
       }))
     } catch (err) {
@@ -356,23 +362,72 @@ function ChatsFilterPage() {
       />
 
       {openChatWindow ? (
-        <ChatWindow
-          conversationId={openChatWindow.conversationId}
-          conversationType={openChatWindow.type}
-          participantName={openChatWindow.name}
-          participantId={openChatWindow.participantId}
-          onClose={() => setOpenChatWindow(null)}
-        />
+        openChatWindow.type === 'group' ? (
+          <div className="bg-white/5 backdrop-blur-xl rounded-2xl border border-white/10 h-[700px] mx-4 my-4 relative">
+            <button
+              onClick={() => setOpenChatWindow(null)}
+              className="absolute top-4 right-4 z-10 p-2 text-white/70 hover:text-white hover:bg-white/10 rounded-xl transition-all duration-200"
+              title="Close"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            <GroupWindow 
+              groupId={openChatWindow.groupId || openChatWindow.conversationId}
+              groupTitle={openChatWindow.name}
+              isGroupMember={openChatWindow.isGroupMember ?? true}
+              userRole={openChatWindow.userRole ?? 'member'}
+            />
+          </div>
+        ) : (
+          <ChatWindow
+            conversationId={openChatWindow.conversationId}
+            conversationType={openChatWindow.type}
+            participantName={openChatWindow.name}
+            participantId={openChatWindow.participantId}
+            onClose={() => setOpenChatWindow(null)}
+          />
+        )
       ) : (
         <ChatsSection
           chatSubTab={chatSubTab}
-          onChatClick={(chat) => {
-            setOpenChatWindow({
-              conversationId: chat.conversationId,
-              type: chat.type,
-              name: chat.name,
-              participantId: chat.participantId
-            });
+          onChatClick={async (chat) => {
+            if (chat.type === 'group') {
+              try {
+                // For groups, we need to fetch group details to get membership info
+                const groupId = chat.groupId || chat.conversationId
+                
+                const groupInfo = await api.getGroup(groupId)
+                
+                setOpenChatWindow({
+                  conversationId: chat.conversationId,
+                  type: chat.type,
+                  name: chat.name,
+                  participantId: chat.participantId,
+                  groupId: groupId,
+                  isGroupMember: groupInfo.is_member,
+                  userRole: groupInfo.role || 'member'
+                })
+              } catch (err) {
+                console.error('Error fetching group info:', err)
+                // Fallback to basic group window
+                setOpenChatWindow({
+                  conversationId: chat.conversationId,
+                  type: chat.type,
+                  name: chat.name,
+                  participantId: chat.participantId,
+                  groupId: chat.groupId || chat.conversationId,
+                  isGroupMember: true,
+                  userRole: 'member'
+                })
+              }
+            } else {
+              setOpenChatWindow({
+                conversationId: chat.conversationId,
+                type: chat.type,
+                name: chat.name,
+                participantId: chat.participantId
+              })
+            }
           }}
           getUserStatus={getUserStatus}
           currentUser={user}

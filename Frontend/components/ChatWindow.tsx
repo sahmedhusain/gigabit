@@ -42,7 +42,8 @@ interface ChatWindowProps {
   groupId?: number
   // Notify parent (GroupChat) when we discover/upgrade to the real conversation ID
   onConversationResolved?: (conversationId: number) => void
-  onClose: () => void
+  onClose?: () => void // Optional for minimal UI
+  hideHeader?: boolean // Hide the chat header if true
 }
 
 const ChatWindow: React.FC<ChatWindowProps> = ({
@@ -52,7 +53,8 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
   participantName,
   groupId,
   onConversationResolved,
-  onClose
+  onClose,
+  hideHeader
 }) => {
   const [newMessage, setNewMessage] = useState('')
   const [showEmojiPicker, setShowEmojiPicker] = useState(false)
@@ -524,123 +526,126 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
       transition={{ duration: 0.3, ease: 'easeOut' }}
     >
       {/* Header */}
-      <motion.div
-        className="bg-gradient-to-r from-white/10 to-white/5 backdrop-blur-xl border-b border-white/20 p-4 flex items-center justify-between flex-shrink-0 shadow-lg"
-        initial={{ y: -20, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        transition={{ delay: 0.1, duration: 0.3 }}
-      >
-        <div className="flex items-center space-x-4">
-          {/* Clickable Avatar */}
-          <motion.div
-            className={`relative ${conversationType === 'private' && participantId ? 'cursor-pointer' : ''}`}
-            whileHover={{ scale: 1.05 }}
-            transition={{ type: 'spring', stiffness: 400, damping: 17 }}
-            onClick={() => {
-              if (conversationType === 'private' && participantId) {
-                router.push(`/profile/${participantId}`)
-              }
-            }}
-          >
-            {conversationType === 'private' && participantData?.avatar ? (
-              <Image
-                src={participantData.avatar}
-                alt={participantData.first_name + ' ' + participantData.last_name}
-                width={48}
-                height={48}
-                className={`w-12 h-12 rounded-full object-cover shadow-xl ring-2 ring-white/20 ${
-                  conversationType === 'private' && participantId ? 'hover:ring-emerald-400/50' : ''
-                } transition-all duration-200`}
-              />
-            ) : (
-              <div className={`w-12 h-12 rounded-full bg-gradient-to-br from-emerald-400 via-teal-500 to-cyan-600 flex items-center justify-center text-white text-lg font-bold shadow-xl ring-2 ring-white/20 ${
-                conversationType === 'private' && participantId ? 'hover:ring-emerald-400/50' : ''
-              } transition-all duration-200`}>
-                {conversationType === 'private' ? participantName[0].toUpperCase() : '#'}
-              </div>
-            )}
-            {/* Online status indicator */}
+      {!hideHeader && (
+        <motion.div
+          className="bg-gradient-to-r from-white/10 to-white/5 backdrop-blur-xl border-b border-white/20 p-4 flex items-center justify-between flex-shrink-0 shadow-lg"
+          initial={{ y: -20, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          transition={{ delay: 0.1, duration: 0.3 }}
+        >
+          <div className="flex items-center space-x-4">
+            {/* Clickable Avatar */}
             <motion.div
-              className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-white/10 ${
-                conversationType === 'private' && participantId
-                  ? (getParticipantStatus() === 'online' ? 'bg-green-500' :
-                     getParticipantStatus() === 'busy' ? 'bg-red-500' :
-                     getParticipantStatus() === 'away' ? 'bg-yellow-500' :
-                     'bg-gray-500')
-                  : (isConnected ? 'bg-green-500' : 'bg-red-500')
-              } shadow-lg`}
-              animate={{ scale: [1, 1.2, 1] }}
-            />
-          </motion.div>
-
-          <div className="flex-1 min-w-0">
-            {/* Clickable Username */}
-            <motion.h1
-              className={`text-white text-xl font-bold truncate leading-tight ${
-                conversationType === 'private' && participantId 
-                  ? 'cursor-pointer hover:text-emerald-300 transition-colors duration-200' 
-                  : ''
-              }`}
-              initial={{ opacity: 0, x: -10 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.2, duration: 0.3 }}
+              className={`relative ${conversationType === 'private' && participantId ? 'cursor-pointer' : ''}`}
+              whileHover={{ scale: 1.05 }}
+              transition={{ type: 'spring', stiffness: 400, damping: 17 }}
               onClick={() => {
                 if (conversationType === 'private' && participantId) {
                   router.push(`/profile/${participantId}`)
                 }
               }}
             >
-              {participantName}
-            </motion.h1>
-            <motion.div
-              className="flex items-center space-x-2 mt-1"
-              initial={{ opacity: 0, x: -10 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.3, duration: 0.3 }}
-            >
-              <span className={`text-xs font-medium ${
-                conversationType === 'private' && participantId
-                  ? (getParticipantStatus() === 'online' ? 'text-green-400' :
-                     getParticipantStatus() === 'busy' ? 'text-red-400' :
-                     getParticipantStatus() === 'away' ? 'text-yellow-400' :
-                     'text-gray-400')
-                  : (isConnected ? 'text-green-400' : 'text-red-400')
-              }`}>
-                {conversationType === 'private' && participantId
-                  ? (getParticipantStatus() === 'online' ? 'Online' :
-                     getParticipantStatus() === 'busy' ? 'Busy' :
-                     getParticipantStatus() === 'away' ? 'Away' :
-                     participantData?.last_status_change ? formatLastOnlineTime(participantData.last_status_change) : 'Offline')
-                  : (isConnected ? 'Connected' : 'Disconnected')
-                }
-              </span>
-              {conversationType === 'group' && (
-                <>
-                  <span className="text-white/40">•</span>
-                  <span className="text-xs text-white/50">
-                    {Array.from(messages.get(conversationId) || []).length} messages
-                  </span>
-                </>
+              {conversationType === 'private' && participantData?.avatar ? (
+                <Image
+                  src={participantData.avatar}
+                  alt={participantData.first_name + ' ' + participantData.last_name}
+                  width={48}
+                  height={48}
+                  className={`w-12 h-12 rounded-full object-cover shadow-xl ring-2 ring-white/20 ${
+                    conversationType === 'private' && participantId ? 'hover:ring-emerald-400/50' : ''
+                  } transition-all duration-200`}
+                />
+              ) : (
+                <div className={`w-12 h-12 rounded-full bg-gradient-to-br from-emerald-400 via-teal-500 to-cyan-600 flex items-center justify-center text-white text-lg font-bold shadow-xl ring-2 ring-white/20 ${
+                  conversationType === 'private' && participantId ? 'hover:ring-emerald-400/50' : ''
+                } transition-all duration-200`}>
+                  {conversationType === 'private' ? participantName[0].toUpperCase() : '#'}
+                </div>
               )}
+              {/* Online status indicator */}
+              <motion.div
+                className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-white/10 ${
+                  conversationType === 'private' && participantId
+                    ? (getParticipantStatus() === 'online' ? 'bg-green-500' :
+                       getParticipantStatus() === 'busy' ? 'bg-red-500' :
+                       getParticipantStatus() === 'away' ? 'bg-yellow-500' :
+                       'bg-gray-500')
+                    : (isConnected ? 'bg-green-500' : 'bg-red-500')
+                } shadow-lg`}
+                animate={{ scale: [1, 1.2, 1] }}
+              />
             </motion.div>
+
+            <div className="flex-1 min-w-0">
+              {/* Clickable Username */}
+              <motion.h1
+                className={`text-white text-xl font-bold truncate leading-tight ${
+                  conversationType === 'private' && participantId 
+                    ? 'cursor-pointer hover:text-emerald-300 transition-colors duration-200' 
+                    : ''
+                }`}
+                initial={{ opacity: 0, x: -10 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.2, duration: 0.3 }}
+                onClick={() => {
+                  if (conversationType === 'private' && participantId) {
+                    router.push(`/profile/${participantId}`)
+                  }
+                }}
+              >
+                {participantName}
+              </motion.h1>
+              <motion.div
+                className="flex items-center space-x-2 mt-1"
+                initial={{ opacity: 0, x: -10 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.3, duration: 0.3 }}
+              >
+                <span className={`text-xs font-medium ${
+                  conversationType === 'private' && participantId
+                    ? (getParticipantStatus() === 'online' ? 'text-green-400' :
+                       getParticipantStatus() === 'busy' ? 'text-red-400' :
+                       getParticipantStatus() === 'away' ? 'text-yellow-400' :
+                       'text-gray-400')
+                    : (isConnected ? 'text-green-400' : 'text-red-400')
+                }`}>
+                  {conversationType === 'private' && participantId
+                    ? (getParticipantStatus() === 'online' ? 'Online' :
+                       getParticipantStatus() === 'busy' ? 'Busy' :
+                       getParticipantStatus() === 'away' ? 'Away' :
+                       participantData?.last_status_change ? formatLastOnlineTime(participantData.last_status_change) : 'Offline')
+                    : (isConnected ? 'Connected' : 'Disconnected')
+                  }
+                </span>
+                {conversationType === 'group' && (
+                  <>
+                    <span className="text-white/40">•</span>
+                    <span className="text-xs text-white/50">
+                      {Array.from(messages.get(conversationId) || []).length} messages
+                    </span>
+                  </>
+                )}
+              </motion.div>
+            </div>
           </div>
-        </div>
 
-        <div className="flex items-center space-x-2">
-          {/* Connection indicator */}
-
-          <motion.button
-            onClick={onClose}
-            className="p-3 text-white/70 hover:text-white hover:bg-white/10 rounded-xl transition-all duration-200 group"
-            title="Close chat"
-            whileHover={{ scale: 1.1, rotate: 90 }}
-            whileTap={{ scale: 0.9 }}
-            transition={{ type: 'spring', stiffness: 400, damping: 17 }}
-          >
-            <X className="w-6 h-6 group-hover:rotate-90 transition-transform duration-200" />
-          </motion.button>
-        </div>
-      </motion.div>
+          <div className="flex items-center space-x-2">
+            {/* Connection indicator */}
+            {onClose && (
+              <motion.button
+                onClick={onClose}
+                className="p-3 text-white/70 hover:text-white hover:bg-white/10 rounded-xl transition-all duration-200 group"
+                title="Close chat"
+                whileHover={{ scale: 1.1, rotate: 90 }}
+                whileTap={{ scale: 0.9 }}
+                transition={{ type: 'spring', stiffness: 400, damping: 17 }}
+              >
+                <X className="w-6 h-6 group-hover:rotate-90 transition-transform duration-200" />
+              </motion.button>
+            )}
+          </div>
+        </motion.div>
+      )}
 
       {/* Messages */}
       <motion.div

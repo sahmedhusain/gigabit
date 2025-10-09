@@ -13,7 +13,7 @@ import { normalizeConversation } from '@/utils/chatUtils'
 
 interface ChatsSectionProps {
   chatSubTab: string
-  onChatClick: (chat: { conversationId: number; type: 'private' | 'group'; name: string; participantId?: number }) => void
+  onChatClick: (chat: { conversationId: number; type: 'private' | 'group'; name: string; participantId?: number; groupId?: number }) => void
   getUserStatus: (userId: number) => string
   currentUser: UserType | null
   showCreateGroup: boolean
@@ -296,8 +296,10 @@ export default function ChatsSection({
                       conversationId: chatIdNum,
                       type: chat.type,
                       name: chat.name,
-                      participantId: chat.participantId
+                      participantId: chat.participantId,
+                      groupId: chat.groupId
                     })}
+                    currentUser={currentUser}
                   />
                 </motion.div>
               );

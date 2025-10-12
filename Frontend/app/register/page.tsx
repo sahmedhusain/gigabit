@@ -16,6 +16,8 @@ function validatePassword(password: string) {
   const lower = /[a-z]/
   const number = /[0-9]/
   const space = /\s/
+  // Allow only ASCII printable characters (excluding space, but including common symbols)
+  const allowedChars = /^[a-zA-Z0-9!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?`~]+$/
 
   const errors = []
 
@@ -39,12 +41,41 @@ function validatePassword(password: string) {
     errors.push("not contain any spaces")
   }
 
+  if (!allowedChars.test(password)) {
+    errors.push("only contain English letters, numbers, and common symbols (no emojis or special characters)")
+  }
+
   // combine errors into a single message
   if (errors.length > 0) {
     const lastError = errors.pop() // for adding 'and' before the last error
     return "Password must " + (errors.length ? errors.join(", ") + ", and " + lastError : lastError)
   }
 
+  return null
+}
+
+function validateNickname(nickname: string) {
+  if (!nickname) return null // nickname is optional
+  
+  // Allow only English letters (a-z, A-Z), numbers (0-9), underscore (_), hyphen (-), and dot (.)
+  const allowedCharsRegex = /^[a-zA-Z0-9._-]+$/
+  
+  if (!allowedCharsRegex.test(nickname)) {
+    return "Nickname can only contain English letters, numbers, underscore (_), hyphen (-), and dot (.)"
+  }
+  
+  // Must start with a letter or number (not special characters)
+  const startsWithAlphanumeric = /^[a-zA-Z0-9]/
+  if (!startsWithAlphanumeric.test(nickname)) {
+    return "Nickname must start with a letter or number"
+  }
+  
+  // Must end with a letter or number (not special characters)
+  const endsWithAlphanumeric = /[a-zA-Z0-9]$/
+  if (!endsWithAlphanumeric.test(nickname)) {
+    return "Nickname must end with a letter or number"
+  }
+  
   return null
 }
 
@@ -70,12 +101,28 @@ function RegisterPage() {
   const [error, setError] = useState<string | null>(null)
   const [showOptionalFields, setShowOptionalFields] = useState(false)
   const [showAvatarPopup, setShowAvatarPopup] = useState(false)
+  const [nicknameError, setNicknameError] = useState<string | null>(null)
+  const [passwordError, setPasswordError] = useState<string | null>(null)
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target
+    
     setFormData({
       ...formData,
-      [e.target.name]: e.target.value
+      [name]: value
     })
+
+    // Real-time validation for nickname
+    if (name === 'nickname') {
+      const validation = validateNickname(value)
+      setNicknameError(validation)
+    }
+
+    // Real-time validation for password
+    if (name === 'password') {
+      const validation = validatePassword(value)
+      setPasswordError(validation)
+    }
   }
 
   const handleGenderSelect = (gender: 'male' | 'female') => {
@@ -164,6 +211,11 @@ function RegisterPage() {
 
       if (formData.nickname && formData.nickname.length > 16) {
         throw new Error('Nickname is too long')
+      }
+
+      const nicknameValidation = validateNickname(formData.nickname)
+      if (nicknameValidation) {
+        throw new Error(nicknameValidation)
       }
 
       if (formData.aboutMe.length > 128) {
@@ -381,7 +433,7 @@ function RegisterPage() {
                           Password
                         </label>
                         <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none z-10 top-7">
-                          <Lock className="h-4 w-4 text-emerald-400/70 group-focus-within:text-emerald-400 transition-colors" />
+                          <Lock className={`h-4 w-4 ${passwordError ? 'text-red-400' : 'text-emerald-400/70 group-focus-within:text-emerald-400'} transition-colors`} />
                         </div>
                         <input
                           id="password"
@@ -389,8 +441,8 @@ function RegisterPage() {
                           type={showPassword ? "text" : "password"}
                           autoComplete="new-password"
                           required
-                          className="w-full pl-11 pr-12 py-3.5 bg-white/10 border border-white/20 rounded-xl placeholder-white/40 text-white focus:outline-none focus:ring-2 focus:ring-emerald-400/50 focus:border-emerald-400/50 focus:bg-white/15 transition-all duration-300 backdrop-blur-sm hover:border-white/30"
-                          placeholder="Create a strong password"
+                          className={`w-full pl-11 pr-12 py-3.5 bg-white/10 border ${passwordError ? 'border-red-400/50' : 'border-white/20'} rounded-xl placeholder-white/40 text-white focus:outline-none focus:ring-2 ${passwordError ? 'focus:ring-red-400/50 focus:border-red-400/50' : 'focus:ring-emerald-400/50 focus:border-emerald-400/50'} focus:bg-white/15 transition-all duration-300 backdrop-blur-sm hover:border-white/30`}
+                          placeholder="Create a strong password (English only)"
                           value={formData.password}
                           onChange={handleInputChange}
                         />
@@ -405,6 +457,12 @@ function RegisterPage() {
                             <Eye className="h-5 w-5 text-white/70 hover:text-white/90 transition-colors" />
                           )}
                         </button>
+                        {passwordError && (
+                          <p className="mt-1 text-xs text-red-400/90">{passwordError}</p>
+                        )}
+                        {!passwordError && formData.password && (
+                          <p className="mt-1 text-xs text-emerald-400/90">Valid password</p>
+                        )}
                       </div>
 
                       {/* Date of Birth */}
@@ -470,17 +528,23 @@ function RegisterPage() {
                           Nickname <span className="text-white/40 text-[10px] normal-case">(Optional)</span>
                         </label>
                         <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none z-10 top-7">
-                          <Edit3 className="h-4 w-4 text-emerald-400/70 group-focus-within:text-emerald-400 transition-colors" />
+                          <Edit3 className={`h-4 w-4 ${nicknameError ? 'text-red-400' : 'text-emerald-400/70 group-focus-within:text-emerald-400'} transition-colors`} />
                         </div>
                         <input
                           id="nickname"
                           name="nickname"
                           type="text"
-                          className="w-full pl-11 pr-4 py-3.5 bg-white/10 border border-white/20 rounded-xl placeholder-white/40 text-white focus:outline-none focus:ring-2 focus:ring-emerald-400/50 focus:border-emerald-400/50 focus:bg-white/15 transition-all duration-300 backdrop-blur-sm hover:border-white/30"
-                          placeholder="Choose a nickname"
+                          className={`w-full pl-11 pr-4 py-3.5 bg-white/10 border ${nicknameError ? 'border-red-400/50' : 'border-white/20'} rounded-xl placeholder-white/40 text-white focus:outline-none focus:ring-2 ${nicknameError ? 'focus:ring-red-400/50 focus:border-red-400/50' : 'focus:ring-emerald-400/50 focus:border-emerald-400/50'} focus:bg-white/15 transition-all duration-300 backdrop-blur-sm hover:border-white/30`}
+                          placeholder="Choose a nickname (a-z, 0-9, ._-)"
                           value={formData.nickname}
                           onChange={handleInputChange}
                         />
+                        {nicknameError && (
+                          <p className="mt-1 text-xs text-red-400/90">{nicknameError}</p>
+                        )}
+                        {!nicknameError && formData.nickname && (
+                          <p className="mt-1 text-xs text-emerald-400/90">Valid nickname</p>
+                        )}
                       </div>
 
                       {/* About Me (Optional) */}
@@ -624,7 +688,7 @@ function RegisterPage() {
                                 <div>
                                   <p className="text-white/60 text-sm">This is how others will see you</p>
                                   {formData.avatar.startsWith('data:') && (
-                                    <p className="text-emerald-400 text-xs mt-1 font-medium">✓ Custom image uploaded</p>
+                                    <p className="text-emerald-400 text-xs mt-1 font-medium">Custom image uploaded</p>
                                   )}
                                 </div>
                               </div>

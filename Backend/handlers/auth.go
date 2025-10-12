@@ -118,6 +118,13 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
+		// Validate nickname characters
+		err = validateNickname(nickname)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+
 		// Check if nickname already exists (only if user provided one)
 		existingUser, err = h.userService.GetUserByNickname(nickname)
 		if err == nil && existingUser != nil {
@@ -249,6 +256,8 @@ func validatePassword(password string) error {
 	lower := regexp.MustCompile(`[a-z]`)
 	number := regexp.MustCompile(`[0-9]`)
 	space := regexp.MustCompile(`\s`)
+	// Allow only ASCII printable characters (excluding space, but including common symbols)
+	allowedChars := regexp.MustCompile(`^[a-zA-Z0-9!@#$%^&*()_+\-=\[\]{};':"\\|,.<>/?` + "`" + `~]+$`)
 	var errMessages []string
 
 	if len(password) < 8 || len(password) > 32 {
@@ -271,12 +280,42 @@ func validatePassword(password string) error {
 		errMessages = append(errMessages, "not contain spaces")
 	}
 
+	if !allowedChars.MatchString(password) {
+		errMessages = append(errMessages, "only contain English letters, numbers, and common symbols (no emojis or special characters)")
+	}
+
 	log.Println("Password validation errors:", errMessages)
 
 	if len(errMessages) > 0 {
 		return errors.New("Password must " + joinWithCommas(errMessages))
 	}
 
+	return nil
+}
+
+func validateNickname(nickname string) error {
+	if nickname == "" {
+		return nil // nickname is optional
+	}
+	
+	// Allow only English letters (a-z, A-Z), numbers (0-9), underscore (_), hyphen (-), and dot (.)
+	allowedChars := regexp.MustCompile(`^[a-zA-Z0-9._-]+$`)
+	if !allowedChars.MatchString(nickname) {
+		return errors.New("Nickname can only contain English letters, numbers, underscore (_), hyphen (-), and dot (.)")
+	}
+	
+	// Must start with a letter or number (not special characters)
+	startsWithAlphanumeric := regexp.MustCompile(`^[a-zA-Z0-9]`)
+	if !startsWithAlphanumeric.MatchString(nickname) {
+		return errors.New("Nickname must start with a letter or number")
+	}
+	
+	// Must end with a letter or number (not special characters)
+	endsWithAlphanumeric := regexp.MustCompile(`[a-zA-Z0-9]$`)
+	if !endsWithAlphanumeric.MatchString(nickname) {
+		return errors.New("Nickname must end with a letter or number")
+	}
+	
 	return nil
 }
 

@@ -375,6 +375,47 @@ export interface PostsResponse {
   posts: APIPost[];
 }
 
+// Poll interfaces
+export interface PollOption {
+  id: number;
+  option_text: string;
+  option_order: number;
+  vote_count: number;
+  percentage: number;
+  voters: string[];
+}
+
+export interface PollResponse {
+  id: number;
+  user_id: number;
+  group_id?: number;
+  title: string;
+  description?: string;
+  allow_multiple_choices: boolean;
+  expires_at?: string;
+  created_at: string;
+  updated_at: string;
+  creator: User;
+  options: PollOption[];
+  total_votes: number;
+  user_voted: boolean;
+  user_votes: number[]; // Option IDs user voted for
+  is_expired: boolean;
+}
+
+export interface CreatePollRequest {
+  group_id?: number;
+  title: string;
+  description?: string;
+  options: string[];
+  allow_multiple_choices: boolean;
+  expires_at?: string;
+}
+
+export interface VotePollRequest {
+  option_ids: number[];
+}
+
 // Error types
 export interface APIError {
   error: string;
@@ -859,6 +900,39 @@ export class ApiClient {
   async getEventResponses(eventId: number): Promise<{ responses: { going: EventResponseDetail[], not_going: EventResponseDetail[] }, counts: { going: number, not_going: number, total: number } }> {
     return this.request<{ responses: { going: EventResponseDetail[], not_going: EventResponseDetail[] }, counts: { going: number, not_going: number, total: number } }>(`/api/events/${eventId}/responses`, {
       method: 'GET',
+    });
+  }
+
+  // Poll endpoints
+  async createPoll(data: CreatePollRequest): Promise<PollResponse> {
+    return this.request<PollResponse>('/api/polls', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async getPoll(pollId: number): Promise<PollResponse> {
+    return this.request<PollResponse>(`/api/polls/${pollId}`, {
+      method: 'GET',
+    });
+  }
+
+  async getGroupPolls(groupId: number, limit: number = 20, offset: number = 0): Promise<PollResponse[]> {
+    return this.request<PollResponse[]>(`/api/groups/${groupId}/polls?limit=${limit}&offset=${offset}`, {
+      method: 'GET',
+    });
+  }
+
+  async votePoll(pollId: number, optionIds: number[]): Promise<PollResponse> {
+    return this.request<PollResponse>(`/api/polls/${pollId}/vote`, {
+      method: 'POST',
+      body: JSON.stringify({ option_ids: optionIds }),
+    });
+  }
+
+  async unvotePoll(pollId: number): Promise<PollResponse> {
+    return this.request<PollResponse>(`/api/polls/${pollId}/vote`, {
+      method: 'DELETE',
     });
   }
 

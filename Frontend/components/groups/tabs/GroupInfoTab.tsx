@@ -93,7 +93,9 @@ const GroupInfoTab: React.FC<GroupInfoTabProps> = ({ groupId }) => {
 
   const getUserStatus = (userId: number) => {
     const onlineUser = onlineUsers.find(ou => ou.user_id === userId)
-    return onlineUser ? onlineUser.status : 'offline'
+    // Normalize to lowercase and fallback: if it's the current user and WS is connected, show online
+    const raw = onlineUser?.status ?? ((userId === user?.id && isConnected) ? 'online' : 'offline')
+    return String(raw).toLowerCase() as 'online' | 'busy' | 'away' | 'invisible' | 'offline'
   }
 
   const handleMemberClick = (memberId: number) => {
@@ -294,7 +296,7 @@ const GroupInfoTab: React.FC<GroupInfoTabProps> = ({ groupId }) => {
                         </div>
                       )}
                       
-                      {/* Status Indicator */}
+                      {/* Status Indicator (show for all, including current user) */}
                       {isConnected && (
                         <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-white/20 ${
                           userStatus === 'online' ? 'bg-green-500' :

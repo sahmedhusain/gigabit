@@ -172,18 +172,12 @@ const GroupPostsTab: React.FC<GroupPostsTabProps> = ({ groupId }) => {
                       {post.user.first_name[0]}{post.user.last_name[0]}
                     </div>
                   )}
-                  {post.user.status === 'online' && (
-                    <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-green-400 border-2 border-white/20 rounded-full"></div>
-                  )}
                 </div>
                 <div className="flex-1">
                   <div className="flex items-center space-x-2">
                     <h4 className="font-semibold text-white group-hover:text-emerald-400 transition-colors">
                       {post.user.first_name} {post.user.last_name}
                     </h4>
-                    {post.user.status === 'online' && (
-                      <span className="text-green-400 text-xs">• Online</span>
-                    )}
                   </div>
                   <p className="text-white/60 text-sm">{formatTime(post.created_at)}</p>
                 </div>

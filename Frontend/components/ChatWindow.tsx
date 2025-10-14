@@ -709,9 +709,8 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
               {tab === 'posts' && <FileText className="w-4 h-4" />}
               {tab === 'events' && <Calendar className="w-4 h-4" />}
               {tab === 'polls' && <BarChart3 className="w-4 h-4" />}
-              {tab === 'members' && <Users className="w-4 h-4" />}
               {tab === 'settings' && <Settings className="w-4 h-4" />}
-              <span className="capitalize">{tab === 'settings' ? 'Settings' : tab === 'members' ? 'Members' : tab}</span>
+              <span className="capitalize">{tab === 'settings' ? 'Settings' : tab}</span>
             </motion.button>
           ))}
         </div>

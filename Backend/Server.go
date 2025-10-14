@@ -108,6 +108,7 @@ func (s *Server) setupRoutes() {
 	messageHandler := handlers.NewMessageHandler(s.DB.GetDB(), s.Hub)
 	notificationHandler := handlers.NewNotificationHandler(s.DB.GetDB(), s.Hub)
 	bookmarkHandler := handlers.NewBookmarkHandler(s.DB.GetDB(), s.Hub)
+	pollHandler := handlers.NewPollHandler(s.DB.GetDB())
 	wsHandler := handlers.NewWebSocketHandler(s.Hub)
 	chatHandler := handlers.NewChatHandler(s.DB.GetDB())
 	conversationHandler := handlers.NewConversationHandler(s.DB.GetDB())
@@ -162,7 +163,7 @@ func (s *Server) setupRoutes() {
 
 	// Group routes
 	s.router.HandleFunc("/api/groups", s.handleGroupsRoute(groupHandler))
-	s.router.HandleFunc("/api/groups/", s.handleGroupRoute(groupHandler, eventHandler))
+	s.router.HandleFunc("/api/groups/", s.handleGroupRoute(groupHandler, eventHandler, pollHandler))
 	s.router.HandleFunc("/api/groups/invitations", s.handleRoute(groupHandler.GetUserInvitations, true))
 	s.router.HandleFunc("/api/follow/requests", s.handleRoute(followHandler.GetFollowRequests, true))
 
@@ -187,6 +188,10 @@ func (s *Server) setupRoutes() {
 
 	// Upload routes
 	s.router.HandleFunc("/api/uploads", s.handleRoute(uploadHandler.UploadImage, true))
+
+	// Poll routes
+	s.router.HandleFunc("/api/polls", s.handlePollsRoute(pollHandler))
+	s.router.HandleFunc("/api/polls/", s.handlePollRoute(pollHandler))
 
 	// Dev-only debug routes (enable by setting ENABLE_DEBUG=1 in environment)
 	if os.Getenv("ENABLE_DEBUG") == "1" {
@@ -495,7 +500,7 @@ func (s *Server) handleGroupsRoute(handler *handlers.GroupHandler) http.HandlerF
 	}
 }
 
-func (s *Server) handleGroupRoute(groupHandler *handlers.GroupHandler, eventHandler *handlers.EventHandler) http.HandlerFunc {
+func (s *Server) handleGroupRoute(groupHandler *handlers.GroupHandler, eventHandler *handlers.EventHandler, pollHandler *handlers.PollHandler) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		path := strings.TrimPrefix(r.URL.Path, "/api/groups/")
 		parts := strings.Split(path, "/")
@@ -713,6 +718,20 @@ func (s *Server) handleGroupRoute(groupHandler *handlers.GroupHandler, eventHand
 						writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
 					}
 				}
+			case "polls":
+				// Handle group polls: /api/groups/{groupID}/polls
+				if r.Method != http.MethodGet {
+					writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
+					return
+				}
+				authMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					userID, ok := middleware.GetUserID(r)
+					if !ok {
+						writeError(w, http.StatusUnauthorized, "Unauthorized")
+						return
+					}
+					pollHandler.GetGroupPolls(w, r, userID)
+				})).ServeHTTP(w, r)
 			default:
 				writeError(w, http.StatusNotFound, "Route not found")
 			}
@@ -991,5 +1010,75 @@ func (s *Server) handleChatsRoute(chatHandler *handlers.ChatHandler, messageHand
 				writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
 			}
 		})).ServeHTTP(w, r)
+	}
+}
+
+// handlePollsRoute handles /api/polls (POST - create poll)
+func (s *Server) handlePollsRoute(handler *handlers.PollHandler) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		authMiddleware := middleware.AuthMiddleware(s.DB.GetDB())
+
+		if r.Method == http.MethodPost {
+			authMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				userID, ok := middleware.GetUserID(r)
+				if !ok {
+					writeError(w, http.StatusUnauthorized, "Unauthorized")
+					return
+				}
+				handler.CreatePoll(w, r, userID)
+			})).ServeHTTP(w, r)
+		} else {
+			writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
+		}
+	}
+}
+
+// handlePollRoute handles /api/polls/{id} and /api/polls/{id}/vote
+func (s *Server) handlePollRoute(handler *handlers.PollHandler) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		path := strings.TrimPrefix(r.URL.Path, "/api/polls/")
+		parts := strings.Split(path, "/")
+
+		if len(parts) == 0 || parts[0] == "" {
+			writeError(w, http.StatusNotFound, "Poll ID required")
+			return
+		}
+
+		authMiddleware := middleware.AuthMiddleware(s.DB.GetDB())
+
+		if len(parts) == 1 {
+			// GET /api/polls/{id} - Get single poll
+			if r.Method == http.MethodGet {
+				authMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					userID, ok := middleware.GetUserID(r)
+					if !ok {
+						writeError(w, http.StatusUnauthorized, "Unauthorized")
+						return
+					}
+					handler.GetPoll(w, r, userID)
+				})).ServeHTTP(w, r)
+			} else {
+				writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
+			}
+		} else if len(parts) == 2 && parts[1] == "vote" {
+			// POST /api/polls/{id}/vote - Vote on poll
+			// DELETE /api/polls/{id}/vote - Unvote from poll
+			authMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				userID, ok := middleware.GetUserID(r)
+				if !ok {
+					writeError(w, http.StatusUnauthorized, "Unauthorized")
+					return
+				}
+				if r.Method == http.MethodPost {
+					handler.VotePoll(w, r, userID)
+				} else if r.Method == http.MethodDelete {
+					handler.UnvotePoll(w, r, userID)
+				} else {
+					writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
+				}
+			})).ServeHTTP(w, r)
+		} else {
+			writeError(w, http.StatusNotFound, "Route not found")
+		}
 	}
 }

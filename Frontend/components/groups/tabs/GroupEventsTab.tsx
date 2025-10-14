@@ -21,6 +21,7 @@ const GroupEventsTab: React.FC<GroupEventsTabProps> = ({ groupId }) => {
     event_time: ''
   })
   const [isCreating, setIsCreating] = useState(false)
+  const [isAdminOrCreator, setIsAdminOrCreator] = useState<boolean>(false)
   const { isConnected } = useConnectionStatus()
   const { success, error: showError } = useToast()
   const {
@@ -36,6 +37,22 @@ const GroupEventsTab: React.FC<GroupEventsTabProps> = ({ groupId }) => {
     }
     setIsLoading(rtEventsLoading)
   }, [realtimeEvents, rtEventsLoading])
+
+  // Fetch role to determine if user can create events
+  useEffect(() => {
+    let mounted = true
+    const fetchRole = async () => {
+      try {
+        const roleInfo = await api.getUserRole(groupId)
+        if (mounted) setIsAdminOrCreator(!!roleInfo.is_admin_or_creator)
+      } catch (_err) {
+        // Non-critical; default to false
+        if (mounted) setIsAdminOrCreator(false)
+      }
+    }
+    fetchRole()
+    return () => { mounted = false }
+  }, [groupId])
 
   // Handle event response
   const handleEventResponse = async (eventId: number, response: 'going' | 'not_going') => {
@@ -53,17 +70,49 @@ const GroupEventsTab: React.FC<GroupEventsTabProps> = ({ groupId }) => {
   const handleCreateEvent = async () => {
     if (!newEvent.title.trim() || !newEvent.description.trim() || !newEvent.event_time || isCreating) return
 
+    // Permission guard client-side
+    if (!isAdminOrCreator) {
+      showError('Only group admins and creators can create events')
+      return
+    }
+
     try {
       setIsCreating(true)
-      console.log('Creating event for group:', groupId, 'data:', newEvent)
-      const createdEvent = await api.createEvent(groupId, newEvent)
+      // Normalize datetime-local string (YYYY-MM-DDTHH:MM) to RFC3339
+      const isoEventTime = (() => {
+        try {
+          const d = new Date(newEvent.event_time)
+          if (isNaN(d.getTime())) throw new Error('Invalid date')
+          return d.toISOString()
+        } catch {
+          // Fallback: append seconds and Z assuming local time
+          return newEvent.event_time.length === 16
+            ? new Date(newEvent.event_time.replace('T', 'T') + ':00').toISOString()
+            : new Date().toISOString()
+        }
+      })()
+
+      const payload = { ...newEvent, event_time: isoEventTime }
+
+      console.log('Creating event for group:', groupId, 'payload:', payload)
+      const createdEvent = await api.createEvent(groupId, payload)
       console.log('Created event:', createdEvent)
-      setEvents([createdEvent.event, ...events])
+      // Prefer refetch to get enriched event with creator/group fields
+      try {
+        await refetchEvents()
+      } catch (_e) {
+        // Fallback to optimistic add if refetch fails
+        setEvents([createdEvent.event as unknown as EventResponse, ...events])
+      }
       setNewEvent({ title: '', description: '', location: '', event_time: '' })
       setShowCreateModal(false)
     } catch (error) {
       console.error('Failed to create event:', error)
-      alert('Failed to create event. Please try again.')
+      // Try to surface a meaningful message
+      const message = (error && typeof error === 'object' && 'message' in (error as any))
+        ? String((error as any).message)
+        : 'Failed to create event. Please try again.'
+      showError(message)
     } finally {
       setIsCreating(false)
     }
@@ -104,15 +153,21 @@ const GroupEventsTab: React.FC<GroupEventsTabProps> = ({ groupId }) => {
       <div className="p-6 border-b border-white/10">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between space-y-3 sm:space-y-0">
           <h2 className="text-xl font-bold text-white">Group Events</h2>
-          <motion.button
-            onClick={() => setShowCreateModal(true)}
-            className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-emerald-500 to-teal-600 rounded-xl text-white hover:from-emerald-600 hover:to-teal-700 transition-all duration-200 shadow-lg w-full sm:w-auto justify-center"
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-          >
-            <Plus className="w-4 h-4" />
-            <span className="font-medium">Create Event</span>
-          </motion.button>
+          {isAdminOrCreator ? (
+            <motion.button
+              onClick={() => setShowCreateModal(true)}
+              className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-emerald-500 to-teal-600 rounded-xl text-white hover:from-emerald-600 hover:to-teal-700 transition-all duration-200 shadow-lg w-full sm:w-auto justify-center"
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+            >
+              <Plus className="w-4 h-4" />
+              <span className="font-medium">Create Event</span>
+            </motion.button>
+          ) : (
+            <div className="text-white/60 text-sm bg-white/5 border border-white/10 rounded-xl px-3 py-2">
+              Only admins and creators can create events
+            </div>
+          )}
         </div>
       </div>
 

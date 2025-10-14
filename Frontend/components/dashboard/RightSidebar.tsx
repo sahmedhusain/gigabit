@@ -39,17 +39,29 @@ interface User {
   status?: string
 }
 
+// interface FollowRequest {
+//   id: number
+//   requester?: {
+//     id: number
+//     first_name?: string
+//     last_name?: string
+//     nickname?: string
+//     username?: string
+//     avatar?: string
+//   }
+//   created_at: string
+// }
+
 interface FollowRequest {
-  id: number
-  requester?: {
+  request_id: number
+  user: {
     id: number
     first_name?: string
     last_name?: string
-    nickname?: string
-    username?: string
     avatar?: string
+    nickname?: string
   }
-  created_at: string
+  requested_at: string
 }
 
 interface GroupInvitation {
@@ -1190,7 +1202,6 @@ export default function RightSidebar({
                     </span>
                   </div>
                 )}
-                {/* Chevrons removed */}
               </div>
             </div>
 
@@ -1207,18 +1218,20 @@ export default function RightSidebar({
                       <>
                         {/* Follow Requests */}
                         {followRequests.map((request) => (
+                          console.log("Request:", request),
+                          console.log("Requester:", request.user?.avatar),
                           <div
-                            key={`follow-${request.id}`}
+                            key={`follow-${request.request_id}`}
                             className="bg-white/5 rounded-xl p-3 border border-white/10 hover:bg-white/10 transition-all duration-300 group"
                           >
                             <div className="flex items-start space-x-3">
                               <div className="relative flex-shrink-0">
                                 <Image
-                                  src={request.requester?.avatar || '/default-avatar.png'}
-                                  alt={request.requester?.first_name + ' ' + request.requester?.last_name}
+                                  src={request.user?.avatar || '/default-avatar.png'}
+                                  alt={request.user?.first_name + ' ' + request.user?.last_name}
                                   width={40}
                                   height={40}
-                                  unoptimized={(request.requester?.avatar || '/default-avatar.png').includes('/svg')}
+                                  unoptimized={(request.user?.avatar || '/default-avatar.png').includes('/svg')}
                                   className="w-10 h-10 rounded-full border-2 border-orange-400/50 group-hover:border-orange-400 transition-colors"
                                 />
                                 <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-orange-500 rounded-full border-2 border-white flex items-center justify-center">
@@ -1230,14 +1243,14 @@ export default function RightSidebar({
                                 <div className="flex items-start justify-between mb-1">
                                   <div>
                                     <p className="text-sm font-semibold text-white truncate">
-                                      {request.requester?.first_name} {request.requester?.last_name}
+                                      {request.user?.first_name} {request.user?.last_name}
                                     </p>
                                     <p className="text-xs text-white/60 truncate">
-                                      @{request.requester?.nickname || request.requester?.username}
+                                      @{request.user?.nickname || request.user?.nickname}
                                     </p>
                                   </div>
                                   <span className="text-xs text-white/50 ml-2 flex-shrink-0">
-                                    {new Date(request.created_at).toLocaleDateString()}
+                                    {new Date(request.requested_at).toLocaleDateString()}
                                   </span>
                                 </div>
 
@@ -1250,9 +1263,9 @@ export default function RightSidebar({
                                     onClick={async (e) => {
                                       e.stopPropagation();
                                       try {
-                                        if (!request.requester?.id) return;
-                                        await api.respondToFollowRequest(request.requester.id, 'accept');
-                                        setFollowRequests(prev => prev.filter(r => r.id !== request.id));
+                                        if (!request.user?.id) return;
+                                        await api.respondToFollowRequest(request.user.id, 'accept');
+                                        setFollowRequests(prev => prev.filter(r => r.request_id !== request.request_id));
                                         success('Follow request accepted');
                                       } catch (err) {
                                         console.error('Failed to accept follow request:', err);
@@ -1268,9 +1281,9 @@ export default function RightSidebar({
                                     onClick={async (e) => {
                                       e.stopPropagation();
                                       try {
-                                        if (!request.requester?.id) return;
-                                        await api.respondToFollowRequest(request.requester.id, 'decline');
-                                        setFollowRequests(prev => prev.filter(r => r.id !== request.id));
+                                        if (!request.user?.id) return;
+                                        await api.respondToFollowRequest(request.user.id, 'decline');
+                                        setFollowRequests(prev => prev.filter(r => r.request_id !== request.request_id));
                                         success('Follow request declined');
                                       } catch (err) {
                                         console.error('Failed to decline follow request:', err);

@@ -70,7 +70,7 @@ function ActivityFilterPage() {
           postsArr = Array.isArray(response?.posts) ? response.posts : []
           break
         case 'commented':
-          // Fetch posts commented by the user
+          // Fetch posts commented on by the user
           response = await api.getUserCommentedPosts()
           postsArr = Array.isArray(response?.posts) ? response.posts : []
           break
@@ -100,6 +100,7 @@ function ActivityFilterPage() {
         return {
           id: post.id,
           user: {
+            id: post.user.id || ('user_id' in post ? post.user_id : 0),
             name: `${post.user.first_name} ${post.user.last_name}`,
             username: post.user.nickname || post.user.email.split('@')[0],
             avatar: post.user.avatar

@@ -133,12 +133,12 @@ func (h *UserHandler) GetAllUsers(w http.ResponseWriter, r *http.Request) {
 
 	// Get all users except the current user
 	query := `
-SELECT id, email, first_name, last_name, avatar, nickname
-FROM users 
-WHERE id != ? 
-ORDER BY first_name, last_name
-LIMIT 50
-`
+		SELECT id, email, first_name, last_name, avatar, nickname
+		FROM users 
+		WHERE id != ? 
+		ORDER BY first_name, last_name
+		LIMIT 50
+		`
 
 	rows, err := h.db.Query(query, userID)
 	if err != nil {

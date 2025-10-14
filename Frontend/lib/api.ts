@@ -67,10 +67,15 @@ export interface MessageItem {
 }
 
 export interface FollowRequestItem {
-  id: number;
-  from_user: User;
-  status: string;
-  created_at: string;
+  request_id: number;
+  user: {
+    id: number;
+    first_name?: string;
+    last_name?: string;
+    avatar?: string;
+    nickname?: string;
+  };
+  requested_at: string;
   [key: string]: unknown;
 }
 

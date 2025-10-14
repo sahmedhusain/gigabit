@@ -72,6 +72,8 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
   const [showEmojiPicker, setShowEmojiPicker] = useState(false)
   const [activeTab, setActiveTab] = useState('chat') // New state for active tab
   const [groupData, setGroupData] = useState<any>(null) // Store group data including user role
+  const [groupMembers, setGroupMembers] = useState<any[]>([])
+  const [isLoadingMembers, setIsLoadingMembers] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const messagesContainerRef = useRef<HTMLDivElement>(null)
   const [participantData, setParticipantData] = useState<User | null>(null)
@@ -201,6 +203,24 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
     }
   }, [effectiveChatType, groupId])
 
+  // Fetch group members for online count calculation
+  useEffect(() => {
+    if (effectiveChatType === 'group' && groupId) {
+      const fetchGroupMembers = async () => {
+        setIsLoadingMembers(true)
+        try {
+          const members = await api.getGroupMembers(groupId)
+          setGroupMembers(members.members)
+        } catch (error) {
+          console.error('Failed to fetch group members:', error)
+        } finally {
+          setIsLoadingMembers(false)
+        }
+      }
+      fetchGroupMembers()
+    }
+  }, [effectiveChatType, groupId])
+
   // Function to load previous messages when button is clicked
   const handleLoadPreviousMessages = React.useCallback(async () => {
     if (conversationId && conversationType && hasMoreMessages.get(conversationId) && !isLoadingMore.get(conversationId)) {
@@ -292,6 +312,16 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
   const handleEmojiClick = (emojiData: EmojiData) => {
     setNewMessage(prev => prev + emojiData.emoji)
     setShowEmojiPicker(false)
+  }
+
+  // Calculate online group members (excluding current user)
+  const getOnlineGroupMembersCount = () => {
+    if (!groupMembers.length || !onlineUsers.length) return 0
+    return onlineUsers.filter(onlineUser => 
+      onlineUser.user_id !== user?.id && // Exclude current user
+      groupMembers.some(member => member.user.id === onlineUser.user_id) && // Must be a group member
+      (onlineUser.status === 'online' || onlineUser.status === 'busy' || onlineUser.status === 'away') // Must be online
+    ).length
   }
 
   const getParticipantStatus = (): string => {
@@ -597,25 +627,39 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
                 #
               </motion.div>
               <div className="flex-1 min-w-0">
-                <motion.h1 
-                  className="text-2xl font-bold bg-gradient-to-r from-white to-white/80 bg-clip-text text-transparent leading-tight cursor-pointer hover:from-emerald-200 hover:to-white/90 transition-all duration-200"
-                  onClick={() => setActiveTab('info')}
-                  whileHover={{ scale: 1.02 }}
-                  title="View group info"
-                >
-                  {participantName}
-                </motion.h1>
-                <div className="flex items-center space-x-3 mt-2">
-                  {/* Online users count */}
-                  {onlineUsers.length > 0 && (
-                    <div className="flex items-center space-x-2 px-3 py-1 rounded-full bg-green-500/20 border-green-400/30 text-green-300 border">
-                      <div className="w-2 h-2 rounded-full bg-green-400 shadow-green-400/50 shadow-lg animate-pulse" />
-                      <span className="text-xs font-semibold">{onlineUsers.length} online</span>
+                <div className="flex items-center space-x-3">
+                  <motion.h1 
+                    className="text-2xl font-bold bg-gradient-to-r from-white to-white/80 bg-clip-text text-transparent leading-tight cursor-pointer hover:from-emerald-200 hover:to-white/90 transition-all duration-200"
+                    onClick={() => setActiveTab('info')}
+                    whileHover={{ scale: 1.02 }}
+                    title="View group info"
+                  >
+                    {participantName}
+                  </motion.h1>
+                  {/* Online users count - inline and smaller */}
+                  {getOnlineGroupMembersCount() > 0 && (
+                    <div className="flex items-center space-x-1 px-2 py-0.5 rounded-full bg-green-500/20 border-green-400/30 text-green-300 border">
+                      <div className="w-1.5 h-1.5 rounded-full bg-green-400 shadow-green-400/50 shadow-lg animate-pulse" />
+                      <span className="text-xs font-medium">{getOnlineGroupMembersCount()}</span>
                     </div>
                   )}
-                  
-                  {/* Typing indicators */}
-                  {typingUsers.length > 0 && (
+                </div>
+                {/* Group description */}
+                {groupData?.description && (
+                  <motion.p 
+                    className="text-sm text-white/60 mt-1 leading-relaxed cursor-pointer hover:text-white/80 transition-colors duration-200"
+                    onClick={() => setActiveTab('info')}
+                    title="View group info"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: 0.3 }}
+                  >
+                    {groupData.description}
+                  </motion.p>
+                )}
+                {/* Typing indicators */}
+                {typingUsers.length > 0 && (
+                  <div className="flex items-center space-x-2 mt-2">
                     <div className="flex items-center space-x-2 px-3 py-1 rounded-full bg-blue-500/20 border-blue-400/30 text-blue-300 border">
                       <div className="flex space-x-1">
                         <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-bounce [animation-delay:0ms]" />
@@ -629,8 +673,8 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
                         }
                       </span>
                     </div>
-                  )}
-                </div>
+                  </div>
+                )}
               </div>
             </div>
             {onClose && (

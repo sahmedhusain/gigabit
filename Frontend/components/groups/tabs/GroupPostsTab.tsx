@@ -1,6 +1,6 @@
 'use client'
 import React, { useState, useEffect } from 'react'
-import { Plus, Heart, MessageCircle, Share2 } from 'lucide-react'
+import { Plus, Heart, ThumbsDown, X } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useAuth } from '@/context/AuthContext'
 import { api, PostResponse } from '@/lib/api'
@@ -66,12 +66,13 @@ const GroupPostsTab: React.FC<GroupPostsTabProps> = ({ groupId }) => {
     try {
       setIsCreating(true)
       console.log('Creating post for group:', groupId, 'content:', newPostContent)
-      const newPost = await api.createGroupPost(groupId, {
+        await api.createGroupPost(groupId, {
         content: newPostContent,
         image_url: ''
       })
-      console.log('Created post:', newPost)
-      setPosts([newPost, ...posts])
+        // Refetch posts to get complete data with user info
+        const response = await api.getGroupPosts(groupId)
+        setPosts(response.posts || [])
       setNewPostContent('')
       setShowCreateModal(false)
     } catch (error) {
@@ -146,7 +147,7 @@ const GroupPostsTab: React.FC<GroupPostsTabProps> = ({ groupId }) => {
             </div>
           </motion.div>
         ) : (
-          posts.map((post, index) => (
+            posts.filter(post => post.user).map((post, index) => (
             <motion.div
               key={post.id}
               className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-2xl p-6 hover:bg-white/15 transition-all duration-200"
@@ -155,22 +156,35 @@ const GroupPostsTab: React.FC<GroupPostsTabProps> = ({ groupId }) => {
               transition={{ delay: index * 0.1 }}
             >
               {/* Post Header */}
-              <div className="flex items-start space-x-3 mb-4">
-                {post.user.avatar ? (
-                  <img
-                    src={post.user.avatar}
-                    alt={`${post.user.first_name} ${post.user.last_name}`}
-                    className="w-10 h-10 rounded-full object-cover"
-                  />
-                ) : (
-                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center text-white font-semibold">
-                    {post.user.first_name[0]}{post.user.last_name[0]}
-                  </div>
-                )}
+              <div 
+                className="flex items-start space-x-3 mb-4 cursor-pointer group"
+                onClick={() => window.location.href = `/profile/${post.user.id}`}
+              >
+                <div className="relative">
+                  {post.user.avatar ? (
+                    <img
+                      src={post.user.avatar}
+                      alt={`${post.user.first_name} ${post.user.last_name}`}
+                      className="w-10 h-10 rounded-full object-cover ring-2 ring-transparent group-hover:ring-emerald-400 transition-all"
+                    />
+                  ) : (
+                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center text-white font-semibold ring-2 ring-transparent group-hover:ring-emerald-400 transition-all">
+                      {post.user.first_name[0]}{post.user.last_name[0]}
+                    </div>
+                  )}
+                  {post.user.status === 'online' && (
+                    <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-green-400 border-2 border-white/20 rounded-full"></div>
+                  )}
+                </div>
                 <div className="flex-1">
-                  <h4 className="font-semibold text-white">
-                    {post.user.first_name} {post.user.last_name}
-                  </h4>
+                  <div className="flex items-center space-x-2">
+                    <h4 className="font-semibold text-white group-hover:text-emerald-400 transition-colors">
+                      {post.user.first_name} {post.user.last_name}
+                    </h4>
+                    {post.user.status === 'online' && (
+                      <span className="text-green-400 text-xs">• Online</span>
+                    )}
+                  </div>
                   <p className="text-white/60 text-sm">{formatTime(post.created_at)}</p>
                 </div>
               </div>
@@ -189,10 +203,35 @@ const GroupPostsTab: React.FC<GroupPostsTabProps> = ({ groupId }) => {
 
               {/* Post Actions */}
               <div className="flex items-center space-x-6 pt-3 border-t border-white/10">
+                {/* Like Button */}
                 <motion.button
+                  onClick={async (e) => {
+                    e.stopPropagation()
+                    try {
+                      if (post.is_liked) {
+                        await api.unlikePost(post.id)
+                      } else {
+                        await api.likePost(post.id)
+                      }
+                      // Update the post in the local state
+                      setPosts(posts.map(p => 
+                        p.id === post.id 
+                          ? { 
+                              ...p, 
+                              is_liked: !p.is_liked,
+                              is_disliked: false, // Remove dislike if exists
+                              like_count: p.is_liked ? p.like_count - 1 : p.like_count + 1,
+                              dislike_count: p.is_disliked ? p.dislike_count - 1 : p.dislike_count
+                            }
+                          : p
+                      ))
+                    } catch (error) {
+                      console.error('Failed to toggle like:', error)
+                    }
+                  }}
                   className={`flex items-center space-x-2 px-3 py-2 rounded-lg transition-all duration-200 ${
                     post.is_liked
-                      ? 'text-red-400 bg-red-500/20'
+                      ? 'text-emerald-400 bg-emerald-500/20'
                       : 'text-white/60 hover:text-white hover:bg-white/10'
                   }`}
                   whileHover={{ scale: 1.05 }}
@@ -202,21 +241,42 @@ const GroupPostsTab: React.FC<GroupPostsTabProps> = ({ groupId }) => {
                   <span className="text-sm">{post.like_count}</span>
                 </motion.button>
 
+                {/* Dislike Button */}
                 <motion.button
-                  className="flex items-center space-x-2 px-3 py-2 rounded-lg text-white/60 hover:text-white hover:bg-white/10 transition-all duration-200"
+                  onClick={async (e) => {
+                    e.stopPropagation()
+                    try {
+                      if (post.is_disliked) {
+                        await api.undislikePost(post.id)
+                      } else {
+                        await api.dislikePost(post.id)
+                      }
+                      // Update the post in the local state
+                      setPosts(posts.map(p => 
+                        p.id === post.id 
+                          ? { 
+                              ...p, 
+                              is_disliked: !p.is_disliked,
+                              is_liked: false, // Remove like if exists
+                              dislike_count: p.is_disliked ? p.dislike_count - 1 : p.dislike_count + 1,
+                              like_count: p.is_liked ? p.like_count - 1 : p.like_count
+                            }
+                          : p
+                      ))
+                    } catch (error) {
+                      console.error('Failed to toggle dislike:', error)
+                    }
+                  }}
+                  className={`flex items-center space-x-2 px-3 py-2 rounded-lg transition-all duration-200 ${
+                    post.is_disliked
+                      ? 'text-red-400 bg-red-500/20'
+                      : 'text-white/60 hover:text-white hover:bg-white/10'
+                  }`}
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
                 >
-                  <MessageCircle className="w-4 h-4" />
-                  <span className="text-sm">{post.comment_count}</span>
-                </motion.button>
-
-                <motion.button
-                  className="flex items-center space-x-2 px-3 py-2 rounded-lg text-white/60 hover:text-white hover:bg-white/10 transition-all duration-200"
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                >
-                  <Share2 className="w-4 h-4" />
+                  <ThumbsDown className={`w-4 h-4 ${post.is_disliked ? 'fill-current' : ''}`} />
+                  <span className="text-sm">{post.dislike_count}</span>
                 </motion.button>
               </div>
             </motion.div>
@@ -228,47 +288,101 @@ const GroupPostsTab: React.FC<GroupPostsTabProps> = ({ groupId }) => {
       <AnimatePresence>
         {showCreateModal && (
           <motion.div
-            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+            className="fixed inset-0 bg-black/60 backdrop-blur-md z-50 flex items-center justify-center py-8 px-4"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={() => setShowCreateModal(false)}
           >
             <motion.div
-              className="bg-gradient-to-br from-white/20 to-white/10 backdrop-blur-xl border border-white/30 rounded-2xl p-6 w-full max-w-md"
+              className="relative w-full max-w-2xl h-[80vh] max-h-[600px] flex flex-col"
               initial={{ scale: 0.9, y: 20 }}
               animate={{ scale: 1, y: 0 }}
               exit={{ scale: 0.9, y: 20 }}
               onClick={(e) => e.stopPropagation()}
             >
-              <h3 className="text-xl font-bold text-white mb-4">Create New Post</h3>
-              
-              <textarea
-                value={newPostContent}
-                onChange={(e) => setNewPostContent(e.target.value)}
-                placeholder="What's on your mind?"
-                className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white placeholder-white/60 focus:outline-none focus:ring-2 focus:ring-emerald-400/60 resize-none min-h-[120px] mb-4"
-                rows={4}
-              />
+              {/* Enhanced backdrop with multiple layers */}
+              <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/20 via-teal-500/10 to-cyan-500/20 backdrop-blur-2xl rounded-3xl border border-white/30 shadow-2xl"></div>
+              <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent rounded-3xl"></div>
 
-              <div className="flex items-center justify-end space-x-3">
-                <motion.button
-                  onClick={() => setShowCreateModal(false)}
-                  className="px-4 py-2 text-white/70 hover:text-white transition-colors duration-200"
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                >
-                  Cancel
-                </motion.button>
-                <motion.button
-                  onClick={handleCreatePost}
-                  disabled={!newPostContent.trim() || isCreating}
-                  className="px-6 py-2 bg-gradient-to-r from-emerald-500 to-teal-500 rounded-xl text-white hover:from-emerald-600 hover:to-teal-600 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                >
-                  {isCreating ? 'Creating...' : 'Create Post'}
-                </motion.button>
+              {/* Fixed Header */}
+              <div className="relative flex-shrink-0 p-6 lg:p-8 pb-4">
+                <div className="flex items-center justify-between mb-8">
+                  <div className="flex items-center space-x-4">
+                    <div className="relative">
+                      <div className="w-12 h-12 bg-gradient-to-br from-emerald-400 via-teal-500 to-cyan-600 rounded-2xl flex items-center justify-center shadow-lg">
+                        <Plus className="w-6 h-6 text-white drop-shadow-sm" />
+                      </div>
+                      <div className="absolute -top-1 -right-1 w-4 h-4 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-full animate-pulse"></div>
+                    </div>
+                    <div>
+                      <h3 className="text-xl lg:text-2xl font-bold text-white mb-1">Create Group Post</h3>
+                      <p className="text-white/60 text-sm">Share your thoughts with the group</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setShowCreateModal(false)}
+                    className="group p-3 text-white/70 hover:text-white hover:bg-white/10 rounded-2xl transition-all duration-300 hover:scale-105"
+                    title="Close"
+                  >
+                    <X className="w-5 h-5 group-hover:rotate-90 transition-transform duration-300" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Scrollable Content Area */}
+              <div className="relative flex-1 overflow-y-auto px-6 lg:px-8">
+                <div className="space-y-6">
+                  {/* Post Content */}
+                  <div className="space-y-3">
+                    <label className="text-white font-semibold text-sm lg:text-base flex items-center space-x-2">
+                      <div className="w-2 h-2 bg-emerald-400 rounded-full"></div>
+                      <span>What&apos;s on your mind?</span>
+                    </label>
+                    <div className="relative">
+                      <textarea
+                        value={newPostContent}
+                        onChange={(e) => setNewPostContent(e.target.value)}
+                        placeholder="Share your thoughts, ideas, or updates with the group..."
+                        maxLength={5000}
+                        className="w-full h-32 lg:h-36 bg-white/10 border border-white/20 rounded-2xl p-4 text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-emerald-400/50 focus:border-emerald-400/50 resize-none text-sm lg:text-base transition-all duration-300 hover:bg-white/15"
+                      />
+                      <div className="absolute bottom-4 right-4 text-xs text-white/50">
+                        {newPostContent.length}/5000
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Fixed Footer */}
+              <div className="relative flex-shrink-0 p-6 lg:p-8 pt-4">
+                <div className="flex flex-col sm:flex-row justify-end space-y-3 sm:space-y-0 sm:space-x-4 pt-6 border-t border-white/10">
+                  <button
+                    onClick={() => setShowCreateModal(false)}
+                    className="w-full sm:w-auto px-6 py-3 border border-white/30 rounded-2xl text-white hover:bg-white/10 hover:border-white/50 transition-all duration-300 text-sm lg:text-base font-medium hover:scale-105"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleCreatePost}
+                    disabled={!newPostContent.trim() || isCreating}
+                    className={`w-full sm:w-auto px-6 py-3 rounded-2xl text-white font-semibold text-sm lg:text-base transition-all duration-300 hover:scale-105 shadow-lg ${
+                      !newPostContent.trim() || isCreating
+                        ? 'bg-white/20 cursor-not-allowed'
+                        : 'bg-gradient-to-r from-emerald-500 via-teal-600 to-cyan-600 hover:from-emerald-600 hover:via-teal-700 hover:to-cyan-700 shadow-emerald-500/25'
+                    }`}
+                  >
+                    {isCreating ? (
+                      <div className="flex items-center justify-center space-x-2">
+                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                        <span>Creating Post...</span>
+                      </div>
+                    ) : (
+                      'Create Post'
+                    )}
+                  </button>
+                </div>
               </div>
             </motion.div>
           </motion.div>

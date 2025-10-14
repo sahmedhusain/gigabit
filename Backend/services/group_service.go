@@ -3,6 +3,8 @@ package services
 import (
 	"database/sql"
 	"errors"
+	"fmt"
+	"strings"
 
 	sqlite3 "github.com/mattn/go-sqlite3"
 
@@ -615,26 +617,40 @@ VALUES (?, ?, ?, ?, ?, ?)
 func (s *GroupService) GetGroupPostByID(postID, currentUserID uint) (*models.GroupPostResponse, error) {
 	query := `
 SELECT gp.id, gp.group_id, gp.user_id, gp.content, gp.image_url, gp.created_at, gp.updated_at,
-       u.first_name, u.last_name, u.avatar, u.nickname,
-       (SELECT COUNT(*) FROM likes WHERE entity_type = 'group_post' AND entity_id = gp.id) as like_count,
+       u.first_name, u.last_name, u.avatar, u.nickname, u.status,
+       (SELECT COUNT(*) FROM likes WHERE entity_type = 'group_post' AND entity_id = gp.id AND reaction_type = 'like') as like_count,
+       (SELECT COUNT(*) FROM likes WHERE entity_type = 'group_post' AND entity_id = gp.id AND reaction_type = 'dislike') as dislike_count,
        (SELECT COUNT(*) FROM comments WHERE post_id = gp.id) as comment_count,
-       (SELECT COUNT(*) > 0 FROM likes WHERE entity_type = 'group_post' AND entity_id = gp.id AND user_id = ?) as is_liked
+       (SELECT COUNT(*) > 0 FROM likes WHERE entity_type = 'group_post' AND entity_id = gp.id AND user_id = ? AND reaction_type = 'like') as is_liked,
+       (SELECT COUNT(*) > 0 FROM likes WHERE entity_type = 'group_post' AND entity_id = gp.id AND user_id = ? AND reaction_type = 'dislike') as is_disliked
 FROM group_posts gp
 JOIN users u ON gp.user_id = u.id
 WHERE gp.id = ?
 `
 
 	var post models.GroupPostResponse
-	var firstName, lastName string
+	var firstName, lastName, status string
 	var avatar, nickname *string
 
-	err := s.db.QueryRow(query, currentUserID, postID).Scan(
+	err := s.db.QueryRow(query, currentUserID, currentUserID, postID).Scan(
 		&post.ID, &post.GroupID, &post.UserID, &post.Content, &post.ImageURL, &post.CreatedAt, &post.UpdatedAt,
-		&firstName, &lastName, &avatar, &nickname,
-		&post.LikeCount, &post.CommentCount, &post.IsLiked,
+		&firstName, &lastName, &avatar, &nickname, &status,
+		&post.LikeCount, &post.DislikeCount, &post.CommentCount, &post.IsLiked, &post.IsDisliked,
 	)
 	if err != nil {
 		return nil, err
+	}
+
+	// Process avatar URL similar to User.ToResponse()
+	var avatarURL *string
+	if avatar != nil && *avatar != "" {
+		processed := *avatar
+		// If it's already a full URL, use as is
+		if !strings.HasPrefix(processed, "http") && !strings.HasPrefix(processed, "/avatars/") && !strings.HasPrefix(processed, "image:") {
+			// For uploaded files, prepend the uploads path
+			processed = fmt.Sprintf("http://localhost:8080/api/uploads/%s", processed)
+		}
+		avatarURL = &processed
 	}
 
 	// Set user details
@@ -642,8 +658,9 @@ WHERE gp.id = ?
 		ID:        post.UserID,
 		FirstName: firstName,
 		LastName:  lastName,
-		Avatar:    avatar,
+		Avatar:    avatarURL,
 		Nickname:  nickname,
+		Status:    status,
 	}
 
 	return &post, nil
@@ -653,10 +670,12 @@ WHERE gp.id = ?
 func (s *GroupService) GetGroupPosts(groupID, currentUserID uint, limit, offset int) ([]models.GroupPostResponse, error) {
 	query := `
 SELECT gp.id, gp.group_id, gp.user_id, gp.content, gp.image_url, gp.created_at, gp.updated_at,
-       u.first_name, u.last_name, u.avatar, u.nickname,
-       (SELECT COUNT(*) FROM likes WHERE entity_type = 'group_post' AND entity_id = gp.id) as like_count,
+       u.first_name, u.last_name, u.avatar, u.nickname, u.status,
+       (SELECT COUNT(*) FROM likes WHERE entity_type = 'group_post' AND entity_id = gp.id AND reaction_type = 'like') as like_count,
+       (SELECT COUNT(*) FROM likes WHERE entity_type = 'group_post' AND entity_id = gp.id AND reaction_type = 'dislike') as dislike_count,
        0 as comment_count,
-       (SELECT COUNT(*) > 0 FROM likes WHERE entity_type = 'group_post' AND entity_id = gp.id AND user_id = ?) as is_liked
+       (SELECT COUNT(*) > 0 FROM likes WHERE entity_type = 'group_post' AND entity_id = gp.id AND user_id = ? AND reaction_type = 'like') as is_liked,
+       (SELECT COUNT(*) > 0 FROM likes WHERE entity_type = 'group_post' AND entity_id = gp.id AND user_id = ? AND reaction_type = 'dislike') as is_disliked
 FROM group_posts gp
 JOIN users u ON gp.user_id = u.id
 WHERE gp.group_id = ?
@@ -664,7 +683,7 @@ ORDER BY gp.created_at DESC
 LIMIT ? OFFSET ?
 `
 
-	rows, err := s.db.Query(query, currentUserID, groupID, limit, offset)
+	rows, err := s.db.Query(query, currentUserID, currentUserID, groupID, limit, offset)
 	if err != nil {
 		return nil, err
 	}
@@ -673,16 +692,28 @@ LIMIT ? OFFSET ?
 	var posts []models.GroupPostResponse
 	for rows.Next() {
 		var post models.GroupPostResponse
-		var firstName, lastName string
+		var firstName, lastName, status string
 		var avatar, nickname *string
 
 		err := rows.Scan(
 			&post.ID, &post.GroupID, &post.UserID, &post.Content, &post.ImageURL, &post.CreatedAt, &post.UpdatedAt,
-			&firstName, &lastName, &avatar, &nickname,
-			&post.LikeCount, &post.CommentCount, &post.IsLiked,
+			&firstName, &lastName, &avatar, &nickname, &status,
+			&post.LikeCount, &post.DislikeCount, &post.CommentCount, &post.IsLiked, &post.IsDisliked,
 		)
 		if err != nil {
-			continue
+			return nil, err // Return error instead of silently skipping
+		}
+
+		// Process avatar URL similar to User.ToResponse()
+		var avatarURL *string
+		if avatar != nil && *avatar != "" {
+			processed := *avatar
+			// If it's already a full URL, use as is
+			if !strings.HasPrefix(processed, "http") && !strings.HasPrefix(processed, "/avatars/") && !strings.HasPrefix(processed, "image:") {
+				// For uploaded files, prepend the uploads path
+				processed = fmt.Sprintf("http://localhost:8080/api/uploads/%s", processed)
+			}
+			avatarURL = &processed
 		}
 
 		// Set user details
@@ -690,8 +721,9 @@ LIMIT ? OFFSET ?
 			ID:        post.UserID,
 			FirstName: firstName,
 			LastName:  lastName,
-			Avatar:    avatar,
+			Avatar:    avatarURL,
 			Nickname:  nickname,
+			Status:    status,
 		}
 
 		posts = append(posts, post)

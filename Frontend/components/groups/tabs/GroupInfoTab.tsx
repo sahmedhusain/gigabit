@@ -2,7 +2,9 @@
 import React, { useState, useEffect } from 'react'
 import { Users, Calendar, Globe, Lock, Crown, Shield, User } from 'lucide-react'
 import { motion } from 'framer-motion'
+import { useRouter } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
+import { useWebSocket } from '@/context/WebSocketContext'
 import { api, GroupResponse, Member } from '@/lib/api'
 
 interface GroupInfoTabProps {
@@ -14,6 +16,8 @@ const GroupInfoTab: React.FC<GroupInfoTabProps> = ({ groupId }) => {
   const [members, setMembers] = useState<Member[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const { user } = useAuth()
+  const router = useRouter()
+  const { onlineUsers, isConnected } = useWebSocket()
 
   useEffect(() => {
     const fetchGroupData = async () => {
@@ -87,6 +91,28 @@ const GroupInfoTab: React.FC<GroupInfoTabProps> = ({ groupId }) => {
     })
   }
 
+  const getUserStatus = (userId: number) => {
+    const onlineUser = onlineUsers.find(ou => ou.user_id === userId)
+    return onlineUser ? onlineUser.status : 'offline'
+  }
+
+  const handleMemberClick = (memberId: number) => {
+    router.push(`/profile/${memberId}`)
+  }
+
+  const getOnlineGroupMembersCount = () => {
+    if (!isConnected || !members.length) return 0
+    
+    return members.filter(member => {
+      // Exclude current user
+      if (member.user.id === user?.id) return false
+      
+      // Check if member is online
+      const onlineUser = onlineUsers.find(ou => ou.user_id === member.user.id)
+      return onlineUser && onlineUser.status === 'online'
+    }).length
+  }
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -130,7 +156,7 @@ const GroupInfoTab: React.FC<GroupInfoTabProps> = ({ groupId }) => {
 
         {/* Group Stats */}
         <motion.div
-          className="grid grid-cols-1 md:grid-cols-3 gap-6"
+          className="grid grid-cols-1 md:grid-cols-4 gap-6"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.2 }}
@@ -139,6 +165,14 @@ const GroupInfoTab: React.FC<GroupInfoTabProps> = ({ groupId }) => {
             <Users className="w-8 h-8 text-emerald-400 mx-auto mb-3" />
             <div className="text-2xl font-bold text-white mb-1">{groupInfo.member_count}</div>
             <div className="text-white/60 text-sm">Members</div>
+          </div>
+
+          <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-2xl p-6 text-center">
+            <div className="w-8 h-8 mx-auto mb-3 relative flex items-center justify-center">
+              <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
+            </div>
+            <div className="text-2xl font-bold text-white mb-1">{getOnlineGroupMembersCount()}</div>
+            <div className="text-white/60 text-sm">Online</div>
           </div>
           
           <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-2xl p-6 text-center">
@@ -170,18 +204,34 @@ const GroupInfoTab: React.FC<GroupInfoTabProps> = ({ groupId }) => {
               <Crown className="w-5 h-5 text-yellow-400 mr-2" />
               Group Creator
             </h3>
-            <div className="flex items-center space-x-4">
-              {groupInfo.creator.avatar ? (
-                <img
-                  src={groupInfo.creator.avatar}
-                  alt={`${groupInfo.creator.first_name} ${groupInfo.creator.last_name}`}
-                  className="w-16 h-16 rounded-full object-cover shadow-lg"
-                />
-              ) : (
-                <div className="w-16 h-16 rounded-full bg-gradient-to-br from-yellow-400 to-orange-500 flex items-center justify-center text-white font-bold text-xl shadow-lg">
-                  {groupInfo.creator.first_name[0]}{groupInfo.creator.last_name[0]}
-                </div>
-              )}
+            <div 
+              className="flex items-center space-x-4 cursor-pointer hover:bg-white/5 rounded-xl p-4 -m-4 transition-all duration-200"
+              onClick={() => groupInfo.creator && handleMemberClick(groupInfo.creator.id)}
+            >
+              <div className="relative">
+                {groupInfo.creator.avatar ? (
+                  <img
+                    src={groupInfo.creator.avatar}
+                    alt={`${groupInfo.creator.first_name} ${groupInfo.creator.last_name}`}
+                    className="w-16 h-16 rounded-full object-cover shadow-lg"
+                  />
+                ) : (
+                  <div className="w-16 h-16 rounded-full bg-gradient-to-br from-yellow-400 to-orange-500 flex items-center justify-center text-white font-bold text-xl shadow-lg">
+                    {groupInfo.creator.first_name[0]}{groupInfo.creator.last_name[0]}
+                  </div>
+                )}
+                
+                {/* Status Indicator */}
+                {isConnected && groupInfo.creator && (
+                  <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-white/20 ${
+                    getUserStatus(groupInfo.creator.id) === 'online' ? 'bg-green-500' :
+                    getUserStatus(groupInfo.creator.id) === 'busy' ? 'bg-red-500' :
+                    getUserStatus(groupInfo.creator.id) === 'away' ? 'bg-yellow-500' :
+                    getUserStatus(groupInfo.creator.id) === 'invisible' ? 'bg-gray-500' :
+                    'bg-gray-400' // offline
+                  }`}></div>
+                )}
+              </div>
               <div>
                 <h4 className="text-lg font-semibold text-white">
                   {groupInfo.creator.first_name} {groupInfo.creator.last_name}
@@ -219,65 +269,77 @@ const GroupInfoTab: React.FC<GroupInfoTabProps> = ({ groupId }) => {
                 const aOrder = roleOrder[a.role as keyof typeof roleOrder] ?? 3
                 const bOrder = roleOrder[b.role as keyof typeof roleOrder] ?? 3
                 return aOrder - bOrder
-              }).map((member, index) => (
-                <motion.div
-                  key={member.id}
-                  className="flex items-center space-x-4 p-4 bg-white/5 rounded-xl hover:bg-white/10 transition-all duration-200"
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: index * 0.05 }}
-                >
-                  {/* Avatar */}
-                  <div className="relative">
-                    {member.user.avatar ? (
-                      <img
-                        src={member.user.avatar}
-                        alt={`${member.user.first_name} ${member.user.last_name}`}
-                        className="w-12 h-12 rounded-full object-cover shadow-lg"
-                      />
-                    ) : (
-                      <div className="w-12 h-12 rounded-full bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center text-white font-semibold shadow-lg">
-                        {member.user.first_name[0]}{member.user.last_name[0]}
-                      </div>
-                    )}
-                    
-                    {/* Role Icon Badge */}
-                    <div className="absolute -bottom-1 -right-1 p-1 bg-white/20 backdrop-blur-sm rounded-full border border-white/30">
-                      {getRoleIcon(member.role)}
-                    </div>
-                  </div>
-
-                  {/* Member Info */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center space-x-3">
-                      <h4 className="font-semibold text-white truncate">
-                        {member.user.first_name} {member.user.last_name}
-                        {member.user.id === user?.id && (
-                          <span className="text-white/60 text-sm font-normal ml-1">(You)</span>
-                        )}
-                      </h4>
+              }).map((member, index) => {
+                const userStatus = getUserStatus(member.user.id)
+                return (
+                  <motion.div
+                    key={member.id}
+                    className="flex items-center space-x-4 p-4 bg-white/5 rounded-xl hover:bg-white/10 transition-all duration-200 cursor-pointer"
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: index * 0.05 }}
+                    onClick={() => handleMemberClick(member.user.id)}
+                  >
+                    {/* Avatar */}
+                    <div className="relative">
+                      {member.user.avatar ? (
+                        <img
+                          src={member.user.avatar}
+                          alt={`${member.user.first_name} ${member.user.last_name}`}
+                          className="w-12 h-12 rounded-full object-cover shadow-lg"
+                        />
+                      ) : (
+                        <div className="w-12 h-12 rounded-full bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center text-white font-semibold shadow-lg">
+                          {member.user.first_name[0]}{member.user.last_name[0]}
+                        </div>
+                      )}
                       
-                      {/* Role Badge */}
-                      <div className={`flex items-center space-x-1 px-2 py-1 rounded-full text-xs font-medium border ${getRoleColor(member.role)}`}>
-                        {getRoleIcon(member.role)}
-                        <span>{getRoleLabel(member.role)}</span>
-                      </div>
+                      {/* Status Indicator */}
+                      {isConnected && (
+                        <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-white/20 ${
+                          userStatus === 'online' ? 'bg-green-500' :
+                          userStatus === 'busy' ? 'bg-red-500' :
+                          userStatus === 'away' ? 'bg-yellow-500' :
+                          userStatus === 'invisible' ? 'bg-gray-500' :
+                          'bg-gray-400' // offline
+                        }`}></div>
+                      )}
                     </div>
 
-                    {/* Join Date */}
-                    <p className="text-white/60 text-sm mt-1">
-                      Joined {formatJoinDate(member.joined_at)}
-                    </p>
+                    {/* Member Info */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center space-x-3">
+                        <h4 className="font-semibold text-white truncate">
+                          {member.user.first_name} {member.user.last_name}
+                          {member.user.id === user?.id && (
+                            <span className="text-white/60 text-sm font-normal ml-1">(You)</span>
+                          )}
+                        </h4>
+                        
+                        {/* Role Badge - Only show for admins and creators */}
+                        {(member.role === 'admin' || member.role === 'creator') && (
+                          <div className={`flex items-center space-x-1 px-2 py-1 rounded-full text-xs font-medium border ${getRoleColor(member.role)}`}>
+                            {getRoleIcon(member.role)}
+                            <span>{getRoleLabel(member.role)}</span>
+                          </div>
+                        )}
+                      </div>
 
-                    {/* Nickname */}
-                    {member.user.nickname && (
-                      <p className="text-white/50 text-sm mt-1">
-                        @{member.user.nickname}
+                      {/* Username */}
+                      {member.user.nickname && (
+                        <p className="text-white/50 text-sm mt-1">
+                          @{member.user.nickname}
+                        </p>
+                      )}
+
+                      {/* Join Date */}
+                      <p className="text-white/60 text-xs mt-2">
+                        Joined {formatJoinDate(member.joined_at)}
                       </p>
-                    )}
-                  </div>
-                </motion.div>
-              ))}
+                    </div>
+                  </motion.div>
+                )
+              })}
             </div>
           </motion.div>
         )}

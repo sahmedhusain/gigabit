@@ -3,9 +3,12 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { API_BASE_URL, api } from '@/lib/api'
 import ChatWindow from '@/components/ChatWindow'
-import { MessageCircle, Users, Hash } from 'lucide-react'
+import CreateGroupPost from '@/components/groups/CreateGroupPost'
+import CreateGroupEvent from '@/components/groups/CreateGroupEvent'
+import { MessageCircle, Users, Hash, FileText, Calendar } from 'lucide-react'
 import { useRealTimeMessages, useOnlineStatus, useConnectionStatus } from '@/hooks'
 import { getAvatarUrl } from '@/utils/avatarUtils'
+import { useAuth } from '@/context/AuthContext'
 import Image from 'next/image'
 
 interface GroupChatProps {
@@ -17,33 +20,41 @@ const GroupChat: React.FC<GroupChatProps> = ({ groupId, groupTitle }) => {
   const { isConnected: connectionStatus } = useConnectionStatus()
   const { onlineUsers: liveOnlineUsers } = useOnlineStatus()
   const { getUnreadCount } = useRealTimeMessages()
+  const { user } = useAuth()
   
   const [showChat, setShowChat] = useState(false)
   const [memberCount, setMemberCount] = useState(0)
+  const [groupMembers, setGroupMembers] = useState<number[]>([])
   const [recentMessages, setRecentMessages] = useState<unknown[]>([])
   const [conversationId, setConversationId] = useState<number | null>(null)
   const [isResolvingConversation, setIsResolvingConversation] = useState(false)
+  
+  // Modal states
+  const [showCreatePost, setShowCreatePost] = useState(false)
+  const [showCreateEvent, setShowCreateEvent] = useState(false)
 
-  // Calculate online member count from real-time data
-  const onlineMemberCount = liveOnlineUsers.filter(user => user.status === 'online').length
+  // Calculate online member count from real-time data (excluding current user)
+  const onlineMemberCount = 0 // Temporarily force to 0 for debugging
   const unreadCount = getUnreadCount(groupId)
+
+  const fetchMemberCount = async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/groups/${groupId}/members`, {
+        credentials: 'include'
+      })
+      if (response.ok) {
+        const data = await response.json()
+        setMemberCount(data.members?.length || 0)
+        // Store member user IDs for online filtering
+        setGroupMembers(data.members?.map((member: { user: { id: number } }) => member.user.id) || [])
+      }
+    } catch (error) {
+      console.error('Error fetching member count:', error)
+    }
+  }
 
   useEffect(() => {
     // Fetch member count
-    const fetchMemberCount = async () => {
-      try {
-        const response = await fetch(`${API_BASE_URL}/api/groups/${groupId}/members`, {
-          credentials: 'include'
-        })
-        if (response.ok) {
-          const data = await response.json()
-          setMemberCount(data.members?.length || 0)
-        }
-      } catch (error) {
-        console.error('Error fetching member count:', error)
-      }
-    }
-
     fetchMemberCount()
   }, [groupId])
 
@@ -135,24 +146,57 @@ const GroupChat: React.FC<GroupChatProps> = ({ groupId, groupTitle }) => {
         </div>
 
         {!showChat && (
-          <div className="relative">
-            <button
-              onClick={handleOpenChat}
-              disabled={!connectionStatus}
-              className={`flex items-center px-4 py-2 rounded-xl text-white transition-all duration-200 ${
-                connectionStatus 
-                  ? 'bg-emerald-500 hover:bg-emerald-600' 
-                  : 'bg-gray-500 cursor-not-allowed'
-              }`}
-            >
-              <MessageCircle className="w-4 h-4 mr-2" />
-              {connectionStatus ? 'Open Chat' : 'Offline'}
-            </button>
-            {unreadCount > 0 && (
-              <div className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full min-w-5 h-5 flex items-center justify-center px-1">
-                {unreadCount > 99 ? '99+' : unreadCount}
-              </div>
-            )}
+          <div className="flex items-center space-x-3">
+            {/* Action Buttons */}
+            <div className="flex items-center space-x-2">
+              <button
+                onClick={() => setShowCreatePost(true)}
+                disabled={!connectionStatus}
+                className={`flex items-center px-3 py-2 rounded-xl text-white transition-all duration-200 text-sm ${
+                  connectionStatus 
+                    ? 'bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-400/30' 
+                    : 'bg-gray-500/20 cursor-not-allowed border border-gray-500/30'
+                }`}
+                title="Create Post"
+              >
+                <FileText className="w-4 h-4 mr-1.5" />
+                <span className="hidden sm:inline">Post</span>
+              </button>
+              <button
+                onClick={() => setShowCreateEvent(true)}
+                disabled={!connectionStatus}
+                className={`flex items-center px-3 py-2 rounded-xl text-white transition-all duration-200 text-sm ${
+                  connectionStatus 
+                    ? 'bg-purple-500/20 hover:bg-purple-500/30 border border-purple-400/30' 
+                    : 'bg-gray-500/20 cursor-not-allowed border border-gray-500/30'
+                }`}
+                title="Create Event"
+              >
+                <Calendar className="w-4 h-4 mr-1.5" />
+                <span className="hidden sm:inline">Event</span>
+              </button>
+            </div>
+
+            {/* Chat Button */}
+            <div className="relative">
+              <button
+                onClick={handleOpenChat}
+                disabled={!connectionStatus}
+                className={`flex items-center px-4 py-2 rounded-xl text-white transition-all duration-200 ${
+                  connectionStatus 
+                    ? 'bg-emerald-500 hover:bg-emerald-600' 
+                    : 'bg-gray-500 cursor-not-allowed'
+                }`}
+              >
+                <MessageCircle className="w-4 h-4 mr-2" />
+                {connectionStatus ? 'Open Chat' : 'Offline'}
+              </button>
+              {unreadCount > 0 && (
+                <div className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full min-w-5 h-5 flex items-center justify-center px-1">
+                  {unreadCount > 99 ? '99+' : unreadCount}
+                </div>
+              )}
+            </div>
           </div>
         )}
       </div>
@@ -273,6 +317,30 @@ const GroupChat: React.FC<GroupChatProps> = ({ groupId, groupTitle }) => {
           </div>
         )}
       </div>
+
+      {/* Create Post Modal */}
+      <CreateGroupPost
+        show={showCreatePost}
+        onClose={() => setShowCreatePost(false)}
+        groupId={groupId}
+        groupTitle={groupTitle}
+        onPostCreated={() => {
+          // Optionally refresh data or show success message
+          console.log('Post created for group:', groupId)
+        }}
+      />
+
+      {/* Create Event Modal */}
+      <CreateGroupEvent
+        show={showCreateEvent}
+        onClose={() => setShowCreateEvent(false)}
+        groupId={groupId}
+        groupTitle={groupTitle}
+        onEventCreated={() => {
+          // Optionally refresh data or show success message
+          console.log('Event created for group:', groupId)
+        }}
+      />
     </div>
   )
 }

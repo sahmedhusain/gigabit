@@ -425,7 +425,65 @@ func (h *PostHandler) UnlikePost(w http.ResponseWriter, r *http.Request, postIDS
 
 	log.Printf("Post %d unliked successfully by user %v", postID, userID)
 	writeJSON(w, http.StatusOK, map[string]string{"message": "Post unliked successfully"})
-} // CreateComment handles creating a new comment on a post
+}
+
+func (h *PostHandler) DislikePost(w http.ResponseWriter, r *http.Request, postIDStr string) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
+
+	postID, err := strconv.ParseUint(postIDStr, 10, 32)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "Invalid post ID")
+		return
+	}
+
+	userID := r.Context().Value("user_id")
+	if userID == nil {
+		writeError(w, http.StatusUnauthorized, "User not authenticated")
+		return
+	}
+
+	if err := h.likeService.DislikePost(uint(postID), userID.(uint)); err != nil {
+		log.Printf("Failed to dislike post %d for user %v: %v", postID, userID, err)
+		writeError(w, http.StatusInternalServerError, "Failed to dislike post")
+		return
+	}
+
+	log.Printf("Post %d disliked successfully by user %v", postID, userID)
+	writeJSON(w, http.StatusOK, map[string]string{"message": "Post disliked successfully"})
+}
+
+func (h *PostHandler) UndislikePost(w http.ResponseWriter, r *http.Request, postIDStr string) {
+	if r.Method != http.MethodDelete {
+		writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
+
+	postID, err := strconv.ParseUint(postIDStr, 10, 32)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "Invalid post ID")
+		return
+	}
+
+	userID := r.Context().Value("user_id")
+	if userID == nil {
+		writeError(w, http.StatusUnauthorized, "User not authenticated")
+		return
+	}
+
+	if err := h.likeService.UndislikePost(uint(postID), userID.(uint)); err != nil {
+		log.Printf("Failed to undislike post %d for user %v: %v", postID, userID, err)
+		writeError(w, http.StatusInternalServerError, "Failed to undislike post")
+		return
+	}
+
+	log.Printf("Post %d undisliked successfully by user %v", postID, userID)
+	writeJSON(w, http.StatusOK, map[string]string{"message": "Post undisliked successfully"})
+}
+
+// CreateComment handles creating a new comment on a post
 func (h *PostHandler) CreateComment(w http.ResponseWriter, r *http.Request, postIDStr string) {
 	if r.Method != http.MethodPost {
 		writeError(w, http.StatusMethodNotAllowed, "Method not allowed")

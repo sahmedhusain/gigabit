@@ -409,6 +409,19 @@ func (s *Server) handlePostRoute(handler *handlers.PostHandler) http.HandlerFunc
 				default:
 					writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
 				}
+			case "dislike":
+				switch r.Method {
+				case http.MethodPost:
+					authMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+						handler.DislikePost(w, r, postID)
+					})).ServeHTTP(w, r)
+				case http.MethodDelete:
+					authMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+						handler.UndislikePost(w, r, postID)
+					})).ServeHTTP(w, r)
+				default:
+					writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
+				}
 			case "comments":
 				switch r.Method {
 				case http.MethodGet:

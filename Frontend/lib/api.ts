@@ -223,8 +223,10 @@ export interface PostResponse {
   privacy: string;
   user: User;
   like_count: number;
+  dislike_count: number;
   comment_count: number;
   is_liked: boolean;
+  is_disliked: boolean;
   is_bookmarked: boolean;
   created_at: string;
   updated_at: string;
@@ -643,6 +645,18 @@ export class ApiClient {
     });
   }
 
+  async dislikePost(postId: number): Promise<{ success: boolean }> {
+    return this.request<{ success: boolean }>(`/api/posts/${postId}/dislike`, {
+      method: 'POST',
+    });
+  }
+
+  async undislikePost(postId: number): Promise<{ success: boolean }> {
+    return this.request<{ success: boolean }>(`/api/posts/${postId}/dislike`, {
+      method: 'DELETE',
+    });
+  }
+
   // Alternative like endpoint that returns detailed info
   async toggleBookmark(id: number): Promise<{ message: string; is_bookmarked: boolean }> {
     return this.request<{ message: string; is_bookmarked: boolean }>(`/api/bookmarks/${id}`, {
@@ -781,11 +795,12 @@ export class ApiClient {
     });
   }
 
-  async createGroupPost(groupId: number, data: CreatePostRequest): Promise<PostResponse> {
-    return this.request<PostResponse>(`/api/groups/${groupId}/posts`, {
+    async createGroupPost(groupId: number, data: CreatePostRequest): Promise<PostResponse> {
+      const response = await this.request<{ message: string, post: PostResponse }>(`/api/groups/${groupId}/posts`, {
       method: 'POST',
       body: JSON.stringify(data),
     });
+      return response.post;
   }
 
   async createGroupEvent(groupId: number, data: { title: string; description: string; event_time: string }): Promise<EventResponse> {

@@ -86,8 +86,10 @@ type GroupPostResponse struct {
 	UpdatedAt    time.Time         `json:"updated_at"`
 	User         UserResponse      `json:"user"`
 	LikeCount    int64             `json:"like_count"`
+	DislikeCount int64             `json:"dislike_count"`
 	CommentCount int64             `json:"comment_count"`
 	IsLiked      bool              `json:"is_liked"`
+	IsDisliked   bool              `json:"is_disliked"`
 	Comments     []CommentResponse `json:"comments,omitempty"`
 }
 

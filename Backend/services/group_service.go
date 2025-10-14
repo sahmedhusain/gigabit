@@ -133,6 +133,14 @@ GROUP BY g.id, u.id
 		}
 	}
 
+	// Get all members if user is a member
+	if group.IsMember {
+		members, err := s.GetGroupMembers(groupID, currentUserID)
+		if err == nil {
+			group.Members = members
+		}
+	}
+
 	return &group, nil
 }
 
@@ -647,7 +655,7 @@ func (s *GroupService) GetGroupPosts(groupID, currentUserID uint, limit, offset 
 SELECT gp.id, gp.group_id, gp.user_id, gp.content, gp.image_url, gp.created_at, gp.updated_at,
        u.first_name, u.last_name, u.avatar, u.nickname,
        (SELECT COUNT(*) FROM likes WHERE entity_type = 'group_post' AND entity_id = gp.id) as like_count,
-       (SELECT COUNT(*) FROM comments WHERE post_id = gp.id) as comment_count,
+       0 as comment_count,
        (SELECT COUNT(*) > 0 FROM likes WHERE entity_type = 'group_post' AND entity_id = gp.id AND user_id = ?) as is_liked
 FROM group_posts gp
 JOIN users u ON gp.user_id = u.id
@@ -869,5 +877,30 @@ func (s *GroupService) DemoteAdmin(groupID, requesterID, targetUserID uint) erro
 		WHERE group_id = ? AND user_id = ? AND status = 'member'
 	`
 	_, err = s.db.Exec(query, time.Now(), groupID, targetUserID)
+	return err
+}
+
+// CountAdmins returns the number of admin users in a group
+func (s *GroupService) CountAdmins(groupID uint) (int, error) {
+	query := `SELECT COUNT(*) FROM group_members WHERE group_id = ? AND role = 'admin' AND status = 'member'`
+
+	var count int
+	err := s.db.QueryRow(query, groupID).Scan(&count)
+	return count, err
+}
+
+// UpdateUserRole updates the role of a user in a group
+func (s *GroupService) UpdateUserRole(groupID, userID uint, newRole string) error {
+	query := `UPDATE group_members SET role = ?, updated_at = ? WHERE group_id = ? AND user_id = ? AND status = 'member'`
+
+	_, err := s.db.Exec(query, newRole, time.Now(), groupID, userID)
+	return err
+}
+
+// RemoveMember removes a user from a group
+func (s *GroupService) RemoveMember(groupID, userID uint) error {
+	query := `DELETE FROM group_members WHERE group_id = ? AND user_id = ?`
+
+	_, err := s.db.Exec(query, groupID, userID)
 	return err
 }

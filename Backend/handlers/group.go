@@ -756,3 +756,124 @@ func (h *GroupHandler) DemoteAdmin(w http.ResponseWriter, r *http.Request, group
 		"message": "Admin demoted to member successfully",
 	})
 }
+
+// UpdateMemberRole updates the role of a group member
+func (h *GroupHandler) UpdateMemberRole(w http.ResponseWriter, r *http.Request, groupIDStr, userIDStr string) {
+	groupID, err := strconv.ParseUint(groupIDStr, 10, 32)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "Invalid group ID")
+		return
+	}
+
+	userID, err := strconv.ParseUint(userIDStr, 10, 32)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "Invalid user ID")
+		return
+	}
+
+	currentUserID, ok := r.Context().Value("user_id").(uint)
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "User not authenticated")
+		return
+	}
+
+	// Check if current user is admin of the group
+	isAdmin, err := h.groupService.IsUserAdminOrCreator(uint(groupID), currentUserID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "Failed to check admin status")
+		return
+	}
+	if !isAdmin {
+		writeError(w, http.StatusForbidden, "Only admins can update member roles")
+		return
+	}
+
+	var req struct {
+		Role string `json:"role"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "Invalid request body")
+		return
+	}
+
+	if req.Role != "admin" && req.Role != "member" {
+		writeError(w, http.StatusBadRequest, "Role must be 'admin' or 'member'")
+		return
+	}
+
+	// If promoting to admin, check admin limit
+	if req.Role == "admin" {
+		adminCount, err := h.groupService.CountAdmins(uint(groupID))
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "Failed to count admins")
+			return
+		}
+		if adminCount >= 3 {
+			writeError(w, http.StatusBadRequest, "Maximum number of admins reached")
+			return
+		}
+	}
+
+	err = h.groupService.UpdateUserRole(uint(groupID), uint(userID), req.Role)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "Failed to update user role")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]string{
+		"message": "User role updated successfully",
+	})
+}
+
+// KickMember removes a member from the group
+func (h *GroupHandler) KickMember(w http.ResponseWriter, r *http.Request, groupIDStr, userIDStr string) {
+	groupID, err := strconv.ParseUint(groupIDStr, 10, 32)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "Invalid group ID")
+		return
+	}
+
+	userID, err := strconv.ParseUint(userIDStr, 10, 32)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "Invalid user ID")
+		return
+	}
+
+	currentUserID, ok := r.Context().Value("user_id").(uint)
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "User not authenticated")
+		return
+	}
+
+	// Check if current user is admin of the group
+	isAdmin, err := h.groupService.IsUserAdminOrCreator(uint(groupID), currentUserID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "Failed to check admin status")
+		return
+	}
+	if !isAdmin {
+		writeError(w, http.StatusForbidden, "Only admins can kick members")
+		return
+	}
+
+	// Check if the user being kicked is also an admin
+	targetUserRole, err := h.groupService.GetUserRole(uint(groupID), uint(userID))
+	if err != nil && err != sql.ErrNoRows {
+		writeError(w, http.StatusInternalServerError, "Failed to check target user role")
+		return
+	}
+	if targetUserRole == "admin" {
+		writeError(w, http.StatusBadRequest, "Cannot kick another admin")
+		return
+	}
+
+	err = h.groupService.RemoveMember(uint(groupID), uint(userID))
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "Failed to remove member")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]string{
+		"message": "Member removed successfully",
+	})
+}

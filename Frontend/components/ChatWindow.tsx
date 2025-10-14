@@ -1,6 +1,6 @@
 'use client'
 import React, { useState, useRef, useEffect } from 'react'
-import { X, Send, Smile, Check, CheckCheck, Clock, ChevronDown } from 'lucide-react'
+import { X, Send, Smile, Check, CheckCheck, Clock, ChevronDown, MessageCircle, FileText, Calendar, BarChart3, Users, Settings, Crown, User as UserIcon, Info } from 'lucide-react'
 import Image from 'next/image'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useAuth } from '@/context/AuthContext'
@@ -10,6 +10,14 @@ import { api, User } from '@/lib/api'
 import EmojiPicker from 'emoji-picker-react'
 import { getAvatarUrl } from '@/utils/avatarUtils'
 import { useRouter } from 'next/navigation'
+
+// Import tab components
+import GroupChatTab from './groups/tabs/GroupChatTab'
+import GroupPostsTab from './groups/tabs/GroupPostsTab'
+import GroupEventsTab from './groups/tabs/GroupEventsTab'
+import GroupPollsTab from './groups/tabs/GroupPollsTab'
+import GroupSettingsTab from './groups/tabs/GroupSettingsTab'
+import GroupInfoTab from './groups/tabs/GroupInfoTab'
 
 interface EmojiData {
   emoji: string
@@ -36,6 +44,7 @@ interface Message {
 interface ChatWindowProps {
   conversationId: number
   conversationType: 'private' | 'group'
+  chatType?: 'group' | 'private' // New prop for UI type
   participantName: string
   participantId?: number
   // For group chats we pass the raw groupId so we can resolve the true conversation ID after first message
@@ -49,6 +58,7 @@ interface ChatWindowProps {
 const ChatWindow: React.FC<ChatWindowProps> = ({
   conversationId,
   conversationType,
+  chatType, // Will be determined from conversationType if not provided
   participantId,
   participantName,
   groupId,
@@ -56,8 +66,12 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
   onClose,
   hideHeader
 }) => {
+  // Determine chatType from conversationType if not explicitly provided
+  const effectiveChatType = chatType || conversationType;
   const [newMessage, setNewMessage] = useState('')
   const [showEmojiPicker, setShowEmojiPicker] = useState(false)
+  const [activeTab, setActiveTab] = useState('chat') // New state for active tab
+  const [groupData, setGroupData] = useState<any>(null) // Store group data including user role
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const messagesContainerRef = useRef<HTMLDivElement>(null)
   const [participantData, setParticipantData] = useState<User | null>(null)
@@ -76,11 +90,42 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
     loadMoreMessages,
     fetchConversationMessages,
     refreshConversations,
-    conversations
+    conversations,
+    registerConversationIdCallback,
+    unregisterConversationIdCallback
   } = useRealTimeMessages()
 
   // Internal effective conversation ID (can upgrade from placeholder groupId to real conversation ID)
   const [effectiveConversationId, setEffectiveConversationId] = useState<number>(conversationId)
+  const [isNewConversation, setIsNewConversation] = useState<boolean>(false)
+
+  // Check if this is a potentially new conversation that needs ID resolution
+  useEffect(() => {
+    // For private conversations, check if we have a generated/placeholder ID
+    // For group conversations, check if the conversationId matches the groupId (indicating it's a placeholder)
+    const needsResolution = conversationType === 'private' 
+      ? !conversations.find(c => c.id === conversationId && c.type === 'private')
+      : !!(conversationType === 'group' && groupId && conversationId === groupId)
+
+    setIsNewConversation(needsResolution)
+
+    // Register callback for conversation ID resolution if needed
+    if (needsResolution) {
+      registerConversationIdCallback(conversationId, (newId: number) => {
+        console.log(`ChatWindow: Conversation ID resolved from ${conversationId} to ${newId}`)
+        setEffectiveConversationId(newId)
+        setIsNewConversation(false)
+        onConversationResolved?.(newId)
+      })
+    }
+
+    // Cleanup callback on unmount or conversation change
+    return () => {
+      if (needsResolution) {
+        unregisterConversationIdCallback(conversationId)
+      }
+    }
+  }, [conversationId, conversationType, groupId, conversations, registerConversationIdCallback, unregisterConversationIdCallback, onConversationResolved])
 
   // If prop conversationId changes (parent already resolved) update effective ID
   useEffect(() => {
@@ -140,6 +185,21 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
       fetchParticipantData()
     }
   }, [conversationType, participantId])
+
+  // Fetch group data when chatType is 'group'
+  useEffect(() => {
+    if (effectiveChatType === 'group' && groupId) {
+      const fetchGroupData = async () => {
+        try {
+          const data = await api.getGroup(groupId)
+          setGroupData(data)
+        } catch (error) {
+          console.error('Failed to fetch group data:', error)
+        }
+      }
+      fetchGroupData()
+    }
+  }, [effectiveChatType, groupId])
 
   // Function to load previous messages when button is clicked
   const handleLoadPreviousMessages = React.useCallback(async () => {
@@ -209,19 +269,8 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
 
       setNewMessage('')
 
-      // If this is the first message in a group and we used a placeholder, try to resolve real conversation
-      if (conversationType === 'group' && groupId && effectiveConversationId === groupId) {
-        // Refresh conversations after a short delay to allow backend to create conversation
-        setTimeout(async () => {
-          await refreshConversations()
-          const match = conversations.find(c => c.type === 'group' && c.group && c.group.id === groupId)
-          if (match && match.id !== effectiveConversationId) {
-            setEffectiveConversationId(match.id)
-            onConversationResolved?.(match.id)
-            fetchConversationMessages(match.id, 'group', undefined, 20, 0, false)
-          }
-        }, 500)
-      }
+      // The conversation ID resolution is now handled automatically by the 
+      // registerConversationIdCallback mechanism in the useEffect above
     } catch (error) {
       console.error('Error sending message:', error)
     }
@@ -465,16 +514,16 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
               </motion.span>
             )}
 
-            {/* Message bubble */}
+            {/* Enhanced Message bubble */}
             <div
-              className={`relative px-4 py-3 rounded-2xl shadow-lg backdrop-blur-sm border transition-all duration-300 hover:shadow-xl ${
+              className={`relative px-5 py-4 rounded-2xl shadow-xl backdrop-blur-lg border transition-all duration-300 hover:shadow-2xl hover:scale-[1.02] ${
                 isCurrentUser
-                  ? 'bg-gradient-to-r from-emerald-500 to-teal-600 text-white border-emerald-400/30 rounded-br-md'
-                  : 'bg-white/10 text-white border-white/20 rounded-bl-md hover:bg-white/15'
+                  ? 'bg-gradient-to-br from-emerald-500 via-teal-500 to-cyan-600 text-white border-emerald-400/40 rounded-br-lg shadow-emerald-500/20'
+                  : 'bg-gradient-to-br from-white/15 to-white/10 text-white border-white/25 rounded-bl-lg hover:from-white/20 hover:to-white/15 shadow-white/10'
               }`}
             >
               {/* Message content */}
-              <div className="text-sm leading-relaxed break-words">
+              <div className="text-sm leading-relaxed break-words font-medium">
                 {message.content}
               </div>
 
@@ -517,28 +566,176 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
     )
   }
 
+  // Render tabbed group interface if chatType is 'group'
+  if (effectiveChatType === 'group') {
+    // Determine tabs based on user role
+    const isAdminOrCreator = groupData?.role === 'admin' || groupData?.role === 'creator';
+    const tabs = isAdminOrCreator 
+      ? ['info', 'chat', 'posts', 'events', 'polls', 'settings']
+      : ['info', 'chat', 'posts', 'events', 'polls'];
+
+    return (
+      <motion.div
+        className="h-full max-h-[calc(100vh-6rem)] flex flex-col bg-gradient-to-br from-white/10 via-white/5 to-white/10 backdrop-blur-2xl rounded-3xl border border-white/30 overflow-hidden shadow-2xl ring-1 ring-white/20 mt-4"
+        initial={{ opacity: 0, scale: 0.96, y: 30 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.96, y: 30 }}
+        transition={{ duration: 0.4, ease: [0.23, 1, 0.320, 1] }}
+      >
+        {/* Enhanced Group Header */}
+        {!hideHeader && (
+          <div className="bg-gradient-to-r from-white/15 via-white/8 to-white/15 backdrop-blur-2xl border-b border-white/25 px-6 py-5 flex items-center justify-between flex-shrink-0 shadow-xl relative">
+            <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/5 via-teal-500/5 to-cyan-500/5 rounded-t-3xl" />
+            <div className="flex items-center space-x-4 relative z-10 flex-1 min-w-0">
+              <motion.div 
+                className="w-16 h-16 rounded-full bg-gradient-to-br from-emerald-400 via-teal-500 to-cyan-600 flex items-center justify-center text-white text-2xl font-bold shadow-2xl ring-2 ring-white/30 cursor-pointer"
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => setActiveTab('info')}
+                title="View group info"
+              >
+                #
+              </motion.div>
+              <div className="flex-1 min-w-0">
+                <motion.h1 
+                  className="text-2xl font-bold bg-gradient-to-r from-white to-white/80 bg-clip-text text-transparent leading-tight cursor-pointer hover:from-emerald-200 hover:to-white/90 transition-all duration-200"
+                  onClick={() => setActiveTab('info')}
+                  whileHover={{ scale: 1.02 }}
+                  title="View group info"
+                >
+                  {participantName}
+                </motion.h1>
+                <div className="flex items-center space-x-3 mt-2">
+                  {/* Online users count */}
+                  {onlineUsers.length > 0 && (
+                    <div className="flex items-center space-x-2 px-3 py-1 rounded-full bg-green-500/20 border-green-400/30 text-green-300 border">
+                      <div className="w-2 h-2 rounded-full bg-green-400 shadow-green-400/50 shadow-lg animate-pulse" />
+                      <span className="text-xs font-semibold">{onlineUsers.length} online</span>
+                    </div>
+                  )}
+                  
+                  {/* Typing indicators */}
+                  {typingUsers.length > 0 && (
+                    <div className="flex items-center space-x-2 px-3 py-1 rounded-full bg-blue-500/20 border-blue-400/30 text-blue-300 border">
+                      <div className="flex space-x-1">
+                        <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-bounce [animation-delay:0ms]" />
+                        <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-bounce [animation-delay:150ms]" />
+                        <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-bounce [animation-delay:300ms]" />
+                      </div>
+                      <span className="text-xs font-medium">
+                        {typingUsers.length === 1 
+                          ? `${typingUsers[0].username || 'Someone'} is typing...`
+                          : `${typingUsers.length} people are typing...`
+                        }
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+            {onClose && (
+              <motion.button
+                onClick={onClose}
+                className="p-3 text-white/60 hover:text-white hover:bg-gradient-to-r hover:from-red-500/20 hover:to-pink-500/20 rounded-2xl border border-white/20 hover:border-red-400/30 transition-all duration-300 group backdrop-blur-sm relative z-10 ml-4"
+                title="Close chat"
+                whileHover={{ scale: 1.1, rotate: 90 }}
+                whileTap={{ scale: 0.95 }}
+              >
+                <X className="w-5 h-5 group-hover:rotate-90 transition-transform duration-300" />
+              </motion.button>
+            )}
+          </div>
+        )}
+
+        {/* Tab Navigation */}
+        <div className="bg-gradient-to-r from-white/10 via-white/5 to-white/10 backdrop-blur-lg border-b border-white/20 px-6 py-3 flex space-x-1 overflow-x-auto">
+          {tabs.map((tab) => (
+            <motion.button
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              className={`flex items-center space-x-2 px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 whitespace-nowrap ${
+                activeTab === tab
+                  ? 'bg-gradient-to-r from-emerald-500/30 to-teal-500/30 text-white border border-emerald-400/30 shadow-lg'
+                  : 'text-white/70 hover:text-white hover:bg-white/10 border border-transparent'
+              }`}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+            >
+              {tab === 'chat' && <MessageCircle className="w-4 h-4" />}
+              {tab === 'posts' && <FileText className="w-4 h-4" />}
+              {tab === 'events' && <Calendar className="w-4 h-4" />}
+              {tab === 'polls' && <BarChart3 className="w-4 h-4" />}
+              {tab === 'members' && <Users className="w-4 h-4" />}
+              {tab === 'settings' && <Settings className="w-4 h-4" />}
+              <span className="capitalize">{tab === 'settings' ? 'Settings' : tab === 'members' ? 'Members' : tab}</span>
+            </motion.button>
+          ))}
+        </div>
+
+        {/* Tab Content */}
+        <div className="flex-1 overflow-hidden">
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={activeTab}
+              className="h-full"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              transition={{ duration: 0.3 }}
+            >
+              {activeTab === 'info' && groupId && (
+                <GroupInfoTab groupId={groupId} />
+              )}
+              {activeTab === 'chat' && (
+                <GroupChatTab
+                  conversationId={effectiveConversationId}
+                  groupId={groupId}
+                  onConversationResolved={onConversationResolved}
+                />
+              )}
+              {activeTab === 'posts' && groupId && (
+                <GroupPostsTab groupId={groupId} />
+              )}
+              {activeTab === 'events' && groupId && (
+                <GroupEventsTab groupId={groupId} />
+              )}
+              {activeTab === 'polls' && groupId && <GroupPollsTab groupId={groupId} />}
+              {activeTab === 'settings' && groupId && (
+                <GroupSettingsTab groupId={groupId} />
+              )}
+            </motion.div>
+          </AnimatePresence>
+        </div>
+      </motion.div>
+    )
+  }
+
+  // Regular chat interface for private messages
   return (
     <motion.div
-      className="h-full flex flex-col bg-white/5 backdrop-blur-xl rounded-2xl border border-white/20 overflow-hidden shadow-2xl"
-      initial={{ opacity: 0, scale: 0.95, y: 20 }}
+      className="h-full max-h-[calc(100vh-6rem)] flex flex-col bg-gradient-to-br from-white/10 via-white/5 to-white/10 backdrop-blur-2xl rounded-3xl border border-white/30 overflow-hidden shadow-2xl ring-1 ring-white/20 mt-4"
+      initial={{ opacity: 0, scale: 0.96, y: 30 }}
       animate={{ opacity: 1, scale: 1, y: 0 }}
-      exit={{ opacity: 0, scale: 0.95, y: 20 }}
-      transition={{ duration: 0.3, ease: 'easeOut' }}
+      exit={{ opacity: 0, scale: 0.96, y: 30 }}
+      transition={{ duration: 0.4, ease: [0.23, 1, 0.320, 1] }}
     >
-      {/* Header */}
+      {/* Enhanced Header */}
       {!hideHeader && (
         <motion.div
-          className="bg-gradient-to-r from-white/10 to-white/5 backdrop-blur-xl border-b border-white/20 p-4 flex items-center justify-between flex-shrink-0 shadow-lg"
-          initial={{ y: -20, opacity: 0 }}
+          className="bg-gradient-to-r from-white/15 via-white/8 to-white/15 backdrop-blur-2xl border-b border-white/25 px-6 py-4 flex items-center justify-between flex-shrink-0 shadow-xl relative"
+          initial={{ y: -30, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
-          transition={{ delay: 0.1, duration: 0.3 }}
+          transition={{ delay: 0.15, duration: 0.4, ease: [0.23, 1, 0.320, 1] }}
         >
-          <div className="flex items-center space-x-4">
-            {/* Clickable Avatar */}
+          {/* Subtle header gradient overlay */}
+          <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/5 via-teal-500/5 to-cyan-500/5 rounded-t-3xl" />
+          
+          <div className="flex items-center space-x-4 relative z-10">
+            {/* Enhanced Avatar */}
             <motion.div
               className={`relative ${conversationType === 'private' && participantId ? 'cursor-pointer' : ''}`}
-              whileHover={{ scale: 1.05 }}
-              transition={{ type: 'spring', stiffness: 400, damping: 17 }}
+              whileHover={{ scale: 1.08 }}
+              transition={{ type: 'spring', stiffness: 300, damping: 20 }}
               onClick={() => {
                 if (conversationType === 'private' && participantId) {
                   router.push(`/profile/${participantId}`)
@@ -549,44 +746,32 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
                 <Image
                   src={participantData.avatar}
                   alt={participantData.first_name + ' ' + participantData.last_name}
-                  width={48}
-                  height={48}
-                  className={`w-12 h-12 rounded-full object-cover shadow-xl ring-2 ring-white/20 ${
-                    conversationType === 'private' && participantId ? 'hover:ring-emerald-400/50' : ''
-                  } transition-all duration-200`}
+                  width={56}
+                  height={56}
+                  className={`w-14 h-14 rounded-full object-cover shadow-2xl ring-2 ring-white/30 ${
+                    conversationType === 'private' && participantId ? 'hover:ring-emerald-400/60 hover:shadow-emerald-400/20' : ''
+                  } transition-all duration-300 hover:shadow-2xl`}
                 />
               ) : (
-                <div className={`w-12 h-12 rounded-full bg-gradient-to-br from-emerald-400 via-teal-500 to-cyan-600 flex items-center justify-center text-white text-lg font-bold shadow-xl ring-2 ring-white/20 ${
-                  conversationType === 'private' && participantId ? 'hover:ring-emerald-400/50' : ''
-                } transition-all duration-200`}>
+                <div className={`w-14 h-14 rounded-full bg-gradient-to-br from-emerald-400 via-teal-500 to-cyan-600 flex items-center justify-center text-white text-xl font-bold shadow-2xl ring-2 ring-white/30 ${
+                  conversationType === 'private' && participantId ? 'hover:ring-emerald-400/60 hover:shadow-emerald-400/20' : ''
+                } transition-all duration-300 hover:shadow-2xl hover:scale-105`}>
                   {conversationType === 'private' ? participantName[0].toUpperCase() : '#'}
                 </div>
               )}
-              {/* Online status indicator */}
-              <motion.div
-                className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-white/10 ${
-                  conversationType === 'private' && participantId
-                    ? (getParticipantStatus() === 'online' ? 'bg-green-500' :
-                       getParticipantStatus() === 'busy' ? 'bg-red-500' :
-                       getParticipantStatus() === 'away' ? 'bg-yellow-500' :
-                       'bg-gray-500')
-                    : (isConnected ? 'bg-green-500' : 'bg-red-500')
-                } shadow-lg`}
-                animate={{ scale: [1, 1.2, 1] }}
-              />
             </motion.div>
 
             <div className="flex-1 min-w-0">
-              {/* Clickable Username */}
+              {/* Enhanced Username */}
               <motion.h1
-                className={`text-white text-xl font-bold truncate leading-tight ${
+                className={`text-2xl font-bold truncate leading-tight bg-gradient-to-r from-white to-white/80 bg-clip-text text-transparent ${
                   conversationType === 'private' && participantId 
-                    ? 'cursor-pointer hover:text-emerald-300 transition-colors duration-200' 
+                    ? 'cursor-pointer hover:from-emerald-300 hover:to-teal-300 transition-all duration-300' 
                     : ''
                 }`}
-                initial={{ opacity: 0, x: -10 }}
+                initial={{ opacity: 0, x: -15 }}
                 animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.2, duration: 0.3 }}
+                transition={{ delay: 0.25, duration: 0.4, ease: [0.23, 1, 0.320, 1] }}
                 onClick={() => {
                   if (conversationType === 'private' && participantId) {
                     router.push(`/profile/${participantId}`)
@@ -595,66 +780,80 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
               >
                 {participantName}
               </motion.h1>
+              
+              {/* Enhanced Status */}
               <motion.div
-                className="flex items-center space-x-2 mt-1"
-                initial={{ opacity: 0, x: -10 }}
+                className="flex items-center space-x-3 mt-2"
+                initial={{ opacity: 0, x: -15 }}
                 animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.3, duration: 0.3 }}
+                transition={{ delay: 0.35, duration: 0.4, ease: [0.23, 1, 0.320, 1] }}
               >
-                <span className={`text-xs font-medium ${
+                <div className={`flex items-center space-x-2 px-3 py-1 rounded-full backdrop-blur-sm border ${
                   conversationType === 'private' && participantId
-                    ? (getParticipantStatus() === 'online' ? 'text-green-400' :
-                       getParticipantStatus() === 'busy' ? 'text-red-400' :
-                       getParticipantStatus() === 'away' ? 'text-yellow-400' :
-                       'text-gray-400')
-                    : (isConnected ? 'text-green-400' : 'text-red-400')
+                    ? (getParticipantStatus() === 'online' ? 'bg-green-500/20 border-green-400/30 text-green-300' :
+                       getParticipantStatus() === 'busy' ? 'bg-red-500/20 border-red-400/30 text-red-300' :
+                       getParticipantStatus() === 'away' ? 'bg-yellow-500/20 border-yellow-400/30 text-yellow-300' :
+                       'bg-gray-500/20 border-gray-400/30 text-gray-300')
+                    : (isConnected ? 'bg-green-500/20 border-green-400/30 text-green-300' : 'bg-red-500/20 border-red-400/30 text-red-300')
                 }`}>
-                  {conversationType === 'private' && participantId
-                    ? (getParticipantStatus() === 'online' ? 'Online' :
-                       getParticipantStatus() === 'busy' ? 'Busy' :
-                       getParticipantStatus() === 'away' ? 'Away' :
-                       participantData?.last_status_change ? formatLastOnlineTime(participantData.last_status_change) : 'Offline')
-                    : (isConnected ? 'Connected' : 'Disconnected')
-                  }
-                </span>
+                  <div className={`w-2 h-2 rounded-full ${
+                    conversationType === 'private' && participantId
+                      ? (getParticipantStatus() === 'online' ? 'bg-green-400 shadow-green-400/50' :
+                         getParticipantStatus() === 'busy' ? 'bg-red-400 shadow-red-400/50' :
+                         getParticipantStatus() === 'away' ? 'bg-yellow-400 shadow-yellow-400/50' :
+                         'bg-gray-400 shadow-gray-400/50')
+                      : (isConnected ? 'bg-green-400 shadow-green-400/50' : 'bg-red-400 shadow-red-400/50')
+                  } shadow-lg`} />
+                  <span className="text-xs font-semibold">
+                    {conversationType === 'private' && participantId
+                      ? (getParticipantStatus() === 'online' ? 'Online' :
+                         getParticipantStatus() === 'busy' ? 'Busy' :
+                         getParticipantStatus() === 'away' ? 'Away' :
+                         participantData?.last_status_change ? formatLastOnlineTime(participantData.last_status_change) : 'Offline')
+                      : (isConnected ? 'Connected' : 'Disconnected')
+                    }
+                  </span>
+                </div>
                 {conversationType === 'group' && (
-                  <>
-                    <span className="text-white/40">•</span>
-                    <span className="text-xs text-white/50">
+                  <div className="flex items-center space-x-2 px-3 py-1 rounded-full bg-white/10 border border-white/20">
+                    <span className="text-xs text-white/70 font-medium">
                       {Array.from(messages.get(conversationId) || []).length} messages
                     </span>
-                  </>
+                  </div>
                 )}
               </motion.div>
             </div>
           </div>
 
-          <div className="flex items-center space-x-2">
-            {/* Connection indicator */}
+          <div className="flex items-center space-x-2 relative z-10">
+            {/* Enhanced Close button */}
             {onClose && (
               <motion.button
                 onClick={onClose}
-                className="p-3 text-white/70 hover:text-white hover:bg-white/10 rounded-xl transition-all duration-200 group"
+                className="p-3 text-white/60 hover:text-white hover:bg-gradient-to-r hover:from-red-500/20 hover:to-pink-500/20 rounded-2xl border border-white/20 hover:border-red-400/30 transition-all duration-300 group backdrop-blur-sm"
                 title="Close chat"
                 whileHover={{ scale: 1.1, rotate: 90 }}
-                whileTap={{ scale: 0.9 }}
-                transition={{ type: 'spring', stiffness: 400, damping: 17 }}
+                whileTap={{ scale: 0.95 }}
+                transition={{ type: 'spring', stiffness: 300, damping: 20 }}
               >
-                <X className="w-6 h-6 group-hover:rotate-90 transition-transform duration-200" />
+                <X className="w-5 h-5 group-hover:rotate-90 transition-transform duration-300" />
               </motion.button>
             )}
           </div>
         </motion.div>
       )}
 
-      {/* Messages */}
+      {/* Enhanced Messages Area */}
       <motion.div
         ref={messagesContainerRef}
-        className="flex-1 overflow-y-auto p-6 space-y-4 min-h-0 scrollbar-thin scrollbar-thumb-emerald-400/20 scrollbar-track-transparent"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 0.2, duration: 0.3 }}
+        className="flex-1 overflow-y-auto px-6 py-4 space-y-4 min-h-0 scrollbar-thin scrollbar-thumb-emerald-400/30 scrollbar-track-emerald-900/10 hover:scrollbar-thumb-emerald-400/50 transition-colors duration-200"
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.3, duration: 0.5, ease: [0.23, 1, 0.320, 1] }}
         onScroll={handleScroll}
+        style={{
+          background: 'linear-gradient(180deg, rgba(255,255,255,0.02) 0%, rgba(255,255,255,0.00) 100%)'
+        }}
       >
           {/* Load Previous Messages Button */}
               {hasMoreMessages.get(effectiveConversationId) && !isLoadingMore.get(effectiveConversationId) && Array.from(messages.get(effectiveConversationId) || []).length > 0 && !isLoadingHistorical && (
@@ -723,25 +922,43 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
               {Array.from(messages.get(effectiveConversationId) || []).length === 0 ? (
                 <motion.div
                   className="flex items-center justify-center h-full"
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ duration: 0.5 }}
+                  initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  transition={{ duration: 0.6, ease: [0.23, 1, 0.320, 1] }}
                 >
-                  <div className="text-center">
+                  <div className="text-center max-w-md mx-auto">
                     <motion.div
-                      animate={{ scale: [1, 1.1, 1] }}
-                      transition={{ duration: 2, repeat: Infinity }}
-                      className="text-white/40 text-6xl mb-4"
+                      animate={{ 
+                        scale: [1, 1.1, 1],
+                        rotate: [0, 5, -5, 0] 
+                      }}
+                      transition={{ 
+                        duration: 3, 
+                        repeat: Infinity,
+                        repeatType: "reverse"
+                      }}
+                      className="text-6xl mb-6 filter drop-shadow-lg"
                     >
                       💬
                     </motion.div>
-                    <div className="text-white/60 text-lg">No messages yet</div>
-                    <div className="text-white/40 text-sm mt-2">Start the conversation!</div>
-                    <div className="text-white/30 text-xs mt-4">
-                      Conversation ID: {effectiveConversationId}<br/>
-                      Conversation Type: {conversationType}<br/>
-                      Available conversation IDs: {Array.from(messages.keys()).join(', ')}
-                    </div>
+                    <motion.div
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.2, duration: 0.5 }}
+                    >
+                      <h3 className="text-2xl font-bold bg-gradient-to-r from-white to-white/70 bg-clip-text text-transparent mb-3">
+                        No messages yet
+                      </h3>
+                      <p className="text-white/60 text-base mb-6 leading-relaxed">
+                        Start the conversation with {conversationType === 'group' ? `#${participantName}` : participantName}!
+                      </p>
+                      <div className="inline-flex items-center space-x-2 px-4 py-2 bg-white/10 backdrop-blur-sm rounded-full border border-white/20">
+                        <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                        <span className="text-white/50 text-sm font-medium">
+                          {isConnected ? 'Connected' : 'Connecting...'}
+                        </span>
+                      </div>
+                    </motion.div>
                   </div>
                 </motion.div>
               ) : (
@@ -789,21 +1006,24 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
           )}
       </motion.div>
 
-      {/* Input */}
+      {/* Enhanced Input Area */}
       <motion.div
-        className="bg-white/5 backdrop-blur-xl border-t border-white/20 p-6 flex-shrink-0"
-        initial={{ y: 20, opacity: 0 }}
+        className="bg-gradient-to-t from-white/10 via-white/5 to-white/8 backdrop-blur-2xl border-t border-white/25 p-6 flex-shrink-0 relative"
+        initial={{ y: 30, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
-        transition={{ delay: 0.3, duration: 0.3 }}
+        transition={{ delay: 0.4, duration: 0.5, ease: [0.23, 1, 0.320, 1] }}
       >
-        <div className="flex items-end space-x-4">
-          {/* Emoji Picker Button */}
+        {/* Subtle input area gradient overlay */}
+        <div className="absolute inset-0 bg-gradient-to-t from-emerald-500/5 via-teal-500/5 to-cyan-500/5 rounded-b-3xl" />
+        
+        <div className="flex items-center space-x-4 relative z-10">
+          {/* Enhanced Emoji Picker Button */}
           <motion.button
             onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-            className="p-3 text-white/60 hover:text-white hover:bg-white/10 rounded-xl transition-colors"
+            className="p-3 text-white/60 hover:text-white hover:bg-gradient-to-r hover:from-yellow-500/20 hover:to-orange-500/20 rounded-2xl border border-white/20 hover:border-yellow-400/30 backdrop-blur-sm transition-all duration-300"
             title="Add emoji"
             whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.9 }}
+            whileTap={{ scale: 0.95 }}
           >
             <Smile className="w-5 h-5" />
           </motion.button>
@@ -823,7 +1043,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
               }}
               onKeyPress={handleKeyPress}
               placeholder={`Message ${conversationType === 'group' ? `#${participantName}` : participantName}...`}
-              className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-emerald-400/50 resize-none min-h-[44px] max-h-32 text-sm overflow-y-auto"
+              className="w-full bg-gradient-to-r from-white/15 to-white/10 border border-white/25 rounded-2xl px-6 py-4 text-white placeholder-white/60 focus:outline-none focus:ring-2 focus:ring-emerald-400/60 focus:border-emerald-400/50 resize-none min-h-[52px] max-h-32 text-sm overflow-y-auto backdrop-blur-sm shadow-inner transition-all duration-300 hover:bg-gradient-to-r hover:from-white/20 hover:to-white/15"
               rows={1}
             />
           </div>
@@ -831,10 +1051,11 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
           <motion.button
             onClick={handleSendMessage}
             disabled={!newMessage.trim() || !isConnected}
-            className="p-3 bg-gradient-to-r from-emerald-500 to-teal-600 rounded-xl text-white hover:from-emerald-600 hover:to-teal-700 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
+            className="p-4 bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-600 rounded-2xl text-white hover:from-emerald-600 hover:via-teal-600 hover:to-cyan-700 transition-all duration-300 disabled:opacity-40 disabled:cursor-not-allowed shadow-xl hover:shadow-emerald-500/30 border border-emerald-400/30 disabled:border-white/20"
             title="Send message"
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
+            whileHover={{ scale: 1.08 }}
+            whileTap={{ scale: 0.92 }}
+            transition={{ type: 'spring', stiffness: 300, damping: 20 }}
           >
             <Send className="w-5 h-5" />
           </motion.button>
@@ -844,7 +1065,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
         <AnimatePresence>
           {showEmojiPicker && (
             <motion.div
-              className="absolute bottom-full left-6 mb-4 z-50"
+              className="absolute bottom-full left-6 mb-8 z-50"
               initial={{ opacity: 0, scale: 0.8, y: 10 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.8, y: 10 }}

@@ -248,9 +248,28 @@ export interface GroupResponse {
   member_count: number;
   is_member: boolean;
   member_status?: GroupMemberStatus;
-  role?: 'admin' | 'member';
+  role?: 'admin' | 'member' | 'creator';
   created_at: string;
   updated_at: string;
+  creator?: {
+    id: number;
+    first_name: string;
+    last_name: string;
+    avatar?: string;
+    nickname?: string;
+  };
+  members?: Array<{
+    id: number;
+    user: {
+      id: number;
+      first_name: string;
+      last_name: string;
+      avatar?: string;
+      nickname?: string;
+    };
+    role: string;
+    joined_at: string;
+  }>;
 }
 
 export interface EventResponse {
@@ -685,7 +704,7 @@ export class ApiClient {
   }
 
   async getGroup(groupId: number): Promise<GroupResponse> {
-    return this.request<GroupResponse>(`/api/groups/${groupId}`, {
+    return this.request<GroupResponse>(`/api/chats?group=${groupId}`, {
       method: 'GET',
     });
   }
@@ -869,6 +888,13 @@ export class ApiClient {
 
   async getConversationMessages(conversationId: number, limit: number = 50, offset: number = 0): Promise<{ messages: MessageItem[]; count: number; limit: number; offset: number }> {
     return this.request<{ messages: MessageItem[]; count: number; limit: number; offset: number }>(`/api/messages/conversation/${conversationId}?limit=${limit}&offset=${offset}`, {
+      method: 'GET',
+    });
+  }
+
+  // New method for getting private chat data using query parameters
+  async getPrivateChat(chatId: number): Promise<{ messages: MessageItem[]; count: number; limit: number; offset: number }> {
+    return this.request<{ messages: MessageItem[]; count: number; limit: number; offset: number }>(`/api/chats?chats=${chatId}`, {
       method: 'GET',
     });
   }

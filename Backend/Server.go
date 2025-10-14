@@ -175,7 +175,7 @@ func (s *Server) setupRoutes() {
 	s.router.HandleFunc("/api/messages/", s.handleMessageRoute(messageHandler))
 	s.router.HandleFunc("/api/conversations", s.handleRoute(messageHandler.GetConversations, true))
 	s.router.HandleFunc("/api/conversations/", s.handleConversationRoute(conversationHandler))
-	s.router.HandleFunc("/api/chats", s.handleRoute(chatHandler.GetUnifiedChats, true))
+	s.router.HandleFunc("/api/chats", s.handleChatsRoute(chatHandler, messageHandler, groupHandler))
 
 	// Notification routes
 	s.router.HandleFunc("/api/notifications", s.handleNotificationsRoute(notificationHandler))
@@ -567,13 +567,42 @@ func (s *Server) handleGroupRoute(groupHandler *handlers.GroupHandler, eventHand
 					groupHandler.LeaveGroup(w, r, groupID)
 				})).ServeHTTP(w, r)
 			case "members":
-				if r.Method != http.MethodGet {
-					writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
-					return
+				if len(parts) == 2 {
+					// GET /api/groups/{groupID}/members
+					if r.Method != http.MethodGet {
+						writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
+						return
+					}
+					authMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+						groupHandler.GetGroupMembers(w, r, groupID)
+					})).ServeHTTP(w, r)
+				} else if len(parts) >= 4 {
+					// Handle /api/groups/{groupID}/members/{userID}/role or /api/groups/{groupID}/members/{userID}
+					userID := parts[2]
+					if len(parts) == 4 && parts[3] == "role" {
+						// PUT /api/groups/{groupID}/members/{userID}/role
+						if r.Method != http.MethodPut {
+							writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
+							return
+						}
+						authMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+							groupHandler.UpdateMemberRole(w, r, groupID, userID)
+						})).ServeHTTP(w, r)
+					} else if len(parts) == 3 {
+						// DELETE /api/groups/{groupID}/members/{userID}
+						if r.Method != http.MethodDelete {
+							writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
+							return
+						}
+						authMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+							groupHandler.KickMember(w, r, groupID, userID)
+						})).ServeHTTP(w, r)
+					} else {
+						writeError(w, http.StatusNotFound, "Not found")
+					}
+				} else {
+					writeError(w, http.StatusNotFound, "Invalid members route")
 				}
-				authMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-					groupHandler.GetGroupMembers(w, r, groupID)
-				})).ServeHTTP(w, r)
 			case "requests":
 				if r.Method != http.MethodGet {
 					writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
@@ -904,5 +933,50 @@ func (s *Server) handleConversationRoute(handler *handlers.ConversationHandler) 
 		} else {
 			writeError(w, http.StatusNotFound, "Route not found")
 		}
+	}
+}
+
+// handleChatsRoute handles /api/chats with query parameters
+// ?chats=id for private chats
+// ?group=id for group chats
+func (s *Server) handleChatsRoute(chatHandler *handlers.ChatHandler, messageHandler *handlers.MessageHandler, groupHandler *handlers.GroupHandler) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// Apply auth middleware
+		authMiddleware := middleware.AuthMiddleware(s.DB.GetDB())
+
+		authMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			query := r.URL.Query()
+
+			// Check for ?chats=id (private chat)
+			if chatID := query.Get("chats"); chatID != "" {
+				switch r.Method {
+				case http.MethodGet:
+					// Get private conversation messages
+					messageHandler.GetConversationMessages(w, r, chatID)
+				default:
+					writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
+				}
+				return
+			}
+
+			// Check for ?group=id (group chat)
+			if groupID := query.Get("group"); groupID != "" {
+				switch r.Method {
+				case http.MethodGet:
+					// Get group details
+					groupHandler.GetGroup(w, r, groupID)
+				default:
+					writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
+				}
+				return
+			}
+
+			// No query parameters - return unified chats list
+			if r.Method == http.MethodGet {
+				chatHandler.GetUnifiedChats(w, r)
+			} else {
+				writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
+			}
+		})).ServeHTTP(w, r)
 	}
 }

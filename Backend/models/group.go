@@ -15,18 +15,19 @@ type Group struct {
 }
 
 type GroupResponse struct {
-	ID           uint         `json:"id"`
-	CreatorID    uint         `json:"creator_id"`
-	Title        string       `json:"title"`
-	Description  string       `json:"description"`
-	Privacy      string       `json:"privacy"`
-	CreatedAt    time.Time    `json:"created_at"`
-	UpdatedAt    time.Time    `json:"updated_at"`
-	Creator      UserResponse `json:"creator"`
-	MemberCount  int          `json:"member_count"`
-	IsMember     bool         `json:"is_member"`
-	MemberStatus string       `json:"member_status"` // "member", "sent", "rejected", "requested", "none"
-	Role         string       `json:"role"`
+	ID           uint                  `json:"id"`
+	CreatorID    uint                  `json:"creator_id"`
+	Title        string                `json:"title"`
+	Description  string                `json:"description"`
+	Privacy      string                `json:"privacy"`
+	CreatedAt    time.Time             `json:"created_at"`
+	UpdatedAt    time.Time             `json:"updated_at"`
+	Creator      UserResponse          `json:"creator"`
+	MemberCount  int                   `json:"member_count"`
+	IsMember     bool                  `json:"is_member"`
+	MemberStatus string                `json:"member_status"` // "member", "sent", "rejected", "requested", "none"
+	Role         string                `json:"role"`
+	Members      []GroupMemberResponse `json:"members,omitempty"`
 }
 
 type CreateGroupRequest struct {

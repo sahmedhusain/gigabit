@@ -33,6 +33,7 @@ func LoadMockData(db *sql.DB) error {
 		"private_conversations.sql",
 		"private_messages.sql",
 		"posts.sql",
+		"group_posts.sql", // Added group posts
 		"likes.sql",
 		// "comments.sql", // Temporarily disabled due to syntax errors
 		"events.sql",

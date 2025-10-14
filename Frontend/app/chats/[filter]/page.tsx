@@ -3,7 +3,6 @@ import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import ProtectedRoute from '@/components/ProtectedRoute'
 import ChatWindow from '@/components/ChatWindow'
-import GroupWindow from '@/components/GroupWindow'
 import { useAuth } from '@/context/AuthContext'
 import { useWebSocket } from '@/context/WebSocketContext'
 import { useToast } from '@/context/ToastContext'
@@ -56,7 +55,7 @@ function ChatsFilterPage() {
     participantId?: number
     groupId?: number
     isGroupMember?: boolean
-    userRole?: 'admin' | 'member'
+    userRole?: 'creator' | 'admin' | 'member'
   } | null>(null)
 
   // Current User Processing
@@ -362,31 +361,15 @@ function ChatsFilterPage() {
       />
 
       {openChatWindow ? (
-        openChatWindow.type === 'group' ? (
-          <div className="bg-white/5 backdrop-blur-xl rounded-2xl border border-white/10 h-[700px] mx-4 my-4 relative">
-            <button
-              onClick={() => setOpenChatWindow(null)}
-              className="absolute top-4 right-4 z-10 p-2 text-white/70 hover:text-white hover:bg-white/10 rounded-xl transition-all duration-200"
-              title="Close"
-            >
-              <X className="w-5 h-5" />
-            </button>
-            <GroupWindow 
-              groupId={openChatWindow.groupId || openChatWindow.conversationId}
-              groupTitle={openChatWindow.name}
-              isGroupMember={openChatWindow.isGroupMember ?? true}
-              userRole={openChatWindow.userRole ?? 'member'}
-            />
-          </div>
-        ) : (
-          <ChatWindow
-            conversationId={openChatWindow.conversationId}
-            conversationType={openChatWindow.type}
-            participantName={openChatWindow.name}
-            participantId={openChatWindow.participantId}
-            onClose={() => setOpenChatWindow(null)}
-          />
-        )
+        <ChatWindow
+          conversationId={openChatWindow.conversationId}
+          conversationType={openChatWindow.type}
+          chatType={openChatWindow.type} // Explicitly set chatType to trigger tabbed interface for groups
+          participantName={openChatWindow.name}
+          participantId={openChatWindow.participantId}
+          groupId={openChatWindow.type === 'group' ? (openChatWindow.groupId || openChatWindow.conversationId) : undefined}
+          onClose={() => setOpenChatWindow(null)}
+        />
       ) : (
         <ChatsSection
           chatSubTab={chatSubTab}

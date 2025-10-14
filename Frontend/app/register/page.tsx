@@ -16,6 +16,8 @@ function validatePassword(password: string) {
   const lower = /[a-z]/
   const number = /[0-9]/
   const space = /\s/
+  // Allow only ASCII printable characters (excluding space, but including common symbols)
+  const allowedChars = /^[a-zA-Z0-9!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?`~]+$/
 
   const errors = []
 
@@ -39,12 +41,41 @@ function validatePassword(password: string) {
     errors.push("not contain any spaces")
   }
 
+  if (!allowedChars.test(password)) {
+    errors.push("only contain English letters, numbers, and common symbols (no emojis or special characters)")
+  }
+
   // combine errors into a single message
   if (errors.length > 0) {
     const lastError = errors.pop() // for adding 'and' before the last error
     return "Password must " + (errors.length ? errors.join(", ") + ", and " + lastError : lastError)
   }
 
+  return null
+}
+
+function validateNickname(nickname: string) {
+  if (!nickname) return null // nickname is optional
+  
+  // Allow only English letters (a-z, A-Z), numbers (0-9), underscore (_), hyphen (-), and dot (.)
+  const allowedCharsRegex = /^[a-zA-Z0-9._-]+$/
+  
+  if (!allowedCharsRegex.test(nickname)) {
+    return "Nickname can only contain English letters, numbers, underscore (_), hyphen (-), and dot (.)"
+  }
+  
+  // Must start with a letter or number (not special characters)
+  const startsWithAlphanumeric = /^[a-zA-Z0-9]/
+  if (!startsWithAlphanumeric.test(nickname)) {
+    return "Nickname must start with a letter or number"
+  }
+  
+  // Must end with a letter or number (not special characters)
+  const endsWithAlphanumeric = /[a-zA-Z0-9]$/
+  if (!endsWithAlphanumeric.test(nickname)) {
+    return "Nickname must end with a letter or number"
+  }
+  
   return null
 }
 
@@ -61,27 +92,43 @@ function RegisterPage() {
     dateOfBirth: '',
     nickname: '',
     aboutMe: '',
-    avatar: '',
-    gender: ''
+    avatar: '/avatars/defaultM.png',
+    gender: 'male'
   })
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
-  const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
+  const [avatarPreview, setAvatarPreview] = useState<string | null>('/avatars/defaultM.png')
   const [error, setError] = useState<string | null>(null)
   const [showOptionalFields, setShowOptionalFields] = useState(false)
   const [showAvatarPopup, setShowAvatarPopup] = useState(false)
+  const [nicknameError, setNicknameError] = useState<string | null>(null)
+  const [passwordError, setPasswordError] = useState<string | null>(null)
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target
+    
     setFormData({
       ...formData,
-      [e.target.name]: e.target.value
+      [name]: value
     })
+
+    // Real-time validation for nickname
+    if (name === 'nickname') {
+      const validation = validateNickname(value)
+      setNicknameError(validation)
+    }
+
+    // Real-time validation for password
+    if (name === 'password') {
+      const validation = validatePassword(value)
+      setPasswordError(validation)
+    }
   }
 
   const handleGenderSelect = (gender: 'male' | 'female') => {
     const defaultAvatar = gender === 'male' ? '/avatars/defaultM.png' : '/avatars/defaultFM.png'
-    setFormData({ 
-      ...formData, 
+    setFormData({
+      ...formData,
       gender: gender,
       avatar: defaultAvatar
     })
@@ -90,10 +137,11 @@ function RegisterPage() {
 
   const handleAvatarSelect = (avatarId: string) => {
     const selectedAvatar = getAvatarOptions(formData.gender as 'male' | 'female').find(avatar => avatar.id === avatarId);
-    setFormData({ ...formData, avatar: selectedAvatar?.imageUrl || avatarId })
-    
-    // Set preview to the selected avatar's image URL or ID for fallback
-    setAvatarPreview(selectedAvatar?.imageUrl || avatarId)
+    if (selectedAvatar) {
+      // Always store the imageUrl for consistency
+      setFormData({ ...formData, avatar: selectedAvatar.imageUrl })
+      setAvatarPreview(selectedAvatar.imageUrl)
+    }
   }
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -114,6 +162,7 @@ function RegisterPage() {
       const reader = new FileReader();
       reader.onload = (e) => {
         const result = e.target?.result as string;
+        // Overwrite any existing avatar selection with uploaded image
         setFormData({ ...formData, avatar: result });
         setAvatarPreview(result);
         setError(null);
@@ -129,8 +178,8 @@ function RegisterPage() {
 
     try {
       // Validate required fields
-      if (!formData.email || !formData.password || !formData.firstName || !formData.lastName || !formData.dateOfBirth || !formData.gender) {
-        throw new Error('Please fill in all required fields including gender')
+      if (!formData.email || !formData.password || !formData.firstName || !formData.lastName || !formData.dateOfBirth) {
+        throw new Error('Please fill in all required fields')
       }
 
       if (formData.firstName.length < 3) {
@@ -148,7 +197,7 @@ function RegisterPage() {
       if (formData.lastName.length > 16) {
         throw new Error('Last name is too long')
       }
-      
+
       // Validate email format
       const emailRegex = /^[a-zA-Z0-9!#$%&'*+/=?^_`{|}~]+(\.[a-zA-Z0-9!#$%&'*+/=?^_`{|}~]+)*@[a-zA-Z0-9-]+(\.[a-zA-Z0-9-]+)*\.[a-zA-Z]{2,}$/;
       if (!emailRegex.test(formData.email)) {
@@ -159,9 +208,14 @@ function RegisterPage() {
       if (returnValue) {
         throw new Error(returnValue)
       }
-      
+
       if (formData.nickname && formData.nickname.length > 16) {
         throw new Error('Nickname is too long')
+      }
+
+      const nicknameValidation = validateNickname(formData.nickname)
+      if (nicknameValidation) {
+        throw new Error(nicknameValidation)
       }
 
       if (formData.aboutMe.length > 128) {
@@ -169,7 +223,7 @@ function RegisterPage() {
       }
 
       console.log("Form data before sending:", {
-        ...formData, 
+        ...formData,
         avatar: formData.avatar ? `${formData.avatar.substring(0, 50)}...` : 'No Avatar'
       })
 
@@ -203,7 +257,7 @@ function RegisterPage() {
         <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-teal-500/20 rounded-full blur-3xl animate-pulse delay-1000"></div>
         <div className="absolute top-3/4 left-1/2 w-64 h-64 bg-cyan-500/20 rounded-full blur-3xl animate-pulse delay-2000"></div>
       </div>
-      
+
       {/* Floating Particles */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         {[...Array(15)].map((_, i) => {
@@ -211,7 +265,7 @@ function RegisterPage() {
           const top = (i * 31 + 41) % 100;
           const delay = (i * 0.3) % 3;
           const duration = 3 + (i * 0.2) % 2;
-          
+
           return (
             <div
               key={i}
@@ -288,7 +342,7 @@ function RegisterPage() {
               {/* Glassmorphism Background */}
               <div className="absolute inset-0 bg-gradient-to-r from-white/10 to-white/5 backdrop-blur-xl rounded-3xl border border-white/20 shadow-2xl shadow-black/20"></div>
               <div className="absolute inset-0 bg-gradient-to-b from-white/5 to-transparent rounded-3xl"></div>
-              
+
               {/* Fixed Header */}
               <div className="relative p-6 pb-4">
                 <div className="text-center">
@@ -296,7 +350,7 @@ function RegisterPage() {
                   <p className="text-white/60 text-sm">Fill in your details to get started</p>
                 </div>
               </div>
-              
+
               {/* Scrollable Content */}
               <div className="relative h-[calc(100%-9.5rem)] overflow-y-auto px-6 pb-1 custom-scrollbar">
                 <form onSubmit={(e) => { e.preventDefault(); handleSubmit(); }} className="space-y-4">
@@ -379,7 +433,7 @@ function RegisterPage() {
                           Password
                         </label>
                         <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none z-10 top-7">
-                          <Lock className="h-4 w-4 text-emerald-400/70 group-focus-within:text-emerald-400 transition-colors" />
+                          <Lock className={`h-4 w-4 ${passwordError ? 'text-red-400' : 'text-emerald-400/70 group-focus-within:text-emerald-400'} transition-colors`} />
                         </div>
                         <input
                           id="password"
@@ -387,8 +441,8 @@ function RegisterPage() {
                           type={showPassword ? "text" : "password"}
                           autoComplete="new-password"
                           required
-                          className="w-full pl-11 pr-12 py-3.5 bg-white/10 border border-white/20 rounded-xl placeholder-white/40 text-white focus:outline-none focus:ring-2 focus:ring-emerald-400/50 focus:border-emerald-400/50 focus:bg-white/15 transition-all duration-300 backdrop-blur-sm hover:border-white/30"
-                          placeholder="Create a strong password"
+                          className={`w-full pl-11 pr-12 py-3.5 bg-white/10 border ${passwordError ? 'border-red-400/50' : 'border-white/20'} rounded-xl placeholder-white/40 text-white focus:outline-none focus:ring-2 ${passwordError ? 'focus:ring-red-400/50 focus:border-red-400/50' : 'focus:ring-emerald-400/50 focus:border-emerald-400/50'} focus:bg-white/15 transition-all duration-300 backdrop-blur-sm hover:border-white/30`}
+                          placeholder="Create a strong password (English only)"
                           value={formData.password}
                           onChange={handleInputChange}
                         />
@@ -403,6 +457,12 @@ function RegisterPage() {
                             <Eye className="h-5 w-5 text-white/70 hover:text-white/90 transition-colors" />
                           )}
                         </button>
+                        {passwordError && (
+                          <p className="mt-1 text-xs text-red-400/90">{passwordError}</p>
+                        )}
+                        {!passwordError && formData.password && (
+                          <p className="mt-1 text-xs text-emerald-400/90">Valid password</p>
+                        )}
                       </div>
 
                       {/* Date of Birth */}
@@ -468,17 +528,23 @@ function RegisterPage() {
                           Nickname <span className="text-white/40 text-[10px] normal-case">(Optional)</span>
                         </label>
                         <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none z-10 top-7">
-                          <Edit3 className="h-4 w-4 text-emerald-400/70 group-focus-within:text-emerald-400 transition-colors" />
+                          <Edit3 className={`h-4 w-4 ${nicknameError ? 'text-red-400' : 'text-emerald-400/70 group-focus-within:text-emerald-400'} transition-colors`} />
                         </div>
                         <input
                           id="nickname"
                           name="nickname"
                           type="text"
-                          className="w-full pl-11 pr-4 py-3.5 bg-white/10 border border-white/20 rounded-xl placeholder-white/40 text-white focus:outline-none focus:ring-2 focus:ring-emerald-400/50 focus:border-emerald-400/50 focus:bg-white/15 transition-all duration-300 backdrop-blur-sm hover:border-white/30"
-                          placeholder="Choose a nickname"
+                          className={`w-full pl-11 pr-4 py-3.5 bg-white/10 border ${nicknameError ? 'border-red-400/50' : 'border-white/20'} rounded-xl placeholder-white/40 text-white focus:outline-none focus:ring-2 ${nicknameError ? 'focus:ring-red-400/50 focus:border-red-400/50' : 'focus:ring-emerald-400/50 focus:border-emerald-400/50'} focus:bg-white/15 transition-all duration-300 backdrop-blur-sm hover:border-white/30`}
+                          placeholder="Choose a nickname (a-z, 0-9, ._-)"
                           value={formData.nickname}
                           onChange={handleInputChange}
                         />
+                        {nicknameError && (
+                          <p className="mt-1 text-xs text-red-400/90">{nicknameError}</p>
+                        )}
+                        {!nicknameError && formData.nickname && (
+                          <p className="mt-1 text-xs text-emerald-400/90">Valid nickname</p>
+                        )}
                       </div>
 
                       {/* About Me (Optional) */}
@@ -529,50 +595,48 @@ function RegisterPage() {
                         </div>
 
                         {/* Enhanced Content */}
-                        <div className="p-6 max-h-[70vh] overflow-y-auto">
+                        <div className="p-8 max-h-[70vh] overflow-y-auto space-y-8">
                           {/* Gender Selection */}
-                          <div className="mb-8">
+                          <div>
                             <div className="flex items-center justify-center space-x-3 mb-6">
-                              <div className="h-px w-8 bg-gradient-to-r from-transparent via-emerald-400/50 to-transparent"></div>
-                              <div className="flex items-center space-x-2 bg-gradient-to-r from-emerald-500/20 to-teal-500/20 px-4 py-2 rounded-full border border-emerald-400/30">
-                                <User className="w-4 h-4 text-emerald-400" />
-                                <h4 className="text-lg font-semibold text-white">Choose Gender</h4>
+                              <div className="h-px w-12 bg-gradient-to-r from-transparent via-emerald-400/50 to-transparent"></div>
+                              <div className="flex items-center space-x-2 bg-gradient-to-r from-emerald-500/20 to-teal-500/20 px-6 py-3 rounded-full border border-emerald-400/30">
+                                <User className="w-5 h-5 text-emerald-400" />
+                                <h4 className="text-xl font-semibold text-white">Choose Gender</h4>
                               </div>
-                              <div className="h-px w-8 bg-gradient-to-l from-transparent via-teal-400/50 to-transparent"></div>
+                              <div className="h-px w-12 bg-gradient-to-l from-transparent via-teal-400/50 to-transparent"></div>
                             </div>
-                            <div className="flex space-x-6 justify-center">
+                            <div className="flex space-x-8 justify-center">
                               <button
                                 type="button"
                                 onClick={() => handleGenderSelect('male')}
-                                className={`group relative px-8 py-4 rounded-2xl border-2 transition-all duration-300 transform hover:scale-105 hover:-translate-y-0.5 ${
-                                  formData.gender === 'male'
+                                className={`group relative px-10 py-5 rounded-2xl border-2 transition-all duration-300 transform hover:scale-105 hover:-translate-y-0.5 ${formData.gender === 'male'
                                     ? 'border-blue-400 bg-gradient-to-br from-blue-500/25 to-blue-600/15 text-blue-200 shadow-xl shadow-blue-500/30 ring-2 ring-blue-400/20'
                                     : 'border-white/30 text-white/70 hover:border-blue-400/70 hover:text-white hover:shadow-lg hover:shadow-blue-500/20 bg-gradient-to-br from-white/5 to-white/10'
-                                }`}
+                                  }`}
                               >
                                 <div className="absolute inset-0 bg-gradient-to-r from-blue-500/15 to-blue-600/15 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                                <div className="relative flex flex-col items-center space-y-1">
-                                  <div className="w-6 h-6 rounded-full bg-blue-400/25 flex items-center justify-center">
-                                    <span className="text-blue-300 font-bold text-sm">♂</span>
+                                <div className="relative flex flex-col items-center space-y-2">
+                                  <div className="w-8 h-8 rounded-full bg-blue-400/25 flex items-center justify-center">
+                                    <span className="text-blue-300 font-bold text-lg">♂</span>
                                   </div>
-                                  <span className="font-medium text-sm">Male</span>
+                                  <span className="font-semibold">Male</span>
                                 </div>
                               </button>
                               <button
                                 type="button"
                                 onClick={() => handleGenderSelect('female')}
-                                className={`group relative px-8 py-4 rounded-2xl border-2 transition-all duration-300 transform hover:scale-105 hover:-translate-y-0.5 ${
-                                  formData.gender === 'female'
+                                className={`group relative px-10 py-5 rounded-2xl border-2 transition-all duration-300 transform hover:scale-105 hover:-translate-y-0.5 ${formData.gender === 'female'
                                     ? 'border-pink-400 bg-gradient-to-br from-pink-500/25 to-pink-600/15 text-pink-200 shadow-xl shadow-pink-500/30 ring-2 ring-pink-400/20'
                                     : 'border-white/30 text-white/70 hover:border-pink-400/70 hover:text-white hover:shadow-lg hover:shadow-pink-500/20 bg-gradient-to-br from-white/5 to-white/10'
-                                }`}
+                                  }`}
                               >
                                 <div className="absolute inset-0 bg-gradient-to-r from-pink-500/15 to-pink-600/15 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                                <div className="relative flex flex-col items-center space-y-1">
-                                  <div className="w-6 h-6 rounded-full bg-pink-400/25 flex items-center justify-center">
-                                    <span className="text-pink-300 font-bold text-sm">♀</span>
+                                <div className="relative flex flex-col items-center space-y-2">
+                                  <div className="w-8 h-8 rounded-full bg-pink-400/25 flex items-center justify-center">
+                                    <span className="text-pink-300 font-bold text-lg">♀</span>
                                   </div>
-                                  <span className="font-medium text-sm">Female</span>
+                                  <span className="font-semibold">Female</span>
                                 </div>
                               </button>
                             </div>
@@ -580,155 +644,161 @@ function RegisterPage() {
 
                           {/* Avatar Selection */}
                           {formData.gender && (
-                            <div className="space-y-8">
+                            <div className="space-y-10">
                               {/* Current Avatar Preview */}
-                              <div className="text-center">
-                                <div className="inline-flex items-center space-x-2 mb-4">
-                                  <div className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse"></div>
-                                  <h4 className="text-lg font-semibold text-white">Preview</h4>
-                                  <div className="w-1.5 h-1.5 bg-teal-400 rounded-full animate-pulse delay-300"></div>
-                                </div>
-                                <div className="relative group inline-block">
-                                  <div className="absolute inset-0 bg-gradient-to-r from-emerald-400 via-teal-400 to-cyan-400 rounded-full blur-xl opacity-25 group-hover:opacity-40 transition-opacity duration-300"></div>
-                                  <div className="relative w-28 h-28 rounded-full bg-gradient-to-br from-white/15 via-white/10 to-white/5 border-3 border-emerald-400/60 shadow-xl shadow-emerald-400/25 flex items-center justify-center overflow-hidden backdrop-blur-sm ring-2 ring-white/15">
-                                    {avatarPreview ? (
-                                      avatarPreview.startsWith('/') || avatarPreview.startsWith('data:') ? (
-                                        <Image src={avatarPreview} alt="Selected Avatar" width={112} height={112} className="w-full h-full object-cover rounded-full" />
+                              <div className="text-center space-y-6">
+                                <div className="flex justify-center">
+                                  <div className="relative group">
+                                    <div className="absolute inset-0 bg-gradient-to-r from-emerald-400 via-teal-400 to-cyan-400 rounded-full blur-xl opacity-25 group-hover:opacity-40 transition-opacity duration-300"></div>
+                                    <div className="relative w-32 h-32 rounded-full bg-gradient-to-br from-white/15 via-white/10 to-white/5 border-4 border-emerald-400/60 shadow-2xl shadow-emerald-400/25 flex items-center justify-center overflow-hidden backdrop-blur-sm ring-4 ring-white/10">
+                                      {avatarPreview ? (
+                                        avatarPreview.startsWith('/') || avatarPreview.startsWith('data:') ? (
+                                          <Image src={avatarPreview} alt="Selected Avatar" width={128} height={128} className="w-full h-full object-cover rounded-full" />
+                                        ) : (
+                                          // Show gradient for selected avatar ID
+                                          (() => {
+                                            const selectedAvatar = getAvatarOptions(formData.gender as 'male' | 'female').find(avatar => avatar.id === avatarPreview);
+                                            return selectedAvatar ? (
+                                              <div className={`w-full h-full rounded-full bg-gradient-to-r ${selectedAvatar.gradient} flex items-center justify-center`}>
+                                                <span className="text-white font-bold text-3xl drop-shadow-lg">
+                                                  {selectedAvatar.label}
+                                                </span>
+                                              </div>
+                                            ) : (
+                                              <Camera className="w-12 h-12 text-white/50" />
+                                            );
+                                          })()
+                                        )
                                       ) : (
-                                        // Show gradient for selected avatar ID
-                                        (() => {
-                                          const selectedAvatar = getAvatarOptions(formData.gender as 'male' | 'female').find(avatar => avatar.id === avatarPreview);
-                                          return selectedAvatar ? (
-                                            <div className={`w-full h-full rounded-full bg-gradient-to-r ${selectedAvatar.gradient} flex items-center justify-center`}>
-                                              <span className="text-white font-bold text-2xl drop-shadow-lg">
-                                                {selectedAvatar.label}
-                                              </span>
-                                            </div>
-                                          ) : (
-                                            <Camera className="w-10 h-10 text-white/50" />
-                                          );
-                                        })()
-                                      )
-                                    ) : (
-                                      <Camera className="w-10 h-10 text-white/50" />
-                                    )}
-                                  </div>
-                                  <div className="absolute -bottom-2 left-1/2 transform -translate-x-1/2 w-6 h-6 bg-gradient-to-r from-emerald-400 to-teal-400 rounded-full flex items-center justify-center shadow-lg border-2 border-white/20 animate-pulse">
-                                    <div className="w-2 h-2 bg-white rounded-full"></div>
+                                        <Camera className="w-12 h-12 text-white/50" />
+                                      )}
+                                    </div>
+                                    <div className="absolute -bottom-3 left-1/2 transform -translate-x-1/2 w-8 h-8 bg-gradient-to-r from-emerald-400 to-teal-400 rounded-full flex items-center justify-center shadow-lg border-2 border-white/20 animate-pulse">
+                                      <div className="w-3 h-3 bg-white rounded-full"></div>
+                                    </div>
                                   </div>
                                 </div>
-                                <p className="text-white/60 mt-3 text-xs">Your avatar preview</p>
+                                <div className="flex justify-center">
+                                  <div className="inline-flex items-center space-x-3">
+                                    <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></div>
+                                    <h4 className="text-xl font-semibold text-white">Your Avatar</h4>
+                                    <div className="w-2 h-2 bg-teal-400 rounded-full animate-pulse delay-300"></div>
+                                  </div>
+                                </div>
+                                <div>
+                                  <p className="text-white/60 text-sm">This is how others will see you</p>
+                                  {formData.avatar.startsWith('data:') && (
+                                    <p className="text-emerald-400 text-xs mt-1 font-medium">Custom image uploaded</p>
+                                  )}
+                                </div>
                               </div>
 
                               {/* Pre-made Avatars */}
-                              <div className="space-y-6">
-                                <div className="flex items-center justify-center space-x-2">
-                                  <div className="h-px w-6 bg-gradient-to-r from-transparent via-teal-400/50 to-transparent"></div>
-                                  <div className="flex items-center space-x-2 bg-gradient-to-r from-teal-500/20 to-cyan-500/20 px-4 py-2 rounded-full border border-teal-400/30">
-                                    <Sparkles className="w-4 h-4 text-teal-400" />
-                                    <h5 className="text-base font-semibold text-white">Gallery</h5>
+                              <div className="space-y-8">
+                                <div className="flex items-center justify-center space-x-4">
+                                  <div className="h-px w-16 bg-gradient-to-r from-transparent via-teal-400/50 to-transparent"></div>
+                                  <div className="flex items-center space-x-3 bg-gradient-to-r from-teal-500/20 to-cyan-500/20 px-6 py-3 rounded-full border border-teal-400/30">
+                                    <Sparkles className="w-5 h-5 text-teal-400" />
+                                    <h5 className="text-xl font-semibold text-white">Avatar Gallery</h5>
                                   </div>
-                                  <div className="h-px w-6 bg-gradient-to-l from-transparent via-cyan-400/50 to-transparent"></div>
+                                  <div className="h-px w-16 bg-gradient-to-l from-transparent via-cyan-400/50 to-transparent"></div>
                                 </div>
-                                <div className="grid grid-cols-5 gap-4 justify-center">
-                                  {getAvatarOptions(formData.gender as 'male' | 'female').map((avatar) => (
-                                    <div
-                                      key={avatar.id}
-                                      onClick={() => handleAvatarSelect(avatar.id)}
-                                      className={`relative w-16 h-16 rounded-full border-2 cursor-pointer hover:scale-110 transition-all duration-300 flex items-center justify-center backdrop-blur-sm overflow-hidden group shadow-lg transform hover:-translate-y-1 ${
-                                        formData.avatar === avatar.id
-                                          ? 'border-emerald-400 shadow-emerald-400/40 ring-2 ring-emerald-400/25 bg-emerald-400/15 scale-105'
-                                          : 'border-white/30 hover:border-emerald-400/70 hover:shadow-emerald-400/30 bg-gradient-to-br from-white/8 to-white/5'
-                                      }`}
-                                    >
-                                      {/* Image layer */}
-                                      <Image
-                                        src={avatar.imageUrl} 
-                                        alt={`Avatar option ${avatar.label}`}
-                                        width={64}
-                                        height={64}
-                                        className="w-full h-full object-cover absolute inset-0 z-10 rounded-full"
-                                        onError={(e) => {
-                                          // Hide image on error, showing gradient fallback
-                                          e.currentTarget.style.display = 'none';
-                                        }}
-                                      />
-                                      {/* Gradient fallback layer */}
-                                      <div className={`w-full h-full rounded-full bg-gradient-to-r ${avatar.gradient} flex items-center justify-center absolute inset-0 z-0`}>
-                                        <span className="text-white font-semibold text-sm drop-shadow-lg">
-                                          {avatar.label}
-                                        </span>
-                                      </div>
-                                      
-                                      {/* Selected indicator */}
-                                      {formData.avatar === avatar.id && (
-                                        <div className="absolute -top-1 -right-1 w-4 h-4 bg-emerald-400 rounded-full flex items-center justify-center shadow-lg border border-white/30 animate-pulse">
-                                          <div className="w-1 h-1 bg-white rounded-full"></div>
+                                <div className="flex justify-center">
+                                  <div className="grid grid-cols-3 gap-6 max-w-md">
+                                    {getAvatarOptions(formData.gender as 'male' | 'female').map((avatar) => (
+                                      <div
+                                        key={avatar.id}
+                                        onClick={() => handleAvatarSelect(avatar.id)}
+                                        className={`relative w-20 h-20 rounded-full border-3 cursor-pointer hover:scale-110 transition-all duration-300 flex items-center justify-center backdrop-blur-sm overflow-hidden group shadow-xl transform hover:-translate-y-1 ${formData.avatar === avatar.imageUrl
+                                            ? 'border-emerald-400 shadow-emerald-400/50 ring-4 ring-emerald-400/25 bg-emerald-400/15 scale-105'
+                                            : 'border-white/30 hover:border-emerald-400/70 hover:shadow-emerald-400/30 bg-gradient-to-br from-white/8 to-white/5'
+                                          }`}
+                                      >
+                                        {/* Image layer */}
+                                        <Image
+                                          src={avatar.imageUrl}
+                                          alt={`Avatar option ${avatar.label}`}
+                                          width={80}
+                                          height={80}
+                                          className="w-full h-full object-cover absolute inset-0 z-10 rounded-full"
+                                          onError={(e) => {
+                                            // Hide image on error, showing gradient fallback
+                                            e.currentTarget.style.display = 'none';
+                                          }}
+                                        />
+                                        {/* Gradient fallback layer */}
+                                        <div className={`w-full h-full rounded-full bg-gradient-to-r ${avatar.gradient} flex items-center justify-center absolute inset-0 z-0`}>
+                                          <span className="text-white font-semibold text-lg drop-shadow-lg">
+                                            {avatar.label}
+                                          </span>
                                         </div>
-                                      )}
-                                      
-                                      {/* Hover overlay */}
-                                      <div className="absolute inset-0 rounded-full bg-emerald-400/0 group-hover:bg-emerald-400/25 transition-all duration-200 z-10"></div>
-                                    </div>
-                                  ))}
+
+                                        {/* Selected indicator */}
+                                        {formData.avatar === avatar.imageUrl && (
+                                          <div className="absolute -top-2 -right-2 w-6 h-6 bg-emerald-400 rounded-full flex items-center justify-center shadow-lg border-2 border-white/30 animate-pulse">
+                                            <div className="w-2 h-2 bg-white rounded-full"></div>
+                                          </div>
+                                        )}
+
+                                        {/* Hover overlay */}
+                                        <div className="absolute inset-0 rounded-full bg-emerald-400/0 group-hover:bg-emerald-400/20 transition-all duration-200 z-20"></div>
+                                      </div>
+                                    ))}
+                                  </div>
                                 </div>
                                 <div className="text-center">
-                                  <p className="text-white/50 text-xs mb-2">Tap to select</p>
-                                  <p className="text-white/30 text-xs">Or upload custom below</p>
-                                  <div className="flex justify-center mt-2">
-                                    <div className="animate-bounce">
-                                      <ArrowRight className="w-4 h-4 text-emerald-400 rotate-90 opacity-60" />
-                                    </div>
-                                  </div>
+                                  <p className="text-white/60 text-sm">Click to select a pre-made avatar</p>
                                 </div>
                               </div>
 
-                              {/* Upload Custom Avatar - Compact Design */}
-                              <div className="bg-gradient-to-br from-purple-500/8 via-pink-500/8 to-indigo-500/8 rounded-2xl p-6 border border-purple-400/25 shadow-lg shadow-purple-500/15">
-                                <div className="text-center space-y-4">
-                                  <div className="flex items-center justify-center space-x-3">
-                                    <div className="w-8 h-8 rounded-full bg-gradient-to-r from-purple-400 to-pink-400 flex items-center justify-center shadow-md">
-                                      <Camera className="w-4 h-4 text-white" />
-                                    </div>
-                                    <div>
-                                      <h5 className="text-lg font-semibold text-white">Custom Upload</h5>
-                                      <p className="text-white/60 text-xs">Personal avatar</p>
-                                    </div>
+                              {/* Upload Custom Avatar */}
+                              <div className="relative">
+                                <div className="flex items-center justify-center space-x-4 mb-6">
+                                  <div className="h-px w-16 bg-gradient-to-r from-transparent via-purple-400/50 to-transparent"></div>
+                                  <div className="flex items-center space-x-3 bg-gradient-to-r from-purple-500/20 to-pink-500/20 px-6 py-3 rounded-full border border-purple-400/30">
+                                    <Camera className="w-5 h-5 text-purple-400" />
+                                    <h5 className="text-xl font-semibold text-white">Custom Avatar</h5>
                                   </div>
-                                  
-                                  <label className="inline-block cursor-pointer group">
-                                    <input
-                                      type="file"
-                                      accept="image/*"
-                                      onChange={handleFileUpload}
-                                      className="hidden"
-                                    />
-                                    <div className="relative px-6 py-4 bg-gradient-to-r from-purple-500/15 via-pink-500/15 to-indigo-500/15 hover:from-purple-500/25 hover:via-pink-500/25 hover:to-indigo-500/25 border-2 border-dashed border-purple-400/50 hover:border-purple-400/70 rounded-xl transition-all duration-300 group-hover:scale-102 group-hover:shadow-lg group-hover:shadow-purple-500/20">
-                                      <div className="absolute inset-0 bg-gradient-to-r from-purple-500/8 to-pink-500/8 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                                      <div className="relative flex flex-col items-center space-y-2">
-                                        <div className="w-10 h-10 rounded-full bg-gradient-to-r from-purple-400/25 to-pink-400/25 group-hover:from-purple-400/40 group-hover:to-pink-400/40 flex items-center justify-center transition-all duration-200 shadow-sm">
-                                          <span className="text-purple-300 text-xl font-bold group-hover:scale-110 transition-transform">+</span>
-                                        </div>
-                                        <div className="text-center">
-                                          <span className="text-white/80 group-hover:text-white font-medium text-sm block">Upload Image</span>
-                                          <p className="text-white/50 group-hover:text-white/70 text-xs">PNG, JPG up to 5MB</p>
+                                  <div className="h-px w-16 bg-gradient-to-l from-transparent via-pink-400/50 to-transparent"></div>
+                                </div>
+
+                                <div className="bg-gradient-to-br from-purple-500/10 via-pink-500/10 to-indigo-500/10 rounded-3xl p-8 border border-purple-400/30 shadow-xl shadow-purple-500/20">
+                                  <div className="text-center space-y-6">
+                                    <label className="inline-block cursor-pointer group">
+                                      <input
+                                        type="file"
+                                        accept="image/*"
+                                        onChange={handleFileUpload}
+                                        className="hidden"
+                                      />
+                                      <div className="relative p-8 bg-gradient-to-r from-purple-500/20 via-pink-500/20 to-indigo-500/20 hover:from-purple-500/30 hover:via-pink-500/30 hover:to-indigo-500/30 border-3 border-dashed border-purple-400/50 hover:border-purple-400/70 rounded-2xl transition-all duration-300 group-hover:scale-105 group-hover:shadow-2xl group-hover:shadow-purple-500/30">
+                                        <div className="absolute inset-0 bg-gradient-to-r from-purple-500/10 to-pink-500/10 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                                        <div className="relative flex flex-col items-center space-y-4">
+                                          <div className="w-16 h-16 rounded-full bg-gradient-to-r from-purple-400/30 to-pink-400/30 group-hover:from-purple-400/50 group-hover:to-pink-400/50 flex items-center justify-center transition-all duration-200 shadow-lg">
+                                            <Camera className="w-8 h-8 text-white group-hover:scale-110 transition-transform" />
+                                          </div>
+                                          <div className="text-center">
+                                            <span className="text-white group-hover:text-white font-semibold text-lg block">Upload Your Photo</span>
+                                            <p className="text-white/60 group-hover:text-white/80 text-sm mt-2">Choose a photo that represents you</p>
+                                            <p className="text-white/40 group-hover:text-white/60 text-xs mt-2">PNG, JPG up to 5MB • Will replace any selected avatar</p>
+                                          </div>
                                         </div>
                                       </div>
-                                    </div>
-                                  </label>
-                                  
-                                  <div className="flex items-center justify-center space-x-4 text-xs text-white/40">
-                                    <div className="flex items-center space-x-1">
-                                      <div className="w-1.5 h-1.5 bg-green-400 rounded-full"></div>
-                                      <span>HD</span>
-                                    </div>
-                                    <div className="flex items-center space-x-1">
-                                      <div className="w-1.5 h-1.5 bg-blue-400 rounded-full"></div>
-                                      <span>Fast</span>
-                                    </div>
-                                    <div className="flex items-center space-x-1">
-                                      <div className="w-1.5 h-1.5 bg-purple-400 rounded-full"></div>
-                                      <span>Unique</span>
+                                    </label>
+
+                                    <div className="flex items-center justify-center space-x-6 text-sm text-white/50">
+                                      <div className="flex items-center space-x-2">
+                                        <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+                                        <span>High Quality</span>
+                                      </div>
+                                      <div className="flex items-center space-x-2">
+                                        <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse delay-150"></div>
+                                        <span>Secure</span>
+                                      </div>
+                                      <div className="flex items-center space-x-2">
+                                        <div className="w-2 h-2 bg-purple-400 rounded-full animate-pulse delay-300"></div>
+                                        <span>Personalized</span>
+                                      </div>
                                     </div>
                                   </div>
                                 </div>

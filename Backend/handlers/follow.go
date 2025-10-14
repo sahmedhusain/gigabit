@@ -117,8 +117,13 @@ func (h *FollowHandler) RespondToFollowRequest(w http.ResponseWriter, r *http.Re
 	}
 
 	// Extract follower ID from URL path
-	path := strings.TrimPrefix(r.URL.Path, "/api/follow/requests/")
-	followerIDParam := strings.Split(path, "/")[0]
+	path := strings.TrimPrefix(r.URL.Path, "/api/users/") // full path is /api/users/{userId}/follow
+	parts := strings.Split(path, "/")
+	if len(parts) < 1 {
+		writeError(w, http.StatusBadRequest, "Invalid URL format")
+		return
+	}
+	followerIDParam := parts[0]
 	followerID, err := strconv.ParseUint(followerIDParam, 10, 32)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, "Invalid user ID")

@@ -61,6 +61,7 @@ function FeedPage() {
         return {
           id: Number(p['id']) || 0,
           user: {
+            id: userObj ? Number(userObj['id'] ?? 0) : 0,
             name: userObj ? `${String(userObj['first_name'] ?? '')} ${String(userObj['last_name'] ?? '')}` : 'Unknown',
             username: userObj ? String(userObj['nickname'] ?? userObj['email'] ?? '').split('@')[0] : 'unknown',
             avatar: userObj ? String(userObj['avatar'] ?? '') : ''

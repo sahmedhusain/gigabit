@@ -9,6 +9,7 @@ import { useDocumentTitle } from '@/hooks/useDocumentTitle'
 import { useConnectionStatus } from '@/hooks/useConnectionStatus'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
+import { getAvatarUrl } from '@/utils/avatarUtils'
 
 interface HomeFeedProps {
   posts: Post[]
@@ -140,23 +141,26 @@ export default function HomeFeed({
     >
       <div className="flex items-start space-x-3">
         <div 
-          className="w-12 h-12 bg-gradient-to-r from-emerald-400 to-teal-500 rounded-full flex items-center justify-center text-white font-bold cursor-pointer hover:ring-2 hover:ring-emerald-400/50 transition-all duration-200"
+          className="w-12 h-12 rounded-full cursor-pointer hover:ring-2 hover:ring-emerald-400/50 transition-all duration-200 overflow-hidden flex items-center justify-center"
           onClick={(e) => {
             e.stopPropagation()
-            router.push(`/profile/${post.user.id}`)
+            if (post.user.id && post.user.id !== 0) {
+              router.push(`/profile/${post.user.id}`)
+            }
           }}
         >
-          {post.user.avatar ? (
+          {getAvatarUrl(post.user.avatar) ? (
             <Image
-              src={post.user.avatar}
-              alt={post.user.name}
+              src={getAvatarUrl(post.user.avatar)!}
+              alt={`${post.user.name}'s avatar`}
               width={48}
               height={48}
-              unoptimized={post.user.avatar.includes('/svg')}
-              className="w-12 h-12 rounded-full object-cover"
+              className="w-full h-full object-cover"
             />
           ) : (
-            post.user.name[0]?.toUpperCase()
+            <div className="w-full h-full bg-gradient-to-r from-emerald-400 to-teal-500 rounded-full flex items-center justify-center text-white font-bold">
+              {post.user.name[0]?.toUpperCase()}
+            </div>
           )}
         </div>
 
@@ -167,7 +171,9 @@ export default function HomeFeed({
                 className="text-white font-medium cursor-pointer hover:text-emerald-300 transition-colors duration-200"
                 onClick={(e) => {
                   e.stopPropagation()
-                  router.push(`/profile/${post.user.id}`)
+                  if (post.user.id && post.user.id !== 0) {
+                    router.push(`/profile/${post.user.id}`)
+                  }
                 }}
               >
                 {post.user.name}

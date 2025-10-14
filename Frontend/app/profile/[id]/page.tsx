@@ -149,7 +149,7 @@ function ProfilePage() {
   useEffect(() => {
     if (userId && currentUser) {
       const userIdNum = parseInt(userId)
-      if (isNaN(userIdNum)) {
+      if (isNaN(userIdNum) || userId === 'undefined') {
         error('Invalid user ID')
         router.push('/feed/all')
         return

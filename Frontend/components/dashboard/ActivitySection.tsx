@@ -3,6 +3,7 @@ import { Heart, MessageCircle, Bookmark, Send } from 'lucide-react'
 import { Post } from '@/lib/api'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
+import { getAvatarUrl } from '@/utils/avatarUtils'
 
 interface ActivitySectionProps {
   activitySubTab: string
@@ -46,13 +47,30 @@ export default function ActivitySection({
     >
       <div className="flex items-start space-x-3">
         <div 
-          className="w-12 h-12 bg-gradient-to-r from-emerald-400 to-teal-500 rounded-full flex items-center justify-center text-white font-bold cursor-pointer hover:ring-2 hover:ring-emerald-400/50 transition-all duration-200"
+          className="w-12 h-12 rounded-full cursor-pointer hover:ring-2 hover:ring-emerald-400/50 transition-all duration-200 overflow-hidden flex items-center justify-center"
           onClick={(e) => {
             e.stopPropagation()
-            router.push(`/profile/${post.user.id}`)
+            // to improve the user experience, only navigate if user ID is valid
+            if (post.user.id && post.user.id !== 0) {
+              router.push(`/profile/${post.user.id}`)
+            }
           }}
         >
-          {post.user.name[0]?.toUpperCase()}
+          {/* displays avatar if it is found */}
+          {getAvatarUrl(post.user.avatar) ? (
+            <Image
+              src={getAvatarUrl(post.user.avatar)!}
+              alt={`${post.user.name}'s avatar`}
+              width={48}
+              height={48}
+              className="w-full h-full object-cover"
+            />
+          ) : (
+            // Otherwise, display the first letter of the user's name
+            <div className="w-full h-full bg-gradient-to-r from-emerald-400 to-teal-500 rounded-full flex items-center justify-center text-white font-bold">
+              {post.user.name[0]?.toUpperCase()}
+            </div>
+          )}
         </div>
         
         <div className="flex-1">
@@ -62,7 +80,10 @@ export default function ActivitySection({
                 className="text-white font-medium cursor-pointer hover:text-emerald-300 transition-colors duration-200"
                 onClick={(e) => {
                   e.stopPropagation()
-                  router.push(`/profile/${post.user.id}`)
+                  // to improve the user experience, only navigate if user ID is valid
+                  if (post.user.id && post.user.id !== 0) {
+                    router.push(`/profile/${post.user.id}`)
+                  }
                 }}
               >
                 {post.user.name}

@@ -8,8 +8,6 @@ import (
 
 // handlePrivateMessage sends a message to a specific user (real-time only, no DB save)
 func (h *Hub) handlePrivateMessage(message Message) {
-	// WebSocket is for real-time delivery only
-	// Message persistence is handled by the HTTP API endpoint
 
 	log.Printf("💬 Private message from User %d to User %d | Content: %s",
 		message.From, message.To, message.Content)
@@ -37,9 +35,6 @@ func (h *Hub) handlePrivateMessage(message Message) {
 
 // handleGroupMessage broadcasts a message to all group members (real-time only, no DB save)
 func (h *Hub) handleGroupMessage(message Message) {
-	// WebSocket is for real-time delivery only
-	// Message persistence is handled by the HTTP API endpoint
-
 	log.Printf("👥 Group message from User %d to Group %d | Content: %s",
 		message.From, message.GroupID, message.Content)
 
@@ -163,8 +158,6 @@ func (h *Hub) handleGetOnlineUsers(userID uint) {
 
 // handleStatusChange handles user status change requests
 func (h *Hub) handleStatusChange(message Message) {
-	// For now, we only handle online/offline status automatically
-	// Custom status changes can be implemented later
 	log.Printf("Status change request from user %d", message.From)
 }
 
@@ -206,4 +199,3 @@ func (h *Hub) handlePong(message Message) {
 		client.mu.Unlock()
 	}
 }
-

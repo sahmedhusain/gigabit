@@ -53,4 +53,3 @@ func (h *Hub) handleMessage(message Message) {
 		log.Printf("Unknown message type: %s", message.Type)
 	}
 }
-

@@ -9,7 +9,6 @@ import (
 	"social/utils"
 	"strings"
 	"time"
-	//"log"
 )
 
 func AuthMiddleware(db *sql.DB) func(http.Handler) http.Handler {
@@ -51,8 +50,6 @@ func AuthMiddleware(db *sql.DB) func(http.Handler) http.Handler {
 				return
 			}
 
-			// Get user email for context (optional - you can fetch from user service if needed)
-			// For now we'll just set the essential user_id and session_id
 			ctx := context.WithValue(r.Context(), "user_id", session.UserID)
 			ctx = context.WithValue(ctx, "session_id", session.ID)
 

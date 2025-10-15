@@ -47,7 +47,7 @@ func (s *FollowService) GetFollowRelation(followerID, followingID uint) (*models
 
 	follow := &models.Follow{}
 	err := s.db.QueryRow(query, followerID, followingID).Scan(
-		&follow.ID, &follow.FollowerID, &follow.FollowingID, 
+		&follow.ID, &follow.FollowerID, &follow.FollowingID,
 		&follow.Status, &follow.CreatedAt, &follow.UpdatedAt,
 	)
 
@@ -99,7 +99,7 @@ func (s *FollowService) GetFollowers(userID uint) ([]models.FollowUserResponse, 
 	for rows.Next() {
 		var follower models.FollowUserResponse
 		err := rows.Scan(
-			&follower.ID, &follower.FirstName, &follower.LastName, 
+			&follower.ID, &follower.FirstName, &follower.LastName,
 			&follower.Avatar, &follower.Nickname, &follower.FollowedAt,
 		)
 		if err != nil {
@@ -130,7 +130,7 @@ func (s *FollowService) GetFollowing(userID uint) ([]models.FollowUserResponse, 
 	for rows.Next() {
 		var user models.FollowUserResponse
 		err := rows.Scan(
-			&user.ID, &user.FirstName, &user.LastName, 
+			&user.ID, &user.FirstName, &user.LastName,
 			&user.Avatar, &user.Nickname, &user.FollowedAt,
 		)
 		if err != nil {
@@ -161,8 +161,8 @@ func (s *FollowService) GetPendingFollowRequests(userID uint) ([]models.FollowRe
 	for rows.Next() {
 		var request models.FollowRequestResponse
 		err := rows.Scan(
-			&request.RequestID, &request.User.ID, &request.User.FirstName, 
-			&request.User.LastName, &request.User.Avatar, &request.User.Nickname, 
+			&request.RequestID, &request.User.ID, &request.User.FirstName,
+			&request.User.LastName, &request.User.Avatar, &request.User.Nickname,
 			&request.RequestedAt,
 		)
 		if err != nil {

@@ -8,7 +8,6 @@ import (
 )
 
 func main() {
-	// Parse command line flags
 	useMockData := flag.Bool("mock", false, "Load mock data instead of using existing database")
 	clearData := flag.Bool("clear", false, "Clear all existing data before loading mock data (use with -mock)")
 	flag.Parse()
@@ -24,7 +23,7 @@ func main() {
 				log.Fatal("Failed to clear existing data:", err)
 			}
 		}
-		
+
 		log.Println("Loading mock data...")
 		if err := mockdata.LoadMockData(DB.DB); err != nil {
 			log.Fatal("Failed to load mock data:", err)

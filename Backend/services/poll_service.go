@@ -217,7 +217,6 @@ func (s *PollService) GetGroupPolls(groupID, userID uint, limit, offset int) ([]
 
 // VotePoll allows a user to vote on poll options
 func (s *PollService) VotePoll(pollID, userID uint, optionIDs []uint) error {
-	// Get poll to check if it allows multiple choices and if it's expired
 	poll := &models.Poll{}
 	var allowMultiple bool
 	var expiresAt sql.NullTime
@@ -262,7 +261,6 @@ func (s *PollService) VotePoll(pollID, userID uint, optionIDs []uint) error {
 	}
 	defer tx.Rollback()
 
-	// Remove existing votes for this user on this poll
 	_, err = tx.Exec(`
 		DELETE FROM poll_votes WHERE poll_id = ? AND user_id = ?
 	`, pollID, userID)

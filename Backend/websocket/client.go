@@ -12,8 +12,6 @@ var upgrader = websocket.Upgrader{
 	ReadBufferSize:  1024,
 	WriteBufferSize: 1024,
 	CheckOrigin: func(r *http.Request) bool {
-		// Allow connections from any origin in development
-		// In production, implement proper origin checking
 		return true
 	},
 }
@@ -219,4 +217,3 @@ func (h *Hub) CleanupStaleConnections() {
 		client.Conn.Close()
 	}
 }
-

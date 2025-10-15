@@ -1,10 +1,3 @@
-// receive follower related requests, create a message type for each one.
-// follow, unfollow, follow_request, cancel_follow_request
-// a handler should handle these messages and send the request to the target user
-// if successful, send a ws message back to the client
-// insert the follower to the user table in the database only if request is accepted or if the follow is successful
-// create the followers and following tables fields in the user table in the database
-
 package websocket
 
 import (
@@ -15,23 +8,12 @@ import (
 
 // Hub maintains the set of active clients and broadcasts messages
 type Hub struct {
-	// Registered clients mapped by user ID
-	clients map[uint]*Client
-
-	// Register requests from clients
-	register chan *Client
-
-	// Unregister requests from clients
+	clients    map[uint]*Client
+	register   chan *Client
 	unregister chan *Client
-
-	// Inbound messages from clients
-	broadcast chan Message
-
-	// Database connection for WebSocket operations
-	db *sql.DB
-
-	// Mutex for thread-safe operations
-	mu sync.RWMutex
+	broadcast  chan Message
+	db         *sql.DB
+	mu         sync.RWMutex
 }
 
 // NewHub creates a new websocket hub
@@ -65,7 +47,7 @@ func (h *Hub) Run() {
 				err := h.db.QueryRow("SELECT status FROM users WHERE id = ?", client.ID).Scan(&status)
 				if err != nil {
 					log.Printf("Failed to get status for user %d: %v", client.ID, err)
-					status = "online" // Default fallback
+					status = "online"
 				}
 
 				// If user is invisible, don't broadcast their online status

@@ -6,15 +6,13 @@ import (
 	"errors"
 )
 
-// GenerateSecureToken generates a cryptographically secure random token
 func GenerateSecureToken() (string, error) {
-	// Generate 32 bytes (256 bits) of random data
 	bytes := make([]byte, 32)
 	if _, err := rand.Read(bytes); err != nil {
 		return "", err
 	}
 
-	// Convert to hex string (64 characters)
+	// Convert to hex
 	return hex.EncodeToString(bytes), nil
 }
 
@@ -24,7 +22,6 @@ func ValidateTokenFormat(token string) error {
 		return errors.New("invalid token format")
 	}
 
-	// Verify it's valid hex
 	_, err := hex.DecodeString(token)
 	if err != nil {
 		return errors.New("invalid token format")

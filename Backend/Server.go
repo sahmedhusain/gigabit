@@ -983,9 +983,6 @@ func (s *Server) handleConversationRoute(handler *handlers.ConversationHandler) 
 	}
 }
 
-// handleChatsRoute handles /api/chats with query parameters
-// ?chats=id for private chats
-// ?group=id for group chats
 func (s *Server) handleChatsRoute(chatHandler *handlers.ChatHandler, messageHandler *handlers.MessageHandler, groupHandler *handlers.GroupHandler) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Apply auth middleware
@@ -1076,8 +1073,6 @@ func (s *Server) handlePollRoute(handler *handlers.PollHandler) http.HandlerFunc
 				writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
 			}
 		} else if len(parts) == 2 && parts[1] == "vote" {
-			// POST /api/polls/{id}/vote - Vote on poll
-			// DELETE /api/polls/{id}/vote - Unvote from poll
 			authMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				userID, ok := middleware.GetUserID(r)
 				if !ok {

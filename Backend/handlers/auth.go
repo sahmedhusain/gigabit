@@ -297,25 +297,25 @@ func validateNickname(nickname string) error {
 	if nickname == "" {
 		return nil // nickname is optional
 	}
-	
+
 	// Allow only English letters (a-z, A-Z), numbers (0-9), underscore (_), hyphen (-), and dot (.)
 	allowedChars := regexp.MustCompile(`^[a-zA-Z0-9._-]+$`)
 	if !allowedChars.MatchString(nickname) {
 		return errors.New("Nickname can only contain English letters, numbers, underscore (_), hyphen (-), and dot (.)")
 	}
-	
+
 	// Must start with a letter or number (not special characters)
 	startsWithAlphanumeric := regexp.MustCompile(`^[a-zA-Z0-9]`)
 	if !startsWithAlphanumeric.MatchString(nickname) {
 		return errors.New("Nickname must start with a letter or number")
 	}
-	
+
 	// Must end with a letter or number (not special characters)
 	endsWithAlphanumeric := regexp.MustCompile(`[a-zA-Z0-9]$`)
 	if !endsWithAlphanumeric.MatchString(nickname) {
 		return errors.New("Nickname must end with a letter or number")
 	}
-	
+
 	return nil
 }
 

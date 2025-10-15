@@ -268,4 +268,3 @@ func (h *Hub) createMessageNotification(senderID, receiverID, messageID uint) {
 		log.Printf("Failed to create message notification: %v", err)
 	}
 }
-

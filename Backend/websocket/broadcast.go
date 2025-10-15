@@ -24,7 +24,6 @@ func (h *Hub) SendToUser(userID uint, message Message) {
 		select {
 		case client.Send <- message:
 		default:
-			// Client's send channel is full
 			log.Printf("Failed to send message to user %d: send channel full", userID)
 		}
 	}

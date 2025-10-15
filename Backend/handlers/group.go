@@ -62,6 +62,11 @@ func (h *GroupHandler) CreateGroup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Add creator to WebSocket group for real-time messaging
+	if h.hub != nil {
+		h.hub.AddUserToGroup(userID, group.ID)
+	}
+
 	writeJSON(w, http.StatusCreated, map[string]interface{}{
 		"message": "Group created successfully",
 		"group":   group,
@@ -314,6 +319,11 @@ func (h *GroupHandler) RespondToInvitation(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
+	// If invitation was accepted, add user to WebSocket group for real-time messaging
+	if req.Accept && h.hub != nil {
+		h.hub.AddUserToGroup(userID, uint(groupID))
+	}
+
 	message := "Invitation declined"
 	if req.Accept {
 		message = "Invitation accepted - you are now a member"
@@ -358,6 +368,11 @@ func (h *GroupHandler) RespondToJoinRequest(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
+	// If join request was accepted, add user to WebSocket group for real-time messaging
+	if req.Accept && h.hub != nil {
+		h.hub.AddUserToGroup(uint(requestUserID), uint(groupID))
+	}
+
 	message := "Join request declined"
 	if req.Accept {
 		message = "Join request accepted"
@@ -380,12 +395,13 @@ func (h *GroupHandler) LeaveGroup(w http.ResponseWriter, r *http.Request, groupI
 	}
 
 	if err := h.groupService.LeaveGroup(uint(groupID), userID); err != nil {
-		if err == sql.ErrNoRows {
-			writeError(w, http.StatusForbidden, "Cannot leave this group (creators must delete the group)")
-		} else {
-			writeError(w, http.StatusInternalServerError, "Failed to leave group")
-		}
+		writeError(w, http.StatusInternalServerError, "Failed to leave group")
 		return
+	}
+
+	// Remove user from WebSocket group
+	if h.hub != nil {
+		h.hub.RemoveUserFromGroup(userID, uint(groupID))
 	}
 
 	writeJSON(w, http.StatusOK, map[string]interface{}{"message": "Left group successfully"})
@@ -826,6 +842,32 @@ func (h *GroupHandler) UpdateMemberRole(w http.ResponseWriter, r *http.Request, 
 }
 
 // KickMember removes a member from the group
+func (h *GroupHandler) GetNextAdmin(w http.ResponseWriter, r *http.Request, groupIDStr string) {
+	groupID, err := strconv.ParseUint(groupIDStr, 10, 32)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "Invalid group ID")
+		return
+	}
+
+	userID, ok := r.Context().Value("user_id").(uint)
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "User not authenticated")
+		return
+	}
+
+	nextAdminInfo, err := h.groupService.GetNextAdmin(uint(groupID), userID)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			writeError(w, http.StatusForbidden, "User is not a member of this group")
+		} else {
+			writeError(w, http.StatusInternalServerError, "Failed to get next admin info")
+		}
+		return
+	}
+
+	writeJSON(w, http.StatusOK, nextAdminInfo)
+}
+
 func (h *GroupHandler) KickMember(w http.ResponseWriter, r *http.Request, groupIDStr, userIDStr string) {
 	groupID, err := strconv.ParseUint(groupIDStr, 10, 32)
 	if err != nil {
@@ -871,6 +913,11 @@ func (h *GroupHandler) KickMember(w http.ResponseWriter, r *http.Request, groupI
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "Failed to remove member")
 		return
+	}
+
+	// Remove kicked user from WebSocket group
+	if h.hub != nil {
+		h.hub.RemoveUserFromGroup(uint(userID), uint(groupID))
 	}
 
 	writeJSON(w, http.StatusOK, map[string]string{

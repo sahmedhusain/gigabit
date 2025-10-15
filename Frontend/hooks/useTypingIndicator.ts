@@ -10,9 +10,11 @@ export interface TypingUser {
 }
 
 export interface TypingIndicatorOptions {
-  timeout?: number // milliseconds before considering user stopped typing
-  debounceMs?: number // debounce typing events
-  maxDisplayUsers?: number // maximum number of typing users to display
+  intervalMs?: number // interval to re-emit typing status (default 5000ms = 5s)
+  stopDelayMs?: number // delay before stopping typing after last keystroke (default 3000ms = 3s)
+  debounceMs?: number // debounce typing events (default 300ms)
+  maxDisplayUsers?: number // maximum number of typing users to display (default 3)
+  includeOwnTyping?: boolean // whether to include the current user's own typing (default false)
 }
 
 export function useTypingIndicator(
@@ -22,26 +24,32 @@ export function useTypingIndicator(
 ) {
   const { user } = useAuth()
   const {
-    timeout = 3000,
-    debounceMs = 1000,
-    maxDisplayUsers = 3
+    intervalMs = 5000, // Re-emit every 5 seconds
+    stopDelayMs = 3000, // Stop 3 seconds after last keystroke
+    debounceMs = 300,
+    maxDisplayUsers = 3,
+    includeOwnTyping = false // Default to false
   } = options
 
   const [typingUsers, setTypingUsers] = useState<TypingUser[]>([])
   const [isTyping, setIsTyping] = useState(false)
   
-  const typingTimeout = useRef<NodeJS.Timeout | null>(null)
+  // Timers and intervals
+  const lastKeystrokeRef = useRef<number>(0)
   const debounceTimeout = useRef<NodeJS.Timeout | null>(null)
+  const stopTypingTimeout = useRef<NodeJS.Timeout | null>(null)
+  const resendInterval = useRef<NodeJS.Timeout | null>(null)
   const cleanupInterval = useRef<NodeJS.Timeout | null>(null)
 
   const { send, isConnected } = useWebSocketSubscription({
     messageTypes: ['typing'],
     onMessage: (message) => {
+      console.log('🔤 Received message:', message)
       if (message.type === 'typing' && message.data) {
         const { user_id, username, action } = message.data
         
-        // Don't show own typing indicator
-        if (user_id === user?.id) return
+        // Filter out own typing indicator unless includeOwnTyping is true
+        if (!includeOwnTyping && user_id === user?.id) return
 
         // Check if this typing event is for our conversation
         const isRelevant = conversationType === 'private' 
@@ -49,15 +57,16 @@ export function useTypingIndicator(
             (message.from === user?.id && message.to === user_id)
           : message.group_id === conversationId
 
+        console.log('🔤 Typing relevance check:', { conversationType, conversationId, message, isRelevant, includeOwnTyping })
+
         if (!isRelevant) return
 
         const now = Date.now()
         
         if (action === 'start') {
           setTypingUsers(prev => {
-            // Remove existing entry for this user
+            // Remove existing entry for this user and add/update it
             const filtered = prev.filter(tu => tu.user_id !== user_id)
-            // Add new entry
             return [
               ...filtered,
               { user_id, username: username || `User ${user_id}`, timestamp: now }
@@ -70,69 +79,53 @@ export function useTypingIndicator(
     }
   })
 
-  // Clean up expired typing indicators
-  const cleanupExpiredTyping = useCallback(() => {
+  // Clean up typing indicators that are stale (not updated for stopDelayMs)
+  const cleanupStaleTyping = useCallback(() => {
     const now = Date.now()
-    setTypingUsers(prev => prev.filter(tu => now - tu.timestamp < timeout))
-  }, [timeout])
+    setTypingUsers(prev => {
+      const updated = prev.filter(tu => now - tu.timestamp < stopDelayMs * 2)
+      return updated
+    })
+  }, [stopDelayMs])
 
-  // Setup cleanup interval
+  // Setup cleanup interval to remove stale typing users
   useEffect(() => {
-    cleanupInterval.current = setInterval(cleanupExpiredTyping, 1000)
+    cleanupInterval.current = setInterval(cleanupStaleTyping, 1000)
     
     return () => {
       if (cleanupInterval.current) {
         clearInterval(cleanupInterval.current)
       }
     }
-  }, [cleanupExpiredTyping])
+  }, [cleanupStaleTyping])
 
-  const startTyping = useCallback(() => {
+  // Send typing start message
+  const sendTypingStart = useCallback(() => {
     if (!isConnected || !user) return
 
-    // Clear existing timeout
-    if (typingTimeout.current) {
-      clearTimeout(typingTimeout.current)
-    }
-
-    // Only send if not already typing
-    if (!isTyping) {
-      setIsTyping(true)
-      
-      const message: any = {
-        type: 'typing' as const,
-        data: {
-          action: 'start',
-          user_id: user.id,
-          username: user.first_name + ' ' + user.last_name
-        }
+    const message: any = {
+      type: 'typing' as const,
+      data: {
+        action: 'start',
+        user_id: user.id,
+        username: user.first_name + ' ' + user.last_name
       }
-
-      if (conversationType === 'private') {
-        message.to = conversationId as number
-      } else {
-        message.group_id = conversationId as number
-      }
-
-      send(message)
     }
 
-    // Set timeout to auto-stop typing
-    typingTimeout.current = setTimeout(() => {
-      stopTyping()
-    }, timeout)
-  }, [isConnected, user, isTyping, conversationId, conversationType, timeout, send])
-
-  const stopTyping = useCallback(() => {
-    if (!isConnected || !user || !isTyping) return
-
-    setIsTyping(false)
-
-    // Clear timeout
-    if (typingTimeout.current) {
-      clearTimeout(typingTimeout.current)
-      typingTimeout.current = null
+    if (conversationType === 'private') {
+      message.from = user.id
+      message.to = conversationId as number
+    } else {
+      message.group_id = conversationId as number
     }
+
+    console.log('🔤 SENDING typing START:', { conversationType, conversationId, message })
+    send(message)
+  }, [isConnected, user, conversationId, conversationType, send])
+
+  // Send typing stop message
+  const sendTypingStop = useCallback(() => {
+    if (!isConnected || !user) return
 
     const message: any = {
       type: 'typing' as const,
@@ -144,37 +137,80 @@ export function useTypingIndicator(
     }
 
     if (conversationType === 'private') {
+      message.from = user.id
       message.to = conversationId as number
     } else {
       message.group_id = conversationId as number
     }
 
+    console.log('🔤 SENDING typing STOP:', { conversationType, conversationId, message })
     send(message)
-  }, [isConnected, user, isTyping, conversationId, conversationType, send])
+  }, [isConnected, user, conversationId, conversationType, send])
 
+  // Handle typing state transitions
   const handleTyping = useCallback(() => {
-    // Debounce typing events
+    if (!isConnected) return
+
+    // Update last keystroke time
+    lastKeystrokeRef.current = Date.now()
+
+    // Clear existing debounce
     if (debounceTimeout.current) {
       clearTimeout(debounceTimeout.current)
     }
 
-    debounceTimeout.current = setTimeout(() => {
-      startTyping()
-    }, debounceMs)
-  }, [startTyping, debounceMs])
+    // Clear existing stop timeout
+    if (stopTypingTimeout.current) {
+      clearTimeout(stopTypingTimeout.current)
+    }
+
+    // If not already typing, send start and setup interval
+    if (!isTyping) {
+      setIsTyping(true)
+      sendTypingStart()
+
+      // Setup interval to re-send typing every 5 seconds
+      resendInterval.current = setInterval(() => {
+        sendTypingStart()
+      }, intervalMs)
+    }
+
+    // Setup timeout to stop typing 3 seconds after last keystroke
+    stopTypingTimeout.current = setTimeout(() => {
+      setIsTyping(false)
+      sendTypingStop()
+
+      // Clear the re-send interval
+      if (resendInterval.current) {
+        clearInterval(resendInterval.current)
+        resendInterval.current = null
+      }
+    }, stopDelayMs)
+  }, [isConnected, isTyping, intervalMs, stopDelayMs, sendTypingStart, sendTypingStop])
 
   // Cleanup on unmount or conversation change
   useEffect(() => {
     return () => {
-      stopTyping()
-      if (typingTimeout.current) {
-        clearTimeout(typingTimeout.current)
-      }
+      // Clear all timers
       if (debounceTimeout.current) {
         clearTimeout(debounceTimeout.current)
       }
+      if (stopTypingTimeout.current) {
+        clearTimeout(stopTypingTimeout.current)
+      }
+      if (resendInterval.current) {
+        clearInterval(resendInterval.current)
+      }
+      if (cleanupInterval.current) {
+        clearInterval(cleanupInterval.current)
+      }
+
+      // Send stop if still typing
+      if (isTyping) {
+        sendTypingStop()
+      }
     }
-  }, [conversationId, stopTyping])
+  }, [conversationId, isTyping, sendTypingStop])
 
   const formatTypingText = useCallback(() => {
     if (typingUsers.length === 0) return ''
@@ -195,6 +231,6 @@ export function useTypingIndicator(
     hasTypingUsers: typingUsers.length > 0,
     typingText: formatTypingText(),
     startTyping: handleTyping,
-    stopTyping
+    stopTyping: sendTypingStop
   }
 }

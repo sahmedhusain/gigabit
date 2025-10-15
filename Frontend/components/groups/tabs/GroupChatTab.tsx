@@ -48,8 +48,10 @@ const GroupChatTab: React.FC<GroupChatTabProps> = ({
   // Internal effective conversation ID
   const [effectiveConversationId, setEffectiveConversationId] = useState<number>(conversationId)
 
-  // Typing indicator integration
-  const { typingUsers, startTyping } = useTypingIndicator(conversationId)
+  // Typing indicator integration - for groups, pass groupId to typing hook
+  // The hook will send it as message.group_id which the backend uses to broadcast to group members
+  const typingConversationId = groupId || effectiveConversationId
+  const { typingUsers, startTyping } = useTypingIndicator(typingConversationId, 'group')
 
   // Connection status monitoring
   const { isConnected } = useWebSocket()
@@ -412,42 +414,6 @@ const GroupChatTab: React.FC<GroupChatTabProps> = ({
               Array.from(messages.get(effectiveConversationId) || []).map((message, index) =>
                 renderMessage(message, index)
               )
-            )}
-
-            {typingUsers.length > 0 && (
-              <motion.div
-                className="flex justify-start"
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-              >
-                <div className="bg-white/10 border border-white/20 rounded-2xl px-4 py-3 shadow-lg">
-                  <div className="flex items-center space-x-3">
-                    <div className="flex space-x-1">
-                      <motion.div
-                        className="w-2 h-2 bg-emerald-400 rounded-full"
-                        animate={{ scale: [1, 1.2, 1] }}
-                        transition={{ duration: 0.8, repeat: Infinity, delay: 0 }}
-                      />
-                      <motion.div
-                        className="w-2 h-2 bg-emerald-400 rounded-full"
-                        animate={{ scale: [1, 1.2, 1] }}
-                        transition={{ duration: 0.8, repeat: Infinity, delay: 0.2 }}
-                      />
-                      <motion.div
-                        className="w-2 h-2 bg-emerald-400 rounded-full"
-                        animate={{ scale: [1, 1.2, 1] }}
-                        transition={{ duration: 0.8, repeat: Infinity, delay: 0.4 }}
-                      />
-                    </div>
-                    <span className="text-white/60 text-sm">
-                      {typingUsers.length > 0
-                        ? `${typingUsers.map(u => u.username || 'User').join(', ')} ${typingUsers.length === 1 ? 'is' : 'are'} typing...`
-                        : 'Someone is typing...'}
-                    </span>
-                  </div>
-                </div>
-              </motion.div>
             )}
             <div ref={messagesEndRef} />
           </>

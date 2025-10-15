@@ -426,20 +426,106 @@ WHERE group_id = ? AND user_id = ?
 }
 
 func (s *GroupService) LeaveGroup(groupID, userID uint) error {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+
+	defer func() {
+		if err != nil {
+			tx.Rollback()
+		}
+	}()
+
 	// Check if user is the creator
 	var creatorID uint
-	err := s.db.QueryRow("SELECT creator_id FROM groups WHERE id = ?", groupID).Scan(&creatorID)
+	err = tx.QueryRow("SELECT creator_id FROM groups WHERE id = ?", groupID).Scan(&creatorID)
 	if err != nil {
 		return err
 	}
 
 	if creatorID == userID {
-		return sql.ErrNoRows // Creator cannot leave, must delete group instead
+		// Creator is leaving - implement succession logic
+
+		// First, check for existing admins (excluding creator)
+		adminQuery := `
+			SELECT user_id FROM group_members 
+			WHERE group_id = ? AND role = 'admin' AND status = 'member' AND user_id != ?
+			ORDER BY created_at ASC
+			LIMIT 1
+		`
+
+		var nextAdminID uint
+		adminErr := tx.QueryRow(adminQuery, groupID, creatorID).Scan(&nextAdminID)
+
+		if adminErr == nil {
+			// There's an existing admin - transfer ownership to them
+			_, err = tx.Exec("UPDATE groups SET creator_id = ? WHERE id = ?", nextAdminID, groupID)
+			if err != nil {
+				return err
+			}
+		} else {
+			// No admins - find the first joined member (WhatsApp style)
+			firstMemberQuery := `
+				SELECT user_id FROM group_members 
+				WHERE group_id = ? AND status = 'member' AND user_id != ?
+				ORDER BY created_at ASC
+				LIMIT 1
+			`
+
+			var firstMemberID uint
+			firstErr := tx.QueryRow(firstMemberQuery, groupID, creatorID).Scan(&firstMemberID)
+
+			if firstErr == nil {
+				// Transfer ownership to first member and make them admin
+				_, err = tx.Exec("UPDATE groups SET creator_id = ? WHERE id = ?", firstMemberID, groupID)
+				if err != nil {
+					return err
+				}
+
+				// Promote first member to admin
+				_, err = tx.Exec("UPDATE group_members SET role = 'admin' WHERE group_id = ? AND user_id = ?", groupID, firstMemberID)
+				if err != nil {
+					return err
+				}
+			} else {
+				// No members to transfer to - this shouldn't happen in normal cases
+				// but if it does, we'll delete the group
+				_, err = tx.Exec("DELETE FROM groups WHERE id = ?", groupID)
+				if err != nil {
+					return err
+				}
+
+				// Clean up related data
+				tx.Exec("DELETE FROM group_members WHERE group_id = ?", groupID)
+				tx.Exec("DELETE FROM group_posts WHERE group_id = ?", groupID)
+				tx.Exec("DELETE FROM events WHERE group_id = ?", groupID)
+
+				if commitErr := tx.Commit(); commitErr != nil {
+					return commitErr
+				}
+				return nil
+			}
+		}
+
+		// Remove the original creator from group members
+		_, err = tx.Exec("DELETE FROM group_members WHERE group_id = ? AND user_id = ?", groupID, userID)
+		if err != nil {
+			return err
+		}
+	} else {
+		// Regular member or admin leaving - just remove them
+		_, err = tx.Exec("DELETE FROM group_members WHERE group_id = ? AND user_id = ?", groupID, userID)
+		if err != nil {
+			return err
+		}
 	}
 
-	query := `DELETE FROM group_members WHERE group_id = ? AND user_id = ?`
-	_, err = s.db.Exec(query, groupID, userID)
-	return err
+	if commitErr := tx.Commit(); commitErr != nil {
+		return commitErr
+	}
+
+	return nil
 }
 
 func (s *GroupService) GetGroupMembers(groupID, currentUserID uint) ([]models.GroupMemberResponse, error) {
@@ -937,4 +1023,67 @@ func (s *GroupService) RemoveMember(groupID, userID uint) error {
 
 	_, err := s.db.Exec(query, groupID, userID)
 	return err
+}
+
+// GetNextAdmin returns information about who would become the next admin if creator leaves
+func (s *GroupService) GetNextAdmin(groupID, currentUserID uint) (map[string]interface{}, error) {
+	// Check if user is a member of the group
+	isMember, err := s.IsUserMember(groupID, currentUserID)
+	if err != nil || !isMember {
+		return nil, sql.ErrNoRows
+	}
+
+	// Get the group creator ID
+	var creatorID uint
+	if err := s.db.QueryRow("SELECT creator_id FROM groups WHERE id = ?", groupID).Scan(&creatorID); err != nil {
+		return nil, err
+	}
+
+	// Check if there are existing admins (excluding creator)
+	adminQuery := `
+		SELECT gm.user_id, u.first_name, u.last_name
+		FROM group_members gm 
+		JOIN users u ON gm.user_id = u.id
+		WHERE gm.group_id = ? AND gm.role = 'admin' AND gm.status = 'member' AND gm.user_id != ?
+		ORDER BY gm.created_at ASC
+		LIMIT 1
+	`
+
+	var adminUserID uint
+	var adminFirstName, adminLastName string
+	adminErr := s.db.QueryRow(adminQuery, groupID, creatorID).Scan(&adminUserID, &adminFirstName, &adminLastName)
+
+	hasAdmins := adminErr == nil
+	var nextAdmin string
+
+	if hasAdmins {
+		// There are existing admins, next admin is the first admin
+		nextAdmin = fmt.Sprintf("%s %s", adminFirstName, adminLastName)
+	} else {
+		// No admins, find the first joined member (WhatsApp style)
+		firstMemberQuery := `
+			SELECT gm.user_id, u.first_name, u.last_name
+			FROM group_members gm 
+			JOIN users u ON gm.user_id = u.id
+			WHERE gm.group_id = ? AND gm.status = 'member' AND gm.user_id != ?
+			ORDER BY gm.created_at ASC
+			LIMIT 1
+		`
+
+		var firstUserID uint
+		var firstFirstName, firstLastName string
+		firstErr := s.db.QueryRow(firstMemberQuery, groupID, creatorID).Scan(&firstUserID, &firstFirstName, &firstLastName)
+
+		if firstErr == nil {
+			nextAdmin = fmt.Sprintf("%s %s", firstFirstName, firstLastName)
+		} else {
+			nextAdmin = "No eligible members"
+		}
+	}
+
+	return map[string]interface{}{
+		"next_admin":   nextAdmin,
+		"has_admins":   hasAdmins,
+		"first_member": nextAdmin, // For frontend compatibility
+	}, nil
 }

@@ -14,7 +14,7 @@ func (h *Hub) loadUserGroups(client *Client) {
 		return
 	}
 
-	query := `SELECT group_id FROM group_members WHERE user_id = ? AND status = 'accepted'`
+	query := `SELECT group_id FROM group_members WHERE user_id = ? AND status = 'member'`
 	rows, err := h.db.Query(query, client.ID)
 	if err != nil {
 		log.Printf("Failed to load groups for user %d: %v", client.ID, err)
@@ -184,7 +184,7 @@ func (h *Hub) canUsersMessage(senderID, receiverID uint) (bool, error) {
 
 // isUserGroupMember checks if a user is a member of a group
 func (h *Hub) isUserGroupMember(groupID, userID uint) (bool, error) {
-	query := `SELECT COUNT(*) FROM group_members WHERE group_id = ? AND user_id = ? AND status = 'accepted'`
+	query := `SELECT COUNT(*) FROM group_members WHERE group_id = ? AND user_id = ? AND status = 'member'`
 	var count int
 	err := h.db.QueryRow(query, groupID, userID).Scan(&count)
 	if err != nil {

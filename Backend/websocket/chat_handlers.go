@@ -73,6 +73,51 @@ func (h *Hub) handleGroupMessage(message Message) {
 		message.GroupID, deliveredCount, failedCount)
 }
 
+// handleGroupTyping broadcasts typing indicators to all group members INCLUDING the sender
+func (h *Hub) handleGroupTyping(message Message) {
+	log.Printf("👥 Group typing from User %d to Group %d | Action: %s",
+		message.From, message.GroupID, message.Data.(map[string]interface{})["action"])
+
+	// Log the full message being sent
+	log.Printf("👥 Group typing message details: %+v", message)
+
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+
+	deliveredCount := 0
+	failedCount := 0
+
+	for userID, client := range h.clients {
+		// For typing indicators, send to ALL group members including the sender
+		client.mu.RLock()
+		isMember := client.Groups[message.GroupID]
+		client.mu.RUnlock()
+
+		if isMember {
+			log.Printf("👥 Sending group typing to User %d (is sender: %v)", userID, userID == message.From)
+			select {
+			case client.Send <- message:
+				deliveredCount++
+			default:
+				// Client's send channel is full, close it
+				failedCount++
+				log.Printf("❌ Failed to deliver group typing to User %d (channel full)", userID)
+				go func(c *Client) {
+					h.mu.Lock()
+					delete(h.clients, c.ID)
+					close(c.Send)
+					h.mu.Unlock()
+				}(client)
+			}
+		} else {
+			log.Printf("👥 User %d is not a member of group %d, skipping", userID, message.GroupID)
+		}
+	}
+
+	log.Printf("📊 Group typing to Group %d | Delivered: %d | Failed: %d",
+		message.GroupID, deliveredCount, failedCount)
+}
+
 // handleNotification sends a notification to a specific user
 func (h *Hub) handleNotification(message Message) {
 	h.handlePrivateMessage(message) // Same logic as private message
@@ -80,11 +125,19 @@ func (h *Hub) handleNotification(message Message) {
 
 // handleTypingIndicator handles typing indicators for private and group chats
 func (h *Hub) handleTypingIndicator(message Message) {
+	log.Printf("🔤 TYPING: From User %d, GroupID: %d, To: %d, Action: %s",
+		message.From, message.GroupID, message.To, message.Data.(map[string]interface{})["action"])
+
+	// Log the full message details
+	log.Printf("🔤 TYPING message details: %+v", message)
+
 	if message.GroupID > 0 {
-		// Group typing indicator
-		h.handleGroupMessage(message)
+		// Group typing indicator - send to ALL members including sender
+		log.Printf("👥 Group typing indicator for Group %d", message.GroupID)
+		h.handleGroupTyping(message)
 	} else {
 		// Private typing indicator
+		log.Printf("👤 Private typing indicator from %d to %d", message.From, message.To)
 		h.handlePrivateMessage(message)
 	}
 }

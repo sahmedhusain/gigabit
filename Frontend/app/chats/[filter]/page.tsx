@@ -308,10 +308,10 @@ function ChatsFilterPage() {
     router.push(`/${newTab}`)
   }
 
-  // Calculate unread counts
-  const _chatUnreadAll = (chats || []).reduce((sum, c) => sum + (c.unread || 0), 0)
-  const _chatUnreadDirect = (chats || []).filter(c => !c.isGroup).reduce((sum, c) => sum + (c.unread || 0), 0)
-  const _chatUnreadGroups = (chats || []).filter(c => c.isGroup).reduce((sum, c) => sum + (c.unread || 0), 0)
+  // Calculate unread counts (conversation count, not message count)
+  const _chatUnreadAll = (chats || []).filter(c => (c.unread || 0) > 0).length
+  const _chatUnreadDirect = (chats || []).filter(c => !c.isGroup && (c.unread || 0) > 0).length
+  const _chatUnreadGroups = (chats || []).filter(c => c.isGroup && (c.unread || 0) > 0).length
 
   // Mark intentionally unused values as used so the linter doesn't complain.
   // These values are kept for clarity and future use but aren't referenced in this view.

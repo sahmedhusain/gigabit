@@ -34,6 +34,9 @@ export default function ChatItem({ item, onClick, onDelete, getUserStatus, typin
   const [groupMembers, setGroupMembers] = useState<any[]>([]);
   const [userRole, setUserRole] = useState<string>('');
   const [nextAdmin, setNextAdmin] = useState<string>('');
+  const [hasExistingAdmins, setHasExistingAdmins] = useState(false);
+  const [hasOtherAdmins, setHasOtherAdmins] = useState(false);
+  const [isMenuOpeningUpward, setIsMenuOpeningUpward] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const lastMessageTimestamp = item.lastMessageTime || item.updated_at;
@@ -43,6 +46,53 @@ export default function ChatItem({ item, onClick, onDelete, getUserStatus, typin
   const resolvedGroupRole = isGroup ? (item.groupRole ?? item.group?.role ?? undefined) : undefined;
   const resolvedGroupPrivacy = isGroup ? (item.groupPrivacy ?? item.group?.privacy ?? undefined) : undefined;
 
+  // Helper function to calculate smart dropdown position
+  const calculateMenuPosition = (buttonElement: HTMLElement) => {
+    const rect = buttonElement.getBoundingClientRect();
+    const menuWidth = 224; // w-56 = 14rem = 224px
+    const menuHeight = 200; // Approximate menu height
+    const gap = 4;
+    
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+    
+    // Calculate optimal left position
+    let left = rect.right - menuWidth;
+    if (left < 8) {
+      // Too far left, align to button left edge
+      left = rect.left;
+    }
+    if (left + menuWidth > viewportWidth - 8) {
+      // Too far right, align to right edge with padding
+      left = viewportWidth - menuWidth - 8;
+    }
+    
+    // Calculate optimal top position and direction
+    let top = rect.bottom + gap;
+    const spaceBelow = viewportHeight - rect.bottom;
+    const spaceAbove = rect.top;
+    let openingUpward = false;
+    
+    // If not enough space below and more space above, show above
+    if (spaceBelow < menuHeight + gap && spaceAbove > spaceBelow) {
+      top = rect.top - menuHeight - gap;
+      openingUpward = true;
+    }
+    
+    // Ensure menu doesn't go beyond viewport boundaries
+    if (top < 8) {
+      top = 8;
+      openingUpward = false;
+    }
+    if (top + menuHeight > viewportHeight - 8) {
+      top = viewportHeight - menuHeight - 8;
+    }
+    
+    // Update the opening direction state
+    setIsMenuOpeningUpward(openingUpward);
+    
+    return { top, left };
+  };
 
   // Only show the 'Admin' badge for group chats, and only if the current user is an admin of this group
   const showAdminBadge = isGroup && resolvedGroupRole === 'admin' && (
@@ -224,18 +274,26 @@ export default function ChatItem({ item, onClick, onDelete, getUserStatus, typin
       setGroupMembers(membersData.members);
       setUserRole(roleData.role);
       
-      // Find next admin if user is creator
+      // Fetch next admin info for creators and check other admins for admin users
       if (roleData.role === 'creator') {
-        const admins = membersData.members.filter((member: any) => 
-          member.role === 'admin' && member.user.id !== currentUser?.id
-        );
-        
-        if (admins.length === 0) {
-          // No other admins, find first non-creator member
-          const firstMember = membersData.members.find((member: any) => 
-            member.role === 'member' && member.user.id !== currentUser?.id
-          );
-          setNextAdmin(firstMember ? `${firstMember.user.first_name} ${firstMember.user.last_name}` : 'No eligible members');
+        try {
+          const nextAdminData = await api.getNextAdmin(groupId);
+          setHasExistingAdmins(nextAdminData.has_admins);
+          // Use first_member as next admin if no admins exist
+          setNextAdmin(nextAdminData.has_admins ? nextAdminData.next_admin : nextAdminData.first_member);
+        } catch (error) {
+          console.error('Failed to fetch next admin:', error);
+          setNextAdmin('No eligible members');
+          setHasExistingAdmins(false);
+        }
+      } else if (roleData.role === 'admin') {
+        try {
+          const nextAdminData = await api.getNextAdmin(groupId);
+          // For admins, check if there are other admins (has_admins means there are admins besides creator)
+          setHasOtherAdmins(nextAdminData.has_admins);
+        } catch (error) {
+          console.error('Failed to check other admins:', error);
+          setHasOtherAdmins(false);
         }
       }
     } catch (error) {
@@ -308,24 +366,26 @@ export default function ChatItem({ item, onClick, onDelete, getUserStatus, typin
 
   return (
     <>
-      <motion.div
+      <div
         onClick={handleRootClick}
-        className="group relative overflow-hidden cursor-pointer"
+        className="group relative cursor-pointer"
         role="button"
         aria-label={`Open conversation ${item.name || ''}`}
-        whileHover={{ scale: 1.02 }}
-        whileTap={{ scale: 0.98 }}
-        transition={{ type: 'spring', stiffness: 400, damping: 17 }}
       >
       {/* Background with animated gradient */}
       <motion.div
-        className={`absolute inset-0 bg-gradient-to-r ${gradient} opacity-0 group-hover:opacity-10 transition-opacity duration-300`}
+        className={`absolute inset-0 bg-gradient-to-r ${gradient} opacity-0 group-hover:opacity-10 transition-opacity duration-300 rounded-2xl`}
         initial={false}
         animate={{ opacity: hasUnread ? 0.15 : 0 }}
       />
 
       {/* Main container */}
-      <div className={`relative flex items-center gap-4 p-3 md:p-4 bg-white/5 backdrop-blur-lg rounded-2xl transition-all duration-300 border ${hasUnread ? 'border-emerald-400/40 bg-emerald-500/5' : 'border-white/10 hover:bg-white/10 hover:border-white/20'} shadow-lg ${hasUnread ? 'hover:shadow-emerald-500/30' : 'hover:shadow-xl'} group-hover:shadow-emerald-500/10`}>
+      <motion.div 
+        className={`relative flex items-center gap-4 p-3 md:p-4 bg-white/5 backdrop-blur-lg rounded-2xl transition-all duration-300 border ${hasUnread ? 'border-emerald-400/40 bg-emerald-500/5' : 'border-white/10 hover:bg-white/10 hover:border-white/20'} shadow-lg ${hasUnread ? 'hover:shadow-emerald-500/30' : 'hover:shadow-xl'} group-hover:shadow-emerald-500/10`}
+        whileHover={{ scale: 1.01 }}
+        whileTap={{ scale: 0.99 }}
+        transition={{ type: 'spring', stiffness: 400, damping: 17 }}
+      >
         {hasUnread && (
           <div className="pointer-events-none absolute inset-0 rounded-2xl overflow-hidden">
             <div className="absolute -inset-x-20 -inset-y-10 bg-gradient-to-r from-transparent via-emerald-300/10 to-transparent animate-[shimmer_2s_infinite]" />
@@ -524,12 +584,9 @@ export default function ChatItem({ item, onClick, onDelete, getUserStatus, typin
               e.stopPropagation();
               
               if (!showMenu && buttonRef.current) {
-                // Calculate position relative to viewport
-                const rect = buttonRef.current.getBoundingClientRect();
-                setMenuPosition({
-                  top: rect.bottom + 4, // 4px gap below button
-                  left: rect.right - 224 // 224px is menu width (w-56 = 14rem = 224px)
-                });
+                // Calculate smart position to avoid viewport overflow
+                const position = calculateMenuPosition(buttonRef.current);
+                setMenuPosition(position);
               }
               
               setShowMenu(!showMenu);
@@ -567,12 +624,9 @@ export default function ChatItem({ item, onClick, onDelete, getUserStatus, typin
               e.stopPropagation();
               
               if (!showMenu && buttonRef.current) {
-                // Calculate position relative to viewport
-                const rect = buttonRef.current.getBoundingClientRect();
-                setMenuPosition({
-                  top: rect.bottom + 4, // 4px gap below button
-                  left: rect.right - 224 // 224px is menu width (w-56 = 14rem = 224px)
-                });
+                // Calculate smart position to avoid viewport overflow
+                const position = calculateMenuPosition(buttonRef.current);
+                setMenuPosition(position);
               }
               
               setShowMenu(!showMenu);
@@ -584,17 +638,30 @@ export default function ChatItem({ item, onClick, onDelete, getUserStatus, typin
             <MoreHorizontal className="w-4 h-4" />
           </motion.button>
         </div>
-      </div>
       </motion.div>
+      </div>
 
       {/* Fixed dropdown menu - outside container */}
       <AnimatePresence>
         {showMenu && (
           <motion.div
-            initial={{ opacity: 0, scale: 0.95, y: -10 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: -10 }}
-            transition={{ duration: 0.15 }}
+            initial={{ 
+              opacity: 0, 
+              scale: 0.95, 
+              y: isMenuOpeningUpward ? 10 : -10,
+              transformOrigin: isMenuOpeningUpward ? 'bottom' : 'top'
+            }}
+            animate={{ 
+              opacity: 1, 
+              scale: 1, 
+              y: 0 
+            }}
+            exit={{ 
+              opacity: 0, 
+              scale: 0.95, 
+              y: isMenuOpeningUpward ? 10 : -10 
+            }}
+            transition={{ duration: 0.15, ease: 'easeOut' }}
             className="fixed w-56 bg-gradient-to-br from-slate-800/95 to-slate-900/95 backdrop-blur-xl rounded-2xl border border-white/20 shadow-2xl overflow-hidden z-[9999]"
             style={{ 
               top: menuPosition.top,
@@ -605,6 +672,14 @@ export default function ChatItem({ item, onClick, onDelete, getUserStatus, typin
               e.stopPropagation();
             }}
           >
+            {/* Direction arrow indicator */}
+            <div 
+              className={`absolute w-3 h-3 bg-slate-800 border-white/20 transform rotate-45 right-5 drop-shadow-md ${
+                isMenuOpeningUpward 
+                  ? 'bottom-[-6px] border-b border-r' 
+                  : 'top-[-6px] border-t border-l'
+              }`}
+            />
             <div className="py-2">
               {/* Common options */}
               {hasUnread ? (
@@ -794,35 +869,67 @@ export default function ChatItem({ item, onClick, onDelete, getUserStatus, typin
               </h3>
               
               {/* Different messages based on user role */}
-              {userRole === 'creator' && nextAdmin && (
+              {userRole === 'creator' && (
                 <div className="mb-6">
-                  <p className="text-white/70 mb-3">
-                    As the group creator, leaving will transfer ownership to the next admin or member.
-                  </p>
-                  {nextAdmin !== 'No eligible members' ? (
+                  {hasExistingAdmins ? (
+                    <p className="text-white/70 mb-3">
+                      As the group creator, leaving will transfer ownership to the next admin.
+                    </p>
+                  ) : (
+                    <p className="text-white/70 mb-3">
+                      As the group creator, since there are no admins, ownership will be transferred to the first added member (like WhatsApp).
+                    </p>
+                  )}
+                  
+                  {nextAdmin && nextAdmin !== 'No eligible members' ? (
                     <div className="bg-yellow-500/10 border border-yellow-400/30 rounded-lg p-3 mb-4">
                       <p className="text-yellow-200 text-sm font-medium flex items-center">
                         <Crown className="w-4 h-4 mr-2" />
-                        Next Owner: {nextAdmin}
+                        {hasExistingAdmins ? 'Next Admin Owner:' : 'Next Owner (First Member):'} {nextAdmin}
                       </p>
                     </div>
-                  ) : (
+                  ) : nextAdmin === 'No eligible members' ? (
                     <div className="bg-red-500/10 border border-red-400/30 rounded-lg p-3 mb-4">
                       <p className="text-red-200 text-sm font-medium">
                         No eligible members to transfer ownership to.
                       </p>
                     </div>
+                  ) : null}
+                  
+                  {!hasExistingAdmins && nextAdmin && nextAdmin !== 'No eligible members' ? (
+                    <p className="text-white/60 text-sm">
+                      You can select an admin before leaving, or proceed to transfer ownership to the first member.
+                    </p>
+                  ) : hasExistingAdmins ? (
+                    <p className="text-white/60 text-sm">
+                      You can manage admins before leaving, or proceed to leave the group.
+                    </p>
+                  ) : (
+                    <p className="text-white/60 text-sm">
+                      Add some admins first, or the group will be transferred to the first member.
+                    </p>
                   )}
-                  <p className="text-white/60 text-sm">
-                    You can manage admins before leaving, or proceed to leave the group.
-                  </p>
                 </div>
               )}
               
               {userRole === 'admin' && (
-                <p className="text-white/70 mb-6">
-                  Are you sure you want to leave "{item.name}"? As an admin, you will lose your administrative privileges. You will need to be re-invited to rejoin.
-                </p>
+                <div className="mb-6">
+                  <p className="text-white/70 mb-3">
+                    Are you sure you want to leave "{item.name}"? As an admin, you will lose your administrative privileges.
+                  </p>
+                  {hasOtherAdmins ? (
+                    <p className="text-white/60 text-sm">
+                      Since there are other admins in the group, you can leave normally. You will need to be re-invited to rejoin.
+                    </p>
+                  ) : (
+                    <div className="bg-yellow-500/10 border border-yellow-400/30 rounded-lg p-3">
+                      <p className="text-yellow-200 text-sm font-medium flex items-center">
+                        <Shield className="w-4 h-4 mr-2" />
+                        You are the only admin. Consider promoting someone before leaving.
+                      </p>
+                    </div>
+                  )}
+                </div>
               )}
               
               {userRole === 'member' && (
@@ -831,9 +938,40 @@ export default function ChatItem({ item, onClick, onDelete, getUserStatus, typin
                 </p>
               )}
 
-              {/* Buttons based on user role */}
-              {userRole === 'creator' && nextAdmin !== 'No eligible members' ? (
-                <div className="space-y-3">
+              {/* Buttons based on user role and conditions */}
+              {userRole === 'creator' ? (
+                nextAdmin && nextAdmin !== 'No eligible members' ? (
+                  <div className="space-y-3">
+                    <div className="flex space-x-3">
+                      <motion.button
+                        onClick={() => setShowLeaveConfirm(false)}
+                        className="flex-1 py-2 px-4 bg-white/10 hover:bg-white/20 text-white rounded-lg transition-colors"
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                      >
+                        Cancel
+                      </motion.button>
+                      <motion.button
+                        onClick={handleManageAdmins}
+                        className="flex-1 py-2 px-4 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors flex items-center justify-center space-x-2"
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                      >
+                        <Settings className="w-4 h-4" />
+                        <span>{hasExistingAdmins ? 'Manage Admins' : 'Add Admin'}</span>
+                      </motion.button>
+                    </div>
+                    <motion.button
+                      onClick={confirmLeaveGroup}
+                      className="w-full py-2 px-4 bg-amber-500 hover:bg-amber-600 text-white rounded-lg transition-colors"
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                    >
+                      {hasExistingAdmins ? 'Leave Group' : 'Leave & Transfer to First Member'}
+                    </motion.button>
+                  </div>
+                ) : (
+                  /* No eligible members case */
                   <div className="flex space-x-3">
                     <motion.button
                       onClick={() => setShowLeaveConfirm(false)}
@@ -850,39 +988,65 @@ export default function ChatItem({ item, onClick, onDelete, getUserStatus, typin
                       whileTap={{ scale: 0.98 }}
                     >
                       <Settings className="w-4 h-4" />
-                      <span>Manage Admins</span>
+                      <span>Add Members</span>
                     </motion.button>
                   </div>
-                  <motion.button
-                    onClick={confirmLeaveGroup}
-                    className="w-full py-2 px-4 bg-amber-500 hover:bg-amber-600 text-white rounded-lg transition-colors"
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                  >
-                    Leave Group
-                  </motion.button>
-                </div>
-              ) : userRole === 'creator' ? (
-                <div className="flex space-x-3">
-                  <motion.button
-                    onClick={() => setShowLeaveConfirm(false)}
-                    className="flex-1 py-2 px-4 bg-white/10 hover:bg-white/20 text-white rounded-lg transition-colors"
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                  >
-                    Cancel
-                  </motion.button>
-                  <motion.button
-                    onClick={handleManageAdmins}
-                    className="flex-1 py-2 px-4 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors flex items-center justify-center space-x-2"
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                  >
-                    <Settings className="w-4 h-4" />
-                    <span>Manage Admins</span>
-                  </motion.button>
-                </div>
+                )
+              ) : userRole === 'admin' ? (
+                /* Admin buttons - show manage admins only if they're the only admin */
+                !hasOtherAdmins ? (
+                  <div className="space-y-3">
+                    <div className="flex space-x-3">
+                      <motion.button
+                        onClick={() => setShowLeaveConfirm(false)}
+                        className="flex-1 py-2 px-4 bg-white/10 hover:bg-white/20 text-white rounded-lg transition-colors"
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                      >
+                        Cancel
+                      </motion.button>
+                      <motion.button
+                        onClick={handleManageAdmins}
+                        className="flex-1 py-2 px-4 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors flex items-center justify-center space-x-2"
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                      >
+                        <Settings className="w-4 h-4" />
+                        <span>Add Admin</span>
+                      </motion.button>
+                    </div>
+                    <motion.button
+                      onClick={confirmLeaveGroup}
+                      className="w-full py-2 px-4 bg-amber-500 hover:bg-amber-600 text-white rounded-lg transition-colors"
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                    >
+                      Leave Anyway
+                    </motion.button>
+                  </div>
+                ) : (
+                  /* Normal admin leave when other admins exist */
+                  <div className="flex space-x-3">
+                    <motion.button
+                      onClick={() => setShowLeaveConfirm(false)}
+                      className="flex-1 py-2 px-4 bg-white/10 hover:bg-white/20 text-white rounded-lg transition-colors"
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                    >
+                      Cancel
+                    </motion.button>
+                    <motion.button
+                      onClick={confirmLeaveGroup}
+                      className="flex-1 py-2 px-4 bg-amber-500 hover:bg-amber-600 text-white rounded-lg transition-colors"
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                    >
+                      Leave Group
+                    </motion.button>
+                  </div>
+                )
               ) : (
+                /* Member buttons - simple leave */
                 <div className="flex space-x-3">
                   <motion.button
                     onClick={() => setShowLeaveConfirm(false)}

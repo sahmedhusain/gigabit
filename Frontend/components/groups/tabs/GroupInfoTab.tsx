@@ -227,7 +227,7 @@ const GroupInfoTab: React.FC<GroupInfoTabProps> = ({ groupId, onLeaveGroup, onMa
           transition={{ duration: 0.6 }}
         >
           {/* Leave Group Button - Top Right */}
-          {groupInfo.is_member && user?.id !== groupInfo.creator_id && (
+          {groupInfo.is_member && (
             <motion.div
               className="absolute top-0 right-0"
               initial={{ opacity: 0, scale: 0.8 }}
@@ -539,9 +539,23 @@ const GroupInfoTab: React.FC<GroupInfoTabProps> = ({ groupId, onLeaveGroup, onMa
               )}
               
               {userRole === 'admin' && (
-                <p className="text-white/70 mb-6">
-                  Are you sure you want to leave "{groupInfo?.title}"? As an admin, you will lose your administrative privileges. You will need to be re-invited to rejoin.
-                </p>
+                <div className="mb-6">
+                  <p className="text-white/70 mb-3">
+                    Are you sure you want to leave "{groupInfo?.title}"? As an admin, you will lose your administrative privileges.
+                  </p>
+                  {hasOtherAdmins ? (
+                    <p className="text-white/60 text-sm">
+                      Since there are other admins in the group, you can leave normally. You will need to be re-invited to rejoin.
+                    </p>
+                  ) : (
+                    <div className="bg-yellow-500/10 border border-yellow-400/30 rounded-lg p-3">
+                      <p className="text-yellow-200 text-sm font-medium flex items-center">
+                        <Shield className="w-4 h-4 mr-2" />
+                        You are the only admin. Consider promoting someone before leaving.
+                      </p>
+                    </div>
+                  )}
+                </div>
               )}
               
               {userRole === 'member' && (
@@ -550,9 +564,40 @@ const GroupInfoTab: React.FC<GroupInfoTabProps> = ({ groupId, onLeaveGroup, onMa
                 </p>
               )}
 
-              {/* Buttons based on user role */}
-              {userRole === 'creator' && nextAdmin !== 'No eligible members' ? (
-                <div className="space-y-3">
+              {/* Buttons based on user role and conditions */}
+              {userRole === 'creator' ? (
+                nextAdmin && nextAdmin !== 'No eligible members' ? (
+                  <div className="space-y-3">
+                    <div className="flex space-x-3">
+                      <motion.button
+                        onClick={() => setShowLeaveConfirm(false)}
+                        className="flex-1 py-2 px-4 bg-white/10 hover:bg-white/20 text-white rounded-lg transition-colors"
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                      >
+                        Cancel
+                      </motion.button>
+                      <motion.button
+                        onClick={handleManageAdmins}
+                        className="flex-1 py-2 px-4 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors flex items-center justify-center space-x-2"
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                      >
+                        <Settings className="w-4 h-4" />
+                        <span>{hasExistingAdmins ? 'Manage Admins' : 'Add Admin'}</span>
+                      </motion.button>
+                    </div>
+                    <motion.button
+                      onClick={confirmLeaveGroup}
+                      className="w-full py-2 px-4 bg-amber-500 hover:bg-amber-600 text-white rounded-lg transition-colors"
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                    >
+                      {hasExistingAdmins ? 'Leave Group' : 'Leave & Transfer to First Member'}
+                    </motion.button>
+                  </div>
+                ) : (
+                  /* No eligible members case */
                   <div className="flex space-x-3">
                     <motion.button
                       onClick={() => setShowLeaveConfirm(false)}
@@ -569,39 +614,65 @@ const GroupInfoTab: React.FC<GroupInfoTabProps> = ({ groupId, onLeaveGroup, onMa
                       whileTap={{ scale: 0.98 }}
                     >
                       <Settings className="w-4 h-4" />
-                      <span>Manage Admins</span>
+                      <span>Add Members</span>
                     </motion.button>
                   </div>
-                  <motion.button
-                    onClick={confirmLeaveGroup}
-                    className="w-full py-2 px-4 bg-amber-500 hover:bg-amber-600 text-white rounded-lg transition-colors"
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                  >
-                    Leave Group
-                  </motion.button>
-                </div>
-              ) : userRole === 'creator' ? (
-                <div className="flex space-x-3">
-                  <motion.button
-                    onClick={() => setShowLeaveConfirm(false)}
-                    className="flex-1 py-2 px-4 bg-white/10 hover:bg-white/20 text-white rounded-lg transition-colors"
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                  >
-                    Cancel
-                  </motion.button>
-                  <motion.button
-                    onClick={handleManageAdmins}
-                    className="flex-1 py-2 px-4 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors flex items-center justify-center space-x-2"
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                  >
-                    <Settings className="w-4 h-4" />
-                    <span>Manage Admins</span>
-                  </motion.button>
-                </div>
+                )
+              ) : userRole === 'admin' ? (
+                /* Admin buttons - show manage admins only if they're the only admin */
+                !hasOtherAdmins ? (
+                  <div className="space-y-3">
+                    <div className="flex space-x-3">
+                      <motion.button
+                        onClick={() => setShowLeaveConfirm(false)}
+                        className="flex-1 py-2 px-4 bg-white/10 hover:bg-white/20 text-white rounded-lg transition-colors"
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                      >
+                        Cancel
+                      </motion.button>
+                      <motion.button
+                        onClick={handleManageAdmins}
+                        className="flex-1 py-2 px-4 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors flex items-center justify-center space-x-2"
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                      >
+                        <Settings className="w-4 h-4" />
+                        <span>Add Admin</span>
+                      </motion.button>
+                    </div>
+                    <motion.button
+                      onClick={confirmLeaveGroup}
+                      className="w-full py-2 px-4 bg-amber-500 hover:bg-amber-600 text-white rounded-lg transition-colors"
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                    >
+                      Leave Anyway
+                    </motion.button>
+                  </div>
+                ) : (
+                  /* Normal admin leave when other admins exist */
+                  <div className="flex space-x-3">
+                    <motion.button
+                      onClick={() => setShowLeaveConfirm(false)}
+                      className="flex-1 py-2 px-4 bg-white/10 hover:bg-white/20 text-white rounded-lg transition-colors"
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                    >
+                      Cancel
+                    </motion.button>
+                    <motion.button
+                      onClick={confirmLeaveGroup}
+                      className="flex-1 py-2 px-4 bg-amber-500 hover:bg-amber-600 text-white rounded-lg transition-colors"
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                    >
+                      Leave Group
+                    </motion.button>
+                  </div>
+                )
               ) : (
+                /* Member buttons - simple leave */
                 <div className="flex space-x-3">
                   <motion.button
                     onClick={() => setShowLeaveConfirm(false)}

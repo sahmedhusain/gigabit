@@ -637,6 +637,14 @@ func (s *Server) handleGroupRoute(groupHandler *handlers.GroupHandler, eventHand
 				authMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					groupHandler.GetUserRole(w, r, groupID)
 				})).ServeHTTP(w, r)
+			case "next-admin":
+				if r.Method != http.MethodGet {
+					writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
+					return
+				}
+				authMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					groupHandler.GetNextAdmin(w, r, groupID)
+				})).ServeHTTP(w, r)
 			case "promote":
 				if r.Method != http.MethodPost {
 					writeError(w, http.StatusMethodNotAllowed, "Method not allowed")

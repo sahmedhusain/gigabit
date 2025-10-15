@@ -145,47 +145,55 @@ export default function ChatsSection({
     const cleanup = addMessageListener((message) => {
       // Typing indicators
       if (message.type === 'typing' && message.data) {
-        const { username, action, conversation_id } = message.data
-        // Prefer conversation_id when available; fall back to group/private keys for robustness
-        const primaryKey = conversation_id ? String(conversation_id) : (message.group_id ? `group_${message.group_id}` : `private_${message.to}`)
-        const secondaryKey = message.group_id ? `group_${message.group_id}` : undefined
+        const { username, action, user_id } = message.data
+        
+        console.log(`📝 [Typing] RECEIVED: Full message:`, JSON.stringify(message, null, 2))
+        console.log(`📝 [Typing] RECEIVED: action=${action}, username=${username}, user_id=${user_id}, from=${message.from}, to=${message.to}, group_id=${message.group_id}`, message)
+        
+        // Determine the conversation ID/key
+        let conversationKey: string | null = null
+        if (message.group_id) {
+          conversationKey = `group_${message.group_id}`
+          console.log(`📝 [Typing] RECEIVED: Group message, key: ${conversationKey}`)
+        } else if (message.from && message.to && currentUser?.id) {
+          // For private chats, use a consistent key based on both user IDs
+          const from = message.from || 0
+          const to = message.to || 0
+          conversationKey = String(Math.min(from, to) * 1000000 + Math.max(from, to))
+          console.log(`📝 [Typing] RECEIVED: Private message, key: ${conversationKey}`)
+        }
 
-        setTypingChats(prev => {
-          const updateKey = (key: string | undefined, updater: (current: string[]) => string[]) => {
-            if (!key) return prev
-            const current = prev[key] || []
-            const nextForKey = updater(current)
-            return nextForKey === current ? prev : { ...prev, [key]: nextForKey }
-          }
+        console.log(`📝 [Typing] RECEIVED: Final key: ${conversationKey}, typingChats keys before:`, Object.keys(typingChats))
 
-          let next = prev
-          if (action === 'start') {
-            next = updateKey(primaryKey, (current) => current.includes(username) ? current : [...current, username])
-            // Also mirror to secondary key when present (helps when render uses group_{id})
-            if (secondaryKey) {
-              next = { ...next, [secondaryKey]: (next[secondaryKey] || []).includes(username) ? next[secondaryKey] : [ ...(next[secondaryKey] || []), username ] }
-            }
-          } else if (action === 'stop') {
-            next = updateKey(primaryKey, (current) => current.filter(u => u !== username))
-            if (secondaryKey) {
-              next = { ...next, [secondaryKey]: (next[secondaryKey] || []).filter(u => u !== username) }
-            }
-          }
-          return next
-        })
+        if (!conversationKey || !username) {
+          console.log(`📝 [Typing] Skipping: no key (${conversationKey}) or username (${username})`)
+          return
+        }
 
         if (action === 'start') {
-          setTimeout(() => {
-            setTypingChats(prev => {
-              const copy = { ...prev }
-              const keys = [primaryKey, secondaryKey].filter(Boolean) as string[]
-              keys.forEach(k => {
-                copy[k] = (copy[k] || []).filter(u => u !== username)
-                if (copy[k]?.length === 0) delete copy[k]
-              })
-              return copy
-            })
-          }, 3000)
+          setTypingChats(prev => {
+            const current = prev[conversationKey!] || []
+            if (current.includes(username)) {
+              console.log(`📝 [Typing] User already typing: ${username}`)
+              return prev // Already in list
+            }
+            const updated = { ...prev, [conversationKey!]: [...current, username] }
+            console.log(`📝 [Typing] Added ${username} to ${conversationKey}: ${JSON.stringify(updated[conversationKey!])}`)
+            return updated
+          })
+        } else if (action === 'stop') {
+          setTypingChats(prev => {
+            const current = prev[conversationKey!] || []
+            const filtered = current.filter(u => u !== username)
+            if (filtered.length === 0) {
+              const { [conversationKey!]: _, ...rest } = prev
+              console.log(`📝 [Typing] Removed ${username} from ${conversationKey} (now empty)`)
+              return rest
+            }
+            const updated = { ...prev, [conversationKey!]: filtered }
+            console.log(`📝 [Typing] Removed ${username} from ${conversationKey}: ${JSON.stringify(updated[conversationKey!])}`)
+            return updated
+          })
         }
       }
 
@@ -196,10 +204,15 @@ export default function ChatsSection({
     })
 
     return cleanup
-  }, [addMessageListener])
+  }, [addMessageListener, currentUser?.id])
 
   // Normalize chats for consistent preview formatting
   const normalizedChats = (chats || []).map(chat => normalizeConversation(chat))
+
+  // Debug logging for chats
+  useEffect(() => {
+    console.log('🔍 [ChatsSection] Normalized chats:', normalizedChats.map(c => ({ id: c.id, type: c.type, groupId: c.groupId, name: c.name })))
+  }, [normalizedChats])
 
   const filteredChats = normalizedChats.filter(chat => {
     // Allow groups without messages to be shown, but filter out private chats without messages
@@ -223,7 +236,7 @@ export default function ChatsSection({
   const baseStats = {
     online: normalizedChats.filter(chat => chat.type === 'private' && chat.participantId && getUserStatus(chat.participantId) !== 'offline').length,
     total: uniqueChats.length,
-    unread: uniqueChats.reduce((sum, chat) => sum + (chat.unread || 0), 0)
+    unread: uniqueChats.filter(chat => (chat.unread || 0) > 0).length
   }
 
   // Dynamic header configuration based on sub-tab
@@ -232,7 +245,7 @@ export default function ChatsSection({
       case 'private':
         return {
           title: 'Private Chats',
-          subtitle: 'Direct conversations',
+          subtitle: '',
           icon: User,
           gradient: 'from-blue-500/20 to-indigo-500/20',
           iconColor: 'text-blue-400',
@@ -259,7 +272,7 @@ export default function ChatsSection({
       case 'group':
         return {
           title: 'Group Chats',
-          subtitle: 'Group conversations',
+          subtitle: '',
           icon: Users,
           gradient: 'from-purple-500/20 to-pink-500/20',
           iconColor: 'text-purple-400',
@@ -284,7 +297,7 @@ export default function ChatsSection({
       default: // 'all'
         return {
           title: 'Messages',
-          subtitle: 'All conversations',
+          subtitle: '',
           icon: MessageCircle,
           gradient: 'from-emerald-500/20 to-teal-500/20',
           iconColor: 'text-emerald-400',
@@ -423,9 +436,24 @@ export default function ChatsSection({
                       groupId: chat.groupId, // Explicitly pass groupId for group chats
                     }}
                     getUserStatus={getUserStatus}
-                    typingUsers={
-                      (chatIdNum && typingChats[chatIdNum.toString()]) || (chat.groupId ? typingChats[`group_${chat.groupId}`] : []) || []
-                    }
+                    typingUsers={(() => {
+                      // For groups, look up by group key
+                      if (chat.groupId) {
+                        const groupKey = `group_${chat.groupId}`
+                        const typing = typingChats[groupKey] || []
+                        console.log(`👥 [ChatItem] Group ${chat.groupId} (${chat.name}) - key: ${groupKey}, typing:`, typing, 'all typingChats:', Object.keys(typingChats))
+                        return typing
+                      }
+                      // For private chats, calculate the key
+                      if (chat.participantId && currentUser?.id) {
+                        const key = String(Math.min(chat.participantId, currentUser.id) * 1000000 + Math.max(chat.participantId, currentUser.id))
+                        const typing = typingChats[key] || []
+                        console.log(`👤 [ChatItem] Private chat with ${chat.participantId} - key: ${key}, typing:`, typing)
+                        return typing
+                      }
+                      console.log(`❓ [ChatItem] No typing key for chat:`, chat)
+                      return []
+                    })()}
                     onDelete={handleDeleteConversation}
                       onMarkAsRead={handleMarkAsRead}
                       onMarkAsUnread={handleMarkAsUnread}

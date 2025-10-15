@@ -147,10 +147,12 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
   }, [conversationId, conversationType])
 
   // Typing indicator integration
+  // For groups, pass the groupId instead of conversationId since typing messages use group_id field
+  const typingConversationId = conversationType === 'group' && groupId ? groupId : effectiveConversationId
   const {
     typingUsers,
     startTyping
-  } = useTypingIndicator(conversationId)
+  } = useTypingIndicator(typingConversationId, conversationType)
 
   // Connection status monitoring
   const { isConnected, onlineUsers } = useWebSocket()
@@ -742,12 +744,29 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
                 )}
                 {/* Typing indicators */}
                 {typingUsers.length > 0 && (
-                  <div className="flex items-center space-x-2 mt-2">
-                    <div className="flex items-center space-x-2 px-3 py-1 rounded-full bg-blue-500/20 border-blue-400/30 text-blue-300 border">
+                  <motion.div
+                    className="flex items-center space-x-2 mt-2"
+                    initial={{ opacity: 0, y: -5 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -5 }}
+                  >
+                    <div className="flex items-center space-x-2 px-3 py-1 rounded-full bg-blue-500/20 border border-blue-400/30 text-blue-300 backdrop-blur-sm">
                       <div className="flex space-x-1">
-                        <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-bounce [animation-delay:0ms]" />
-                        <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-bounce [animation-delay:150ms]" />
-                        <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-bounce [animation-delay:300ms]" />
+                        <motion.div
+                          className="w-1.5 h-1.5 bg-blue-400 rounded-full"
+                          animate={{ scale: [1, 1.3, 1] }}
+                          transition={{ duration: 0.6, repeat: Infinity, delay: 0 }}
+                        />
+                        <motion.div
+                          className="w-1.5 h-1.5 bg-blue-400 rounded-full"
+                          animate={{ scale: [1, 1.3, 1] }}
+                          transition={{ duration: 0.6, repeat: Infinity, delay: 0.15 }}
+                        />
+                        <motion.div
+                          className="w-1.5 h-1.5 bg-blue-400 rounded-full"
+                          animate={{ scale: [1, 1.3, 1] }}
+                          transition={{ duration: 0.6, repeat: Infinity, delay: 0.3 }}
+                        />
                       </div>
                       <span className="text-xs font-medium">
                         {typingUsers.length === 1 
@@ -756,7 +775,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
                         }
                       </span>
                     </div>
-                  </div>
+                  </motion.div>
                 )}
               </div>
             </div>
@@ -919,32 +938,56 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: 0.35, duration: 0.4, ease: [0.23, 1, 0.320, 1] }}
               >
-                <div className={`flex items-center space-x-2 px-3 py-1 rounded-full backdrop-blur-sm border ${
-                  conversationType === 'private' && participantId
-                    ? (getParticipantStatus() === 'online' ? 'bg-green-500/20 border-green-400/30 text-green-300' :
-                       getParticipantStatus() === 'busy' ? 'bg-red-500/20 border-red-400/30 text-red-300' :
-                       getParticipantStatus() === 'away' ? 'bg-yellow-500/20 border-yellow-400/30 text-yellow-300' :
-                       'bg-gray-500/20 border-gray-400/30 text-gray-300')
-                    : (isConnected ? 'bg-green-500/20 border-green-400/30 text-green-300' : 'bg-red-500/20 border-red-400/30 text-red-300')
-                }`}>
-                  <div className={`w-2 h-2 rounded-full ${
+                {/* Typing indicator for private chats */}
+                {conversationType === 'private' && typingUsers.length > 0 ? (
+                  <div className="flex items-center space-x-2 px-3 py-1 rounded-full bg-blue-500/20 border border-blue-400/30 text-blue-300">
+                    <div className="flex space-x-1">
+                      <motion.div
+                        className="w-1.5 h-1.5 bg-blue-400 rounded-full"
+                        animate={{ scale: [1, 1.3, 1] }}
+                        transition={{ duration: 0.6, repeat: Infinity, delay: 0 }}
+                      />
+                      <motion.div
+                        className="w-1.5 h-1.5 bg-blue-400 rounded-full"
+                        animate={{ scale: [1, 1.3, 1] }}
+                        transition={{ duration: 0.6, repeat: Infinity, delay: 0.15 }}
+                      />
+                      <motion.div
+                        className="w-1.5 h-1.5 bg-blue-400 rounded-full"
+                        animate={{ scale: [1, 1.3, 1] }}
+                        transition={{ duration: 0.6, repeat: Infinity, delay: 0.3 }}
+                      />
+                    </div>
+                    <span className="text-xs font-semibold">typing...</span>
+                  </div>
+                ) : (
+                  <div className={`flex items-center space-x-2 px-3 py-1 rounded-full backdrop-blur-sm border ${
                     conversationType === 'private' && participantId
-                      ? (getParticipantStatus() === 'online' ? 'bg-green-400 shadow-green-400/50' :
-                         getParticipantStatus() === 'busy' ? 'bg-red-400 shadow-red-400/50' :
-                         getParticipantStatus() === 'away' ? 'bg-yellow-400 shadow-yellow-400/50' :
-                         'bg-gray-400 shadow-gray-400/50')
-                      : (isConnected ? 'bg-green-400 shadow-green-400/50' : 'bg-red-400 shadow-red-400/50')
-                  } shadow-lg`} />
-                  <span className="text-xs font-semibold">
-                    {conversationType === 'private' && participantId
-                      ? (getParticipantStatus() === 'online' ? 'Online' :
-                         getParticipantStatus() === 'busy' ? 'Busy' :
-                         getParticipantStatus() === 'away' ? 'Away' :
-                         participantData?.last_status_change ? formatLastOnlineTime(participantData.last_status_change) : 'Offline')
-                      : (isConnected ? 'Connected' : 'Disconnected')
-                    }
-                  </span>
-                </div>
+                      ? (getParticipantStatus() === 'online' ? 'bg-green-500/20 border-green-400/30 text-green-300' :
+                         getParticipantStatus() === 'busy' ? 'bg-red-500/20 border-red-400/30 text-red-300' :
+                         getParticipantStatus() === 'away' ? 'bg-yellow-500/20 border-yellow-400/30 text-yellow-300' :
+                         'bg-gray-500/20 border-gray-400/30 text-gray-300')
+                      : (isConnected ? 'bg-green-500/20 border-green-400/30 text-green-300' : 'bg-red-500/20 border-red-400/30 text-red-300')
+                  }`}>
+                    <div className={`w-2 h-2 rounded-full ${
+                      conversationType === 'private' && participantId
+                        ? (getParticipantStatus() === 'online' ? 'bg-green-400 shadow-green-400/50' :
+                           getParticipantStatus() === 'busy' ? 'bg-red-400 shadow-red-400/50' :
+                           getParticipantStatus() === 'away' ? 'bg-yellow-400 shadow-yellow-400/50' :
+                           'bg-gray-400 shadow-gray-400/50')
+                        : (isConnected ? 'bg-green-400 shadow-green-400/50' : 'bg-red-400 shadow-red-400/50')
+                    } shadow-lg`} />
+                    <span className="text-xs font-semibold">
+                      {conversationType === 'private' && participantId
+                        ? (getParticipantStatus() === 'online' ? 'Online' :
+                           getParticipantStatus() === 'busy' ? 'Busy' :
+                           getParticipantStatus() === 'away' ? 'Away' :
+                           participantData?.last_status_change ? formatLastOnlineTime(participantData.last_status_change) : 'Offline')
+                        : (isConnected ? 'Connected' : 'Disconnected')
+                      }
+                    </span>
+                  </div>
+                )}
                 {conversationType === 'group' && (
                   <div className="flex items-center space-x-2 px-3 py-1 rounded-full bg-white/10 border border-white/20">
                     <span className="text-xs text-white/70 font-medium">
@@ -1096,41 +1139,6 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
                 Array.from(messages.get(effectiveConversationId) || []).map((message, index) =>
                   renderMessage(message, index)
                 )
-              )}
-              {typingUsers.length > 0 && (
-                <motion.div
-                  className="flex justify-start"
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                >
-                  <div className="bg-white/10 border border-white/20 rounded-2xl px-4 py-3 shadow-lg">
-                    <div className="flex items-center space-x-3">
-                      <div className="flex space-x-1">
-                        <motion.div
-                          className="w-2 h-2 bg-emerald-400 rounded-full"
-                          animate={{ scale: [1, 1.2, 1] }}
-                          transition={{ duration: 0.8, repeat: Infinity, delay: 0 }}
-                        />
-                        <motion.div
-                          className="w-2 h-2 bg-emerald-400 rounded-full"
-                          animate={{ scale: [1, 1.2, 1] }}
-                          transition={{ duration: 0.8, repeat: Infinity, delay: 0.2 }}
-                        />
-                        <motion.div
-                          className="w-2 h-2 bg-emerald-400 rounded-full"
-                          animate={{ scale: [1, 1.2, 1] }}
-                          transition={{ duration: 0.8, repeat: Infinity, delay: 0.4 }}
-                        />
-                      </div>
-                      <span className="text-white/60 text-sm">
-                        {conversationType === 'group' && typingUsers.length > 0
-                          ? `${typingUsers.map(u => u.username || 'User').join(', ')} ${typingUsers.length === 1 ? 'is' : 'are'} typing...`
-                          : 'Someone is typing...'}
-                      </span>
-                    </div>
-                  </div>
-                </motion.div>
               )}
               <div ref={messagesEndRef} />
             </>

@@ -820,14 +820,35 @@ func (s *Server) handleMessageRoute(handler *handlers.MessageHandler) http.Handl
 		path := strings.TrimPrefix(r.URL.Path, "/api/messages/")
 		parts := strings.Split(path, "/")
 
-		if len(parts) < 2 {
+		if len(parts) == 0 || parts[0] == "" {
 			writeError(w, http.StatusNotFound, "Invalid route")
 			return
 		}
 
 		messageType := parts[0]
-		targetID := parts[1]
 		authMiddleware := middleware.AuthMiddleware(s.DB.GetDB())
+
+		// Handle routes that don't need targetID
+		if messageType == "read" || messageType == "unread" {
+			if r.Method != http.MethodPut {
+				writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
+				return
+			}
+			if messageType == "read" {
+				authMiddleware(http.HandlerFunc(handler.MarkConversationAsRead)).ServeHTTP(w, r)
+			} else {
+				authMiddleware(http.HandlerFunc(handler.MarkConversationAsUnread)).ServeHTTP(w, r)
+			}
+			return
+		}
+
+		// For routes that need targetID
+		if len(parts) < 2 {
+			writeError(w, http.StatusNotFound, "Invalid route")
+			return
+		}
+
+		targetID := parts[1]
 
 		switch messageType {
 		case "private":
@@ -846,12 +867,6 @@ func (s *Server) handleMessageRoute(handler *handlers.MessageHandler) http.Handl
 			authMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				handler.GetGroupMessages(w, r, targetID)
 			})).ServeHTTP(w, r)
-		case "read":
-			if r.Method != http.MethodPut {
-				writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
-				return
-			}
-			authMiddleware(http.HandlerFunc(handler.MarkAsRead)).ServeHTTP(w, r)
 		case "conversation":
 			if r.Method != http.MethodGet {
 				writeError(w, http.StatusMethodNotAllowed, "Method not allowed")

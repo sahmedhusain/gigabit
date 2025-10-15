@@ -51,12 +51,16 @@ func (s *ChatService) GetUnifiedChats(userID uint) ([]models.UnifiedChatItem, er
 }
 
 func (s *ChatService) getPrivateChats(userID uint) ([]models.UnifiedChatItem, error) {
+	// Calculate unread count dynamically: count messages where current user is NOT the sender and is_read = false
 	query := `
 		SELECT c.id, c.participant1_id, c.participant2_id, c.last_message_id, c.updated_at,
 			   u1.id, u1.first_name, u1.last_name, u1.avatar, u1.nickname,
 			   u2.id, u2.first_name, u2.last_name, u2.avatar, u2.nickname,
 			   m.id, m.content, m.created_at, m.sender_id,
-			   CASE WHEN c.participant1_id = ? THEN c.unread_count1 ELSE c.unread_count2 END as unread_count
+			   (SELECT COUNT(*) FROM private_messages pm 
+			    WHERE pm.conversation_id = c.id 
+			    AND pm.sender_id != ? 
+			    AND pm.is_read = 0) as unread_count
 		FROM private_conversations c
 		JOIN users u1 ON c.participant1_id = u1.id
 		JOIN users u2 ON c.participant2_id = u2.id

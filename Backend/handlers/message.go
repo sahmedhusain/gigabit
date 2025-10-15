@@ -3,6 +3,7 @@ package handlers
 import (
 	"database/sql"
 	"encoding/json"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -168,6 +169,17 @@ func (h *MessageHandler) GetPrivateMessages(w http.ResponseWriter, r *http.Reque
 			writeError(w, http.StatusInternalServerError, "Failed to get messages")
 		}
 		return
+	}
+
+	// Mark unread messages as read (only messages where current user is the receiver)
+	var unreadMessageIDs []uint
+	for _, msg := range messages {
+		if !msg.IsRead && msg.SenderID != currentUserID {
+			unreadMessageIDs = append(unreadMessageIDs, msg.ID)
+		}
+	}
+	if len(unreadMessageIDs) > 0 {
+		_ = h.messageService.MarkMessagesAsRead(unreadMessageIDs, currentUserID)
 	}
 
 	writeJSON(w, http.StatusOK, map[string]interface{}{
@@ -340,6 +352,17 @@ func (h *MessageHandler) GetConversationMessages(w http.ResponseWriter, r *http.
 		return
 	}
 
+	// Mark unread messages as read (only messages where current user is the receiver)
+	var unreadMessageIDs []uint
+	for _, msg := range messages {
+		if !msg.IsRead && msg.SenderID != currentUserID {
+			unreadMessageIDs = append(unreadMessageIDs, msg.ID)
+		}
+	}
+	if len(unreadMessageIDs) > 0 {
+		_ = h.messageService.MarkMessagesAsRead(unreadMessageIDs, currentUserID)
+	}
+
 	writeJSON(w, http.StatusOK, map[string]interface{}{
 		"messages": messages,
 		"count":    len(messages),
@@ -416,6 +439,30 @@ func (h *MessageHandler) MarkAsRead(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+func (h *MessageHandler) MarkAsUnread(w http.ResponseWriter, r *http.Request) {
+	userID, ok := r.Context().Value("user_id").(uint)
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "User not authenticated")
+		return
+	}
+
+	var req models.MarkReadRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "Invalid request body")
+		return
+	}
+
+	if err := h.messageService.MarkMessagesAsUnread(req.MessageIDs, userID); err != nil {
+		writeError(w, http.StatusInternalServerError, "Failed to mark messages as unread")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"message": "Messages marked as unread",
+		"count":   len(req.MessageIDs),
+	})
+}
+
 // Helper function to parse conversation ID from chat ID
 func (h *MessageHandler) parseConversationID(chatID string) uint {
 	if strings.HasPrefix(chatID, "private_") {
@@ -428,4 +475,81 @@ func (h *MessageHandler) parseConversationID(chatID string) uint {
 		}
 	}
 	return 0
+}
+
+// Conversation-level read/unread handlers
+func (h *MessageHandler) MarkConversationAsRead(w http.ResponseWriter, r *http.Request) {
+	userID, ok := r.Context().Value("user_id").(uint)
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "User not authenticated")
+		return
+	}
+
+	var req struct {
+		ConversationID   uint   `json:"conversation_id"`
+		ConversationType string `json:"conversation_type"` // "private" or "group"
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		log.Printf("MarkConversationAsRead: Failed to decode request body: %v", err)
+		writeError(w, http.StatusBadRequest, "Invalid request body")
+		return
+	}
+
+	log.Printf("MarkConversationAsRead: ConversationID=%d, UserID=%d, Type=%s", req.ConversationID, userID, req.ConversationType)
+
+	if req.ConversationID == 0 {
+		log.Printf("MarkConversationAsRead: ConversationID is 0")
+		writeError(w, http.StatusBadRequest, "Conversation ID is required")
+		return
+	}
+
+	if err := h.messageService.MarkConversationAsRead(req.ConversationID, userID, req.ConversationType); err != nil {
+		log.Printf("MarkConversationAsRead: Service error: %v", err)
+		writeError(w, http.StatusInternalServerError, "Failed to mark conversation as read")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"message":         "Conversation marked as read",
+		"conversation_id": req.ConversationID,
+	})
+}
+
+func (h *MessageHandler) MarkConversationAsUnread(w http.ResponseWriter, r *http.Request) {
+	userID, ok := r.Context().Value("user_id").(uint)
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "User not authenticated")
+		return
+	}
+
+	var req struct {
+		ConversationID   uint   `json:"conversation_id"`
+		ConversationType string `json:"conversation_type"` // "private" or "group"
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		log.Printf("MarkConversationAsUnread: Failed to decode request body: %v", err)
+		writeError(w, http.StatusBadRequest, "Invalid request body")
+		return
+	}
+
+	log.Printf("MarkConversationAsUnread: ConversationID=%d, UserID=%d, Type=%s", req.ConversationID, userID, req.ConversationType)
+
+	if req.ConversationID == 0 {
+		log.Printf("MarkConversationAsUnread: ConversationID is 0")
+		writeError(w, http.StatusBadRequest, "Conversation ID is required")
+		return
+	}
+
+	if err := h.messageService.MarkConversationAsUnread(req.ConversationID, userID, req.ConversationType); err != nil {
+		log.Printf("MarkConversationAsUnread: Service error: %v", err)
+		writeError(w, http.StatusInternalServerError, "Failed to mark conversation as unread")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"message":         "Conversation marked as unread",
+		"conversation_id": req.ConversationID,
+	})
 }

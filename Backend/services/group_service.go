@@ -93,7 +93,7 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 
 func (s *GroupService) GetGroupByID(groupID, currentUserID uint) (*models.GroupResponse, error) {
 	query := `
-SELECT g.id, g.creator_id, g.name as title, g.description, g.privacy, g.created_at, g.updated_at,
+SELECT g.id, g.creator_id, g.name as title, g.description, g.privacy, g.avatar, g.created_at, g.updated_at,
 	u.first_name, u.last_name, u.avatar, u.nickname,
 	COUNT(DISTINCT gm.id) as member_count
 FROM groups g
@@ -108,7 +108,7 @@ GROUP BY g.id, u.id
 
 	err := s.db.QueryRow(query, groupID).Scan(
 		&group.ID, &group.CreatorID, &group.Title, &group.Description,
-		&group.Privacy,
+		&group.Privacy, &group.Avatar,
 		&group.CreatedAt, &group.UpdatedAt,
 		&creator.FirstName, &creator.LastName, &creator.Avatar, &creator.Nickname,
 		&group.MemberCount,
@@ -148,7 +148,7 @@ GROUP BY g.id, u.id
 
 func (s *GroupService) GetAllGroups(currentUserID uint, limit, offset int) ([]models.GroupResponse, error) {
 	query := `
-SELECT g.id, g.creator_id, g.name as title, g.description, g.privacy, g.created_at, g.updated_at,
+SELECT g.id, g.creator_id, g.name as title, g.description, g.privacy, g.avatar, g.created_at, g.updated_at,
 	u.first_name, u.last_name, u.avatar, u.nickname,
 	COUNT(DISTINCT gm.id) as member_count
 FROM groups g
@@ -172,6 +172,7 @@ LIMIT ? OFFSET ?
 
 		err := rows.Scan(
 			&group.ID, &group.CreatorID, &group.Title, &group.Description, &group.Privacy,
+			&group.Avatar,
 			&group.CreatedAt, &group.UpdatedAt,
 			&creator.FirstName, &creator.LastName, &creator.Avatar, &creator.Nickname,
 			&group.MemberCount,
@@ -205,7 +206,7 @@ LIMIT ? OFFSET ?
 
 func (s *GroupService) GetUserGroups(userID uint, limit, offset int) ([]models.GroupResponse, error) {
 	query := `
-SELECT g.id, g.creator_id, g.name as title, g.description, g.privacy, g.created_at, g.updated_at,
+SELECT g.id, g.creator_id, g.name as title, g.description, g.privacy, g.avatar, g.created_at, g.updated_at,
 	u.first_name, u.last_name, u.avatar, u.nickname,
 	COUNT(DISTINCT gm2.id) as member_count
 FROM groups g
@@ -230,6 +231,7 @@ LIMIT ? OFFSET ?
 
 		err := rows.Scan(
 			&group.ID, &group.CreatorID, &group.Title, &group.Description, &group.Privacy,
+			&group.Avatar,
 			&group.CreatedAt, &group.UpdatedAt,
 			&creator.FirstName, &creator.LastName, &creator.Avatar, &creator.Nickname,
 			&group.MemberCount,

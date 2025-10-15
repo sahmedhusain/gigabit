@@ -45,13 +45,16 @@ export function useConnectionStatus() {
       setConnectionAttempts(0)
       setConnectionError(null)
     } else {
-      setConnectionAttempts(prev => prev + 1)
-      
-      if (isOnline && connectionAttempts > 0) {
-        setConnectionError('WebSocket connection lost')
-      }
+      setConnectionAttempts(prev => {
+        const newAttempts = prev + 1
+        // Set error if we're online and have connection attempts
+        if (isOnline && newAttempts > 0) {
+          setConnectionError('WebSocket connection lost')
+        }
+        return newAttempts
+      })
     }
-  }, [isConnected, isOnline, connectionAttempts])
+  }, [isConnected, isOnline])
 
   // Monitor socket state
   useEffect(() => {

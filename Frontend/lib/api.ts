@@ -246,6 +246,7 @@ export interface GroupResponse {
   title: string;
   description: string;
   privacy: 'public' | 'private';
+  avatar?: string;
   creator_id: number;
   member_count: number;
   is_member: boolean;
@@ -779,7 +780,7 @@ export class ApiClient {
 
   async leaveGroup(groupId: number): Promise<{ message: string }> {
     return this.request<{ message: string }>(`/api/groups/${groupId}/leave`, {
-      method: 'POST',
+      method: 'DELETE',
     });
   }
 
@@ -827,6 +828,12 @@ export class ApiClient {
     return this.request<{ message: string }>(`/api/groups/${groupId}/demote`, {
       method: 'POST',
       body: JSON.stringify({ user_id: userId }),
+    });
+  }
+
+  async getNextAdmin(groupId: number): Promise<{ next_admin: string; has_admins: boolean; first_member: string }> {
+    return this.request<{ next_admin: string; has_admins: boolean; first_member: string }>(`/api/groups/${groupId}/next-admin`, {
+      method: 'GET',
     });
   }
 
@@ -972,6 +979,40 @@ export class ApiClient {
     return this.request<{ message: string; count: number }>('/api/messages/read', {
       method: 'PUT',
       body: JSON.stringify({ message_ids: messageIds }),
+    });
+  }
+
+  async markMessagesAsUnread(messageIds: number[]): Promise<{ message: string; count: number }> {
+    return this.request<{ message: string; count: number }>('/api/messages/unread', {
+      method: 'PUT',
+      body: JSON.stringify({ message_ids: messageIds }),
+    });
+  }
+
+  // Conversation-level read/unread methods
+  async markConversationAsRead(conversationId: number, conversationType: 'private' | 'group'): Promise<{ message: string; conversation_id: number }> {
+    return this.request<{ message: string; conversation_id: number }>('/api/messages/read', {
+      method: 'PUT',
+      body: JSON.stringify({ 
+        conversation_id: conversationId, 
+        conversation_type: conversationType 
+      }),
+    });
+  }
+
+  async markConversationAsUnread(conversationId: number, conversationType: 'private' | 'group'): Promise<{ message: string; conversation_id: number }> {
+    return this.request<{ message: string; conversation_id: number }>('/api/messages/unread', {
+      method: 'PUT',
+      body: JSON.stringify({ 
+        conversation_id: conversationId, 
+        conversation_type: conversationType 
+      }),
+    });
+  }
+
+  async deleteConversation(conversationId: number): Promise<{ message: string }> {
+    return this.request<{ message: string }>(`/api/conversations/${conversationId}`, {
+      method: 'DELETE',
     });
   }
 

@@ -75,6 +75,13 @@ func (s *MessageService) SendPrivateMessage(message *models.Message) error {
 		fmt.Printf("Failed to update conversation: %v\n", err)
 	}
 
+	// Increment unread count for the receiver
+	err = s.incrementPrivateUnreadCount(conversationID, message.ReceiverID)
+	if err != nil {
+		// Log error but don't fail the message send
+		fmt.Printf("Failed to increment unread count: %v\n", err)
+	}
+
 	// Create notification for the receiver
 	s.createMessageNotification(message.SenderID, message.ReceiverID, message.ID)
 
@@ -160,9 +167,10 @@ func (s *MessageService) GetPrivateMessages(userID1, userID2 uint, limit, offset
 	for rows.Next() {
 		var message models.MessageResponse
 		var sender models.UserResponse
+		var isReadInDB bool
 
 		err := rows.Scan(
-			&message.ID, &message.SenderID, &message.Content, &message.IsRead, &message.CreatedAt,
+			&message.ID, &message.SenderID, &message.Content, &isReadInDB, &message.CreatedAt,
 			&sender.FirstName, &sender.LastName, &sender.Avatar, &sender.Nickname,
 		)
 		if err != nil {
@@ -177,8 +185,12 @@ func (s *MessageService) GetPrivateMessages(userID1, userID2 uint, limit, offset
 		// Set receiver ID based on who is not the sender
 		if message.SenderID == userID1 {
 			message.ReceiverID = userID2
+			// If current user is the sender, mark as read (sender always sees their own messages as read)
+			message.IsRead = true
 		} else {
 			message.ReceiverID = userID1
+			// If current user is the receiver, use the actual is_read status from DB
+			message.IsRead = isReadInDB
 		}
 
 		messages = append(messages, message)
@@ -472,10 +484,17 @@ func (s *MessageService) GetConversationMessages(conversationID, userID uint, li
 }
 
 func (s *MessageService) MarkMessagesAsRead(messageIDs []uint, userID uint) error {
+	if len(messageIDs) == 0 {
+		return nil
+	}
+
+	// Only mark messages as read where the current user is the RECEIVER (not the sender)
 	query := `
 		UPDATE private_messages 
 		SET is_read = TRUE 
-		WHERE id IN (?) AND conversation_id IN (
+		WHERE id IN (?) 
+		AND sender_id != ?
+		AND conversation_id IN (
 			SELECT id FROM private_conversations 
 			WHERE participant1_id = ? OR participant2_id = ?
 		)
@@ -493,11 +512,17 @@ func (s *MessageService) MarkMessagesAsRead(messageIDs []uint, userID uint) erro
 
 	fullQuery := strings.Replace(query, "?", inClause, 1)
 
-	args := append(ids, userID, userID)
+	args := append(ids, userID, userID, userID)
 
-	_, err := s.db.Exec(fullQuery, args...)
+	result, err := s.db.Exec(fullQuery, args...)
 	if err != nil {
 		return fmt.Errorf("failed to mark private messages as read: %w", err)
+	}
+
+	rowsAffected, _ := result.RowsAffected()
+	if rowsAffected > 0 {
+		// Decrement unread count for the user
+		s.decrementPrivateUnreadCountByMessages(messageIDs, userID)
 	}
 
 	// Also mark group messages as read
@@ -520,4 +545,258 @@ func (s *MessageService) MarkMessagesAsRead(messageIDs []uint, userID uint) erro
 	}
 
 	return nil
+}
+
+func (s *MessageService) MarkMessagesAsUnread(messageIDs []uint, userID uint) error {
+	if len(messageIDs) == 0 {
+		return nil
+	}
+
+	// Only mark messages as unread where the current user is the RECEIVER (not the sender)
+	query := `
+		UPDATE private_messages 
+		SET is_read = FALSE 
+		WHERE id IN (?) 
+		AND sender_id != ?
+		AND conversation_id IN (
+			SELECT id FROM private_conversations 
+			WHERE participant1_id = ? OR participant2_id = ?
+		)
+	`
+
+	// Convert uint slice to interface slice for the query
+	ids := make([]interface{}, len(messageIDs))
+	for i, id := range messageIDs {
+		ids[i] = id
+	}
+
+	// Build the IN clause
+	inClause := strings.Repeat("?,", len(messageIDs))
+	inClause = inClause[:len(inClause)-1] // Remove trailing comma
+
+	fullQuery := strings.Replace(query, "?", inClause, 1)
+
+	args := append(ids, userID, userID, userID)
+
+	result, err := s.db.Exec(fullQuery, args...)
+	if err != nil {
+		return fmt.Errorf("failed to mark private messages as unread: %w", err)
+	}
+
+	rowsAffected, _ := result.RowsAffected()
+	if rowsAffected > 0 {
+		// Increment unread count for the user
+		s.incrementPrivateUnreadCountByMessages(messageIDs, userID)
+	}
+
+	// Also mark group messages as unread
+	groupQuery := `
+		UPDATE group_messages 
+		SET is_read = FALSE 
+		WHERE id IN (?) AND conversation_id IN (
+			SELECT gc.id FROM group_conversations gc
+			JOIN group_members gm ON gc.group_id = gm.group_id
+			WHERE gm.user_id = ?
+		)
+	`
+
+	fullGroupQuery := strings.Replace(groupQuery, "?", inClause, 1)
+	groupArgs := append(ids, userID)
+
+	_, err = s.db.Exec(fullGroupQuery, groupArgs...)
+	if err != nil {
+		return fmt.Errorf("failed to mark group messages as unread: %w", err)
+	}
+
+	return nil
+}
+
+func (s *MessageService) incrementPrivateUnreadCountByMessages(messageIDs []uint, userID uint) error {
+	if len(messageIDs) == 0 {
+		return nil
+	}
+
+	// Get conversation IDs for the affected messages where user is receiver
+	query := `
+		SELECT DISTINCT conversation_id 
+		FROM private_messages 
+		WHERE id IN (?) 
+		AND sender_id != ?
+		AND conversation_id IN (
+			SELECT id FROM private_conversations 
+			WHERE participant1_id = ? OR participant2_id = ?
+		)
+	`
+
+	// Build the IN clause
+	inClause := strings.Repeat("?,", len(messageIDs))
+	inClause = inClause[:len(inClause)-1] // Remove trailing comma
+
+	fullQuery := strings.Replace(query, "?", inClause, 1)
+
+	// Convert uint slice to interface slice
+	ids := make([]interface{}, len(messageIDs))
+	for i, id := range messageIDs {
+		ids[i] = id
+	}
+
+	args := append(ids, userID, userID, userID)
+
+	rows, err := s.db.Query(fullQuery, args...)
+	if err != nil {
+		return fmt.Errorf("failed to get conversation IDs for unread increment: %w", err)
+	}
+	defer rows.Close()
+
+	var conversationIDs []uint
+	for rows.Next() {
+		var convID uint
+		if err := rows.Scan(&convID); err != nil {
+			continue
+		}
+		conversationIDs = append(conversationIDs, convID)
+	}
+
+	// Increment unread count for each conversation
+	for _, convID := range conversationIDs {
+		err = s.incrementPrivateUnreadCount(convID, userID)
+		if err != nil {
+			return fmt.Errorf("failed to increment unread count for conversation %d: %w", convID, err)
+		}
+	}
+
+	return nil
+}
+
+func (s *MessageService) incrementPrivateUnreadCount(conversationID, userID uint) error {
+	updateQuery := `
+		UPDATE private_conversations
+		SET unread_count1 = CASE WHEN participant1_id = ? THEN unread_count1 + 1 ELSE unread_count1 END,
+		    unread_count2 = CASE WHEN participant2_id = ? THEN unread_count2 + 1 ELSE unread_count2 END,
+		    updated_at = ?
+		WHERE id = ?
+	`
+	now := time.Now()
+	_, err := s.db.Exec(updateQuery, userID, userID, now, conversationID)
+	return err
+}
+
+func (s *MessageService) decrementPrivateUnreadCountByMessages(messageIDs []uint, userID uint) error {
+	if len(messageIDs) == 0 {
+		return nil
+	}
+
+	// Count how many messages were marked as read for this user
+	// Only count messages where the user is the RECEIVER (not the sender)
+	countQuery := `
+		SELECT COUNT(*) FROM private_messages 
+		WHERE id IN (?) 
+		AND sender_id != ?
+		AND conversation_id IN (
+			SELECT id FROM private_conversations 
+			WHERE participant1_id = ? OR participant2_id = ?
+		)
+	`
+
+	// Convert uint slice to interface slice for the query
+	ids := make([]interface{}, len(messageIDs))
+	for i, id := range messageIDs {
+		ids[i] = id
+	}
+
+	// Build the IN clause
+	inClause := strings.Repeat("?,", len(messageIDs))
+	inClause = inClause[:len(inClause)-1] // Remove trailing comma
+
+	fullCountQuery := strings.Replace(countQuery, "?", inClause, 1)
+	countArgs := append(ids, userID, userID, userID)
+
+	var count int
+	err := s.db.QueryRow(fullCountQuery, countArgs...).Scan(&count)
+	if err != nil {
+		return err
+	}
+
+	if count == 0 {
+		return nil // No messages to decrement
+	}
+
+	// Decrement the unread count
+	updateQuery := `
+		UPDATE private_conversations
+		SET unread_count1 = CASE WHEN participant1_id = ? THEN GREATEST(unread_count1 - ?, 0) ELSE unread_count1 END,
+		    unread_count2 = CASE WHEN participant2_id = ? THEN GREATEST(unread_count2 - ?, 0) ELSE unread_count2 END,
+		    updated_at = ?
+		WHERE participant1_id = ? OR participant2_id = ?
+	`
+	now := time.Now()
+	_, err = s.db.Exec(updateQuery, userID, count, userID, count, now, userID, userID)
+	return err
+}
+
+// MarkConversationAsRead marks all messages in a conversation as read for the user
+func (s *MessageService) MarkConversationAsRead(conversationID uint, userID uint, conversationType string) error {
+	if conversationType == "group" {
+		// Mark all group messages as read where user is not the sender
+		query := `
+			UPDATE group_messages 
+			SET is_read = TRUE 
+			WHERE conversation_id = ? 
+			AND sender_id != ?
+			AND is_read = FALSE
+		`
+		_, err := s.db.Exec(query, conversationID, userID)
+		return err
+	} else {
+		// Mark all private messages as read where user is not the sender
+		query := `
+			UPDATE private_messages 
+			SET is_read = TRUE 
+			WHERE conversation_id = ? 
+			AND sender_id != ?
+			AND is_read = FALSE
+		`
+		_, err := s.db.Exec(query, conversationID, userID)
+		return err
+	}
+}
+
+// MarkConversationAsUnread marks a conversation as having unread status
+// This doesn't change individual message read status, but adds an unread indicator
+func (s *MessageService) MarkConversationAsUnread(conversationID uint, userID uint, conversationType string) error {
+	// For unread status, we'll use a separate table or field to track conversation-level unread status
+	// For now, let's mark the latest message the user received as unread
+	if conversationType == "group" {
+		// Find the latest message in the group that wasn't sent by the user
+		query := `
+			UPDATE group_messages 
+			SET is_read = FALSE 
+			WHERE conversation_id = ? 
+			AND sender_id != ?
+			AND id = (
+				SELECT id FROM group_messages 
+				WHERE conversation_id = ? AND sender_id != ?
+				ORDER BY created_at DESC 
+				LIMIT 1
+			)
+		`
+		_, err := s.db.Exec(query, conversationID, userID, conversationID, userID)
+		return err
+	} else {
+		// Find the latest message in the private conversation that wasn't sent by the user
+		query := `
+			UPDATE private_messages 
+			SET is_read = FALSE 
+			WHERE conversation_id = ? 
+			AND sender_id != ?
+			AND id = (
+				SELECT id FROM private_messages 
+				WHERE conversation_id = ? AND sender_id != ?
+				ORDER BY created_at DESC 
+				LIMIT 1
+			)
+		`
+		_, err := s.db.Exec(query, conversationID, userID, conversationID, userID)
+		return err
+	}
 }

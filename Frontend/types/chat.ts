@@ -7,9 +7,12 @@ export interface ChatItem {
   avatar?: string;
   lastMessage?: string;
   lastMessageTime?: string;
+  lastMessageStatus?: 'sending' | 'sent' | 'delivered' | 'read';
+  lastMessageSenderId?: number;
   hasUnread?: boolean;
   unreadCount?: number;
   unread_count: number;
+  has_unread?: boolean; // manually marked as unread (conversation-level flag)
   isOnline?: boolean;
   isTyping?: boolean;
   typingUsers?: string[];
@@ -21,5 +24,6 @@ export interface ChatItem {
   groupRole?: GroupResponse['role'];
   conversationId?: number;
   participantId?: number;
+  groupId?: number; // Add group ID for group chats
   updated_at: string;
 }

@@ -13,7 +13,7 @@ import { normalizeConversation } from '@/utils/chatUtils'
 
 interface ChatsSectionProps {
   chatSubTab: string
-  onChatClick: (chat: { conversationId: number; type: 'private' | 'group'; name: string; participantId?: number; groupId?: number }) => void
+  onChatClick: (chat: { conversationId: number; type: 'private' | 'group'; name: string; participantId?: number; groupId?: number; initialTab?: string }) => void
   getUserStatus: (userId: number) => string
   currentUser: UserType | null
   showCreateGroup: boolean
@@ -41,53 +41,157 @@ export default function ChatsSection({
 
   const handleDeleteConversation = async (conversationId: number) => {
     try {
-      await fetch(`/api/conversations/${conversationId}`, {
-        method: 'DELETE',
-        credentials: 'include'
-      })
+      await api.deleteConversation(conversationId)
       mutate('chats')
     } catch (error) {
       console.error('Failed to delete conversation:', error)
     }
   }
 
+  const handleMarkAsRead = async (conversationId: number) => {
+    try {
+      // Find the chat to get details
+      const chat = normalizedChats.find(c => c.id === conversationId)
+      if (!chat) return
+
+      const conversationType = chat.type === 'group' ? 'group' : 'private';
+      const actualConversationId = chat.type === 'group' ? (chat.groupId || conversationId) : conversationId;
+      
+      await api.markConversationAsRead(actualConversationId, conversationType);
+
+      // Optimistically update the UI
+      mutate('chats', (current: any) => {
+        if (!current) return current
+        const updated = Array.isArray(current) ? current : current.conversations
+        if (!Array.isArray(updated)) return current
+        const next = updated.map((c: any) => c?.id === conversationId ? { ...c, unread_count: 0 } : c)
+        return Array.isArray(current) ? next : { ...current, conversations: next }
+      }, false)
+      
+      // Refresh from server
+      mutate('chats')
+    } catch (error) {
+      console.error('Failed to mark messages as read:', error)
+    }
+  }
+
+  const handleMarkAsUnread = async (conversationId: number) => {
+    try {
+      // Find the chat to get details
+      const chat = normalizedChats.find(c => c.id === conversationId)
+      if (!chat) return
+
+      const conversationType = chat.type === 'group' ? 'group' : 'private';
+      const actualConversationId = chat.type === 'group' ? (chat.groupId || conversationId) : conversationId;
+      
+      await api.markConversationAsUnread(actualConversationId, conversationType);
+
+      // Optimistically update the UI - show unread indicator without specific count
+      mutate('chats', (current: any) => {
+        if (!current) return current
+        const updated = Array.isArray(current) ? current : current.conversations
+        if (!Array.isArray(updated)) return current
+        const next = updated.map((c: any) => c?.id === conversationId ? { ...c, unread_count: 1, has_unread: true } : c)
+        return Array.isArray(current) ? next : { ...current, conversations: next }
+      }, false)
+      
+      // Refresh from server after a short delay
+      setTimeout(() => mutate('chats'), 500)
+    } catch (error) {
+      console.error('Failed to mark messages as unread:', error)
+    }
+  }
+
+  const handleShowInfo = (conversationId: number, type: 'private' | 'group') => {
+    // Navigate to the chat and open info tab
+    const chat = normalizedChats.find(c => c.id === conversationId)
+    if (chat) {
+      onChatClick({
+        conversationId,
+        type,
+        name: chat.name,
+        participantId: chat.participantId,
+        groupId: chat.groupId,
+        initialTab: 'info'
+      })
+    }
+  }
+
+  const handleLeaveGroup = async (groupId: number) => {
+    try {
+      await api.leaveGroup(groupId)
+      mutate('chats')
+    } catch (error) {
+      console.error('Failed to leave group:', error)
+    }
+  }
+
+  const handleShowSettings = (conversationId: number, type: 'private' | 'group') => {
+    // Navigate to the chat and open settings tab
+    const chat = normalizedChats.find(c => c.id === conversationId)
+    if (chat) {
+      onChatClick({
+        conversationId,
+        type,
+        name: chat.name,
+        participantId: chat.participantId,
+        groupId: chat.groupId,
+        initialTab: 'settings'
+      })
+    }
+  }
+
   useEffect(() => {
     const cleanup = addMessageListener((message) => {
+      // Typing indicators
       if (message.type === 'typing' && message.data) {
         const { username, action, conversation_id } = message.data
-        const chatId = conversation_id || (message.group_id ? `group_${message.group_id}` : `private_${message.to}`)
+        // Prefer conversation_id when available; fall back to group/private keys for robustness
+        const primaryKey = conversation_id ? String(conversation_id) : (message.group_id ? `group_${message.group_id}` : `private_${message.to}`)
+        const secondaryKey = message.group_id ? `group_${message.group_id}` : undefined
 
         setTypingChats(prev => {
-          const current = prev[chatId] || []
-
-          if (action === 'start') {
-            if (!current.includes(username)) {
-              return {
-                ...prev,
-                [chatId]: [...current, username]
-              }
-            }
-          } else if (action === 'stop') {
-            return {
-              ...prev,
-              [chatId]: current.filter(u => u !== username)
-            }
+          const updateKey = (key: string | undefined, updater: (current: string[]) => string[]) => {
+            if (!key) return prev
+            const current = prev[key] || []
+            const nextForKey = updater(current)
+            return nextForKey === current ? prev : { ...prev, [key]: nextForKey }
           }
 
-          return prev
+          let next = prev
+          if (action === 'start') {
+            next = updateKey(primaryKey, (current) => current.includes(username) ? current : [...current, username])
+            // Also mirror to secondary key when present (helps when render uses group_{id})
+            if (secondaryKey) {
+              next = { ...next, [secondaryKey]: (next[secondaryKey] || []).includes(username) ? next[secondaryKey] : [ ...(next[secondaryKey] || []), username ] }
+            }
+          } else if (action === 'stop') {
+            next = updateKey(primaryKey, (current) => current.filter(u => u !== username))
+            if (secondaryKey) {
+              next = { ...next, [secondaryKey]: (next[secondaryKey] || []).filter(u => u !== username) }
+            }
+          }
+          return next
         })
 
         if (action === 'start') {
           setTimeout(() => {
             setTypingChats(prev => {
-              const current = prev[chatId] || []
-              return {
-                ...prev,
-                [chatId]: current.filter(u => u !== username)
-              }
+              const copy = { ...prev }
+              const keys = [primaryKey, secondaryKey].filter(Boolean) as string[]
+              keys.forEach(k => {
+                copy[k] = (copy[k] || []).filter(u => u !== username)
+                if (copy[k]?.length === 0) delete copy[k]
+              })
+              return copy
             })
           }, 3000)
         }
+      }
+
+      // When a new message arrives, refresh conversations to update previews and unread badges
+      if (message.type === 'private_message' || message.type === 'group_message') {
+        mutate('chats')
       }
     })
 
@@ -95,7 +199,7 @@ export default function ChatsSection({
   }, [addMessageListener])
 
   // Normalize chats for consistent preview formatting
-  const normalizedChats = (chats || []).map(chat => normalizeConversation(chat, currentUser?.id))
+  const normalizedChats = (chats || []).map(chat => normalizeConversation(chat))
 
   const filteredChats = normalizedChats.filter(chat => {
     // Allow groups without messages to be shown, but filter out private chats without messages
@@ -272,8 +376,32 @@ export default function ChatsSection({
         >
           <AnimatePresence mode="popLayout">
             {uniqueChats.map((chat) => {
-              const chatIdNum = typeof chat.id === 'string' ? parseInt(chat.id.replace(/\D/g, '')) : chat.id;
+              const chatIdNum = chat.id ? (typeof chat.id === 'string' ? parseInt(chat.id.replace(/\D/g, '')) : chat.id) : 0;
               const avatar = chat.avatar && typeof chat.avatar === 'string' ? chat.avatar : undefined;
+
+              // Skip rendering if chat ID is invalid
+              if (!chatIdNum || isNaN(chatIdNum)) {
+                return null;
+              }
+              const handleOpenChat = () => {
+                // Optimistically clear unread in cache for snappy UX
+                mutate('chats', (current: any) => {
+                  if (!current) return current
+                  const updated = Array.isArray(current) ? current : current.conversations
+                  if (!Array.isArray(updated)) return current
+                  const next = updated.map((c: any) => c?.id === chatIdNum ? { ...c, unread_count: 0 } : c)
+                  // Preserve original shape if needed
+                  return Array.isArray(current) ? next : { ...current, conversations: next }
+                }, false)
+
+                onChatClick({
+                  conversationId: chatIdNum,
+                  type: chat.type,
+                  name: chat.name,
+                  participantId: chat.participantId,
+                  groupId: chat.groupId
+                })
+              }
               return (
                 <motion.div
                   key={chatIdNum}
@@ -286,19 +414,25 @@ export default function ChatsSection({
                       ...chat,
                       id: chatIdNum,
                       avatar,
+                      conversationId: chatIdNum,
+                      unreadCount: chat.unread || 0,
                       unread_count: chat.unread || 0,
+                      lastMessageSenderId: chat.lastMessageSenderId,
+                      lastMessageStatus: (chat.lastMessage && currentUser?.id && chat.lastMessageSenderId === currentUser.id) ? 'sent' : undefined,
                       updated_at: chat.timestamp || '',
+                      groupId: chat.groupId, // Explicitly pass groupId for group chats
                     }}
                     getUserStatus={getUserStatus}
-                    typingUsers={typingChats[chatIdNum.toString()] || []}
+                    typingUsers={
+                      (chatIdNum && typingChats[chatIdNum.toString()]) || (chat.groupId ? typingChats[`group_${chat.groupId}`] : []) || []
+                    }
                     onDelete={handleDeleteConversation}
-                    onClick={() => onChatClick({
-                      conversationId: chatIdNum,
-                      type: chat.type,
-                      name: chat.name,
-                      participantId: chat.participantId,
-                      groupId: chat.groupId
-                    })}
+                      onMarkAsRead={handleMarkAsRead}
+                      onMarkAsUnread={handleMarkAsUnread}
+                      onShowInfo={handleShowInfo}
+                      onLeaveGroup={handleLeaveGroup}
+                      onShowSettings={handleShowSettings}
+                    onClick={handleOpenChat}
                     currentUser={currentUser}
                   />
                 </motion.div>
@@ -400,7 +534,7 @@ export default function ChatsSection({
 
         {/* Enhanced Search and Filter Section */}
         <motion.div
-          className="bg-gradient-to-r from-white/5 to-white/10 backdrop-blur-xl rounded-3xl p-6 border border-white/10 shadow-xl"
+          className="bg-gradient-to-r from-white/5 to-white/10 backdrop-blur-xl rounded-3xl p-6 border border-white/10 shadow-xl mb-6"
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, delay: 0.1 }}

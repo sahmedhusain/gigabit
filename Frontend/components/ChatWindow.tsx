@@ -4,6 +4,7 @@ import { X, Send, Smile, Check, CheckCheck, Clock, ChevronDown, MessageCircle, F
 import Image from 'next/image'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useAuth } from '@/context/AuthContext'
+import { mutate } from 'swr'
 import { useWebSocket } from '@/context/WebSocketContext'
 import { useRealTimeMessages, useTypingIndicator } from '@/hooks'
 import { api, User } from '@/lib/api'
@@ -53,6 +54,7 @@ interface ChatWindowProps {
   onConversationResolved?: (conversationId: number) => void
   onClose?: () => void // Optional for minimal UI
   hideHeader?: boolean // Hide the chat header if true
+  initialTab?: string // Initial tab to open ('info', 'settings', etc.)
 }
 
 const ChatWindow: React.FC<ChatWindowProps> = ({
@@ -62,15 +64,18 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
   participantId,
   participantName,
   groupId,
+  initialTab,
   onConversationResolved,
   onClose,
   hideHeader
 }) => {
   // Determine chatType from conversationType if not explicitly provided
   const effectiveChatType = chatType || conversationType;
+  
+
   const [newMessage, setNewMessage] = useState('')
   const [showEmojiPicker, setShowEmojiPicker] = useState(false)
-  const [activeTab, setActiveTab] = useState('chat') // New state for active tab
+  const [activeTab, setActiveTab] = useState(initialTab || 'chat') // New state for active tab
   const [groupData, setGroupData] = useState<any>(null) // Store group data including user role
   const [groupMembers, setGroupMembers] = useState<any[]>([])
   const [isLoadingMembers, setIsLoadingMembers] = useState(false)
@@ -93,6 +98,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
     fetchConversationMessages,
     refreshConversations,
     conversations,
+    markAsRead,
     registerConversationIdCallback,
     unregisterConversationIdCallback
   } = useRealTimeMessages()
@@ -156,6 +162,43 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
     }
   }, [effectiveConversationId, conversationType, participantId, fetchConversationMessages])
 
+  // Mark messages as read when viewing a conversation and sync unread counts
+  useEffect(() => {
+    if (!effectiveConversationId || !user) return
+    const convMsgs = Array.from(messages.get(effectiveConversationId) || [])
+    if (convMsgs.length === 0) return
+
+    const unreadIds = convMsgs
+      .filter(m => m.sender_id !== user.id && !m.is_read)
+      .map(m => m.id)
+
+    if (unreadIds.length === 0) return
+
+    // Local state: mark as read now for instant UX
+    markAsRead(effectiveConversationId)
+
+    // Backend: mark specific messages as read
+    api.markMessagesAsRead(unreadIds)
+      .then(() => {
+        // Revalidate chats to ensure backend unread counts are synced
+        mutate('chats')
+        // Also refresh conversations in the real-time hook
+        refreshConversations()
+      })
+      .catch(err => {
+        console.error('Failed to mark messages as read on server:', err)
+      })
+
+    // Chats list: clear unread count optimistically for this conversation
+    mutate('chats', (current: any) => {
+      if (!current) return current
+      const list = Array.isArray(current) ? current : current.conversations
+      if (!Array.isArray(list)) return current
+      const next = list.map((c: any) => c?.id === effectiveConversationId ? { ...c, unread_count: 0 } : c)
+      return Array.isArray(current) ? next : { ...current, conversations: next }
+    }, false)
+  }, [effectiveConversationId, messages, user, markAsRead, refreshConversations])
+
   // Attempt to resolve real group conversation ID if we only have the raw groupId placeholder
   useEffect(() => {
     if (conversationType !== 'group') return
@@ -202,6 +245,18 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
       fetchGroupData()
     }
   }, [effectiveChatType, groupId])
+
+  // Check permissions for settings tab once group data loads
+  useEffect(() => {
+    if (effectiveChatType === 'group' && activeTab === 'settings' && groupData) {
+      const isAdminOrCreator = groupData?.role === 'admin' || groupData?.role === 'creator';
+      
+      if (!isAdminOrCreator) {
+        // User doesn't have permission for settings, redirect to info tab
+        setActiveTab('info');
+      }
+    }
+  }, [activeTab, effectiveChatType, groupData])
 
   // Fetch group members for online count calculation
   useEffect(() => {
@@ -274,6 +329,24 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
   useEffect(() => {
     handleMessagesChange()
   }, [messages, handleMessagesChange, effectiveConversationId])
+
+  const handleLeaveGroup = async (groupIdToLeave: number) => {
+    try {
+      await api.leaveGroup(groupIdToLeave)
+      // Refresh conversations to update the list
+      mutate('chats')
+      // Close the chat window
+      if (onClose) {
+        onClose()
+      }
+    } catch (error) {
+      console.error('Failed to leave group:', error)
+    }
+  }
+
+  const handleManageAdmins = () => {
+    setActiveTab('settings')
+  }
 
   const handleSendMessage = async () => {
     if (!newMessage.trim() || !isConnected) return
@@ -617,14 +690,24 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
           <div className="bg-gradient-to-r from-white/15 via-white/8 to-white/15 backdrop-blur-2xl border-b border-white/25 px-6 py-5 flex items-center justify-between flex-shrink-0 shadow-xl relative">
             <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/5 via-teal-500/5 to-cyan-500/5 rounded-t-3xl" />
             <div className="flex items-center space-x-4 relative z-10 flex-1 min-w-0">
-              <motion.div 
-                className="w-16 h-16 rounded-full bg-gradient-to-br from-emerald-400 via-teal-500 to-cyan-600 flex items-center justify-center text-white text-2xl font-bold shadow-2xl ring-2 ring-white/30 cursor-pointer"
+              <motion.div
+                className="w-16 h-16 rounded-full bg-gradient-to-br from-emerald-400 via-teal-500 to-cyan-600 flex items-center justify-center text-white text-2xl font-bold shadow-2xl ring-2 ring-white/30 cursor-pointer overflow-hidden"
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 onClick={() => setActiveTab('info')}
                 title="View group info"
               >
-                #
+                {groupData?.avatar && getAvatarUrl(groupData.avatar) ? (
+                  <Image
+                    src={getAvatarUrl(groupData.avatar)!}
+                    alt={participantName}
+                    width={64}
+                    height={64}
+                    className="w-full h-full object-cover rounded-full"
+                  />
+                ) : (
+                  participantName?.charAt(0).toUpperCase()
+                )}
               </motion.div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center space-x-3">
@@ -727,7 +810,12 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
               transition={{ duration: 0.3 }}
             >
               {activeTab === 'info' && groupId && (
-                <GroupInfoTab groupId={groupId} />
+                <GroupInfoTab 
+                  groupId={groupId} 
+                  onLeaveGroup={handleLeaveGroup}
+                  onManageAdmins={handleManageAdmins}
+                  onClose={onClose}
+                />
               )}
               {activeTab === 'chat' && (
                 <GroupChatTab

@@ -10,6 +10,7 @@ type Group struct {
 	Title       string    `json:"title"`
 	Description string    `json:"description"`
 	Privacy     string    `json:"privacy"`
+	Avatar      *string   `json:"avatar"`
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
 }
@@ -20,6 +21,7 @@ type GroupResponse struct {
 	Title        string                `json:"title"`
 	Description  string                `json:"description"`
 	Privacy      string                `json:"privacy"`
+	Avatar       *string               `json:"avatar"`
 	CreatedAt    time.Time             `json:"created_at"`
 	UpdatedAt    time.Time             `json:"updated_at"`
 	Creator      UserResponse          `json:"creator"`

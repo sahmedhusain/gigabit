@@ -57,6 +57,7 @@ function ChatsPage() {
     type: 'private' | 'group',
     name: string
     participantId?: number
+    initialTab?: string
   } | null>(null)
 
   // Current User Processing
@@ -384,6 +385,7 @@ function ChatsPage() {
                   conversationType={openChatWindow.type}
                   participantName={openChatWindow.name}
                   participantId={openChatWindow.participantId}
+                  initialTab={openChatWindow.initialTab}
                   onClose={() => setOpenChatWindow(null)}
                 />
               ) : (
@@ -405,7 +407,8 @@ function ChatsPage() {
                       conversationId: conversationId,
                       type: chat.type,
                       name: chat.name,
-                      participantId: participantId
+                      participantId: participantId,
+                      initialTab: chat.initialTab
                     });
                   }}
                   getUserStatus={getUserStatus}

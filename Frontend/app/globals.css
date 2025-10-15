@@ -566,3 +566,14 @@ body {
   max-width: calc(100vw - 40px);
   z-index: 50;
 }
+
+/* Shimmer effect for unread list items */
+@keyframes shimmer {
+  0% { transform: translateX(-100%); }
+  60% { transform: translateX(100%); }
+  100% { transform: translateX(100%); }
+}
+
+.animate-\[shimmer_2s_infinite\] {
+  animation: shimmer 2s infinite linear;
+}

@@ -59,7 +59,7 @@ const GroupPollsTab: React.FC<GroupPollsTabProps> = ({ groupId }) => {
         expires_at: expiresAtISO
       })
 
-      setPolls([newPoll, ...polls])
+      setPolls([newPoll, ...(polls || [])])
     } catch (error) {
       console.error('Failed to create poll:', error)
       throw error
@@ -69,7 +69,7 @@ const GroupPollsTab: React.FC<GroupPollsTabProps> = ({ groupId }) => {
   const handleVote = async (pollId: number, optionIds: number[]) => {
     try {
       const updatedPoll = await api.votePoll(pollId, optionIds)
-      setPolls(polls.map(poll => poll.id === pollId ? updatedPoll : poll))
+      setPolls((polls || []).map(poll => poll.id === pollId ? updatedPoll : poll))
     } catch (error) {
       console.error('Failed to vote:', error)
       throw error
@@ -79,7 +79,7 @@ const GroupPollsTab: React.FC<GroupPollsTabProps> = ({ groupId }) => {
   const handleUnvote = async (pollId: number) => {
     try {
       const updatedPoll = await api.unvotePoll(pollId)
-      setPolls(polls.map(poll => poll.id === pollId ? updatedPoll : poll))
+      setPolls((polls || []).map(poll => poll.id === pollId ? updatedPoll : poll))
     } catch (error) {
       console.error('Failed to unvote:', error)
       throw error
@@ -112,7 +112,7 @@ const GroupPollsTab: React.FC<GroupPollsTabProps> = ({ groupId }) => {
               className="w-8 h-8 border-2 border-purple-500/30 border-t-purple-500 rounded-full"
             />
           </div>
-        ) : polls.length === 0 ? (
+        ) : !polls || polls.length === 0 ? (
           <div className="flex items-center justify-center h-full">
             <div className="text-center max-w-md mx-auto">
               <BarChart3 className="w-16 h-16 text-white/40 mx-auto mb-6" />

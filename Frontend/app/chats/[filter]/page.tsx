@@ -56,6 +56,7 @@ function ChatsFilterPage() {
     groupId?: number
     isGroupMember?: boolean
     userRole?: 'creator' | 'admin' | 'member'
+    initialTab?: string
   } | null>(null)
 
   // Current User Processing
@@ -368,6 +369,7 @@ function ChatsFilterPage() {
           participantName={openChatWindow.name}
           participantId={openChatWindow.participantId}
           groupId={openChatWindow.type === 'group' ? (openChatWindow.groupId || openChatWindow.conversationId) : undefined}
+          initialTab={openChatWindow.initialTab}
           onClose={() => setOpenChatWindow(null)}
         />
       ) : (
@@ -388,7 +390,8 @@ function ChatsFilterPage() {
                   participantId: chat.participantId,
                   groupId: groupId,
                   isGroupMember: groupInfo.is_member,
-                  userRole: groupInfo.role || 'member'
+                  userRole: groupInfo.role || 'member',
+                  initialTab: chat.initialTab
                 })
               } catch (err) {
                 console.error('Error fetching group info:', err)
@@ -400,7 +403,8 @@ function ChatsFilterPage() {
                   participantId: chat.participantId,
                   groupId: chat.groupId || chat.conversationId,
                   isGroupMember: true,
-                  userRole: 'member'
+                  userRole: 'member',
+                  initialTab: chat.initialTab
                 })
               }
             } else {
@@ -408,7 +412,8 @@ function ChatsFilterPage() {
                 conversationId: chat.conversationId,
                 type: chat.type,
                 name: chat.name,
-                participantId: chat.participantId
+                participantId: chat.participantId,
+                initialTab: chat.initialTab
               })
             }
           }}

@@ -5,22 +5,17 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useConnectionStatus, useRealTimeEvents } from '@/hooks'
 import { useToast } from '@/context/ToastContext'
 import { api, EventResponse } from '@/lib/api'
+import CreateGroupEvent from '../CreateGroupEvent'
 
 interface GroupEventsTabProps {
   groupId: number
+  groupTitle: string
 }
 
-const GroupEventsTab: React.FC<GroupEventsTabProps> = ({ groupId }) => {
+const GroupEventsTab: React.FC<GroupEventsTabProps> = ({ groupId, groupTitle }) => {
   const [events, setEvents] = useState<EventResponse[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [showCreateModal, setShowCreateModal] = useState(false)
-  const [newEvent, setNewEvent] = useState({
-    title: '',
-    description: '',
-    location: '',
-    event_time: ''
-  })
-  const [isCreating, setIsCreating] = useState(false)
   const [isAdminOrCreator, setIsAdminOrCreator] = useState<boolean>(false)
   const { isConnected } = useConnectionStatus()
   const { success, error: showError } = useToast()
@@ -66,56 +61,9 @@ const GroupEventsTab: React.FC<GroupEventsTabProps> = ({ groupId }) => {
     }
   }
 
-  // Create new event
-  const handleCreateEvent = async () => {
-    if (!newEvent.title.trim() || !newEvent.description.trim() || !newEvent.event_time || isCreating) return
-
-    // Permission guard client-side
-    if (!isAdminOrCreator) {
-      showError('Only group admins and creators can create events')
-      return
-    }
-
-    try {
-      setIsCreating(true)
-      // Normalize datetime-local string (YYYY-MM-DDTHH:MM) to RFC3339
-      const isoEventTime = (() => {
-        try {
-          const d = new Date(newEvent.event_time)
-          if (isNaN(d.getTime())) throw new Error('Invalid date')
-          return d.toISOString()
-        } catch {
-          // Fallback: append seconds and Z assuming local time
-          return newEvent.event_time.length === 16
-            ? new Date(newEvent.event_time.replace('T', 'T') + ':00').toISOString()
-            : new Date().toISOString()
-        }
-      })()
-
-      const payload = { ...newEvent, event_time: isoEventTime }
-
-      console.log('Creating event for group:', groupId, 'payload:', payload)
-      const createdEvent = await api.createEvent(groupId, payload)
-      console.log('Created event:', createdEvent)
-      // Prefer refetch to get enriched event with creator/group fields
-      try {
-        await refetchEvents()
-      } catch (_e) {
-        // Fallback to optimistic add if refetch fails
-        setEvents([createdEvent.event as unknown as EventResponse, ...events])
-      }
-      setNewEvent({ title: '', description: '', location: '', event_time: '' })
-      setShowCreateModal(false)
-    } catch (error) {
-      console.error('Failed to create event:', error)
-      // Try to surface a meaningful message
-      const message = (error && typeof error === 'object' && 'message' in (error as any))
-        ? String((error as any).message)
-        : 'Failed to create event. Please try again.'
-      showError(message)
-    } finally {
-      setIsCreating(false)
-    }
+  // Handle event created
+  const handleEventCreated = () => {
+    refetchEvents()
   }
 
   // Compute time until event (or since if past)
@@ -404,180 +352,14 @@ const GroupEventsTab: React.FC<GroupEventsTabProps> = ({ groupId }) => {
         )}
       </div>
 
-      {/* Create Event Modal */}
-      <AnimatePresence>
-        {showCreateModal && (
-          <motion.div
-            className="fixed inset-0 bg-black/60 backdrop-blur-md z-50 flex items-center justify-center py-8 px-4"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={() => setShowCreateModal(false)}
-          >
-            <motion.div
-              className="relative w-full max-w-2xl h-[80vh] max-h-[600px] flex flex-col"
-              initial={{ scale: 0.9, y: 20 }}
-              animate={{ scale: 1, y: 0 }}
-              exit={{ scale: 0.9, y: 20 }}
-              onClick={(e) => e.stopPropagation()}
-            >
-              {/* Enhanced backdrop with multiple layers */}
-              <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/20 via-teal-500/10 to-cyan-500/20 backdrop-blur-2xl rounded-3xl border border-white/30 shadow-2xl"></div>
-              <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent rounded-3xl"></div>
-
-              {/* Fixed Header */}
-              <div className="relative flex-shrink-0 p-6 lg:p-8 pb-4">
-                <div className="flex items-center justify-between mb-8">
-                  <div className="flex items-center space-x-4">
-                    <div className="relative">
-                      <div className="w-12 h-12 bg-gradient-to-br from-emerald-400 via-teal-500 to-cyan-600 rounded-2xl flex items-center justify-center shadow-lg">
-                        <Calendar className="w-6 h-6 text-white drop-shadow-sm" />
-                      </div>
-                      <div className="absolute -top-1 -right-1 w-4 h-4 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-full animate-pulse"></div>
-                    </div>
-                    <div>
-                      <h3 className="text-xl lg:text-2xl font-bold text-white mb-1">Create Group Event</h3>
-                      <p className="text-white/60 text-sm">Organize an event for this group</p>
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => setShowCreateModal(false)}
-                    className="group p-3 text-white/70 hover:text-white hover:bg-white/10 rounded-2xl transition-all duration-300 hover:scale-105"
-                    title="Close"
-                  >
-                    <X className="w-5 h-5 group-hover:rotate-90 transition-transform duration-300" />
-                  </button>
-                </div>
-              </div>
-
-              {/* Scrollable Content Area */}
-              <div className="relative flex-1 overflow-y-auto px-6 lg:px-8">
-                <div className="space-y-6">
-                  {/* Event Title */}
-                  <div className="space-y-3">
-                    <label className="text-white font-semibold text-sm lg:text-base flex items-center space-x-2">
-                      <div className="w-2 h-2 bg-emerald-400 rounded-full"></div>
-                      <span>Event Title</span>
-                      <span className="text-red-400">*</span>
-                    </label>
-                    <div className="relative">
-                      <input
-                        type="text"
-                        value={newEvent.title}
-                        onChange={(e) => setNewEvent({ ...newEvent, title: e.target.value })}
-                        placeholder="Enter an exciting event title..."
-                        maxLength={100}
-                        className="w-full bg-white/10 border border-white/20 rounded-2xl p-4 pl-12 text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-emerald-400/50 focus:border-emerald-400/50 text-sm lg:text-base transition-all duration-300 hover:bg-white/15"
-                      />
-                      <div className="absolute left-4 top-1/2 transform -translate-y-1/2 text-white/50">
-                        <Calendar className="w-5 h-5" />
-                      </div>
-                    </div>
-                    <div className="text-xs text-white/50 text-right">
-                      {newEvent.title.length}/100
-                    </div>
-                  </div>
-
-                  {/* Event Description */}
-                  <div className="space-y-3">
-                    <label className="text-white font-semibold text-sm lg:text-base flex items-center space-x-2">
-                      <div className="w-2 h-2 bg-teal-400 rounded-full"></div>
-                      <span>Description</span>
-                    </label>
-                    <textarea
-                      value={newEvent.description}
-                      onChange={(e) => setNewEvent({ ...newEvent, description: e.target.value })}
-                      placeholder="Tell people what this event is about, what's the agenda, what to expect..."
-                      maxLength={500}
-                      className="w-full h-28 lg:h-32 bg-white/10 border border-white/20 rounded-2xl p-4 text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-emerald-400/50 focus:border-emerald-400/50 resize-none text-sm lg:text-base transition-all duration-300 hover:bg-white/15"
-                    />
-                    <div className="text-xs text-white/50 text-right">
-                      {newEvent.description.length}/500
-                    </div>
-                  </div>
-
-                  {/* Event Location */}
-                  <div className="space-y-3">
-                    <label className="text-white font-semibold text-sm lg:text-base flex items-center space-x-2">
-                      <div className="w-2 h-2 bg-cyan-400 rounded-full"></div>
-                      <span>Location</span>
-                    </label>
-                    <textarea
-                      value={newEvent.location}
-                      onChange={(e) => setNewEvent({ ...newEvent, location: e.target.value })}
-                      placeholder="Where will the event take place? Include address, virtual meeting link, or venue details..."
-                      maxLength={200}
-                      className="w-full h-24 lg:h-28 bg-white/10 border border-white/20 rounded-2xl p-4 text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-emerald-400/50 focus:border-emerald-400/50 resize-none text-sm lg:text-base transition-all duration-300 hover:bg-white/15"
-                    />
-                    <div className="text-xs text-white/50 text-right">
-                      {newEvent.location.length}/200
-                    </div>
-                  </div>
-
-                  {/* Date & Time */}
-                  <div className="space-y-3">
-                    <label className="text-white font-semibold text-sm lg:text-base flex items-center space-x-2">
-                      <div className="w-2 h-2 bg-emerald-400 rounded-full"></div>
-                      <span>Date & Time</span>
-                      <span className="text-red-400">*</span>
-                    </label>
-                    <div className="relative">
-                      <input
-                        type="datetime-local"
-                        value={newEvent.event_time}
-                        onChange={(e) => setNewEvent({ ...newEvent, event_time: e.target.value })}
-                        min={new Date().toISOString().slice(0, 16)}
-                        className="w-full bg-white/10 border border-white/20 rounded-2xl p-4 pl-12 text-white focus:outline-none focus:ring-2 focus:ring-emerald-400/50 focus:border-emerald-400/50 transition-all duration-300 text-sm lg:text-base hover:bg-white/15"
-                        title="Select event date and time"
-                      />
-                      <div className="absolute left-4 top-1/2 transform -translate-y-1/2 text-white/50">
-                        <Calendar className="w-5 h-5" />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Connection Status */}
-                  {!isConnected && (
-                    <div className="bg-gradient-to-r from-red-500/20 to-pink-500/20 border border-red-400/30 rounded-2xl p-4 animate-in slide-in-from-top-2 duration-300">
-                      <p className="text-red-300 text-sm font-medium">You are currently offline. Event will be created when connection is restored.</p>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Fixed Footer */}
-              <div className="relative flex-shrink-0 p-6 lg:p-8 pt-4">
-                <div className="flex flex-col sm:flex-row justify-end space-y-3 sm:space-y-0 sm:space-x-4 pt-6 border-t border-white/10">
-                  <button
-                    onClick={() => setShowCreateModal(false)}
-                    className="w-full sm:w-auto px-6 py-3 border border-white/30 rounded-2xl text-white hover:bg-white/10 hover:border-white/50 transition-all duration-300 text-sm lg:text-base font-medium hover:scale-105"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={handleCreateEvent}
-                    disabled={isCreating || !isConnected || !newEvent.title.trim() || !newEvent.description.trim() || !newEvent.event_time}
-                    className={`w-full sm:w-auto px-6 py-3 rounded-2xl text-white font-semibold text-sm lg:text-base transition-all duration-300 hover:scale-105 shadow-lg ${
-                      isCreating || !isConnected || !newEvent.title.trim() || !newEvent.description.trim() || !newEvent.event_time
-                        ? 'bg-white/20 cursor-not-allowed'
-                        : 'bg-gradient-to-r from-emerald-500 via-teal-600 to-cyan-600 hover:from-emerald-600 hover:via-teal-700 hover:to-cyan-700 shadow-emerald-500/25'
-                    }`}
-                  >
-                    {isCreating ? (
-                      <div className="flex items-center justify-center space-x-2">
-                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                        <span>Creating Event...</span>
-                      </div>
-                    ) : (
-                      'Create Event'
-                    )}
-                  </button>
-                </div>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {/* Create Event Modal Component */}
+      <CreateGroupEvent
+        show={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+        groupId={groupId}
+        groupTitle={groupTitle}
+        onEventCreated={handleEventCreated}
+      />
     </div>
   )
 }

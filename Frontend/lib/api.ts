@@ -851,6 +851,12 @@ export class ApiClient {
       return response.post;
   }
 
+  async deleteGroupPost(groupId: number, postId: number): Promise<{ message: string }> {
+    return this.request<{ message: string }>(`/api/groups/${groupId}/posts/${postId}`, {
+      method: 'DELETE',
+    });
+  }
+
   async createGroupEvent(groupId: number, data: { title: string; description: string; event_time: string }): Promise<EventResponse> {
     return this.request<EventResponse>(`/api/groups/${groupId}/events`, {
       method: 'POST',

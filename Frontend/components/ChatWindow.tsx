@@ -845,10 +845,10 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
                 />
               )}
               {activeTab === 'posts' && groupId && (
-                <GroupPostsTab groupId={groupId} />
+                <GroupPostsTab groupId={groupId} groupTitle={participantName} />
               )}
               {activeTab === 'events' && groupId && (
-                <GroupEventsTab groupId={groupId} />
+                <GroupEventsTab groupId={groupId} groupTitle={participantName} />
               )}
               {activeTab === 'polls' && groupId && <GroupPollsTab groupId={groupId} />}
               {activeTab === 'settings' && groupId && (

@@ -11,6 +11,7 @@ import { useConnectionStatus, useOptimisticUpdate } from '@/hooks'
 import { api, APIPost, Comment as CommentType, NetworkError } from '@/lib/api'
 import { getAvatarUrl } from '@/utils/avatarUtils'
 import Image from 'next/image'
+import { motion, AnimatePresence } from 'framer-motion'
 
 interface CommentWithUser extends CommentType {
     timeAgo: string
@@ -669,229 +670,335 @@ function PostDetailPage() {
         </div>
 
         {/* Comment Modal */}
-        {isCommentModalOpen && (
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-50 flex items-center justify-center p-4">
-            <div className="relative w-full max-w-2xl h-[80vh] flex flex-col">
-              {/* Enhanced backdrop with multiple layers */}
-              <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/20 via-teal-500/10 to-cyan-500/20 backdrop-blur-2xl rounded-3xl border border-white/30 shadow-2xl"></div>
-              <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent rounded-3xl"></div>
-
-              {/* Fixed Header */}
-              <div className="relative flex-shrink-0 p-6 lg:p-8 pb-4">
-                <div className="flex items-center justify-between mb-8">
-                  <div className="flex items-center space-x-4">
-                    <div className="relative">
-                      <div className="w-12 h-12 bg-gradient-to-br from-emerald-400 via-teal-500 to-cyan-600 rounded-2xl flex items-center justify-center shadow-lg">
-                        <MessageSquare className="w-6 h-6 text-white drop-shadow-sm" />
-                      </div>
-                      <div className="absolute -top-1 -right-1 w-4 h-4 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-full animate-pulse"></div>
-                    </div>
-                    <div>
-                      <h3 className="text-xl lg:text-2xl font-bold text-white mb-1">Add Comment</h3>
-                      <p className="text-white/60 text-sm">Share your thoughts on this post</p>
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => setIsCommentModalOpen(false)}
-                    className="group p-3 text-white/70 hover:text-white hover:bg-white/10 rounded-2xl transition-all duration-300 hover:scale-105"
-                    title="Close"
-                  >
-                    <span className="text-xl group-hover:rotate-90 transition-transform duration-300">✕</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* Scrollable Content Area */}
-              <div className="relative flex-1 overflow-y-auto px-6 lg:px-8">
-                <div className="space-y-6">
-                  {/* Comment Content */}
-                  <div className="space-y-3">
-                    <label className="text-white font-semibold text-sm lg:text-base flex items-center space-x-2">
-                      <div className="w-2 h-2 bg-emerald-400 rounded-full"></div>
-                      <span>Your Comment</span>
-                    </label>
-                    <div className="relative">
-                      <textarea
-                        value={newComment}
-                        onChange={(e) => setNewComment(e.target.value)}
-                        placeholder="Share your thoughts, ask questions, or start a discussion..."
-                        className="w-full h-32 lg:h-36 bg-white/10 border border-white/20 rounded-2xl p-4 text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-emerald-400/50 focus:border-emerald-400/50 resize-none text-sm lg:text-base transition-all duration-300 hover:bg-white/15"
-                        maxLength={500}
-                      />
-                      <div className="absolute bottom-4 right-4 text-xs text-white/50">
-                        {newComment.length}/500
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Image Upload */}
-                  <div className="space-y-3">
-                    <label className="text-white font-semibold text-sm lg:text-base flex items-center space-x-2">
-                      <div className="w-2 h-2 bg-teal-400 rounded-full"></div>
-                      <span>Media (Optional)</span>
-                    </label>
-                    <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-3 sm:space-y-0 sm:space-x-4">
-                      <label htmlFor="modal-comment-image-input" className="sr-only">Upload image</label>
-                      <input
-                        id="modal-comment-image-input"
-                        type="file"
-                        accept="image/*"
-                        onChange={e => setNewCommentImage(e.target.files?.[0] || null)}
-                        className="hidden"
-                      />
-                      <button
-                        onClick={() => document.getElementById('modal-comment-image-input')?.click()}
-                        title="Add Image or GIF"
-                        className="flex items-center px-4 py-3 bg-white/10 hover:bg-white/15 border border-white/20 rounded-2xl text-white transition-all duration-300 hover:scale-105 text-sm lg:text-base font-medium"
+        <AnimatePresence>
+          {isCommentModalOpen && (
+            <motion.div
+              className="fixed inset-0 bg-black/50 backdrop-blur-xl z-50 flex items-center justify-center p-4"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.3 }}
+            >
+              <motion.div
+                className="relative w-full max-w-2xl h-[80vh] flex flex-col bg-white/5 backdrop-blur-2xl rounded-3xl border border-white/20 shadow-2xl overflow-hidden"
+                initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.9, y: 20 }}
+                transition={{ duration: 0.3, ease: 'easeOut' }}
+              >
+                {/* Header */}
+                <motion.div
+                  className="relative flex-shrink-0 p-6 lg:p-8 pb-4 bg-gradient-to-r from-white/10 to-white/5 border-b border-white/20"
+                  initial={{ y: -20, opacity: 0 }}
+                  animate={{ y: 0, opacity: 1 }}
+                  transition={{ delay: 0.1, duration: 0.3 }}
+                >
+                  <div className="flex items-center justify-between mb-6">
+                    <div className="flex items-center space-x-4">
+                      <motion.div
+                        className="relative"
+                        whileHover={{ scale: 1.05 }}
+                        transition={{ type: 'spring', stiffness: 400, damping: 17 }}
                       >
-                        <ImageIcon className="w-5 h-5 mr-3" />
-                        Add Image or GIF
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Image Preview */}
-                  {newCommentImage && (
-                    <div className="bg-white/10 border border-white/20 rounded-2xl p-4">
-                      <div className="flex items-center justify-between mb-3">
-                        <span className="text-white text-sm font-semibold">Selected Image:</span>
-                        <button
-                          onClick={() => setNewCommentImage(null)}
-                          title="Remove image"
-                          className="p-2 text-white/70 hover:text-white hover:bg-white/10 rounded-xl transition-all duration-300 hover:scale-105"
+                        <div className="w-12 h-12 bg-gradient-to-br from-emerald-400 via-teal-500 to-cyan-600 rounded-2xl flex items-center justify-center shadow-lg">
+                          <MessageSquare className="w-6 h-6 text-white drop-shadow-sm" />
+                        </div>
+                        <motion.div
+                          className="absolute -top-1 -right-1 w-4 h-4 bg-gradient-to-br from-emerald-400 to-teal-500 rounded-full"
+                          animate={{ scale: [1, 1.2, 1] }}
+                        />
+                      </motion.div>
+                      <div>
+                        <motion.h3
+                          className="text-xl lg:text-2xl font-bold text-white mb-1"
+                          initial={{ opacity: 0, x: -10 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ delay: 0.2, duration: 0.3 }}
                         >
-                          <span className="text-lg">×</span>
-                        </button>
-                      </div>
-                      <div className="flex items-center space-x-4">
-                        <div className="w-14 h-14 bg-white/20 rounded-xl flex items-center justify-center">
-                          <ImageIcon className="w-7 h-7 text-white/70" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-white text-sm font-medium truncate">{newCommentImage.name}</p>
-                          <p className="text-white/60 text-xs">
-                            {(newCommentImage.size / 1024 / 1024).toFixed(2)} MB
-                          </p>
-                        </div>
+                          Add Comment
+                        </motion.h3>
+                        <motion.p
+                          className="text-white/60 text-sm"
+                          initial={{ opacity: 0, x: -10 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ delay: 0.3, duration: 0.3 }}
+                        >
+                          Share your thoughts on this post
+                        </motion.p>
                       </div>
                     </div>
-                  )}
+                    <motion.button
+                      onClick={() => setIsCommentModalOpen(false)}
+                      className="group p-3 text-white/70 hover:text-white hover:bg-white/10 rounded-xl transition-all duration-200"
+                      title="Close"
+                      whileHover={{ scale: 1.1, rotate: 90 }}
+                      whileTap={{ scale: 0.9 }}
+                      initial={{ opacity: 0, x: 10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: 0.4, duration: 0.3 }}
+                    >
+                      <X className="w-5 h-5 group-hover:rotate-90 transition-transform duration-200" />
+                    </motion.button>
+                  </div>
+                </motion.div>
 
-                  {/* Connection Status */}
-                  {!connectionStatus && (
-                    <div className="bg-gradient-to-r from-red-500/20 to-pink-500/20 border border-red-400/30 rounded-2xl p-4 animate-in slide-in-from-top-2 duration-300">
-                      <p className="text-red-300 text-sm font-medium">You are currently offline. Comment will be posted when connection is restored.</p>
-                    </div>
-                  )}
-                </div>
-              </div>
+                {/* Scrollable Content Area */}
+                <motion.div
+                  className="relative flex-1 overflow-y-auto px-6 lg:px-8 py-6"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: 0.2, duration: 0.3 }}
+                >
+                  <div className="space-y-6">
+                    {/* Comment Content */}
+                    <motion.div
+                      className="space-y-3"
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.3, duration: 0.3 }}
+                    >
+                      <motion.label
+                        className="text-white font-semibold text-sm lg:text-base flex items-center space-x-2"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        transition={{ delay: 0.4, duration: 0.3 }}
+                      >
+                        <div className="w-2 h-2 bg-emerald-400 rounded-full"></div>
+                        <span>Your Comment</span>
+                      </motion.label>
+                      <div className="relative">
+                        <motion.textarea
+                          value={newComment}
+                          onChange={(e) => setNewComment(e.target.value)}
+                          placeholder="Share your thoughts, ask questions, or start a discussion..."
+                          className="w-full h-32 lg:h-36 bg-white/10 border border-white/20 rounded-xl p-4 text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-emerald-400/50 focus:border-emerald-400/50 resize-none text-sm lg:text-base transition-all duration-300 hover:bg-white/15"
+                          maxLength={500}
+                          initial={{ opacity: 0, scale: 0.95 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          transition={{ delay: 0.5, duration: 0.3 }}
+                        />
+                        <motion.div
+                          className="absolute bottom-4 right-4 text-xs text-white/50"
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          transition={{ delay: 0.6, duration: 0.3 }}
+                        >
+                          {newComment.length}/500
+                        </motion.div>
+                      </div>
+                    </motion.div>
 
-              {/* Fixed Footer */}
-              <div className="relative flex-shrink-0 p-6 lg:p-8 pt-4">
-                <div className="flex flex-col sm:flex-row justify-end space-y-3 sm:space-y-0 sm:space-x-4 pt-6 border-t border-white/10">
-                  <button
-                    onClick={() => setIsCommentModalOpen(false)}
-                    className="w-full sm:w-auto px-6 py-3 border border-white/30 rounded-2xl text-white hover:bg-white/10 hover:border-white/50 transition-all duration-300 text-sm lg:text-base font-medium hover:scale-105"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={async () => {
-                      await handleSubmitComment()
-                      setIsCommentModalOpen(false)
-                    }}
-                    disabled={(!newComment.trim() && !newCommentImage) || isSubmittingComment || !isConnected}
-                    className={`w-full sm:w-auto px-6 py-3 rounded-2xl text-white font-semibold text-sm lg:text-base transition-all duration-300 hover:scale-105 shadow-lg ${(!newComment.trim() && !newCommentImage) || isSubmittingComment || !isConnected
-                        ? 'bg-white/20 cursor-not-allowed'
-                        : 'bg-gradient-to-r from-emerald-500 via-teal-600 to-cyan-600 hover:from-emerald-600 hover:via-teal-700 hover:to-cyan-700 shadow-emerald-500/25'
-                      }`}
-                  >
-                    {isSubmittingComment ? (
-                      <div className="flex items-center justify-center space-x-2">
-                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                        <span>Posting...</span>
+                    {/* Image Upload */}
+                    <motion.div
+                      className="space-y-3"
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.4, duration: 0.3 }}
+                    >
+                      <motion.label
+                        className="text-white font-semibold text-sm lg:text-base flex items-center space-x-2"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        transition={{ delay: 0.5, duration: 0.3 }}
+                      >
+                        <div className="w-2 h-2 bg-teal-400 rounded-full"></div>
+                        <span>Media (Optional)</span>
+                      </motion.label>
+                      <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-3 sm:space-y-0 sm:space-x-4">
+                        <label htmlFor="modal-comment-image-input" className="sr-only">Upload image</label>
+                        <input
+                          id="modal-comment-image-input"
+                          type="file"
+                          accept="image/*"
+                          onChange={e => setNewCommentImage(e.target.files?.[0] || null)}
+                          className="hidden"
+                        />
+                        <motion.button
+                          onClick={() => document.getElementById('modal-comment-image-input')?.click()}
+                          title="Add Image or GIF"
+                          className="flex items-center px-4 py-3 bg-white/10 hover:bg-white/15 border border-white/20 rounded-xl text-white transition-all duration-300 text-sm lg:text-base font-medium"
+                          whileHover={{ scale: 1.05 }}
+                          whileTap={{ scale: 0.95 }}
+                        >
+                          <ImageIcon className="w-5 h-5 mr-3" />
+                          Add Image or GIF
+                        </motion.button>
                       </div>
-                    ) : !connectionStatus ? (
-                      <div className="flex items-center justify-center space-x-2">
-                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                        <span>Offline</span>
-                      </div>
-                    ) : (
-                      'Post Comment'
+                    </motion.div>
+
+                    {/* Image Preview */}
+                    {newCommentImage && (
+                      <motion.div
+                        className="bg-white/10 border border-white/20 rounded-xl p-4"
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                      >
+                        <div className="flex items-center justify-between mb-3">
+                          <span className="text-white text-sm font-semibold">Selected Image:</span>
+                          <motion.button
+                            onClick={() => setNewCommentImage(null)}
+                            title="Remove image"
+                            className="p-2 text-white/70 hover:text-white hover:bg-white/10 rounded-xl transition-all duration-300"
+                            whileHover={{ scale: 1.1 }}
+                            whileTap={{ scale: 0.9 }}
+                          >
+                            <X className="w-4 h-4" />
+                          </motion.button>
+                        </div>
+                        <div className="flex items-center space-x-4">
+                          <div className="w-14 h-14 bg-white/20 rounded-xl flex items-center justify-center">
+                            <ImageIcon className="w-7 h-7 text-white/70" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-white text-sm font-medium truncate">{newCommentImage.name}</p>
+                            <p className="text-white/60 text-xs">
+                              {(newCommentImage.size / 1024 / 1024).toFixed(2)} MB
+                            </p>
+                          </div>
+                        </div>
+                      </motion.div>
                     )}
-                  </button>
-                </div>
-              </div>
+
+                    {/* Connection Status */}
+                    {!connectionStatus && (
+                      <motion.div
+                        className="bg-gradient-to-r from-red-500/20 to-pink-500/20 border border-red-400/30 rounded-xl p-4"
+                        initial={{ opacity: 0, y: -10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                      >
+                        <p className="text-red-300 text-sm font-medium">You are currently offline. Comment will be posted when connection is restored.</p>
+                      </motion.div>
+                    )}
+                  </div>
+                </motion.div>
+
+                {/* Footer */}
+                <motion.div
+                  className="relative flex-shrink-0 p-6 lg:p-8 pt-4 bg-gradient-to-r from-white/5 to-white/10 border-t border-white/20"
+                  initial={{ y: 20, opacity: 0 }}
+                  animate={{ y: 0, opacity: 1 }}
+                  transition={{ delay: 0.5, duration: 0.3 }}
+                >
+                  <div className="flex flex-col sm:flex-row justify-end space-y-3 sm:space-y-0 sm:space-x-4">
+                    <motion.button
+                      onClick={() => setIsCommentModalOpen(false)}
+                      className="w-full sm:w-auto px-6 py-3 border border-white/30 rounded-xl text-white hover:bg-white/10 hover:border-white/50 transition-all duration-300 text-sm lg:text-base font-medium"
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      transition={{ type: 'spring', stiffness: 400, damping: 17 }}
+                    >
+                      Cancel
+                    </motion.button>
+                    <motion.button
+                      onClick={async () => {
+                        await handleSubmitComment()
+                        setIsCommentModalOpen(false)
+                      }}
+                      disabled={(!newComment.trim() && !newCommentImage) || isSubmittingComment || !isConnected}
+                      className={`w-full sm:w-auto px-6 py-3 rounded-xl text-white font-semibold text-sm lg:text-base transition-all duration-300 shadow-lg ${
+                        (!newComment.trim() && !newCommentImage) || isSubmittingComment || !isConnected
+                          ? 'bg-white/20 cursor-not-allowed'
+                          : 'bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 shadow-emerald-500/25'
+                      }`}
+                      whileHover={{ scale: ((!newComment.trim() && !newCommentImage) || isSubmittingComment || !isConnected) ? 1 : 1.05 }}
+                      whileTap={{ scale: ((!newComment.trim() && !newCommentImage) || isSubmittingComment || !isConnected) ? 1 : 0.95 }}
+                      transition={{ type: 'spring', stiffness: 400, damping: 17 }}
+                    >
+                      {isSubmittingComment ? (
+                        <div className="flex items-center justify-center space-x-2">
+                          <motion.div
+                            className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full"
+                            animate={{ rotate: 360 }}
+                            transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+                          />
+                          <span>Posting...</span>
+                        </div>
+                      ) : !connectionStatus ? (
+                        <div className="flex items-center justify-center space-x-2">
+                          <motion.div
+                            className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full"
+                            animate={{ rotate: 360 }}
+                            transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+                          />
+                          <span>Offline</span>
+                        </div>
+                      ) : (
+                        'Post Comment'
+                      )}
+                    </motion.button>
+                  </div>
+                </motion.div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Image Popup Modal */}
+        {imagePopupUrl && (
+          <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-[9999] flex items-center justify-center" onClick={handleCloseImagePopup}>
+            {/* Control Bar */}
+            <div className="absolute top-20 left-1/2 transform -translate-x-1/2 z-[10000] flex items-center space-x-4 bg-black/50 backdrop-blur-xl rounded-2xl p-3 border border-white/20">
+              <button
+                onClick={(e) => { e.stopPropagation(); handleZoomOut(); }}
+                className="p-3 text-white/70 hover:text-white hover:bg-white/10 rounded-xl transition-all duration-300 hover:scale-105"
+                title="Zoom Out"
+              >
+                <ZoomOut className="w-5 h-5" />
+              </button>
+              <button
+                onClick={(e) => { e.stopPropagation(); handleResetZoom(); }}
+                className="px-3 py-2 text-white/70 hover:text-white hover:bg-white/10 rounded-xl transition-all duration-300 hover:scale-105 text-sm font-medium"
+                title="Reset Zoom"
+              >
+                100%
+              </button>
+              <span className="text-white text-sm font-medium min-w-[60px] text-center">
+                {Math.round(imageZoom * 100)}%
+              </span>
+              <button
+                onClick={(e) => { e.stopPropagation(); handleZoomIn(); }}
+                className="p-3 text-white/70 hover:text-white hover:bg-white/10 rounded-xl transition-all duration-300 hover:scale-105"
+                title="Zoom In"
+              >
+                <ZoomIn className="w-5 h-5" />
+              </button>
+              <div className="w-px h-8 bg-white/20 mx-2"></div>
+              <button
+                onClick={(e) => { e.stopPropagation(); handleDownload(); }}
+                className="p-3 text-white/70 hover:text-white hover:bg-white/10 rounded-xl transition-all duration-300 hover:scale-105"
+                title="Download Image"
+              >
+                <Download className="w-5 h-5" />
+              </button>
+              <div className="w-px h-8 bg-white/20 mx-2"></div>
+              <button
+                onClick={(e) => { e.stopPropagation(); handleCloseImagePopup(); }}
+                className="p-3 text-white/70 hover:text-white hover:bg-white/10 rounded-xl transition-all duration-300 hover:scale-105"
+                title="Close"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Image Container */}
+            <div className="relative w-full h-full max-w-[90vw] max-h-[calc(100vh-200px)] flex items-center justify-center">
+              <img
+                src={imagePopupUrl}
+                alt="Full size image"
+                className="max-w-full max-h-full object-contain rounded-2xl shadow-2xl transition-transform duration-300 cursor-grab active:cursor-grabbing select-none"
+                style={{
+                  transform: `scale(${imageZoom})`,
+                  transformOrigin: 'center center'
+                }}
+                onClick={(e) => e.stopPropagation()}
+                onDoubleClick={handleResetZoom}
+                onWheel={handleWheelZoom}
+                draggable={false}
+              />
             </div>
           </div>
         )}
       </div>
-
-      {/* Image Popup Modal */}
-      {imagePopupUrl && (
-        <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-[9999] flex items-center justify-center" onClick={handleCloseImagePopup}>
-          {/* Control Bar */}
-          <div className="absolute top-20 left-1/2 transform -translate-x-1/2 z-[10000] flex items-center space-x-4 bg-black/50 backdrop-blur-xl rounded-2xl p-3 border border-white/20">
-            <button
-              onClick={(e) => { e.stopPropagation(); handleZoomOut(); }}
-              className="p-3 text-white/70 hover:text-white hover:bg-white/10 rounded-xl transition-all duration-300 hover:scale-105"
-              title="Zoom Out"
-            >
-              <ZoomOut className="w-5 h-5" />
-            </button>
-            <button
-              onClick={(e) => { e.stopPropagation(); handleResetZoom(); }}
-              className="px-3 py-2 text-white/70 hover:text-white hover:bg-white/10 rounded-xl transition-all duration-300 hover:scale-105 text-sm font-medium"
-              title="Reset Zoom"
-            >
-              100%
-            </button>
-            <span className="text-white text-sm font-medium min-w-[60px] text-center">
-              {Math.round(imageZoom * 100)}%
-            </span>
-            <button
-              onClick={(e) => { e.stopPropagation(); handleZoomIn(); }}
-              className="p-3 text-white/70 hover:text-white hover:bg-white/10 rounded-xl transition-all duration-300 hover:scale-105"
-              title="Zoom In"
-            >
-              <ZoomIn className="w-5 h-5" />
-            </button>
-            <div className="w-px h-8 bg-white/20 mx-2"></div>
-            <button
-              onClick={(e) => { e.stopPropagation(); handleDownload(); }}
-              className="p-3 text-white/70 hover:text-white hover:bg-white/10 rounded-xl transition-all duration-300 hover:scale-105"
-              title="Download Image"
-            >
-              <Download className="w-5 h-5" />
-            </button>
-            <div className="w-px h-8 bg-white/20 mx-2"></div>
-            <button
-              onClick={(e) => { e.stopPropagation(); handleCloseImagePopup(); }}
-              className="p-3 text-white/70 hover:text-white hover:bg-white/10 rounded-xl transition-all duration-300 hover:scale-105"
-              title="Close"
-            >
-              <X className="w-5 h-5" />
-            </button>
-          </div>
-
-          {/* Image Container */}
-          <div className="relative w-full h-full max-w-[90vw] max-h-[calc(100vh-200px)] flex items-center justify-center">
-            <img
-              src={imagePopupUrl}
-              alt="Full size image"
-              className="max-w-full max-h-full object-contain rounded-2xl shadow-2xl transition-transform duration-300 cursor-grab active:cursor-grabbing select-none"
-              style={{
-                transform: `scale(${imageZoom})`,
-                transformOrigin: 'center center'
-              }}
-              onClick={(e) => e.stopPropagation()}
-              onDoubleClick={handleResetZoom}
-              onWheel={handleWheelZoom}
-              draggable={false}
-            />
-          </div>
-        </div>
-      )}
     </AppLayout>
   )
 }

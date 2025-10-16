@@ -57,19 +57,40 @@ func (s *ChatService) getPrivateChats(userID uint) ([]models.UnifiedChatItem, er
 			   u1.id, u1.first_name, u1.last_name, u1.avatar, u1.nickname,
 			   u2.id, u2.first_name, u2.last_name, u2.avatar, u2.nickname,
 			   m.id, m.content, m.created_at, m.sender_id,
-			   (SELECT COUNT(*) FROM private_messages pm 
-			    WHERE pm.conversation_id = c.id 
-			    AND pm.sender_id != ? 
-			    AND pm.is_read = 0) as unread_count
+			   (
+				   SELECT COUNT(*) FROM private_messages pm 
+				   WHERE pm.conversation_id = c.id 
+					 AND pm.sender_id != ? 
+					 AND pm.is_read = 0
+					 AND (
+						 CASE 
+							 WHEN c.participant1_id = ? AND c.participant1_deleted_at IS NOT NULL THEN pm.created_at > c.participant1_deleted_at
+							 WHEN c.participant2_id = ? AND c.participant2_deleted_at IS NOT NULL THEN pm.created_at > c.participant2_deleted_at
+							 ELSE 1
+						 END
+					 )
+			   ) as unread_count
 		FROM private_conversations c
 		JOIN users u1 ON c.participant1_id = u1.id
 		JOIN users u2 ON c.participant2_id = u2.id
-		LEFT JOIN private_messages m ON c.last_message_id = m.id
+		LEFT JOIN private_messages m ON m.id = (
+			SELECT pm.id FROM private_messages pm
+			WHERE pm.conversation_id = c.id
+			  AND (
+				  CASE 
+					  WHEN c.participant1_id = ? AND c.participant1_deleted_at IS NOT NULL THEN pm.created_at > c.participant1_deleted_at
+					  WHEN c.participant2_id = ? AND c.participant2_deleted_at IS NOT NULL THEN pm.created_at > c.participant2_deleted_at
+					  ELSE 1
+				  END
+			  )
+			ORDER BY pm.created_at DESC
+			LIMIT 1
+		)
 		WHERE ((c.participant1_id = ? AND c.participant1_deleted = FALSE) OR (c.participant2_id = ? AND c.participant2_deleted = FALSE))
 		ORDER BY c.updated_at DESC
 	`
 
-	rows, err := s.db.Query(query, userID, userID, userID)
+	rows, err := s.db.Query(query, userID, userID, userID, userID, userID, userID, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -277,11 +298,15 @@ func (s *ChatService) DeleteConversation(conversationID, userID uint) error {
 	query := `
 		UPDATE private_conversations
 		SET participant1_deleted = CASE WHEN participant1_id = ? THEN TRUE ELSE participant1_deleted END,
-		    participant2_deleted = CASE WHEN participant2_id = ? THEN TRUE ELSE participant2_deleted END,
-		    updated_at = CURRENT_TIMESTAMP
+			participant2_deleted = CASE WHEN participant2_id = ? THEN TRUE ELSE participant2_deleted END,
+			participant1_deleted_at = CASE WHEN participant1_id = ? THEN CURRENT_TIMESTAMP ELSE participant1_deleted_at END,
+			participant2_deleted_at = CASE WHEN participant2_id = ? THEN CURRENT_TIMESTAMP ELSE participant2_deleted_at END,
+			unread_count1 = CASE WHEN participant1_id = ? THEN 0 ELSE unread_count1 END,
+			unread_count2 = CASE WHEN participant2_id = ? THEN 0 ELSE unread_count2 END,
+			updated_at = CURRENT_TIMESTAMP
 		WHERE id = ?
 	`
 
-	_, err := s.db.Exec(query, userID, userID, conversationID)
+	_, err := s.db.Exec(query, userID, userID, userID, userID, userID, userID, conversationID)
 	return err
 }

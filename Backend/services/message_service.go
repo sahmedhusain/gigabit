@@ -44,10 +44,16 @@ func (s *MessageService) SendPrivateMessage(message *models.Message) error {
 	restoreQuery := `
 		UPDATE private_conversations
 		SET participant1_deleted = CASE WHEN participant1_id = ? THEN FALSE ELSE participant1_deleted END,
-		    participant2_deleted = CASE WHEN participant2_id = ? THEN FALSE ELSE participant2_deleted END
+			participant2_deleted = CASE WHEN participant2_id = ? THEN FALSE ELSE participant2_deleted END
 		WHERE id = ?
 	`
 	_, err = s.db.Exec(restoreQuery, message.SenderID, message.SenderID, conversationID)
+	if err != nil {
+		return err
+	}
+
+	// Also restore conversation for receiver if they had deleted it, so new incoming message reappears
+	_, err = s.db.Exec(restoreQuery, message.ReceiverID, message.ReceiverID, conversationID)
 	if err != nil {
 		return err
 	}
@@ -147,17 +153,40 @@ func (s *MessageService) GetPrivateMessages(userID1, userID2 uint, limit, offset
 		return nil, err
 	}
 
+	// Determine deletion boundary for requesting user - apply if user has deleted_at timestamp (even if restored)
+	var p1ID, p2ID uint
+	var delAt sql.NullString
+	var isDeleted bool
+	delQuery := `
+		SELECT participant1_id, participant2_id,
+			   CASE WHEN participant1_id = ? THEN participant1_deleted_at ELSE participant2_deleted_at END as deleted_at,
+			   CASE WHEN participant1_id = ? THEN participant1_deleted ELSE participant2_deleted END as is_deleted
+		FROM private_conversations WHERE id = ?
+	`
+	if err := s.db.QueryRow(delQuery, userID1, userID1, conversationID).Scan(&p1ID, &p2ID, &delAt, &isDeleted); err != nil {
+		return nil, err
+	}
+
+	// Base query with optional deleted_at filter (apply if user has deleted_at, regardless of current deleted flag)
 	query := `
 	SELECT m.id, m.sender_id, m.content, m.is_read, m.created_at,
 	   u.first_name, u.last_name, u.avatar, u.nickname
 	FROM private_messages m
 	JOIN users u ON m.sender_id = u.id
 	WHERE m.conversation_id = ?
+	  AND (? IS NULL OR m.created_at > ?)
 	ORDER BY m.created_at DESC
 	LIMIT ? OFFSET ?
 	`
 
-	rows, err := s.db.Query(query, conversationID, limit, offset)
+	var delAtVal interface{}
+	if delAt.Valid && delAt.String != "" {
+		delAtVal = delAt.String
+	} else {
+		delAtVal = nil
+	}
+
+	rows, err := s.db.Query(query, conversationID, delAtVal, delAtVal, limit, offset)
 	if err != nil {
 		return nil, err
 	}

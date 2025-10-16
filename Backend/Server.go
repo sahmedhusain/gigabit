@@ -112,6 +112,7 @@ func (s *Server) setupRoutes() {
 	wsHandler := handlers.NewWebSocketHandler(s.Hub)
 	chatHandler := handlers.NewChatHandler(s.DB.GetDB())
 	conversationHandler := handlers.NewConversationHandler(s.DB.GetDB())
+	statusHandler := handlers.NewStatusHandler(s.DB.GetDB())
 
 	// Health check
 	s.router.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
@@ -147,6 +148,11 @@ func (s *Server) setupRoutes() {
 	s.router.HandleFunc("/api/users", s.handleRoute(userHandler.GetAllUsers, true))
 	s.router.HandleFunc("/api/users/status", s.handleRoute(userHandler.UpdateStatus, true))
 	s.router.HandleFunc("/api/users/", s.handleUserRoute(followHandler, wsHandler))
+
+	// Status routes
+	s.router.HandleFunc("/api/status/me", s.handleRoute(statusHandler.GetMyStatus, true))
+	s.router.HandleFunc("/api/status/update", s.handleRoute(statusHandler.UpdateMyStatus, true))
+	s.router.HandleFunc("/api/status/online", s.handleRoute(statusHandler.GetOnlineUsers, true))
 
 	// Post routes
 	s.router.HandleFunc("/api/posts", s.handlePostsRoute(postHandler))

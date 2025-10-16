@@ -45,6 +45,8 @@ func (h *Hub) handleMessage(message Message) {
 		h.handleGroupUpdate(message)
 	case MessageTypeEventUpdate:
 		h.handleEventUpdate(message)
+	case MessageTypeLayoutSync:
+		h.handleLayoutSync(message)
 	case MessageTypePing:
 		h.handlePing(message)
 	case MessageTypePong:

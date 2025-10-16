@@ -147,8 +147,9 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
   }, [conversationId, conversationType])
 
   // Typing indicator integration
-  // For groups, pass the groupId instead of conversationId since typing messages use group_id field
-  const typingConversationId = conversationType === 'group' && groupId ? groupId : effectiveConversationId
+  // For groups, pass the groupId; for private chats, pass the participantId (not conversationId)
+  // This is because WebSocket typing messages use group_id for groups and to/from user IDs for private
+  const typingConversationId = conversationType === 'group' && groupId ? groupId : (participantId || effectiveConversationId)
   const {
     typingUsers,
     startTyping

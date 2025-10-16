@@ -1110,6 +1110,26 @@ export class ApiClient {
     });
   }
 
+  // Status endpoints
+  async getMyStatus(): Promise<{ user_id: number; status: string; last_status_change: string; is_online: boolean }> {
+    return this.request<{ user_id: number; status: string; last_status_change: string; is_online: boolean }>('/api/status/me', {
+      method: 'GET',
+    });
+  }
+
+  async updateMyStatus(status: 'online' | 'busy' | 'away' | 'invisible'): Promise<{ message: string }> {
+    return this.request<{ message: string }>('/api/status/update', {
+      method: 'PUT',
+      body: JSON.stringify({ status }),
+    });
+  }
+
+  async getOnlineUsers(): Promise<{ users: Array<{ user_id: number; username: string; status: string; last_status_change: string }> }> {
+    return this.request<{ users: Array<{ user_id: number; username: string; status: string; last_status_change: string }> }>('/api/status/online', {
+      method: 'GET',
+    });
+  }
+
   async updateUserPrivacy(userId: number, isPrivate: boolean): Promise<{ message: string; user: User }> {
     return this.request<{ message: string; user: User }>(`/api/profile/privacy`, {
       method: 'PUT',

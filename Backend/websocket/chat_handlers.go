@@ -25,8 +25,8 @@ func (h *Hub) handlePrivateMessage(message Message) {
 			log.Printf("❌ Failed to deliver private message to User %d (channel full)", message.To)
 			h.mu.Lock()
 			delete(h.clients, targetClient.ID)
-			close(targetClient.Send)
 			h.mu.Unlock()
+			h.safeCloseClient(targetClient)
 		}
 	} else {
 		log.Printf("⚠️  User %d is offline, message not delivered in real-time", message.To)
@@ -61,8 +61,8 @@ func (h *Hub) handleGroupMessage(message Message) {
 					go func(c *Client) {
 						h.mu.Lock()
 						delete(h.clients, c.ID)
-						close(c.Send)
 						h.mu.Unlock()
+						h.safeCloseClient(c)
 					}(client)
 				}
 			}
@@ -105,8 +105,8 @@ func (h *Hub) handleGroupTyping(message Message) {
 				go func(c *Client) {
 					h.mu.Lock()
 					delete(h.clients, c.ID)
-					close(c.Send)
 					h.mu.Unlock()
+					h.safeCloseClient(c)
 				}(client)
 			}
 		} else {
@@ -175,25 +175,51 @@ func (h *Hub) handleGetOnlineUsers(userID uint) {
 
 	onlineUsers := make([]map[string]interface{}, 0, len(h.clients))
 	for id := range h.clients {
-		// Get user info from database if available
-		var username string
+		// Get user info and current status from database
+		var firstName, lastName string
+		var status string
+		var lastStatusChange *time.Time
+
 		if h.db != nil {
-			var firstName, lastName string
-			err := h.db.QueryRow("SELECT first_name, last_name FROM users WHERE id = ?", id).Scan(&firstName, &lastName)
-			if err == nil {
-				username = firstName + " " + lastName
+			err := h.db.QueryRow("SELECT first_name, last_name, status, last_status_change FROM users WHERE id = ?", id).
+				Scan(&firstName, &lastName, &status, &lastStatusChange)
+
+			if err != nil {
+				log.Printf("Failed to get user info for %d: %v", id, err)
+				// Fallback to basic info
+				firstName = fmt.Sprintf("User %d", id)
+				lastName = ""
+				status = "online"
 			}
+		} else {
+			firstName = fmt.Sprintf("User %d", id)
+			lastName = ""
+			status = "online"
 		}
 
-		if username == "" {
-			username = fmt.Sprintf("User %d", id)
+		// For invisible users, show them their real status but show as offline to others
+		displayStatus := status
+		if status == "invisible" && id != userID {
+			displayStatus = "offline"
 		}
 
-		onlineUsers = append(onlineUsers, map[string]interface{}{
+		username := firstName
+		if lastName != "" {
+			username = firstName + " " + lastName
+		}
+
+		userInfo := map[string]interface{}{
 			"user_id":   id,
 			"username":  username,
-			"is_online": true,
-		})
+			"status":    displayStatus,
+			"is_online": status != "offline",
+		}
+
+		if lastStatusChange != nil {
+			userInfo["last_status_change"] = lastStatusChange.Format(time.RFC3339)
+		}
+
+		onlineUsers = append(onlineUsers, userInfo)
 	}
 
 	responseMessage := Message{
@@ -212,6 +238,84 @@ func (h *Hub) handleGetOnlineUsers(userID uint) {
 // handleStatusChange handles user status change requests
 func (h *Hub) handleStatusChange(message Message) {
 	log.Printf("Status change request from user %d", message.From)
+
+	if message.Data == nil {
+		log.Printf("No data provided for status change from user %d", message.From)
+		h.sendStatusChangeResponse(message.From, "error", "No status data provided")
+		return
+	}
+
+	data, ok := message.Data.(map[string]interface{})
+	if !ok {
+		log.Printf("Invalid data format for status change from user %d", message.From)
+		h.sendStatusChangeResponse(message.From, "error", "Invalid data format")
+		return
+	}
+
+	userID := message.From
+	newStatus, ok := data["status"].(string)
+	if !ok {
+		log.Printf("Invalid status in status change request from user %d", userID)
+		h.sendStatusChangeResponse(userID, "error", "Invalid status format")
+		return
+	}
+
+	// Validate status
+	validStatuses := map[string]bool{
+		"online":    true,
+		"away":      true,
+		"busy":      true,
+		"invisible": true,
+		"offline":   true,
+	}
+
+	if !validStatuses[newStatus] {
+		log.Printf("Invalid status '%s' from user %d", newStatus, userID)
+		h.sendStatusChangeResponse(userID, "error", fmt.Sprintf("Invalid status: %s", newStatus))
+		return
+	}
+
+	// Update status in database with timestamp
+	if h.db != nil {
+		_, err := h.db.Exec("UPDATE users SET status = ?, last_status_change = CURRENT_TIMESTAMP WHERE id = ?", newStatus, userID)
+		if err != nil {
+			log.Printf("Failed to update status for user %d: %v", userID, err)
+			h.sendStatusChangeResponse(userID, "error", "Failed to update status")
+			return
+		}
+		log.Printf("Successfully updated user %d status from database to: %s", userID, newStatus)
+	}
+
+	// Send success response to the user
+	h.sendStatusChangeResponse(userID, "success", fmt.Sprintf("Status updated to %s", newStatus))
+
+	// Determine what status to broadcast to other users
+	broadcastStatus := newStatus
+	if newStatus == "invisible" {
+		// If user is going invisible, broadcast offline status instead
+		broadcastStatus = "offline"
+		log.Printf("User %d set status to invisible, broadcasting as offline", userID)
+	}
+
+	// Broadcast the status change to all other clients
+	h.BroadcastUserStatus(userID, broadcastStatus)
+}
+
+// sendStatusChangeResponse sends a response back to the user who requested status change
+func (h *Hub) sendStatusChangeResponse(userID uint, status, message string) {
+	responseMessage := Message{
+		Type: MessageTypeUserStatus,
+		From: 0, // System message
+		To:   userID,
+		Data: map[string]interface{}{
+			"action":  "status_change_response",
+			"status":  status,
+			"message": message,
+		},
+		Timestamp: time.Now().Unix(),
+	}
+
+	h.SendToUser(userID, responseMessage)
 }
 
 // handlePing responds to ping messages with pong
@@ -251,4 +355,35 @@ func (h *Hub) handlePong(message Message) {
 		client.LastPing = time.Now()
 		client.mu.Unlock()
 	}
+}
+
+// handleLayoutSync synchronizes layout changes across all user's active sessions
+func (h *Hub) handleLayoutSync(message Message) {
+	log.Printf("Layout sync from user %d", message.From)
+
+	if message.Data == nil {
+		return
+	}
+
+	// Send layout sync to all sessions of the same user
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+
+	userID := message.From
+	deliveredCount := 0
+
+	for clientID, client := range h.clients {
+		// Send to all sessions of the same user (multi-tab sync)
+		if client.ID == userID {
+			select {
+			case client.Send <- message:
+				deliveredCount++
+				log.Printf("Layout sync delivered to client %d (user %d)", clientID, userID)
+			default:
+				log.Printf("Failed to deliver layout sync to client %d (user %d): channel full", clientID, userID)
+			}
+		}
+	}
+
+	log.Printf("Layout sync for user %d delivered to %d sessions", userID, deliveredCount)
 }

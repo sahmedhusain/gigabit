@@ -27,6 +27,7 @@ const (
 	MessageTypeFollowerCountUpdate = "follower_count_update"
 	MessageTypeGroupUpdate         = "group_update"
 	MessageTypeEventUpdate         = "event_update"
+	MessageTypeLayoutSync          = "layout_sync"
 	MessageTypeError               = "error"
 	MessageTypePing                = "ping"
 	MessageTypePong                = "pong"
@@ -56,5 +57,6 @@ type Client struct {
 	Groups    map[uint]bool
 	Following map[uint]bool
 	LastPing  time.Time
+	Closed    bool // Flag to track if the client's send channel is closed
 	mu        sync.RWMutex
 }

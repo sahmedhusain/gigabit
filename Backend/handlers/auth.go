@@ -174,7 +174,7 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 	session := &models.Session{
 		UserID:    user.ID,
 		Token:     token,
-		ExpiresAt: time.Now().Add(30 * time.Minute),
+		ExpiresAt: time.Now().Add(60 * time.Minute), // 1 hour session timeout
 	}
 
 	if err := h.sessionService.CreateSession(session); err != nil {
@@ -235,7 +235,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	session := &models.Session{
 		UserID:    user.ID,
 		Token:     token,
-		ExpiresAt: time.Now().Add(30 * time.Minute),
+		ExpiresAt: time.Now().Add(60 * time.Minute), // 1 hour session timeout
 	}
 
 	if err := h.sessionService.CreateSession(session); err != nil {

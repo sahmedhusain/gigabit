@@ -8,7 +8,7 @@ export interface WebSocketMessage {
         'post_update' | 'comment_update' | 'like_update' | 'like' | 'follow_update' | 
         'follow' | 'unfollow' | 'follow_request' | 'cancel_follow_request' |
         'group_update' | 'event_update' | 'category_update' | 'follower_count_update' |
-        'ping' | 'pong' | 'error'
+        'layout_sync' | 'ping' | 'pong' | 'error'
   from?: number
   to?: number
   group_id?: number
@@ -105,6 +105,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
           case 'user_status':
             if (message.data?.online_users) {
               // Handle initial online users list
+              console.log('Received initial online users:', message.data.online_users)
               const usersWithStatus = message.data.online_users.map((user: any) => ({
                 user_id: user.user_id,
                 username: user.username || `User ${user.user_id}`,
@@ -114,19 +115,22 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
               setOnlineUsers(usersWithStatus)
             } else if (message.data?.user_id) {
               // Handle individual user status update
+              console.log('Received user status update:', message.data)
               setOnlineUsers(prev => {
                 const filtered = prev.filter(u => u.user_id !== message.data.user_id)
                 
                 // If status is offline, don't add the user back (they disconnected)
                 if (message.data.status === 'offline') {
+                  console.log(`User ${message.data.user_id} went offline`)
                   return filtered
                 }
                 
+                console.log(`User ${message.data.user_id} status: ${message.data.status}`)
                 const newUser = {
                   user_id: message.data.user_id,
                   username: message.data.username || `User ${message.data.user_id}`,
                   status: message.data.status || 'offline',
-                  last_status_change: message.data.last_status_change
+                  last_status_change: message.data.last_status_change || new Date().toISOString()
                 }
                 return [...filtered, newUser]
               })
@@ -158,6 +162,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
           case 'follow_update':
           case 'group_update':
           case 'event_update':
+          case 'layout_sync':
             console.log(`Real-time ${message.type}:`, message)
             messageListeners.current.forEach(callback => callback(message))
             break
@@ -221,24 +226,26 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
       pongTimeout.current = null
     }
 
-    // Send ping every 30 seconds
+    // Send ping every 25 seconds (more frequent for better detection)
     pingInterval.current = setInterval(() => {
       if (ws.readyState === WebSocket.OPEN) {
+        console.log('Sending ping to server')
         ws.send(JSON.stringify({
           type: 'ping',
+          from: user?.id,
           timestamp: Date.now()
         }))
 
-        // Set timeout for pong response (10 seconds)
+        // Set timeout for pong response (8 seconds - shorter for faster recovery)
         if (pongTimeout.current) {
           clearTimeout(pongTimeout.current)
         }
         pongTimeout.current = setTimeout(() => {
-          console.log('No pong received, closing connection')
-          ws.close()
-        }, 10000)
+          console.log('No pong received within 8 seconds, closing connection for reconnect')
+          ws.close(1001, 'Ping timeout')
+        }, 8000)
       }
-    }, 30000)
+    }, 25000)
   }
 
   const stopPingInterval = () => {

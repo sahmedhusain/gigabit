@@ -387,4 +387,4 @@ INSERT INTO comments (post_id, user_id, content, created_at, updated_at) VALUES
 (157, 38, 'Social impact work like yours makes the world better.', datetime('now', '-27 days'), datetime('now', '-27 days')),
 (158, 39, 'Data visualization that tells a story is worth a thousand charts.', datetime('now', '-22 days'), datetime('now', '-22 days')),
 (159, 40, 'Cybersecurity awareness is more important than ever.', datetime('now', '-17 days'), datetime('now', '-17 days')),
-(160, 31, 'AR/VR has so much potential for education and training.', datetime('now', '-12 days'), datetime('now', '-12 days')));
+(160, 31, 'AR/VR has so much potential for education and training.', datetime('now', '-12 days'), datetime('now', '-12 days'));

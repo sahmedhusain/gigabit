@@ -1,6 +1,7 @@
 package websocket
 
 import (
+	"fmt"
 	"log"
 	"time"
 )
@@ -54,33 +55,63 @@ func (h *Hub) SendToGroup(groupID uint, message Message, excludeUserID uint) {
 
 // BroadcastUserStatus sends user status updates to all connected clients
 func (h *Hub) BroadcastUserStatus(userID uint, status string) {
+	// Get username and status info from database for the broadcast
+	var username string
+	var lastStatusChange *time.Time
+
+	if h.db != nil {
+		var firstName, lastName string
+		err := h.db.QueryRow("SELECT first_name, last_name, last_status_change FROM users WHERE id = ?", userID).
+			Scan(&firstName, &lastName, &lastStatusChange)
+		if err == nil {
+			username = firstName + " " + lastName
+		}
+	}
+	if username == "" {
+		username = fmt.Sprintf("User %d", userID)
+	}
+
+	messageData := map[string]interface{}{
+		"user_id":  userID,
+		"username": username,
+		"status":   status,
+	}
+
+	if lastStatusChange != nil {
+		messageData["last_status_change"] = lastStatusChange.Format(time.RFC3339)
+	}
+
 	message := Message{
 		Type: MessageTypeUserStatus,
 		From: userID,
-		Data: map[string]interface{}{
-			"user_id": userID,
-			"status":  status,
-		},
+		Data: messageData,
 	}
 
 	h.mu.RLock()
 	defer h.mu.RUnlock()
 
-	for _, client := range h.clients {
-		if client.ID != userID { // Don't send to the user themselves
-			select {
-			case client.Send <- message:
-			default:
-				// Client's send channel is full, close it
-				go func(c *Client) {
-					h.mu.Lock()
-					delete(h.clients, c.ID)
-					close(c.Send)
-					h.mu.Unlock()
-				}(client)
-			}
+	deliveredCount := 0
+	failedCount := 0
+
+	// Send to ALL connected clients (including the user themselves for multi-tab sync)
+	for clientID, client := range h.clients {
+		select {
+		case client.Send <- message:
+			deliveredCount++
+		default:
+			// Client's send channel is full, close it
+			failedCount++
+			log.Printf("Failed to send user status to client %d: channel full", clientID)
+			go func(c *Client) {
+				h.mu.Lock()
+				delete(h.clients, c.ID)
+				h.mu.Unlock()
+				h.safeCloseClient(c)
+			}(client)
 		}
 	}
+
+	log.Printf("Broadcasted status update for user %d (%s) | Delivered: %d | Failed: %d", userID, status, deliveredCount, failedCount)
 }
 
 // BroadcastPostUpdate broadcasts a post update to relevant users

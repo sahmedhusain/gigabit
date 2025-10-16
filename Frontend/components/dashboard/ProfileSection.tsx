@@ -166,7 +166,7 @@ export default function ProfileSection({
       setShowPrivacyConfirm(false)
     }
   }  // Use real-time data when connected, fallback to provided data
-  const displayPosts = isConnected ? realTimePosts.filter(p => p.user_id === currentUser?.id) : posts
+  const displayPosts = posts // Use fetched posts for profile, real-time is for feed
   const displayFollowers = isConnected ? liveFollowers : followers
   const displayFollowing = isConnected ? liveFollowing : following
 
@@ -373,7 +373,7 @@ export default function ProfileSection({
                       <span>Just now</span>
                       <div className="flex space-x-3 lg:space-x-4">
                         <span>{(post as { like_count?: number; likes?: number }).like_count || (post as { like_count?: number; likes?: number }).likes || 0} likes</span>
-                        <span>{Array.isArray((post as { comments?: unknown[] }).comments) ? (post as { comments?: unknown[] }).comments!.length : ((post as { comment_count?: number; comments?: number }).comment_count || (post as { comment_count?: number; comments?: number }).comments || 0)} comments</span>
+                        <span>{Array.isArray((post as unknown as { comments?: unknown[] }).comments) ? (post as unknown as { comments?: unknown[] }).comments!.length : ((post as unknown as { comment_count?: number; comments?: number }).comment_count || (post as unknown as { comment_count?: number; comments?: number }).comments || 0)} comments</span>
                       </div>
                     </div>
                   </div>

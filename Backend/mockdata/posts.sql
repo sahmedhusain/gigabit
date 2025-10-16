@@ -47,10 +47,10 @@ INSERT INTO posts (user_id, content, image_url, privacy, created_at, updated_at)
 (4, 'Just finished painting a landscape piece inspired by my recent trip to the mountains. Art therapy is real! 🎨 #Painting #Art #Landscape #Creativity', '', 'public', datetime('now', '-335 days'), datetime('now', '-335 days')),
 (4, 'Movie night: watched the new sci-fi thriller. The cinematography was breathtaking, but the plot could have been tighter 🎬 #Movies #Cinema #Review', '', 'public', datetime('now', '-325 days'), datetime('now', '-325 days')),
 (4, 'Teaching watercolor techniques to beginners today. Seeing their faces light up when they create something beautiful never gets old 🎨 #Teaching #Art #Education', '', 'public', datetime('now', '-315 days'), datetime('now', '-315 days')),
-(4, 'Design portfolio update! Added my latest branding project. Feedback welcome 🎨 #Design #Branding #Portfolio', '', 'friends_only', datetime('now', '-305 days'), datetime('now', '-305 days')),
+(4, 'Design portfolio update! Added my latest branding project. Feedback welcome 🎨 #Design #Branding #Portfolio', '', 'friends', datetime('now', '-305 days'), datetime('now', '-305 days')),
 (4, 'Exploring abstract art styles. Sometimes breaking the rules leads to the best creations 🎨 #AbstractArt #Creativity', '', 'public', datetime('now', '-295 days'), datetime('now', '-295 days')),
 (4, 'Client project complete! So happy with how this logo turned out. What do you think? 🏷️ #LogoDesign #ClientWork', '', 'public', datetime('now', '-285 days'), datetime('now', '-285 days')),
-(4, 'Art supplies haul! New paints, brushes, and canvases. Can''t wait to create 🎨 #ArtSupplies #Creativity', '', 'friends_only', datetime('now', '-275 days'), datetime('now', '-275 days')),
+(4, 'Art supplies haul! New paints, brushes, and canvases. Can''t wait to create 🎨 #ArtSupplies #Creativity', '', 'friends', datetime('now', '-275 days'), datetime('now', '-275 days')),
 
 -- David's posts (active - 9 posts)
 (5, 'AI development is moving so fast! GPT-4 capabilities are mind-blowing. We are living in interesting times 🤖 #AI #Technology #Innovation #Future', '', 'public', datetime('now', '-325 days'), datetime('now', '-325 days')),
@@ -88,9 +88,9 @@ INSERT INTO posts (user_id, content, image_url, privacy, created_at, updated_at)
 -- Lisa's posts (moderate - 6 posts, private)
 (8, 'Machine learning model accuracy improved by 15% today! Feature engineering is an art 🎯 #MachineLearning #DataScience', '', 'public', datetime('now', '-310 days'), datetime('now', '-310 days')),
 (8, 'Deep learning conference was mind-blowing. Neural networks are getting so sophisticated 🧠 #DeepLearning #AI', '', 'public', datetime('now', '-300 days'), datetime('now', '-300 days')),
-(8, 'Data visualization tip: Choose the right chart for your data story 📊 #DataViz #Analytics', '', 'friends_only', datetime('now', '-290 days'), datetime('now', '-290 days')),
+(8, 'Data visualization tip: Choose the right chart for your data story 📊 #DataViz #Analytics', '', 'friends', datetime('now', '-290 days'), datetime('now', '-290 days')),
 (8, 'Working on a recommendation system. Collaborative filtering is fascinating 🤝 #RecommendationSystem #ML', '', 'public', datetime('now', '-280 days'), datetime('now', '-280 days')),
-(8, 'Big data processing challenge solved! Distributed computing saves the day 💾 #BigData #DistributedSystems', '', 'friends_only', datetime('now', '-270 days'), datetime('now', '-270 days')),
+(8, 'Big data processing challenge solved! Distributed computing saves the day 💾 #BigData #DistributedSystems', '', 'friends', datetime('now', '-270 days'), datetime('now', '-270 days')),
 (8, 'Research paper accepted! Excited to share our findings on computer vision applications 📄 #Research #ComputerVision', '', 'public', datetime('now', '-260 days'), datetime('now', '-260 days')),
 
 -- Ryan's posts (moderate - 7 posts)
@@ -120,7 +120,7 @@ INSERT INTO posts (user_id, content, image_url, privacy, created_at, updated_at)
 (11, 'Real estate market insights: Location and fundamentals matter most 🏠 #RealEstate #Investing', '', 'public', datetime('now', '-265 days'), datetime('now', '-265 days')),
 
 -- Mia's posts (low - 3 posts, private)
-(12, 'Pet health tip: Regular check-ups can prevent major issues 🐾 #PetHealth #Veterinary', '', 'friends_only', datetime('now', '-290 days'), datetime('now', '-290 days')),
+(12, 'Pet health tip: Regular check-ups can prevent major issues 🐾 #PetHealth #Veterinary', '', 'friends', datetime('now', '-290 days'), datetime('now', '-290 days')),
 (12, 'Emergency pet care: Know the signs of common emergencies 🚨 #PetCare #Emergency', '', 'public', datetime('now', '-280 days'), datetime('now', '-280 days')),
 (12, 'Adopting pets changes lives. Every animal deserves a loving home ❤️ #PetAdoption #AnimalWelfare', '', 'public', datetime('now', '-270 days'), datetime('now', '-270 days')),
 
@@ -171,10 +171,10 @@ INSERT INTO posts (user_id, content, image_url, privacy, created_at, updated_at)
 (18, 'Cooking class today: Teaching knife skills to beginners 🔪 #CookingClass #Teaching', '', 'public', datetime('now', '-240 days'), datetime('now', '-240 days')),
 
 -- Ava's posts (moderate - 5 posts, private)
-(19, 'Investigative journalism in the digital age: Challenges and opportunities 📰 #Journalism #DigitalAge', '', 'friends_only', datetime('now', '-255 days'), datetime('now', '-255 days')),
+(19, 'Investigative journalism in the digital age: Challenges and opportunities 📰 #Journalism #DigitalAge', '', 'friends', datetime('now', '-255 days'), datetime('now', '-255 days')),
 (19, 'Storytelling through data visualization. Facts become compelling narratives 📊 #DataJournalism #Storytelling', '', 'public', datetime('now', '-245 days'), datetime('now', '-245 days')),
 (19, 'Press freedom is under threat worldwide. Democracy depends on independent media 📰 #PressFreedom #Democracy', '', 'public', datetime('now', '-235 days'), datetime('now', '-235 days')),
-(19, 'Multimedia storytelling: Combining text, video, and interactive elements 📱 #Multimedia #Journalism', '', 'friends_only', datetime('now', '-225 days'), datetime('now', '-225 days')),
+(19, 'Multimedia storytelling: Combining text, video, and interactive elements 📱 #Multimedia #Journalism', '', 'friends', datetime('now', '-225 days'), datetime('now', '-225 days')),
 (19, 'Community journalism matters. Local stories connect us all 🏘️ #CommunityJournalism #LocalNews', '', 'public', datetime('now', '-215 days'), datetime('now', '-215 days')),
 
 -- Logan's posts (low - 4 posts)
@@ -197,7 +197,7 @@ INSERT INTO posts (user_id, content, image_url, privacy, created_at, updated_at)
 (22, 'Historic preservation meets modern design. Beautiful blend of old and new 🏛️ #HistoricPreservation #Architecture', '', 'public', datetime('now', '-220 days'), datetime('now', '-220 days')),
 
 -- Madison's posts (low - 2 posts, private)
-(23, 'Mental health awareness month. Breaking stigma one conversation at a time 🧠 #MentalHealth #Awareness', '', 'friends_only', datetime('now', '-235 days'), datetime('now', '-235 days')),
+(23, 'Mental health awareness month. Breaking stigma one conversation at a time 🧠 #MentalHealth #Awareness', '', 'friends', datetime('now', '-235 days'), datetime('now', '-235 days')),
 (23, 'Therapy is a sign of strength, not weakness 💪 #MentalHealth #Therapy', '', 'public', datetime('now', '-225 days'), datetime('now', '-225 days')),
 
 -- William's posts (moderate - 5 posts)

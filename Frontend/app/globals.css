@@ -234,8 +234,8 @@ body {
   height: 100%;
   max-height: 100%;
   gap: 16px;
-  /* Ensure no section overflows */
-  overflow: hidden;
+  /* Allow scrolling if content exceeds viewport */
+  overflow-y: auto;
   box-sizing: border-box;
 }
 
@@ -247,10 +247,36 @@ body {
   position: relative; /* For proper modal positioning */
 }
 
-/* Specific constraints for invitation section when expanded */
+/* Add specific constraints for invitation section when expanded */
 .sidebar-section:has(.invitation-content).expandable {
   max-height: calc(100vh - 500px); /* Same constraint for invitation section */
   flex: 0 0 auto;
+}
+
+/* Add specific constraints for following section when expanded */
+.sidebar-section:has(.following-content).expandable {
+  max-height: calc(55vh - 80px); /* Even more reduced height for optimal viewport management */
+  flex: 0 0 auto;
+}
+
+/* Make following section header completely fixed and non-scrollable */
+.sidebar-section:has(.following-content).expandable > div > div:first-child {
+  position: sticky;
+  top: 16px; /* Position from top of section */
+  z-index: 15;
+  background: inherit;
+  -webkit-backdrop-filter: inherit;
+  backdrop-filter: inherit;
+  border-radius: inherit;
+  padding-bottom: 16px;
+  margin-bottom: 0; /* Remove bottom margin to prevent gap */
+  pointer-events: auto;
+}
+
+/* Adjust following section content to account for sticky header */
+.sidebar-section:has(.following-content).expandable .section-content {
+  margin-top: 0;
+  padding-top: 0;
 }
 
 /* Add class to invitation content for targeting */
@@ -258,6 +284,14 @@ body {
   /* Specific styling for invitation content */
   position: relative;
   max-height: calc(100vh - 500px); /* Match section constraint */
+  overflow-y: auto; /* Allow internal scrolling */
+}
+
+/* Add class to following content for targeting */
+.following-content {
+  /* Specific styling for following content */
+  position: relative;
+  max-height: calc(55vh - 80px); /* Match section constraint */
   overflow-y: auto; /* Allow internal scrolling */
 }
 
@@ -576,4 +610,40 @@ body {
 
 .animate-\[shimmer_2s_infinite\] {
   animation: shimmer 2s infinite linear;
+}
+
+/* Post animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.6s ease-out forwards;
+}
+
+.animate-slide-in-from-bottom {
+  animation: fadeIn 0.6s ease-out forwards;
+}
+
+/* Header animations */
+@keyframes headerSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-header-in {
+  animation: headerSlideIn 0.5s ease-out forwards;
 }

@@ -1,6 +1,7 @@
 package websocket
 
 import (
+	"database/sql"
 	"log"
 	"time"
 )
@@ -95,12 +96,21 @@ func (h *Hub) handleCommentCreate(message Message) {
 		// Get user information for the response
 		userQuery := `SELECT first_name, last_name, avatar, nickname FROM users WHERE id = ?`
 		var firstName, lastName string
-		var avatar, nickname *string
+		var avatar, nickname sql.NullString
 
 		err = h.db.QueryRow(userQuery, userID).Scan(&firstName, &lastName, &avatar, &nickname)
 		if err != nil {
 			log.Printf("Failed to get user info: %v", err)
 			return
+		}
+
+		// Handle nullable fields properly
+		var avatarStr, nicknameStr *string
+		if avatar.Valid {
+			avatarStr = &avatar.String
+		}
+		if nickname.Valid {
+			nicknameStr = &nickname.String
 		}
 
 		// Create response data with complete comment information
@@ -109,15 +119,21 @@ func (h *Hub) handleCommentCreate(message Message) {
 			"post_id":    postID,
 			"user_id":    userID,
 			"content":    content,
-			"image_url":  imageURL,
-			"created_at": now.Format("2006-01-02T15:04:05Z"),
-			"updated_at": now.Format("2006-01-02T15:04:05Z"),
+			"image_url":  imageURL, // This is already a *string or nil
+			"created_at": now.Format("2006-01-02T15:04:05Z07:00"),
+			"updated_at": now.Format("2006-01-02T15:04:05Z07:00"),
 			"user": map[string]interface{}{
-				"id":         userID,
-				"first_name": firstName,
-				"last_name":  lastName,
-				"avatar":     avatar,
-				"nickname":   nickname,
+				"id":            userID,
+				"first_name":    firstName,
+				"last_name":     lastName,
+				"avatar":        avatarStr,   // Send as *string to match frontend expectations
+				"nickname":      nicknameStr, // Send as *string to match frontend expectations
+				"email":         "",          // Add missing fields that frontend expects
+				"date_of_birth": "",
+				"about_me":      nil,
+				"is_private":    false,
+				"created_at":    "",
+				"updated_at":    "",
 			},
 		}
 

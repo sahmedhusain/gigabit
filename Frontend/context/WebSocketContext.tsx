@@ -163,7 +163,6 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
           case 'group_update':
           case 'event_update':
           case 'layout_sync':
-            console.log(`Real-time ${message.type}:`, message)
             messageListeners.current.forEach(callback => callback(message))
             break
             

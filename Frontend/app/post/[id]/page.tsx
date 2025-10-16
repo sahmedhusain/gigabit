@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
-import { User, Heart, MessageSquare, MoreHorizontal, Send, Image as ImageIcon, Bookmark } from 'lucide-react'
+import { User, Heart, MessageSquare, MoreHorizontal, Send, Image as ImageIcon, Bookmark, ZoomIn, ZoomOut, Download, X } from 'lucide-react'
 import ProtectedRoute from '@/components/ProtectedRoute'
 import AppLayout from '@/components/AppLayout'
 import { useAuth } from '@/context/AuthContext'
@@ -38,6 +38,9 @@ function PostDetailPage() {
   const [newComment, setNewComment] = useState('')
   const [newCommentImage, setNewCommentImage] = useState<File | null>(null)
   const [isSubmittingComment, setIsSubmittingComment] = useState(false)
+  const [isCommentModalOpen, setIsCommentModalOpen] = useState(false)
+  const [imagePopupUrl, setImagePopupUrl] = useState<string | null>(null)
+  const [imageZoom, setImageZoom] = useState(1)
 
     // Real-time optimistic updates for likes
     const { performUpdate: performOptimisticUpdate, isLoading: likePending } = useOptimisticUpdate(
@@ -174,12 +177,7 @@ function PostDetailPage() {
     // Handle comment submission via WebSocket
   const handleSubmitComment = async () => {
     if (!newComment.trim() && !newCommentImage) return
-    if (!post || !user || !isConnected) return
-
-    if (newComment.length > 500) {
-      error('Comment is too long. Maximum 500 characters.')
-      return
-    }
+    if (!post || !user) return
 
     try {
       setIsSubmittingComment(true)
@@ -206,21 +204,30 @@ function PostDetailPage() {
         }
       }
 
-      // Send comment via WebSocket
-      sendMessage({
-        type: 'comment_update',
-        from: user.id,
-        post_id: post.id,
-        action: 'create',
-        data: {
+      // Create comment via HTTP API
+      const token = localStorage.getItem('token')
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/api/posts/${post.id}/comments`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
+        credentials: 'include',
+        body: JSON.stringify({
           content: newComment.trim(),
           image_url: imageUrl
-        }
+        })
       })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Failed to create comment')
+      }
 
       // Clear the input (optimistically)
       setNewComment('')
       setNewCommentImage(null)
+      setIsCommentModalOpen(false)
       success('Comment posted!')
     } catch (err) {
       console.error('Error submitting comment:', err)
@@ -243,6 +250,63 @@ function PostDetailPage() {
     }
   }
 
+  // Image popup handlers
+  const handleZoomIn = () => setImageZoom(prev => Math.min(prev + 0.25, 3))
+  const handleZoomOut = () => setImageZoom(prev => Math.max(prev - 0.25, 0.25))
+  const handleResetZoom = () => setImageZoom(1)
+  const handleWheelZoom = (e: React.WheelEvent) => {
+    e.preventDefault()
+    if (e.deltaY < 0) {
+      handleZoomIn()
+    } else {
+      handleZoomOut()
+    }
+  }
+  const handleDownload = async () => {
+    if (!imagePopupUrl) return
+
+    try {
+      // Fetch the image as a blob
+      const response = await fetch(imagePopupUrl, {
+        credentials: 'include' // Include cookies for authentication
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch image')
+      }
+
+      const blob = await response.blob()
+
+      // Create a blob URL for download
+      const blobUrl = URL.createObjectURL(blob)
+
+      // Create download link
+      const link = document.createElement('a')
+      link.href = blobUrl
+      link.download = `image-${Date.now()}.jpg`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+
+      // Clean up the blob URL
+      URL.revokeObjectURL(blobUrl)
+    } catch (error) {
+      console.error('Download failed:', error)
+      // Fallback to direct download
+      const link = document.createElement('a')
+      link.href = imagePopupUrl
+      link.download = `image-${Date.now()}.jpg`
+      link.target = '_blank'
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+    }
+  }
+  const handleCloseImagePopup = () => {
+    setImagePopupUrl(null)
+    setImageZoom(1)
+  }
+
     // WebSocket message listener
     useEffect(() => {
         if (!isConnected || !post) return
@@ -250,7 +314,7 @@ function PostDetailPage() {
         const removeListener = addMessageListener((message) => {
             switch (message.type) {
                 case 'comment_update':
-                    if (message.post_id === post.id && message.action === 'create') {
+                    if (message.post_id === Number(post.id) && message.action === 'create') {
                         // Add new comment to the list
                         if (message.data) {
                             const newComment: CommentWithUser = {
@@ -282,7 +346,7 @@ function PostDetailPage() {
                     break
 
                 case 'like':
-                    if (message.post_id === post.id) {
+                    if (message.post_id === Number(post.id)) {
                         setPost(prev => prev ? {
                             ...prev,
                             is_liked: message.action === 'like',
@@ -361,8 +425,9 @@ function PostDetailPage() {
         }
       }}
     >
-      {/* Post Card */}
-      <div className="bg-gradient-to-br from-white/10 via-white/5 to-transparent backdrop-blur-xl rounded-3xl border border-white/20 shadow-2xl p-8 mb-8 hover:shadow-emerald-500/10 transition-all duration-300 group">
+      <div className="post-page-container">
+        {/* Post Card */}
+        <div className="bg-gradient-to-br from-white/10 via-white/5 to-transparent backdrop-blur-xl rounded-3xl border border-white/20 shadow-2xl p-8 mb-8 hover:shadow-emerald-500/10 transition-all duration-300 group">
           {/* Post Header */}
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center space-x-4 flex-1">
@@ -385,8 +450,6 @@ function PostDetailPage() {
                     <User className="w-6 h-6 text-white" />
                   )}
                 </div>
-                {/* Online Status Indicator */}
-                <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-green-400 border-2 border-gray-900 rounded-full"></div>
                 </div>
 
                 <div className="flex-1">
@@ -456,206 +519,379 @@ function PostDetailPage() {
 
           {/* Post Actions */}
           <div className="flex items-center justify-between pt-6 border-t border-white/10">
-            <button
-              onClick={handleLikePost}
-              disabled={likePending || !connectionStatus}
-              className={`flex items-center space-x-3 px-5 py-3 rounded-2xl transition-all duration-300 hover:scale-105 ${
-                post.is_liked
-                  ? 'text-red-400 bg-gradient-to-r from-red-500/20 to-pink-500/20 border border-red-400/30'
-                  : 'text-white/70 hover:text-white hover:bg-gradient-to-r from-white/10 to-white/5 border border-white/10'
-              } ${likePending || !connectionStatus ? 'opacity-50 cursor-not-allowed' : ''}`}
-            >
-              <Heart className={`w-5 h-5 ${post.is_liked ? 'fill-current animate-pulse' : ''} ${likePending ? 'animate-bounce' : ''}`} />
-              <span className="font-medium">{post.like_count}</span>
-              {!connectionStatus && (
-                <span className="text-xs text-orange-400 ml-1">(Offline)</span>
-              )}
-            </button>
+            <div className="flex items-center space-x-4">
+              <button
+                onClick={handleLikePost}
+                disabled={likePending || !connectionStatus}
+                className={`flex items-center justify-center space-x-2 px-5 py-3 rounded-2xl transition-all duration-300 hover:scale-105 ${
+                  post.is_liked
+                    ? 'text-red-400 bg-gradient-to-r from-red-500/20 to-pink-500/20 border border-red-400/30'
+                    : 'text-white/70 hover:text-white hover:bg-gradient-to-r from-white/10 to-white/5 border border-white/10'
+                } ${likePending || !connectionStatus ? 'opacity-50 cursor-not-allowed' : ''}`}
+                title="Like"
+              >
+                <Heart className={`w-5 h-5 ${post.is_liked ? 'fill-current animate-pulse' : ''} ${likePending ? 'animate-bounce' : ''}`} />
+                <span className="text-sm font-medium">{post.like_count}</span>
+                {!connectionStatus && (
+                  <span className="text-xs text-orange-400 ml-1">(Offline)</span>
+                )}
+              </button>
+
+              <button 
+                onClick={() => setIsCommentModalOpen(true)}
+                className="flex items-center justify-center space-x-2 px-5 py-3 text-white/70 hover:text-white hover:bg-gradient-to-r from-white/10 to-white/5 border border-white/10 rounded-2xl transition-all duration-300 hover:scale-105 cursor-pointer"
+                title="Comment"
+              >
+                <MessageSquare className="w-5 h-5" />
+                <span className="text-sm font-medium">{comments.length}</span>
+              </button>              <button
+                className="flex items-center justify-center space-x-2 px-5 py-3 text-white/70 hover:text-white hover:bg-gradient-to-r from-white/10 to-white/5 border border-white/10 rounded-2xl transition-all duration-300 hover:scale-105"
+                title="Share"
+              >
+                <Send className="w-5 h-5" />
+                <span className="text-sm font-medium">0</span>
+              </button>
+            </div>
 
             <button
               onClick={handleBookmarkPost}
               disabled={!connectionStatus}
-              className={`flex items-center space-x-3 px-5 py-3 rounded-2xl transition-all duration-300 hover:scale-105 ${
+              className={`flex items-center justify-center px-5 py-3 rounded-2xl transition-all duration-300 hover:scale-105 ${
                 post.is_bookmarked
                   ? 'text-yellow-400 bg-gradient-to-r from-yellow-500/20 to-orange-500/20 border border-yellow-400/30'
                   : 'text-white/70 hover:text-white hover:bg-gradient-to-r from-white/10 to-white/5 border border-white/10'
               } ${!connectionStatus ? 'opacity-50 cursor-not-allowed' : ''}`}
+              title="Bookmark"
             >
               <Bookmark className={`w-5 h-5 ${post.is_bookmarked ? 'fill-current' : ''}`} />
-              <span className="font-medium">{post.is_bookmarked ? 'Saved' : 'Save'}</span>
               {!connectionStatus && (
-                <span className="text-xs text-orange-400 ml-1">(Offline)</span>
+                <span className="text-xs text-orange-400 ml-2">(Offline)</span>
               )}
-            </button>
-
-            <button className="flex items-center space-x-3 px-5 py-3 text-white/70 hover:text-white hover:bg-gradient-to-r from-white/10 to-white/5 border border-white/10 rounded-2xl transition-all duration-300 hover:scale-105">
-              <MessageSquare className="w-5 h-5" />
-              <span className="font-medium">{comments.length}</span>
-            </button>
-
-            <button className="flex items-center space-x-3 px-5 py-3 text-white/70 hover:text-white hover:bg-gradient-to-r from-white/10 to-white/5 border border-white/10 rounded-2xl transition-all duration-300 hover:scale-105">
-              <Send className="w-5 h-5" />
-              <span className="font-medium">Share</span>
             </button>
           </div>
         </div>
 
-        {/* Comment Form */}
-        <div className="bg-gradient-to-r from-white/10 to-white/5 backdrop-blur-xl rounded-2xl border border-white/20 p-4 mb-6">
-          <div className="flex items-start space-x-3">
-            <div className="w-8 h-8 bg-gradient-to-r from-emerald-500 to-teal-600 rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden">
-              {getAvatarUrl(user?.avatar) ? (
-                <Image
-                  src={getAvatarUrl(user?.avatar)!}
-                  alt={`${user?.first_name} ${user?.last_name}'s avatar`}
-                  width={32}
-                  height={32}
-                  unoptimized={user?.avatar.includes('/svg')}
-                  className="w-8 h-8 rounded-full object-cover"
-                />
-              ) : (
-                <User className="w-4 h-4 text-white" />
-              )}
-            </div>
-            <div className="flex-1">
-              <textarea
-                value={newComment}
-                onChange={(e) => setNewComment(e.target.value)}
-                placeholder="Write a comment..."
-                className="w-full bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-white placeholder-white/60 focus:outline-none focus:border-emerald-400 resize-none"
-                rows={3}
-                maxLength={500}
-              />
+        {/* Comments Section - Enhanced Design */}
+        <div className="bg-gradient-to-br from-white/10 via-white/5 to-transparent backdrop-blur-xl rounded-3xl border border-white/20 shadow-2xl p-8 mb-8 hover:shadow-emerald-500/10 transition-all duration-300 group">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-white font-semibold text-lg">
+              Comments ({comments.length})
+            </h2>
+            <button
+              onClick={() => setIsCommentModalOpen(true)}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg flex items-center space-x-2 transition-all duration-200 text-sm hover:scale-105"
+            >
+              <MessageSquare className="w-4 h-4" />
+              <span>Add Comment</span>
+            </button>
+          </div>
+
+          <div className="post-comments-section">
+            {comments.length === 0 ? (
+              <div className="text-center py-12">
+                <MessageSquare className="w-16 h-16 text-white/30 mx-auto mb-4" />
+                <p className="text-white/60 text-lg mb-2">No comments yet</p>
+                <p className="text-white/40 text-sm">Be the first to share your thoughts!</p>
+              </div>
+            ) : (
+              <div className="space-y-6">
+                {comments.map((comment) => (
+                  <div key={comment.id} className="group bg-gradient-to-r from-white/5 to-white/10 backdrop-blur-sm rounded-2xl border border-white/10 p-6 hover:border-emerald-400/30 hover:shadow-lg hover:shadow-emerald-500/10 transition-all duration-300">
+                    <div className="flex items-start space-x-4">
+                      {/* Enhanced Avatar - Circular, no status */}
+                      <div className="flex-shrink-0">
+                        <div className="w-12 h-12 bg-gradient-to-br from-emerald-400 via-teal-500 to-cyan-600 rounded-full flex items-center justify-center overflow-hidden ring-2 ring-white/20 group-hover:ring-emerald-400/50 transition-all duration-300">
+                          {getAvatarUrl(comment.user.avatar) ? (
+                            <Image
+                              src={getAvatarUrl(comment.user.avatar)!}
+                              alt={`${comment.user.first_name} ${comment.user.last_name}'s avatar`}
+                              width={48}
+                              height={48}
+                              unoptimized={comment.user.avatar.includes('/svg')}
+                              className="w-12 h-12 rounded-full object-cover"
+                            />
+                          ) : (
+                            <User className="w-6 h-6 text-white" />
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="flex-1 min-w-0">
+                        {/* Enhanced Header */}
+                        <div className="flex items-center space-x-3 mb-3">
+                          <div className="flex items-center space-x-2">
+                            <h4 className="text-white font-semibold text-base hover:text-emerald-300 transition-colors duration-200 cursor-pointer">
+                              {comment.user.first_name} {comment.user.last_name}
+                            </h4>
+                            <span className="text-white/60 text-sm">
+                              @{comment.user.nickname || comment.user.email.split('@')[0]}
+                            </span>
+                          </div>
+                          <span className="text-white/40 text-sm">•</span>
+                          <span className="text-white/50 text-sm">{comment.timeAgo}</span>
+                        </div>
+
+                        {/* Enhanced Content */}
+                        <div className="mb-4">
+                          <p className="text-white/90 text-base leading-relaxed whitespace-pre-wrap">
+                            {comment.content}
+                          </p>
+                        </div>
+
+                        {/* Enhanced Image */}
+                        {comment.image_url && (
+                          <div className="flex justify-start">
+                            <img
+                              src={comment.image_url.startsWith('http') ?
+                                comment.image_url :
+                                `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}${comment.image_url}`
+                              }
+                              alt="Comment image"
+                              className="max-w-full max-h-64 object-contain hover:scale-105 cursor-pointer rounded-2xl transition-all duration-300"
+                              onClick={() => comment.image_url && setImagePopupUrl(comment.image_url.startsWith('http') ?
+                                comment.image_url :
+                                `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}${comment.image_url}`
+                              )}
+                              onError={(e) => {
+                                const target = e.target as HTMLImageElement;
+                                target.style.display = 'none';
+                              }}
+                            />
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Comment Modal */}
+        {isCommentModalOpen && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-50 flex items-center justify-center p-4">
+            <div className="relative w-full max-w-2xl h-[80vh] flex flex-col">
+              {/* Enhanced backdrop with multiple layers */}
+              <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/20 via-teal-500/10 to-cyan-500/20 backdrop-blur-2xl rounded-3xl border border-white/30 shadow-2xl"></div>
+              <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent rounded-3xl"></div>
+
+              {/* Fixed Header */}
+              <div className="relative flex-shrink-0 p-6 lg:p-8 pb-4">
+                <div className="flex items-center justify-between mb-8">
+                  <div className="flex items-center space-x-4">
+                    <div className="relative">
+                      <div className="w-12 h-12 bg-gradient-to-br from-emerald-400 via-teal-500 to-cyan-600 rounded-2xl flex items-center justify-center shadow-lg">
+                        <MessageSquare className="w-6 h-6 text-white drop-shadow-sm" />
+                      </div>
+                      <div className="absolute -top-1 -right-1 w-4 h-4 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-full animate-pulse"></div>
+                    </div>
+                    <div>
+                      <h3 className="text-xl lg:text-2xl font-bold text-white mb-1">Add Comment</h3>
+                      <p className="text-white/60 text-sm">Share your thoughts on this post</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setIsCommentModalOpen(false)}
+                    className="group p-3 text-white/70 hover:text-white hover:bg-white/10 rounded-2xl transition-all duration-300 hover:scale-105"
+                    title="Close"
+                  >
+                    <span className="text-xl group-hover:rotate-90 transition-transform duration-300">✕</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Scrollable Content Area */}
+              <div className="relative flex-1 overflow-y-auto px-6 lg:px-8">
+                <div className="space-y-6">
+                  {/* Comment Content */}
+                  <div className="space-y-3">
+                    <label className="text-white font-semibold text-sm lg:text-base flex items-center space-x-2">
+                      <div className="w-2 h-2 bg-emerald-400 rounded-full"></div>
+                      <span>Your Comment</span>
+                    </label>
+                    <div className="relative">
+                      <textarea
+                        value={newComment}
+                        onChange={(e) => setNewComment(e.target.value)}
+                        placeholder="Share your thoughts, ask questions, or start a discussion..."
+                        className="w-full h-32 lg:h-36 bg-white/10 border border-white/20 rounded-2xl p-4 text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-emerald-400/50 focus:border-emerald-400/50 resize-none text-sm lg:text-base transition-all duration-300 hover:bg-white/15"
+                        maxLength={500}
+                      />
+                      <div className="absolute bottom-4 right-4 text-xs text-white/50">
+                        {newComment.length}/500
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Image Upload */}
+                  <div className="space-y-3">
+                    <label className="text-white font-semibold text-sm lg:text-base flex items-center space-x-2">
+                      <div className="w-2 h-2 bg-teal-400 rounded-full"></div>
+                      <span>Media (Optional)</span>
+                    </label>
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-3 sm:space-y-0 sm:space-x-4">
+                      <label htmlFor="modal-comment-image-input" className="sr-only">Upload image</label>
                       <input
-                        id="comment-image-input"
+                        id="modal-comment-image-input"
                         type="file"
                         accept="image/*"
                         onChange={e => setNewCommentImage(e.target.files?.[0] || null)}
                         className="hidden"
                       />
                       <button
-                        type="button"
-                        onClick={() => document.getElementById('comment-image-input')?.click()}
-                        className="mt-2 flex items-center space-x-2 px-3 py-2 text-white/70 hover:text-white hover:bg-white/10 border border-white/20 rounded-lg transition-all duration-200"
+                        onClick={() => document.getElementById('modal-comment-image-input')?.click()}
+                        title="Add Image or GIF"
+                        className="flex items-center px-4 py-3 bg-white/10 hover:bg-white/15 border border-white/20 rounded-2xl text-white transition-all duration-300 hover:scale-105 text-sm lg:text-base font-medium"
                       >
-                        <ImageIcon className="w-4 h-4" />
-                        <span className="text-sm">Add Image</span>
+                        <ImageIcon className="w-5 h-5 mr-3" />
+                        Add Image or GIF
                       </button>
-                      {newCommentImage && (
-                        <div className="mt-2 relative">
-                          <div className="relative inline-block">
-                            <img 
-                              src={URL.createObjectURL(newCommentImage)} 
-                              alt="Comment preview" 
-                              className="max-w-48 max-h-32 object-contain rounded-lg border border-white/20" 
-                            />
-                            <button
-                              type="button"
-                              onClick={() => setNewCommentImage(null)}
-                              className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 hover:bg-red-600 rounded-full flex items-center justify-center text-white text-xs transition-colors"
-                              title="Remove image"
-                            >
-                              ×
-                            </button>
-                          </div>
-                          <p className="text-white/60 text-xs mt-1">{newCommentImage.name}</p>
+                    </div>
+                  </div>
+
+                  {/* Image Preview */}
+                  {newCommentImage && (
+                    <div className="bg-white/10 border border-white/20 rounded-2xl p-4">
+                      <div className="flex items-center justify-between mb-3">
+                        <span className="text-white text-sm font-semibold">Selected Image:</span>
+                        <button
+                          onClick={() => setNewCommentImage(null)}
+                          title="Remove image"
+                          className="p-2 text-white/70 hover:text-white hover:bg-white/10 rounded-xl transition-all duration-300 hover:scale-105"
+                        >
+                          <span className="text-lg">×</span>
+                        </button>
+                      </div>
+                      <div className="flex items-center space-x-4">
+                        <div className="w-14 h-14 bg-white/20 rounded-xl flex items-center justify-center">
+                          <ImageIcon className="w-7 h-7 text-white/70" />
                         </div>
-                      )}
-              <div className="flex items-center justify-between mt-2">
-                <div className="flex items-center space-x-3">
-                  <span className="text-white/60 text-xs">
-                    {newComment.length}/500 characters
-                  </span>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-white text-sm font-medium truncate">{newCommentImage.name}</p>
+                          <p className="text-white/60 text-xs">
+                            {(newCommentImage.size / 1024 / 1024).toFixed(2)} MB
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Connection Status */}
                   {!connectionStatus && (
-                    <span className="text-orange-400 text-xs flex items-center space-x-1">
-                      <div className="w-1.5 h-1.5 bg-orange-400 rounded-full"></div>
-                      <span>Offline mode</span>
-                    </span>
+                    <div className="bg-gradient-to-r from-red-500/20 to-pink-500/20 border border-red-400/30 rounded-2xl p-4 animate-in slide-in-from-top-2 duration-300">
+                      <p className="text-red-300 text-sm font-medium">You are currently offline. Comment will be posted when connection is restored.</p>
+                    </div>
                   )}
                 </div>
-                <button
-                  onClick={handleSubmitComment}
-                  disabled={(!newComment.trim() && !newCommentImage) || isSubmittingComment || !isConnected}
-                  className="bg-emerald-600 hover:bg-emerald-700 disabled:bg-white/10 disabled:text-white/50 text-white px-4 py-2 rounded-lg flex items-center space-x-2 transition-all duration-200"
-                >
-                  <Send className="w-4 h-4" />
-                  <span>
-                    {isSubmittingComment
-                      ? 'Posting...'
-                      : !connectionStatus
-                        ? 'Reconnecting...'
-                        : 'Post'}
-                  </span>
-                </button>
+              </div>
+
+              {/* Fixed Footer */}
+              <div className="relative flex-shrink-0 p-6 lg:p-8 pt-4">
+                <div className="flex flex-col sm:flex-row justify-end space-y-3 sm:space-y-0 sm:space-x-4 pt-6 border-t border-white/10">
+                  <button
+                    onClick={() => setIsCommentModalOpen(false)}
+                    className="w-full sm:w-auto px-6 py-3 border border-white/30 rounded-2xl text-white hover:bg-white/10 hover:border-white/50 transition-all duration-300 text-sm lg:text-base font-medium hover:scale-105"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={async () => {
+                      await handleSubmitComment()
+                      setIsCommentModalOpen(false)
+                    }}
+                    disabled={(!newComment.trim() && !newCommentImage) || isSubmittingComment || !isConnected}
+                    className={`w-full sm:w-auto px-6 py-3 rounded-2xl text-white font-semibold text-sm lg:text-base transition-all duration-300 hover:scale-105 shadow-lg ${(!newComment.trim() && !newCommentImage) || isSubmittingComment || !isConnected
+                        ? 'bg-white/20 cursor-not-allowed'
+                        : 'bg-gradient-to-r from-emerald-500 via-teal-600 to-cyan-600 hover:from-emerald-600 hover:via-teal-700 hover:to-cyan-700 shadow-emerald-500/25'
+                      }`}
+                  >
+                    {isSubmittingComment ? (
+                      <div className="flex items-center justify-center space-x-2">
+                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                        <span>Posting...</span>
+                      </div>
+                    ) : !connectionStatus ? (
+                      <div className="flex items-center justify-center space-x-2">
+                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                        <span>Offline</span>
+                      </div>
+                    ) : (
+                      'Post Comment'
+                    )}
+                  </button>
+                </div>
               </div>
             </div>
           </div>
-        </div>
+        )}
+      </div>
 
-        {/* Comments Section */}
-        <div className="bg-gradient-to-r from-white/10 to-white/5 backdrop-blur-xl rounded-2xl border border-white/20 p-6">
-          <h2 className="text-white font-semibold text-lg mb-4">
-            Comments ({comments.length})
-          </h2>
+      {/* Image Popup Modal */}
+      {imagePopupUrl && (
+        <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-[9999] flex items-center justify-center" onClick={handleCloseImagePopup}>
+          {/* Control Bar */}
+          <div className="absolute top-20 left-1/2 transform -translate-x-1/2 z-[10000] flex items-center space-x-4 bg-black/50 backdrop-blur-xl rounded-2xl p-3 border border-white/20">
+            <button
+              onClick={(e) => { e.stopPropagation(); handleZoomOut(); }}
+              className="p-3 text-white/70 hover:text-white hover:bg-white/10 rounded-xl transition-all duration-300 hover:scale-105"
+              title="Zoom Out"
+            >
+              <ZoomOut className="w-5 h-5" />
+            </button>
+            <button
+              onClick={(e) => { e.stopPropagation(); handleResetZoom(); }}
+              className="px-3 py-2 text-white/70 hover:text-white hover:bg-white/10 rounded-xl transition-all duration-300 hover:scale-105 text-sm font-medium"
+              title="Reset Zoom"
+            >
+              100%
+            </button>
+            <span className="text-white text-sm font-medium min-w-[60px] text-center">
+              {Math.round(imageZoom * 100)}%
+            </span>
+            <button
+              onClick={(e) => { e.stopPropagation(); handleZoomIn(); }}
+              className="p-3 text-white/70 hover:text-white hover:bg-white/10 rounded-xl transition-all duration-300 hover:scale-105"
+              title="Zoom In"
+            >
+              <ZoomIn className="w-5 h-5" />
+            </button>
+            <div className="w-px h-8 bg-white/20 mx-2"></div>
+            <button
+              onClick={(e) => { e.stopPropagation(); handleDownload(); }}
+              className="p-3 text-white/70 hover:text-white hover:bg-white/10 rounded-xl transition-all duration-300 hover:scale-105"
+              title="Download Image"
+            >
+              <Download className="w-5 h-5" />
+            </button>
+            <div className="w-px h-8 bg-white/20 mx-2"></div>
+            <button
+              onClick={(e) => { e.stopPropagation(); handleCloseImagePopup(); }}
+              className="p-3 text-white/70 hover:text-white hover:bg-white/10 rounded-xl transition-all duration-300 hover:scale-105"
+              title="Close"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
 
-          {comments.length === 0 ? (
-            <p className="text-white/60 text-center py-8">
-              No comments yet. Be the first to comment!
-            </p>
-          ) : (
-            <div className="space-y-4">
-              {comments.map((comment) => (
-                <div key={comment.id} className="flex items-start space-x-3 p-3 rounded-lg bg-white/5">
-                  <div className="w-8 h-8 bg-gradient-to-r from-emerald-500 to-teal-600 rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden">
-                    {getAvatarUrl(comment.user.avatar) ? (
-                      <Image
-                        src={getAvatarUrl(comment.user.avatar)!}
-                        alt={`${comment.user.first_name} ${comment.user.last_name}'s avatar`}
-                        width={32}
-                        height={32}
-                        unoptimized={comment.user.avatar.includes('/svg')}
-                        className="w-8 h-8 rounded-full object-cover"
-                      />
-                    ) : (
-                      <User className="w-4 h-4 text-white" />
-                    )}
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex items-center space-x-2 mb-1">
-                      <h4 className="text-white font-medium text-sm">
-                        {comment.user.first_name} {comment.user.last_name}
-                      </h4>
-                      <span className="text-white/60 text-xs">
-                        @{comment.user.nickname || comment.user.email.split('@')[0]}
-                      </span>
-                      <span className="text-white/60 text-xs">•</span>
-                      <span className="text-white/60 text-xs">{comment.timeAgo}</span>
-                    </div>
-                    <p className="text-white/90 text-sm leading-relaxed whitespace-pre-wrap">
-                      {comment.content}
-                    </p>
-                            {comment.image_url && (
-                              <div className="mt-2">
-                                <img
-                                  src={comment.image_url.startsWith('http') ?
-                                    comment.image_url :
-                                    `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}${comment.image_url}`
-                                  }
-                                  alt="Comment image"
-                                  className="max-w-48 max-h-48 object-contain rounded-lg border border-white/20"
-                                  onError={(e) => {
-                                    const target = e.target as HTMLImageElement;
-                                    target.style.display = 'none';
-                                  }}
-                                />
-                              </div>
-                            )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+          {/* Image Container */}
+          <div className="relative w-full h-full max-w-[90vw] max-h-[calc(100vh-200px)] flex items-center justify-center">
+            <img
+              src={imagePopupUrl}
+              alt="Full size image"
+              className="max-w-full max-h-full object-contain rounded-2xl shadow-2xl transition-transform duration-300 cursor-grab active:cursor-grabbing select-none"
+              style={{
+                transform: `scale(${imageZoom})`,
+                transformOrigin: 'center center'
+              }}
+              onClick={(e) => e.stopPropagation()}
+              onDoubleClick={handleResetZoom}
+              onWheel={handleWheelZoom}
+              draggable={false}
+            />
+          </div>
         </div>
+      )}
     </AppLayout>
   )
 }

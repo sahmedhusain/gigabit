@@ -851,7 +851,7 @@ export default function RightSidebar({
             </div>
 
             {expandedSection === 'following' && (
-              <div className="section-content flex-1 flex flex-col min-h-0">
+              <div className="section-content following-content flex-1 flex flex-col min-h-0">
                 <div className="flex-1 overflow-y-auto">
                   <div className="space-y-2">
                     {(() => {

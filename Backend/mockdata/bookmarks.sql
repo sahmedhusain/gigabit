@@ -3,80 +3,80 @@
 
 INSERT INTO bookmarks (user_id, post_id, created_at, updated_at) VALUES
 -- John bookmarks tech and fitness posts
-(1, 25, datetime('now', '-30 days'), datetime('now', '-30 days')),
-(1, 45, datetime('now', '-25 days'), datetime('now', '-25 days')),
-(1, 67, datetime('now', '-20 days'), datetime('now', '-20 days')),
-(1, 89, datetime('now', '-15 days'), datetime('now', '-15 days')),
-(1, 112, datetime('now', '-10 days'), datetime('now', '-10 days')),
+(1, 25, '2024-11-25 09:15:00', '2024-11-25 09:15:00'),
+(1, 45, '2024-11-30 14:20:00', '2024-11-30 14:20:00'),
+(1, 67, '2024-12-05 10:30:00', '2024-12-05 10:30:00'),
+(1, 89, '2024-12-10 16:45:00', '2024-12-10 16:45:00'),
+(1, 112, '2024-12-15 11:00:00', '2024-12-15 11:00:00'),
 
 -- Sarah bookmarks design and travel posts
-(2, 28, datetime('now', '-28 days'), datetime('now', '-28 days')),
-(2, 52, datetime('now', '-22 days'), datetime('now', '-22 days')),
-(2, 76, datetime('now', '-18 days'), datetime('now', '-18 days')),
-(2, 98, datetime('now', '-12 days'), datetime('now', '-12 days')),
-(2, 124, datetime('now', '-8 days'), datetime('now', '-8 days')),
+(2, 28, '2024-11-27 13:25:00', '2024-11-27 13:25:00'),
+(2, 52, '2024-12-03 15:10:00', '2024-12-03 15:10:00'),
+(2, 76, '2024-12-07 09:40:00', '2024-12-07 09:40:00'),
+(2, 98, '2024-12-13 14:55:00', '2024-12-13 14:55:00'),
+(2, 124, '2024-12-17 10:20:00', '2024-12-17 10:20:00'),
 
 -- Mike bookmarks fitness and health posts
-(3, 31, datetime('now', '-26 days'), datetime('now', '-26 days')),
-(3, 55, datetime('now', '-19 days'), datetime('now', '-19 days')),
-(3, 79, datetime('now', '-14 days'), datetime('now', '-14 days')),
-(3, 101, datetime('now', '-9 days'), datetime('now', '-9 days')),
-(3, 127, datetime('now', '-5 days'), datetime('now', '-5 days')),
+(3, 31, '2024-11-29 08:30:00', '2024-11-29 08:30:00'),
+(3, 55, '2024-12-06 12:15:00', '2024-12-06 12:15:00'),
+(3, 79, '2024-12-11 15:35:00', '2024-12-11 15:35:00'),
+(3, 101, '2024-12-16 09:50:00', '2024-12-16 09:50:00'),
+(3, 127, '2024-12-20 13:10:00', '2024-12-20 13:10:00'),
 
 -- Alice bookmarks art and creative posts
-(4, 34, datetime('now', '-24 days'), datetime('now', '-24 days')),
-(4, 58, datetime('now', '-16 days'), datetime('now', '-16 days')),
-(4, 82, datetime('now', '-11 days'), datetime('now', '-11 days')),
-(4, 106, datetime('now', '-6 days'), datetime('now', '-6 days')),
+(4, 34, '2024-12-01 10:45:00', '2024-12-01 10:45:00'),
+(4, 58, '2024-12-09 14:25:00', '2024-12-09 14:25:00'),
+(4, 82, '2024-12-14 11:40:00', '2024-12-14 11:40:00'),
+(4, 106, '2024-12-19 16:05:00', '2024-12-19 16:05:00'),
 
 -- David bookmarks business and tech posts
-(5, 37, datetime('now', '-22 days'), datetime('now', '-22 days')),
-(5, 61, datetime('now', '-13 days'), datetime('now', '-13 days')),
-(5, 85, datetime('now', '-8 days'), datetime('now', '-8 days')),
-(5, 109, datetime('now', '-3 days'), datetime('now', '-3 days')),
+(5, 37, '2024-12-03 09:20:00', '2024-12-03 09:20:00'),
+(5, 61, '2024-12-12 13:35:00', '2024-12-12 13:35:00'),
+(5, 85, '2024-12-17 15:50:00', '2024-12-17 15:50:00'),
+(5, 109, '2024-12-22 10:15:00', '2024-12-22 10:15:00'),
 
 -- Emma bookmarks UX and design posts
-(6, 40, datetime('now', '-20 days'), datetime('now', '-20 days')),
-(6, 64, datetime('now', '-10 days'), datetime('now', '-10 days')),
-(6, 88, datetime('now', '-5 days'), datetime('now', '-5 days')),
-(6, 115, datetime('now', '-1 day'), datetime('now', '-1 day')),
+(6, 40, '2024-12-05 14:30:00', '2024-12-05 14:30:00'),
+(6, 64, '2024-12-15 10:45:00', '2024-12-15 10:45:00'),
+(6, 88, '2024-12-20 12:00:00', '2024-12-20 12:00:00'),
+(6, 115, '2024-12-24 09:25:00', '2024-12-24 09:25:00'),
 
 -- James bookmarks development posts
-(7, 43, datetime('now', '-18 days'), datetime('now', '-18 days')),
-(7, 67, datetime('now', '-7 days'), datetime('now', '-7 days')),
-(7, 91, datetime('now', '-2 days'), datetime('now', '-2 days')),
+(7, 43, '2024-12-07 11:10:00', '2024-12-07 11:10:00'),
+(7, 67, '2024-12-18 15:20:00', '2024-12-18 15:20:00'),
+(7, 91, '2024-12-23 13:40:00', '2024-12-23 13:40:00'),
 
 -- Lisa bookmarks AI and data science posts
-(8, 46, datetime('now', '-16 days'), datetime('now', '-16 days')),
-(8, 70, datetime('now', '-4 days'), datetime('now', '-4 days')),
+(8, 46, '2024-12-09 09:55:00', '2024-12-09 09:55:00'),
+(8, 70, '2024-12-21 14:10:00', '2024-12-21 14:10:00'),
 
 -- Ryan bookmarks photography posts
-(9, 49, datetime('now', '-14 days'), datetime('now', '-14 days')),
-(9, 73, datetime('now', '-3 days'), datetime('now', '-3 days')),
+(9, 49, '2024-12-11 10:30:00', '2024-12-11 10:30:00'),
+(9, 73, '2024-12-22 16:45:00', '2024-12-22 16:45:00'),
 
 -- Sophia bookmarks marketing posts
-(10, 50, datetime('now', '-12 days'), datetime('now', '-12 days')),
-(10, 74, datetime('now', '-2 days'), datetime('now', '-2 days')),
+(10, 50, '2024-12-13 12:20:00', '2024-12-13 12:20:00'),
+(10, 74, '2024-12-23 11:35:00', '2024-12-23 11:35:00'),
 
 -- Oliver bookmarks finance posts
-(11, 53, datetime('now', '-10 days'), datetime('now', '-10 days')),
-(11, 77, datetime('now', '-1 day'), datetime('now', '-1 day')),
+(11, 53, '2024-12-15 14:50:00', '2024-12-15 14:50:00'),
+(11, 77, '2024-12-24 10:05:00', '2024-12-24 10:05:00'),
 
 -- Mia bookmarks pet-related posts
-(12, 56, datetime('now', '-8 days'), datetime('now', '-8 days')),
+(12, 56, '2024-12-17 09:40:00', '2024-12-17 09:40:00'),
 
 -- Ethan bookmarks science posts
-(13, 59, datetime('now', '-6 days'), datetime('now', '-6 days')),
+(13, 59, '2024-12-19 13:25:00', '2024-12-19 13:25:00'),
 
 -- Chloe bookmarks fashion posts
-(14, 62, datetime('now', '-4 days'), datetime('now', '-4 days')),
+(14, 62, '2024-12-21 15:15:00', '2024-12-21 15:15:00'),
 
 -- Noah bookmarks gaming posts
-(15, 65, datetime('now', '-2 days'), datetime('now', '-2 days')),
+(15, 65, '2024-12-23 10:50:00', '2024-12-23 10:50:00'),
 
 -- New users bookmark recent posts
-(31, 151, datetime('now', '-5 days'), datetime('now', '-5 days')),
-(32, 152, datetime('now', '-4 days'), datetime('now', '-4 days')),
-(33, 153, datetime('now', '-3 days'), datetime('now', '-3 days')),
-(34, 154, datetime('now', '-2 days'), datetime('now', '-2 days')),
-(35, 155, datetime('now', '-1 day'), datetime('now', '-1 day'));
+(31, 151, '2024-12-20 14:30:00', '2024-12-20 14:30:00'),
+(32, 152, '2024-12-21 11:20:00', '2024-12-21 11:20:00'),
+(33, 153, '2024-12-22 09:45:00', '2024-12-22 09:45:00'),
+(34, 154, '2024-12-23 15:10:00', '2024-12-23 15:10:00'),
+(35, 155, '2024-12-24 13:55:00', '2024-12-24 13:55:00');

@@ -8,12 +8,16 @@ export interface WebSocketMessage {
         'post_update' | 'comment_update' | 'like_update' | 'like' | 'follow_update' | 
         'follow' | 'unfollow' | 'follow_request' | 'cancel_follow_request' |
         'group_update' | 'event_update' | 'category_update' | 'follower_count_update' |
-        'layout_sync' | 'ping' | 'pong' | 'error'
+        'poll_update' | 'poll_vote_update' | 'layout_sync' | 'ping' | 'pong' | 'error'
   from?: number
   to?: number
   group_id?: number
+  GroupID?: number  // Backend sends GroupID (capital G)
   post_id?: number
   event_id?: number
+  EventID?: number  // Backend sends EventID (capital E)
+  poll_id?: number
+  PollID?: number  // Backend sends PollID (capital P)
   content?: string
   action?: string
   data?: any
@@ -162,6 +166,8 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
           case 'follow_update':
           case 'group_update':
           case 'event_update':
+          case 'poll_update':
+          case 'poll_vote_update':
           case 'layout_sync':
             messageListeners.current.forEach(callback => callback(message))
             break

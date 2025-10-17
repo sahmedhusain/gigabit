@@ -1,9 +1,10 @@
 'use client'
 import React, { useState, useEffect } from 'react'
-import { Plus, Calendar, MapPin, Users, Check, X, WifiOff, Hourglass } from 'lucide-react'
+import { Plus, Calendar, MapPin, Users, Check, X, WifiOff, Hourglass, Trash2, MoreVertical, Edit } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useConnectionStatus, useRealTimeEvents } from '@/hooks'
 import { useToast } from '@/context/ToastContext'
+import { useAuth } from '@/context/AuthContext'
 import { api, EventResponse } from '@/lib/api'
 import CreateGroupEvent from '../CreateGroupEvent'
 
@@ -17,8 +18,18 @@ const GroupEventsTab: React.FC<GroupEventsTabProps> = ({ groupId, groupTitle }) 
   const [isLoading, setIsLoading] = useState(true)
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [isAdminOrCreator, setIsAdminOrCreator] = useState<boolean>(false)
+  const [dropdownOpen, setDropdownOpen] = useState<number | null>(null)
+  const [showCancelModal, setShowCancelModal] = useState(false)
+  const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [showEditModal, setShowEditModal] = useState(false)
+  const [selectedEvent, setSelectedEvent] = useState<EventResponse | null>(null)
+  const [cancelReason, setCancelReason] = useState('')
+  const [editLocation, setEditLocation] = useState('')
+  const [editDate, setEditDate] = useState('')
+  const [editTime, setEditTime] = useState('')
   const { isConnected } = useConnectionStatus()
   const { success, error: showError } = useToast()
+  const { user } = useAuth()
   const {
     events: realtimeEvents,
     loading: rtEventsLoading,
@@ -33,21 +44,34 @@ const GroupEventsTab: React.FC<GroupEventsTabProps> = ({ groupId, groupTitle }) 
     setIsLoading(rtEventsLoading)
   }, [realtimeEvents, rtEventsLoading])
 
-  // Fetch role to determine if user can create events
+  // Load user role for this group
   useEffect(() => {
-    let mounted = true
-    const fetchRole = async () => {
+    const loadUserRole = async () => {
+      if (!user || !groupId) return
+      
       try {
-        const roleInfo = await api.getUserRole(groupId)
-        if (mounted) setIsAdminOrCreator(!!roleInfo.is_admin_or_creator)
-      } catch (_err) {
-        // Non-critical; default to false
-        if (mounted) setIsAdminOrCreator(false)
+        const roleData = await api.getUserRole(groupId)
+        setIsAdminOrCreator(roleData.is_admin_or_creator)
+      } catch (err) {
+        console.error('Failed to load user role for group:', err)
+        setIsAdminOrCreator(false)
       }
     }
-    fetchRole()
-    return () => { mounted = false }
-  }, [groupId])
+    
+    loadUserRole()
+  }, [user, groupId])
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownOpen && !(event.target as Element).closest('.relative')) {
+        setDropdownOpen(null);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [dropdownOpen]);
 
   // Handle event response
   const handleEventResponse = async (eventId: number, response: 'going' | 'not_going') => {
@@ -58,6 +82,53 @@ const GroupEventsTab: React.FC<GroupEventsTabProps> = ({ groupId, groupTitle }) 
     } catch (error) {
       console.error('Failed to respond to event:', error)
       showError('Failed to update event response. Please try again.')
+    }
+  }
+
+  // Handle event deletion
+  const handleDeleteEvent = async (eventId: number) => {
+    try {
+      await api.cancelEvent(eventId, { cancel_reason: 'Event cancelled by organizer' });
+      success('Event cancelled successfully!');
+      refetchEvents();
+    } catch (error) {
+      console.error('Failed to cancel event:', error);
+      showError('Failed to cancel event. Please try again.');
+    }
+  }
+
+  // Handle event cancellation
+  const handleCancelEvent = async (eventId: number) => {
+    try {
+      await api.cancelEvent(eventId, { cancel_reason: cancelReason });
+      success('Event cancelled successfully!');
+      refetchEvents();
+    } catch (error) {
+      console.error('Failed to cancel event:', error);
+      showError('Failed to cancel event. Please try again.');
+    }
+  }
+
+  // Handle event editing
+  const handleEditEvent = async (eventId: number) => {
+    try {
+      const eventDateTime = new Date(`${editDate}T${editTime}`);
+      const eventData: any = {
+        event_time: eventDateTime.toISOString(),
+        location: editLocation.trim()
+      };
+
+      await api.updateEvent(eventId, eventData);
+      success('Event updated successfully!');
+      refetchEvents();
+      setShowEditModal(false);
+      setSelectedEvent(null);
+      setEditLocation('');
+      setEditDate('');
+      setEditTime('');
+    } catch (error) {
+      console.error('Failed to update event:', error);
+      showError('Failed to update event. Please try again.');
     }
   }
 
@@ -93,6 +164,20 @@ const GroupEventsTab: React.FC<GroupEventsTabProps> = ({ groupId, groupTitle }) 
     }
 
     return diffMs >= 0 ? `Starts in ${value}` : `${value} ago`
+  }
+
+  // Format cancellation reason for display
+    const formatCancellationReason = (reason: string) => {
+    if (!reason) return ''
+    return reason
+      .split('_')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+      .join(' ')
+  }
+
+  const isEventEnded = (event: EventResponse) => {
+    if (event.canceled) return false
+    return new Date(event.event_time) < new Date()
   }
 
   return (
@@ -200,20 +285,100 @@ const GroupEventsTab: React.FC<GroupEventsTabProps> = ({ groupId, groupTitle }) 
                           <div className="flex-1">
                             <div className="flex flex-wrap items-center gap-2 mb-2">
                               <h3 className="text-white font-bold text-xl group-hover:text-emerald-200 transition-colors duration-200">{event.title}</h3>
-                              {isToday && (
+                              {event.canceled && (
+                                <span className="px-2 py-1 bg-red-500 text-white text-xs rounded-full font-medium">
+                                  CANCELED
+                                </span>
+                              )}
+                              {isEventEnded(event) && (
+                                <span className="px-2 py-1 bg-gray-500 text-white text-xs rounded-full font-medium">
+                                  ENDED
+                                </span>
+                              )}
+                              {isToday && !isEventEnded(event) && (
                                 <span className="px-2 py-1 bg-yellow-500 text-black text-xs rounded-full font-medium">Today</span>
                               )}
-                              {isExpired && (
-                                <span className="px-2 py-1 bg-gray-600 text-white text-xs rounded-full">Past Event</span>
-                              )}
-                              {!isExpired && !isToday && (
+                              {!isExpired && !isToday && !event.canceled && (
                                 <span className="px-2 py-1 bg-emerald-500/20 text-emerald-300 text-xs rounded-full flex items-center gap-1">
                                   <Hourglass className="w-3 h-3" /> {getTimeUntil(event.event_time)}
                                 </span>
                               )}
                             </div>
                             <p className="text-white/80 mb-4 leading-relaxed">{event.description}</p>
+                            {event.canceled && event.cancel_reason && (
+                              <div className="mb-4 p-3 bg-red-500/10 border border-red-500/20 rounded-lg">
+                                <p className="text-red-300 text-sm">
+                                  <span className="font-medium">Cancellation reason:</span> {formatCancellationReason(event.cancel_reason)}
+                                </p>
+                              </div>
+                            )}
                           </div>
+                          {/* Three-dots menu for admins/creators and event creators */}
+                          {(isAdminOrCreator || (user && event.creator_id === user.id)) && (
+                            <div className="relative ml-2">
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setDropdownOpen(dropdownOpen === event.id ? null : event.id);
+                                }}
+                                className="p-2 text-white/60 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+                                aria-label="Event options"
+                                title="Event Options"
+                              >
+                                <MoreVertical className="w-5 h-5" />
+                              </button>
+
+                              {/* Dropdown Menu */}
+                              {dropdownOpen === event.id && (
+                                <div className="absolute right-0 top-full mt-1 w-48 bg-gray-800 border border-white/20 rounded-lg shadow-lg z-50">
+                                  {!event.canceled && !isEventEnded(event) && (
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setSelectedEvent(event);
+                                        setEditLocation(event.location || '');
+                                        const eventDate = new Date(event.event_time);
+                                        setEditDate(eventDate.toISOString().split('T')[0]);
+                                        setEditTime(eventDate.toTimeString().slice(0, 5));
+                                        setDropdownOpen(null);
+                                        setShowEditModal(true);
+                                      }}
+                                      className="w-full flex items-center space-x-2 px-4 py-3 text-blue-400 hover:bg-blue-500/10 hover:text-blue-300 transition-colors rounded-t-lg"
+                                    >
+                                      <Edit className="w-4 h-4" />
+                                      <span className="text-sm font-medium">Edit Event</span>
+                                    </button>
+                                  )}
+                                  {!event.canceled && !isEventEnded(event) && (
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setSelectedEvent(event);
+                                        setDropdownOpen(null);
+                                        setShowCancelModal(true);
+                                      }}
+                                      className="w-full flex items-center space-x-2 px-4 py-3 text-orange-400 hover:bg-orange-500/10 hover:text-orange-300 transition-colors"
+                                    >
+                                      <X className="w-4 h-4" />
+                                      <span className="text-sm font-medium">Cancel Event</span>
+                                    </button>
+                                  )}
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setSelectedEvent(event);
+                                      setDropdownOpen(null);
+                                      setShowDeleteModal(true);
+                                    }}
+                                    className={`w-full flex items-center space-x-2 px-4 py-3 text-red-400 hover:bg-red-500/10 hover:text-red-300 transition-colors rounded-b-lg`}
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                    <span className="text-sm font-medium">Delete Event</span>
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          )}
                         </div>
 
                         {/* Event Details Grid */}
@@ -293,9 +458,10 @@ const GroupEventsTab: React.FC<GroupEventsTabProps> = ({ groupId, groupTitle }) 
                                 e.stopPropagation();
                                 handleEventResponse(event.id, 'going');
                               }}
-                              className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 flex items-center justify-center space-x-2 disabled:opacity-50 shadow-lg"
-                              whileHover={{ scale: 1.05 }}
-                              whileTap={{ scale: 0.95 }}
+                              disabled={event.canceled || isEventEnded(event)}
+                              className={`flex-1 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 flex items-center justify-center space-x-2 disabled:opacity-50 shadow-lg ${event.canceled || isEventEnded(event) ? 'cursor-not-allowed' : ''}`}
+                              whileHover={event.canceled || isEventEnded(event) ? {} : { scale: 1.05 }}
+                              whileTap={event.canceled || isEventEnded(event) ? {} : { scale: 0.95 }}
                             >
                               <Check className="w-4 h-4" />
                               <span>Going</span>
@@ -306,9 +472,10 @@ const GroupEventsTab: React.FC<GroupEventsTabProps> = ({ groupId, groupTitle }) 
                                 e.stopPropagation();
                                 handleEventResponse(event.id, 'going');
                               }}
-                              className="flex-1 bg-white/10 hover:bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 flex items-center justify-center space-x-2 disabled:opacity-50 border border-white/20 hover:border-emerald-400/50"
-                              whileHover={{ scale: 1.05 }}
-                              whileTap={{ scale: 0.95 }}
+                              disabled={event.canceled || isEventEnded(event)}
+                              className={`flex-1 bg-white/10 hover:bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 flex items-center justify-center space-x-2 disabled:opacity-50 border border-white/20 hover:border-emerald-400/50 ${event.canceled || isEventEnded(event) ? 'cursor-not-allowed' : ''}`}
+                              whileHover={event.canceled || isEventEnded(event) ? {} : { scale: 1.05 }}
+                              whileTap={event.canceled || isEventEnded(event) ? {} : { scale: 0.95 }}
                             >
                               <Check className="w-4 h-4" />
                               <span>Going</span>
@@ -321,9 +488,10 @@ const GroupEventsTab: React.FC<GroupEventsTabProps> = ({ groupId, groupTitle }) 
                                 e.stopPropagation();
                                 handleEventResponse(event.id, 'not_going');
                               }}
-                              className="flex-1 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 flex items-center justify-center space-x-2 disabled:opacity-50 shadow-lg"
-                              whileHover={{ scale: 1.05 }}
-                              whileTap={{ scale: 0.95 }}
+                              disabled={event.canceled || isEventEnded(event)}
+                              className={`flex-1 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 flex items-center justify-center space-x-2 disabled:opacity-50 shadow-lg ${event.canceled || isEventEnded(event) ? 'cursor-not-allowed' : ''}`}
+                              whileHover={event.canceled || isEventEnded(event) ? {} : { scale: 1.05 }}
+                              whileTap={event.canceled || isEventEnded(event) ? {} : { scale: 0.95 }}
                             >
                               <X className="w-4 h-4" />
                               <span>Not Going</span>
@@ -334,9 +502,10 @@ const GroupEventsTab: React.FC<GroupEventsTabProps> = ({ groupId, groupTitle }) 
                                 e.stopPropagation();
                                 handleEventResponse(event.id, 'not_going');
                               }}
-                              className="flex-1 bg-white/10 hover:bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 flex items-center justify-center space-x-2 disabled:opacity-50 border border-white/20 hover:border-red-400/50"
-                              whileHover={{ scale: 1.05 }}
-                              whileTap={{ scale: 0.95 }}
+                              disabled={event.canceled || isEventEnded(event)}
+                              className={`flex-1 bg-white/10 hover:bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 flex items-center justify-center space-x-2 disabled:opacity-50 border border-white/20 hover:border-red-400/50 ${event.canceled || isEventEnded(event) ? 'cursor-not-allowed' : ''}`}
+                              whileHover={event.canceled || isEventEnded(event) ? {} : { scale: 1.05 }}
+                              whileTap={event.canceled || isEventEnded(event) ? {} : { scale: 0.95 }}
                             >
                               <X className="w-4 h-4" />
                               <span>Not Going</span>
@@ -360,6 +529,275 @@ const GroupEventsTab: React.FC<GroupEventsTabProps> = ({ groupId, groupTitle }) 
         groupTitle={groupTitle}
         onEventCreated={handleEventCreated}
       />
+
+      {/* Cancel Event Confirmation Modal */}
+      <AnimatePresence>
+        {showCancelModal && selectedEvent && (
+          <motion.div
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setShowCancelModal(false)}
+          >
+            <motion.div
+              className="bg-gray-800 border border-white/20 rounded-xl p-6 w-full max-w-md"
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center space-x-3 mb-4">
+                <div className="w-10 h-10 bg-orange-500/20 rounded-full flex items-center justify-center">
+                  <X className="w-5 h-5 text-orange-400" />
+                </div>
+                <div>
+                  <h3 className="text-white font-bold text-lg">Cancel Event</h3>
+                  <p className="text-white/60 text-sm">Cancel "{selectedEvent.title}"</p>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label htmlFor="cancel-reason" className="block text-white/80 text-sm font-medium mb-2">
+                    Reason for cancellation *
+                  </label>
+                  <select
+                    id="cancel-reason"
+                    value={cancelReason}
+                    onChange={(e) => setCancelReason(e.target.value)}
+                    className="w-full bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-white placeholder-white/50 focus:outline-none focus:border-orange-400/50"
+                    required
+                  >
+                    <option value="">Select a reason...</option>
+                    <option value="organizer_unavailable">Organizer unavailable</option>
+                    <option value="venue_unavailable">Venue unavailable</option>
+                    <option value="low_attendance">Low attendance</option>
+                    <option value="weather_conditions">Weather conditions</option>
+                    <option value="emergency">Emergency situation</option>
+                    <option value="other">Other reason</option>
+                  </select>
+                </div>
+
+                <div className="bg-orange-500/10 border border-orange-500/20 rounded-lg p-3">
+                  <p className="text-orange-300 text-sm">
+                    This will notify all attendees that the event has been cancelled.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex space-x-3 mt-6">
+                <button
+                  onClick={() => {
+                    setShowCancelModal(false);
+                    setSelectedEvent(null);
+                    setCancelReason('');
+                  }}
+                  className="flex-1 px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded-lg transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={async () => {
+                    if (!cancelReason) {
+                      showError('Please select a reason for cancellation.');
+                      return;
+                    }
+                    try {
+                      await handleCancelEvent(selectedEvent.id);
+                      setShowCancelModal(false);
+                      setSelectedEvent(null);
+                      setCancelReason('');
+                    } catch (error) {
+                      // Error already handled in handleCancelEvent
+                    }
+                  }}
+                  className="flex-1 px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg transition-colors"
+                  disabled={!cancelReason}
+                >
+                  Cancel Event
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Delete Event Confirmation Modal */}
+      <AnimatePresence>
+        {showDeleteModal && selectedEvent && (
+          <motion.div
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setShowDeleteModal(false)}
+          >
+            <motion.div
+              className="bg-gray-800 border border-white/20 rounded-xl p-6 w-full max-w-md"
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center space-x-3 mb-4">
+                <div className="w-10 h-10 bg-red-500/20 rounded-full flex items-center justify-center">
+                  <Trash2 className="w-5 h-5 text-red-400" />
+                </div>
+                <div>
+                  <h3 className="text-white font-bold text-lg">Delete Event</h3>
+                  <p className="text-white/60 text-sm">Delete "{selectedEvent.title}"</p>
+                </div>
+              </div>
+
+              <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-3 mb-4">
+                <p className="text-red-300 text-sm">
+                  This action cannot be undone. This will permanently delete the event and remove all associated data.
+                </p>
+              </div>
+
+              <div className="flex space-x-3">
+                <button
+                  onClick={() => {
+                    setShowDeleteModal(false);
+                    setSelectedEvent(null);
+                  }}
+                  className="flex-1 px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded-lg transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={async () => {
+                    try {
+                      await handleDeleteEvent(selectedEvent.id);
+                      setShowDeleteModal(false);
+                      setSelectedEvent(null);
+                    } catch (error) {
+                      // Error already handled in handleDeleteEvent
+                    }
+                  }}
+                  className="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors"
+                >
+                  Delete Event
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Edit Event Modal */}
+      <AnimatePresence>
+        {showEditModal && selectedEvent && (
+          <motion.div
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setShowEditModal(false)}
+          >
+            <motion.div
+              className="bg-gray-800 border border-white/20 rounded-xl p-6 w-full max-w-md"
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center space-x-3 mb-4">
+                <div className="w-10 h-10 bg-blue-500/20 rounded-full flex items-center justify-center">
+                  <Edit className="w-5 h-5 text-blue-400" />
+                </div>
+                <div>
+                  <h3 className="text-white font-bold text-lg">Edit Event</h3>
+                  <p className="text-white/60 text-sm">Edit "{selectedEvent.title}"</p>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label htmlFor="edit-location" className="block text-white/80 text-sm font-medium mb-2">
+                    Location (optional)
+                  </label>
+                  <input
+                    id="edit-location"
+                    type="text"
+                    value={editLocation}
+                    onChange={(e) => setEditLocation(e.target.value)}
+                    placeholder="Enter event location"
+                    className="w-full bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-white placeholder-white/50 focus:outline-none focus:border-blue-400/50"
+                  />
+                </div>
+
+                <div>
+                  <label htmlFor="edit-date" className="block text-white/80 text-sm font-medium mb-2">
+                    Date *
+                  </label>
+                  <input
+                    id="edit-date"
+                    type="date"
+                    value={editDate}
+                    onChange={(e) => setEditDate(e.target.value)}
+                    min={new Date().toISOString().split('T')[0]}
+                    className="w-full bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-400/50"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label htmlFor="edit-time" className="block text-white/80 text-sm font-medium mb-2">
+                    Time *
+                  </label>
+                  <input
+                    id="edit-time"
+                    type="time"
+                    value={editTime}
+                    onChange={(e) => setEditTime(e.target.value)}
+                    className="w-full bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-400/50"
+                    required
+                  />
+                </div>
+
+                <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3">
+                  <p className="text-blue-300 text-sm">
+                    Only location, date, and time can be edited. Title and description cannot be changed.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex space-x-3 mt-6">
+                <button
+                  onClick={() => {
+                    setShowEditModal(false);
+                    setSelectedEvent(null);
+                    setEditLocation('');
+                    setEditDate('');
+                    setEditTime('');
+                  }}
+                  className="flex-1 px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded-lg transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={async () => {
+                    if (!editDate || !editTime) {
+                      showError('Please fill in both date and time.');
+                      return;
+                    }
+                    try {
+                      await handleEditEvent(selectedEvent.id);
+                    } catch (error) {
+                      // Error already handled in handleEditEvent
+                    }
+                  }}
+                  className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+                >
+                  Update Event
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }

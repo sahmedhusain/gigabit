@@ -108,7 +108,7 @@ func (s *Server) setupRoutes() {
 	messageHandler := handlers.NewMessageHandler(s.DB.GetDB(), s.Hub)
 	notificationHandler := handlers.NewNotificationHandler(s.DB.GetDB(), s.Hub)
 	bookmarkHandler := handlers.NewBookmarkHandler(s.DB.GetDB(), s.Hub)
-	pollHandler := handlers.NewPollHandler(s.DB.GetDB())
+	pollHandler := handlers.NewPollHandler(s.DB.GetDB(), s.Hub)
 	wsHandler := handlers.NewWebSocketHandler(s.Hub)
 	chatHandler := handlers.NewChatHandler(s.DB.GetDB())
 	conversationHandler := handlers.NewConversationHandler(s.DB.GetDB())
@@ -1059,7 +1059,7 @@ func (s *Server) handlePollsRoute(handler *handlers.PollHandler) http.HandlerFun
 	}
 }
 
-// handlePollRoute handles /api/polls/{id} and /api/polls/{id}/vote
+// handlePollRoute handles /api/polls/{id} and /api/polls/{id}/vote and /api/polls/{id}/expire
 func (s *Server) handlePollRoute(handler *handlers.PollHandler) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		path := strings.TrimPrefix(r.URL.Path, "/api/polls/")
@@ -1074,6 +1074,7 @@ func (s *Server) handlePollRoute(handler *handlers.PollHandler) http.HandlerFunc
 
 		if len(parts) == 1 {
 			// GET /api/polls/{id} - Get single poll
+			// DELETE /api/polls/{id} - Delete poll
 			if r.Method == http.MethodGet {
 				authMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					userID, ok := middleware.GetUserID(r)
@@ -1082,6 +1083,15 @@ func (s *Server) handlePollRoute(handler *handlers.PollHandler) http.HandlerFunc
 						return
 					}
 					handler.GetPoll(w, r, userID)
+				})).ServeHTTP(w, r)
+			} else if r.Method == http.MethodDelete {
+				authMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					userID, ok := middleware.GetUserID(r)
+					if !ok {
+						writeError(w, http.StatusUnauthorized, "Unauthorized")
+						return
+					}
+					handler.DeletePoll(w, r, userID)
 				})).ServeHTTP(w, r)
 			} else {
 				writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
@@ -1101,6 +1111,20 @@ func (s *Server) handlePollRoute(handler *handlers.PollHandler) http.HandlerFunc
 					writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
 				}
 			})).ServeHTTP(w, r)
+		} else if len(parts) == 2 && parts[1] == "expire" {
+			// PUT /api/polls/{id}/expire - Expire poll
+			if r.Method == http.MethodPut {
+				authMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					userID, ok := middleware.GetUserID(r)
+					if !ok {
+						writeError(w, http.StatusUnauthorized, "Unauthorized")
+						return
+					}
+					handler.ExpirePoll(w, r, userID)
+				})).ServeHTTP(w, r)
+			} else {
+				writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
+			}
 		} else {
 			writeError(w, http.StatusNotFound, "Route not found")
 		}

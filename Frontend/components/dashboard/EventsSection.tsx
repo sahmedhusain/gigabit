@@ -34,6 +34,7 @@ interface EventDetailsModalProps {
   event: EventResponse | null;
   onEventDeleted: () => void;
   onEventUpdated: () => void;
+  groupRoles?: { [groupId: number]: { role: string; is_admin_or_creator: boolean } };
 }
 
 interface EventResponseData {
@@ -318,13 +319,22 @@ const EventDetailsModal: React.FC<EventDetailsModalProps> = ({
   onClose, 
   event, 
   onEventDeleted, 
-  onEventUpdated 
+  onEventUpdated,
+  groupRoles = {}
 }) => {
   const [responses, setResponses] = useState<EventResponseData | null>(null);
   const [isRespondingToEvent, setIsRespondingToEvent] = useState(false);
   const [isDeletingEvent, setIsDeletingEvent] = useState(false);
   const { success, error } = useToast();
   const { user } = useAuth();
+
+  // Format cancellation reason for display
+  const formatCancellationReason = (reason: string) => {
+    return reason
+      .split('_')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ');
+  };
 
   const loadEventResponses = useCallback(async () => {
     if (!event) return;
@@ -367,12 +377,12 @@ const EventDetailsModal: React.FC<EventDetailsModalProps> = ({
     
     setIsDeletingEvent(true);
     try {
-      await api.deleteEvent(event.id);
-      success('Event deleted successfully!');
+      await api.cancelEvent(event.id, { cancel_reason: 'Event cancelled by organizer' });
+      success('Event cancelled successfully!');
       onEventDeleted();
       onClose();
     } catch {
-      error('Failed to delete event. Please try again.');
+      error('Failed to cancel event. Please try again.');
     } finally {
       setIsDeletingEvent(false);
     }
@@ -384,10 +394,22 @@ const EventDetailsModal: React.FC<EventDetailsModalProps> = ({
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
       <div className="bg-gradient-to-br from-slate-900 to-slate-800 rounded-2xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-6">
-          <h3 className="text-2xl font-bold text-white">{event.title}</h3>
           <div className="flex items-center space-x-2">
-            {/* Only show delete button to event creator */}
-            {user && event.creator_id === user.id && (
+            <h3 className="text-2xl font-bold text-white">{event.title}</h3>
+            {event.canceled && (
+              <span className="px-2 py-1 bg-red-500 text-white text-xs rounded-full font-medium">
+                CANCELED
+              </span>
+            )}
+            {!event.canceled && new Date(event.event_time) < new Date() && (
+              <span className="px-2 py-1 bg-gray-500 text-white text-xs rounded-full font-medium">
+                ENDED
+              </span>
+            )}
+          </div>
+          <div className="flex items-center space-x-2">
+            {/* Show delete button to event creator or group admins/creators */}
+            {user && event && (event.creator_id === user.id || (event.group && groupRoles[event.group.id]?.is_admin_or_creator)) && (
               <button
                 onClick={handleDeleteEvent}
                 disabled={isDeletingEvent}
@@ -406,6 +428,13 @@ const EventDetailsModal: React.FC<EventDetailsModalProps> = ({
         <div className="space-y-6">
           <div>
             <p className="text-gray-300 leading-relaxed">{event.description}</p>
+            {event.canceled && event.cancel_reason && (
+              <div className="mt-4 p-3 bg-red-500/10 border border-red-500/20 rounded-lg">
+                <p className="text-red-300 text-sm">
+                  <span className="font-medium">Cancellation reason:</span> {formatCancellationReason(event.cancel_reason)}
+                </p>
+              </div>
+            )}
           </div>
 
           <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-6 space-y-3 sm:space-y-0 text-gray-300">
@@ -422,12 +451,12 @@ const EventDetailsModal: React.FC<EventDetailsModalProps> = ({
           <div className="flex space-x-3">
             <button
               onClick={() => handleEventResponse('going')}
-              disabled={isRespondingToEvent}
+              disabled={isRespondingToEvent || event.canceled || (!event.canceled && new Date(event.event_time) < new Date())}
               className={`flex-1 py-2 px-4 rounded-lg transition-all duration-200 ${
                 event.user_response === 'going'
                   ? 'bg-emerald-500 text-white'
                   : 'border border-emerald-500 text-emerald-500 hover:bg-emerald-500 hover:text-white'
-              }`}
+              } ${event.canceled || (!event.canceled && new Date(event.event_time) < new Date()) ? 'cursor-not-allowed opacity-50' : ''}`}
             >
               <div className="flex items-center justify-center">
                 {event.user_response === 'going' && <Check className="w-4 h-4 mr-2" />}
@@ -436,12 +465,12 @@ const EventDetailsModal: React.FC<EventDetailsModalProps> = ({
             </button>
             <button
               onClick={() => handleEventResponse('not_going')}
-              disabled={isRespondingToEvent}
+              disabled={isRespondingToEvent || event.canceled || (!event.canceled && new Date(event.event_time) < new Date())}
               className={`flex-1 py-2 px-4 rounded-lg transition-all duration-200 ${
                 event.user_response === 'not_going'
                   ? 'bg-red-500 text-white'
                   : 'border border-red-500 text-red-500 hover:bg-red-500 hover:text-white'
-              }`}
+              } ${event.canceled || (!event.canceled && new Date(event.event_time) < new Date()) ? 'cursor-not-allowed opacity-50' : ''}`}
             >
               <div className="flex items-center justify-center">
                 {event.user_response === 'not_going' && <Check className="w-4 h-4 mr-2" />}
@@ -501,6 +530,7 @@ export const EventsSection: React.FC<EventsSectionProps> = ({ events, onEventsUp
   const [groups, setGroups] = useState<GroupResponse[]>([]);
   const [groupRoles, setGroupRoles] = useState<{ [groupId: number]: { role: string; is_admin_or_creator: boolean } }>({});
   const { user } = useAuth();
+  const { success, error } = useToast();
   
   // Real-time events integration
   useRealTimeEvents()
@@ -632,6 +662,16 @@ export const EventsSection: React.FC<EventsSectionProps> = ({ events, onEventsUp
                       <div className="flex-1">
                         <div className="flex items-center space-x-2 mb-2">
                           <h3 className="text-lg lg:text-xl font-semibold text-white">{event.title}</h3>
+                          {event.canceled && (
+                            <span className="px-2 py-1 bg-red-500 text-white text-xs rounded-full font-medium">
+                              CANCELED
+                            </span>
+                          )}
+                          {!event.canceled && isExpired && (
+                            <span className="px-2 py-1 bg-gray-500 text-white text-xs rounded-full font-medium">
+                              ENDED
+                            </span>
+                          )}
                           {isToday && (
                             <span className="px-2 py-1 bg-yellow-500 text-black text-xs rounded-full font-medium">
                               Today
@@ -700,6 +740,49 @@ export const EventsSection: React.FC<EventsSectionProps> = ({ events, onEventsUp
                         
                         {/* Action buttons */}
                         <div className="flex space-x-2 justify-center lg:justify-end">
+                          {/* Show delete/cancel buttons for event creator or group admins/creators */}
+                          {user && event.group && (event.creator_id === user.id || groupRoles[event.group.id]?.is_admin_or_creator) && (
+                            <>
+                              <button
+                                onClick={async (e) => {
+                                  e.stopPropagation();
+                                  if (!confirm('Are you sure you want to cancel this event?')) return;
+                                  try {
+                                    await api.cancelEvent(event.id, { cancel_reason: 'Event cancelled by organizer' });
+                                    success('Event cancelled successfully!');
+                                    onEventsUpdate();
+                                  } catch (err) {
+                                    console.error('Failed to cancel event:', err);
+                                    error('Failed to cancel event. Please try again.');
+                                  }
+                                }}
+                                className="p-2 text-orange-400 hover:text-orange-300 hover:bg-orange-500/10 rounded-lg transition-colors"
+                                aria-label="Cancel event"
+                                title="Cancel Event"
+                              >
+                                <X className="w-4 h-4" />
+                              </button>
+                              <button
+                                onClick={async (e) => {
+                                  e.stopPropagation();
+                                  if (!confirm('Are you sure you want to delete this event? This action cannot be undone.')) return;
+                                  try {
+                                    await api.cancelEvent(event.id, { cancel_reason: 'Event cancelled by organizer' });
+                                    success('Event cancelled successfully!');
+                                    onEventsUpdate();
+                                  } catch (err) {
+                                    console.error('Failed to cancel event:', err);
+                                    error('Failed to cancel event. Please try again.');
+                                  }
+                                }}
+                                className="p-2 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg transition-colors"
+                                aria-label="Delete event"
+                                title="Delete Event"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </>
+                          )}
                           {/* Only show edit button to event creator */}
                           {user && event.creator_id === user.id && (
                             <button
@@ -758,6 +841,7 @@ export const EventsSection: React.FC<EventsSectionProps> = ({ events, onEventsUp
         event={selectedEvent}
         onEventDeleted={onEventsUpdate}
         onEventUpdated={onEventsUpdate}
+        groupRoles={groupRoles}
       />
     </div>
   );

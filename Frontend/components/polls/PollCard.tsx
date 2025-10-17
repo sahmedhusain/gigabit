@@ -1,18 +1,64 @@
 'use client'
 import React, { useState } from 'react'
-import { Users, Clock, CheckCircle, BarChart3 } from 'lucide-react'
+import { Users, Clock, CheckCircle, BarChart3, Trash2, StopCircle, AlertTriangle } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { PollResponse } from '@/lib/api'
+import { useAuth } from '@/context/AuthContext'
+import { api, PollResponse } from '@/lib/api'
+import { useToast } from '@/context/ToastContext'
 
 interface PollCardProps {
   poll: PollResponse
   onVote: (pollId: number, optionIds: number[]) => Promise<void>
   onUnvote: (pollId: number) => Promise<void>
+  onDelete?: (pollId: number) => Promise<void>
+  onExpire?: (pollId: number) => Promise<void>
+  canManage?: boolean // Whether current user can delete/expire this poll
 }
 
-export default function PollCard({ poll, onVote, onUnvote }: PollCardProps) {
+export default function PollCard({ poll, onVote, onUnvote, onDelete, onExpire, canManage = false }: PollCardProps) {
   const [selectedOptions, setSelectedOptions] = useState<number[]>(poll.user_votes || [])
   const [isVoting, setIsVoting] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
+  const [isExpiring, setIsExpiring] = useState(false)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [showExpireConfirm, setShowExpireConfirm] = useState(false)
+
+  const { error: showErrorToast } = useToast()
+
+  // Update selectedOptions when poll changes
+  React.useEffect(() => {
+    setSelectedOptions(poll.user_votes || [])
+  }, [poll.user_votes])
+
+  const handleDelete = async () => {
+    if (!onDelete || isDeleting) return
+
+    setIsDeleting(true)
+    try {
+      await onDelete(poll.id)
+      setShowDeleteConfirm(false)
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to delete poll'
+      showErrorToast(errorMessage)
+    } finally {
+      setIsDeleting(false)
+    }
+  }
+
+  const handleExpire = async () => {
+    if (!onExpire || isExpiring) return
+
+    setIsExpiring(true)
+    try {
+      await onExpire(poll.id)
+      setShowExpireConfirm(false)
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to expire poll'
+      showErrorToast(errorMessage)
+    } finally {
+      setIsExpiring(false)
+    }
+  }
 
   const handleOptionClick = async (optionId: number) => {
     if (poll.is_expired || isVoting) return
@@ -31,7 +77,8 @@ export default function PollCard({ poll, onVote, onUnvote }: PollCardProps) {
       try {
         await onVote(poll.id, newSelection)
       } catch (error) {
-        console.error('Failed to vote:', error)
+        const errorMessage = error instanceof Error ? error.message : 'Failed to vote'
+        showErrorToast(errorMessage)
         // Revert selection on error
         setSelectedOptions(poll.user_votes || [])
       } finally {
@@ -43,7 +90,8 @@ export default function PollCard({ poll, onVote, onUnvote }: PollCardProps) {
       try {
         await onUnvote(poll.id)
       } catch (error) {
-        console.error('Failed to unvote:', error)
+        const errorMessage = error instanceof Error ? error.message : 'Failed to unvote'
+        showErrorToast(errorMessage)
         setSelectedOptions(poll.user_votes || [])
       } finally {
         setIsVoting(false)
@@ -76,11 +124,35 @@ export default function PollCard({ poll, onVote, onUnvote }: PollCardProps) {
       <div className="mb-5">
         <div className="flex items-start justify-between mb-3">
           <h3 className="text-lg lg:text-xl font-bold text-white flex-1">{poll.title}</h3>
-          {isExpired && (
-            <span className="ml-3 px-3 py-1 bg-red-500/20 border border-red-400/30 rounded-full text-red-300 text-xs font-semibold">
-              Expired
-            </span>
-          )}
+          <div className="flex items-center space-x-2 ml-3">
+            {isExpired && (
+              <span className="px-3 py-1 bg-red-500/20 border border-red-400/30 rounded-full text-red-300 text-xs font-semibold">
+                Expired
+              </span>
+            )}
+            {canManage && (
+              <div className="flex items-center space-x-1">
+                {!isExpired && (
+                  <button
+                    onClick={() => setShowExpireConfirm(true)}
+                    disabled={isExpiring}
+                    className="p-2 text-orange-400 hover:text-orange-300 hover:bg-orange-500/10 rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                    title="Expire poll"
+                  >
+                    <StopCircle className="w-4 h-4" />
+                  </button>
+                )}
+                <button
+                  onClick={() => setShowDeleteConfirm(true)}
+                  disabled={isDeleting}
+                  className="p-2 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                  title="Delete poll"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
+            )}
+          </div>
         </div>
         {poll.description && (
           <p className="text-white/70 text-sm lg:text-base mb-4 leading-relaxed">{poll.description}</p>
@@ -166,20 +238,22 @@ export default function PollCard({ poll, onVote, onUnvote }: PollCardProps) {
 
                 <div className="relative flex items-center justify-between">
                   <div className="flex items-center space-x-3 flex-1">
-                    {/* Checkbox/Radio indicator */}
-                    <div className={`w-5 h-5 rounded-${poll.allow_multiple_choices ? 'lg' : 'full'} border-2 flex-shrink-0 transition-all duration-300 flex items-center justify-center ${
-                      isSelected || isUserVote
-                        ? 'border-purple-300 bg-purple-400 shadow-lg shadow-purple-400/30'
-                        : 'border-white/40'
-                    }`}>
-                      {(isSelected || isUserVote) && (
-                        <motion.div
-                          initial={{ scale: 0 }}
-                          animate={{ scale: 1 }}
-                          className="w-2 h-2 bg-white rounded-full"
-                        />
-                      )}
-                    </div>
+                    {/* Checkbox/Radio indicator - only show if poll is not expired */}
+                    {!isExpired && (
+                      <div className={`w-5 h-5 rounded-${poll.allow_multiple_choices ? 'lg' : 'full'} border-2 flex-shrink-0 transition-all duration-300 flex items-center justify-center ${
+                        isSelected || isUserVote
+                          ? 'border-purple-300 bg-purple-400 shadow-lg shadow-purple-400/30'
+                          : 'border-white/40'
+                      }`}>
+                        {(isSelected || isUserVote) && (
+                          <motion.div
+                            initial={{ scale: 0 }}
+                            animate={{ scale: 1 }}
+                            className="w-2 h-2 bg-white rounded-full"
+                          />
+                        )}
+                      </div>
+                    )}
                     <span className="text-white font-medium text-sm lg:text-base flex-1">
                       {option.option_text}
                     </span>
@@ -204,7 +278,7 @@ export default function PollCard({ poll, onVote, onUnvote }: PollCardProps) {
                       <Users className="w-3 h-3" />
                       <span className="truncate">
                         {option.voters.slice(0, 3).join(', ')}
-                        {option.voters.length > 3 && ` +${option.voters.length - 3} more`}
+                        {option.total_voters > 3 && ` +${option.total_voters - 3} more`}
                       </span>
                     </div>
                   </div>
@@ -246,6 +320,106 @@ export default function PollCard({ poll, onVote, onUnvote }: PollCardProps) {
           <span>Updating vote...</span>
         </motion.div>
       )}
+
+      {/* Delete Confirmation Dialog */}
+      <AnimatePresence>
+        {showDeleteConfirm && (
+          <motion.div
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            <motion.div
+              className="bg-gradient-to-br from-gray-900 to-gray-800 border border-white/20 rounded-2xl p-6 max-w-md w-full"
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+            >
+              <div className="flex items-center space-x-3 mb-4">
+                <div className="w-12 h-12 bg-red-500/20 rounded-full flex items-center justify-center">
+                  <AlertTriangle className="w-6 h-6 text-red-400" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-white">Delete Poll</h3>
+                  <p className="text-white/70 text-sm">This action cannot be undone.</p>
+                </div>
+              </div>
+              <p className="text-white/80 mb-6">
+                Are you sure you want to delete this poll? All votes and responses will be permanently removed.
+              </p>
+              <div className="flex space-x-3">
+                <button
+                  onClick={() => setShowDeleteConfirm(false)}
+                  className="flex-1 px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded-lg transition-all duration-200"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleDelete}
+                  disabled={isDeleting}
+                  className="flex-1 px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
+                >
+                  {isDeleting && (
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                  )}
+                  <span>{isDeleting ? 'Deleting...' : 'Delete'}</span>
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Expire Confirmation Dialog */}
+      <AnimatePresence>
+        {showExpireConfirm && (
+          <motion.div
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            <motion.div
+              className="bg-gradient-to-br from-gray-900 to-gray-800 border border-white/20 rounded-2xl p-6 max-w-md w-full"
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+            >
+              <div className="flex items-center space-x-3 mb-4">
+                <div className="w-12 h-12 bg-orange-500/20 rounded-full flex items-center justify-center">
+                  <StopCircle className="w-6 h-6 text-orange-400" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-white">Expire Poll</h3>
+                  <p className="text-white/70 text-sm">End voting immediately.</p>
+                </div>
+              </div>
+              <p className="text-white/80 mb-6">
+                Are you sure you want to expire this poll? No more votes will be accepted, but existing votes will remain visible.
+              </p>
+              <div className="flex space-x-3">
+                <button
+                  onClick={() => setShowExpireConfirm(false)}
+                  className="flex-1 px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded-lg transition-all duration-200"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleExpire}
+                  disabled={isExpiring}
+                  className="flex-1 px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
+                >
+                  {isExpiring && (
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                  )}
+                  <span>{isExpiring ? 'Expiring...' : 'Expire'}</span>
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </motion.div>
   )
 }

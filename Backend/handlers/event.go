@@ -18,7 +18,7 @@ type EventHandler struct {
 
 func NewEventHandler(db *sql.DB, hub *websocket.Hub) *EventHandler {
 	return &EventHandler{
-		eventService:        services.NewEventService(db),
+		eventService:        services.NewEventService(db, hub),
 		groupService:        services.NewGroupService(db),
 		notificationService: services.NewNotificationService(db, hub),
 	}
@@ -248,6 +248,37 @@ func (h *EventHandler) DeleteEvent(w http.ResponseWriter, r *http.Request, event
 	}
 
 	writeJSON(w, http.StatusOK, map[string]interface{}{"message": "Event deleted successfully"})
+}
+
+func (h *EventHandler) CancelEvent(w http.ResponseWriter, r *http.Request, eventIDStr string) {
+	eventID, err := strconv.ParseUint(eventIDStr, 10, 32)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "Invalid event ID")
+		return
+	}
+
+	userID, ok := r.Context().Value("user_id").(uint)
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "User not authenticated")
+		return
+	}
+
+	var req models.CancelEventRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "Invalid request body")
+		return
+	}
+
+	if err := h.eventService.CancelEvent(uint(eventID), userID, req.CancelReason); err != nil {
+		if err == sql.ErrNoRows {
+			writeError(w, http.StatusForbidden, "Cannot cancel this event")
+		} else {
+			writeError(w, http.StatusInternalServerError, "Failed to cancel event")
+		}
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]interface{}{"message": "Event cancelled successfully"})
 }
 
 func (h *EventHandler) RespondToEvent(w http.ResponseWriter, r *http.Request, eventIDStr string) {

@@ -450,8 +450,8 @@ export default function Sidebar({
                                     return count > 0 ? (
                                       <span className={`text-xs px-2 py-1 rounded-full font-medium ${
                                         isActive 
-                                          ? 'bg-red-400/30 text-red-200' 
-                                          : 'bg-red-500/20 text-red-400 group-hover:bg-red-400/30 group-hover:text-red-300'
+                                          ? 'bg-red-400/30 text-white' 
+                                          : 'bg-red-500/20 text-white group-hover:bg-red-400/30 group-hover:text-white'
                                       }`}>
                                         {count}
                                       </span>

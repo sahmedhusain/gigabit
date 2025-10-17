@@ -1,6 +1,6 @@
 'use client'
 import { useState, useEffect } from 'react'
-import { Heart, Globe, Lock, EyeOff, MessageSquare, Sparkles, Bookmark, Send, MoreHorizontal, User, Image as ImageIcon, X } from 'lucide-react'
+import { Heart, Globe, Lock, EyeOff, MessageSquare, Sparkles, Bookmark, Send, MoreHorizontal, User, Image as ImageIcon, Trash2 } from 'lucide-react'
 import CreatePost from './CreatePost'
 import { Post } from '@/lib/api'
 import { Plus } from 'lucide-react'
@@ -11,6 +11,9 @@ import { useRouter } from 'next/navigation'
 import { useToast } from '@/context/ToastContext'
 import Image from 'next/image'
 import { getAvatarUrl } from '@/utils/avatarUtils'
+import { useAuth } from '@/context/AuthContext'
+import { api } from '@/lib/api'
+import { motion, AnimatePresence } from 'framer-motion'
 
 interface HomeFeedProps {
   posts: Post[]
@@ -70,6 +73,12 @@ export default function HomeFeed({
 
   const { isConnected } = useConnectionStatus()
   const { success, error } = useToast()
+  const { user } = useAuth()
+
+  // Three-dot menu state
+  const [openMenu, setOpenMenu] = useState<{[key: number]: boolean}>({})
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState<{[key: number]: boolean}>({})
+  const [isDeleting, setIsDeleting] = useState<{[key: number]: boolean}>({})
 
   // Update document title with unread count
   const { setUnread, setPageTitle } = useDocumentTitle()
@@ -115,6 +124,31 @@ export default function HomeFeed({
     e.stopPropagation()
     setSelectedPostForComment(post)
     setIsCommentModalOpen(true)
+  }
+
+  const canDeletePost = (post: Post) => {
+    return user && user.id === post.user.id
+  }
+
+  const handleDeletePost = (postId: number) => {
+    setShowDeleteConfirm(prev => ({ ...prev, [postId]: true }))
+  }
+
+  const confirmDeletePost = async (postId: number) => {
+    setIsDeleting(prev => ({ ...prev, [postId]: true }))
+    try {
+      await api.deletePost(postId)
+      success('Post deleted successfully')
+      // Optionally refresh posts or remove from local state
+      window.location.reload() // Simple refresh for now
+    } catch (err) {
+      console.error('Failed to delete post:', err)
+      error('Failed to delete post. Please try again.')
+    } finally {
+      setIsDeleting(prev => ({ ...prev, [postId]: false }))
+      setShowDeleteConfirm(prev => ({ ...prev, [postId]: false }))
+      setOpenMenu(prev => ({ ...prev, [postId]: false }))
+    }
   }
 
   const handleSubmitComment = async () => {
@@ -280,13 +314,43 @@ export default function HomeFeed({
           </div>
         </div>
 
-        <button
-          className="p-3 text-white/70 hover:text-white hover:bg-white/10 rounded-xl transition-all duration-200 hover:scale-105"
-          title="More options"
-          aria-label="More options"
-        >
-          <MoreHorizontal className="w-5 h-5" />
-        </button>
+        {canDeletePost(post) && (
+          <div className="relative">
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                setOpenMenu(prev => ({ ...prev, [post.id]: !prev[post.id] }))
+              }}
+              className="p-3 text-white/70 hover:text-white hover:bg-white/10 rounded-xl transition-all duration-200 hover:scale-105"
+              title="More options"
+              aria-label="More options"
+            >
+              <MoreHorizontal className="w-5 h-5" />
+            </button>
+
+            {/* Dropdown Menu */}
+            <AnimatePresence>
+              {openMenu[post.id] && (
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.95, y: -10 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.95, y: -10 }}
+                  transition={{ duration: 0.15 }}
+                  className="absolute right-0 top-full mt-2 w-48 bg-gradient-to-br from-slate-800/95 to-slate-900/95 backdrop-blur-xl border border-white/20 rounded-xl shadow-2xl overflow-hidden z-50"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <button
+                    onClick={() => handleDeletePost(post.id)}
+                    className="w-full flex items-center space-x-3 px-4 py-3 text-red-400 hover:bg-red-500/10 transition-all duration-200"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    <span className="text-sm font-medium">Delete Post</span>
+                  </button>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        )}
       </div>
 
           {/* Post Content */}
@@ -620,6 +684,58 @@ export default function HomeFeed({
           </div>
         </div>
       )}
+
+      {/* Delete Confirmation Modal */}
+      <AnimatePresence>
+        {Object.entries(showDeleteConfirm).some(([_, show]) => show) && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+            onClick={() => setShowDeleteConfirm({})}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-gradient-to-br from-slate-800/95 to-slate-900/95 backdrop-blur-xl border border-white/20 rounded-2xl p-6 max-w-sm w-full mx-4"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="text-center">
+                <div className="w-12 h-12 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Trash2 className="w-6 h-6 text-red-400" />
+                </div>
+                <h3 className="text-white font-semibold text-lg mb-2">Delete Post</h3>
+                <p className="text-white/70 text-sm mb-6">
+                  Are you sure you want to delete this post? This action cannot be undone.
+                </p>
+                <div className="flex space-x-3">
+                  <button
+                    onClick={() => setShowDeleteConfirm({})}
+                    className="flex-1 px-4 py-2 text-white/70 hover:text-white hover:bg-white/10 rounded-xl transition-all duration-200"
+                    disabled={Object.values(isDeleting).some(deleting => deleting)}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => {
+                      const postId = Object.keys(showDeleteConfirm).find((key) => showDeleteConfirm[parseInt(key)] !== false)
+                      if (postId) {
+                        confirmDeletePost(parseInt(postId))
+                      }
+                    }}
+                    className="flex-1 px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                    disabled={Object.values(isDeleting).some(deleting => deleting)}
+                  >
+                    {Object.values(isDeleting).some(deleting => deleting) ? 'Deleting...' : 'Delete'}
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }

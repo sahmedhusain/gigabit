@@ -217,3 +217,43 @@ func (h *Hub) broadcastFollowerCountUpdate(userID uint) {
 
 	h.BroadcastMessage(countUpdateMessage)
 }
+
+// BroadcastEventUpdate broadcasts an event update to group members
+func (h *Hub) BroadcastEventUpdate(eventID, groupID, userID uint, action string, eventData interface{}) {
+	message := Message{
+		Type:      MessageTypeEventUpdate,
+		From:      userID,
+		GroupID:   groupID,
+		EventID:   eventID,
+		Action:    action,
+		Data:      eventData,
+		Timestamp: time.Now().Unix(),
+	}
+	h.BroadcastMessage(message)
+}
+
+// BroadcastPollUpdate broadcasts a poll update to group members
+func (h *Hub) BroadcastPollUpdate(pollID, groupID, userID uint, action string, pollData interface{}) {
+	message := Message{
+		Type:      MessageTypePollUpdate,
+		From:      userID,
+		GroupID:   groupID,
+		Action:    action,
+		Data:      pollData,
+		Timestamp: time.Now().Unix(),
+	}
+	h.BroadcastMessage(message)
+}
+
+// BroadcastPollVoteUpdate broadcasts a poll vote update to group members
+func (h *Hub) BroadcastPollVoteUpdate(pollID, groupID, userID uint, action string, voteData interface{}) {
+	message := Message{
+		Type:      MessageTypePollVoteUpdate,
+		From:      userID,
+		GroupID:   groupID,
+		Action:    action,
+		Data:      voteData,
+		Timestamp: time.Now().Unix(),
+	}
+	h.BroadcastMessage(message)
+}

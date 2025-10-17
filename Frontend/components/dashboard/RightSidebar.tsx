@@ -767,7 +767,19 @@ export default function RightSidebar({
                               return (
                                 <div key={event.id} className="bg-white/15 rounded-lg p-3 border border-white/20 hover:bg-white/25 transition-colors">
                                   <div className="flex items-start justify-between mb-2">
-                                    <span className="text-sm text-white font-medium flex-1">{event.title}</span>
+                                    <div className="flex items-center space-x-2 flex-1">
+                                      <span className="text-sm text-white font-medium">{event.title}</span>
+                                      {fullEvent?.canceled && (
+                                        <span className="px-1.5 py-0.5 bg-red-500 text-white text-xs rounded-full font-medium">
+                                          CANCELED
+                                        </span>
+                                      )}
+                                      {fullEvent && !fullEvent.canceled && new Date(fullEvent.event_time) < new Date() && (
+                                        <span className="px-1.5 py-0.5 bg-gray-500 text-white text-xs rounded-full font-medium">
+                                          ENDED
+                                        </span>
+                                      )}
+                                    </div>
                                     <span className="text-xs text-white/70 ml-2 flex-shrink-0">{event.time}</span>
                                   </div>
                                   {fullEvent?.location && (

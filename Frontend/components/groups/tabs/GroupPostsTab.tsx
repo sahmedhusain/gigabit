@@ -1,6 +1,6 @@
 'use client'
 import React, { useState, useEffect } from 'react'
-import { Plus, Heart, MoreHorizontal, User as UserIcon, ThumbsDown, Trash2 } from 'lucide-react'
+import { Plus, MoreHorizontal, User as UserIcon, ThumbsDown, ThumbsUp, Trash2 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useAuth } from '@/context/AuthContext'
 import { api, PostResponse } from '@/lib/api'
@@ -206,74 +206,102 @@ const GroupPostsTab: React.FC<GroupPostsTabProps> = ({ groupId, groupTitle }) =>
             posts.filter(post => post.user).map((post, index) => (
             <motion.div
               key={post.id}
-              className="bg-gradient-to-r from-white/10 to-white/5 backdrop-blur-xl rounded-2xl lg:rounded-3xl border border-white/20 p-4 lg:p-6 cursor-pointer hover:bg-white/15 transition-all duration-200"
+              className={`bg-gradient-to-br from-white/10 via-white/5 to-transparent backdrop-blur-xl rounded-3xl border border-white/20 shadow-2xl p-6 mb-6 hover:shadow-emerald-500/10 transition-all duration-500 group cursor-pointer animate-fade-in animate-slide-in-from-bottom`}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: index * 0.1 }}
+              onClick={(e) => {
+                // Don't navigate if clicking on interactive elements
+                if ((e.target as HTMLElement).closest('button')) {
+                  return
+                }
+                // For now, just prevent navigation since group posts don't have individual pages
+                e.stopPropagation()
+              }}
             >
               {/* Post Header */}
-              <div className="flex items-center justify-between mb-3 lg:mb-4">
-                <div className="flex items-center space-x-3 flex-1 min-w-0">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center space-x-4 flex-1">
                   {/* Clickable Avatar */}
-                  <div 
-                    className="w-8 h-8 lg:w-10 lg:h-10 bg-gradient-to-r from-emerald-500 to-teal-600 rounded-full flex items-center justify-center overflow-hidden cursor-pointer hover:ring-2 hover:ring-emerald-400/50 transition-all duration-200"
+                  <div
+                    className="relative group cursor-pointer"
                     onClick={(e) => {
                       e.stopPropagation()
-                      router.push(`/profile/${post.user.id}`)
+                      if (post.user.id && post.user.id !== 0) {
+                        router.push(`/profile/${post.user.id}`)
+                      }
                     }}
                   >
-                    {getAvatarUrl(post.user.avatar) ? (
-                      <>
-                        <Image 
+                    <div className="w-12 h-12 bg-gradient-to-br from-emerald-400 via-teal-500 to-cyan-600 rounded-full flex items-center justify-center overflow-hidden ring-2 ring-white/20 group-hover:ring-emerald-400/50 transition-all duration-300">
+                      {getAvatarUrl(post.user.avatar) ? (
+                        <Image
                           src={getAvatarUrl(post.user.avatar)!}
-                          alt={`${post.user.first_name} ${post.user.last_name}`}
-                          width={40}
-                          height={40}
-                          unoptimized={getAvatarUrl(post.user.avatar)!.includes('/svg')}
-                          className="w-full h-full object-cover rounded-full"
-                          onError={(e) => {
-                            const target = e.target as HTMLImageElement;
-                            target.style.display = 'none';
-                            target.nextElementSibling?.classList.remove('hidden');
-                          }}
+                          alt={`${post.user.first_name} ${post.user.last_name}'s avatar`}
+                          width={48}
+                          height={48}
+                          className="w-full h-full object-cover"
                         />
-                        <UserIcon className="w-4 h-4 lg:w-5 lg:h-5 text-white hidden" />
-                      </>
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-white font-semibold text-sm lg:text-base">
-                        {post.user.first_name[0]}{post.user.last_name[0]}
-                      </div>
-                    )}
+                      ) : (
+                        <div className="w-full h-full bg-gradient-to-r from-emerald-400 to-teal-500 rounded-full flex items-center justify-center text-white font-bold">
+                          {post.user.first_name[0]?.toUpperCase()}{post.user.last_name[0]?.toUpperCase()}
+                        </div>
+                      )}
+                    </div>
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center space-x-2 mb-1">
-                      {/* Clickable Name */}
-                      <h4 
-                        className="text-white font-medium text-sm lg:text-base truncate cursor-pointer hover:text-emerald-300 transition-colors duration-200"
+
+                  <div className="flex-1">
+                    {/* Clickable Full Name */}
+                    <div
+                      className="group cursor-pointer"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        if (post.user.id && post.user.id !== 0) {
+                          router.push(`/profile/${post.user.id}`)
+                        }
+                      }}
+                    >
+                      <span
+                        className="text-white font-semibold text-lg hover:text-emerald-300 transition-colors duration-200"
                         onClick={(e) => {
                           e.stopPropagation()
-                          router.push(`/profile/${post.user.id}`)
+                          if (post.user.id && post.user.id !== 0) {
+                            router.push(`/profile/${post.user.id}`)
+                          }
                         }}
                       >
                         {post.user.first_name} {post.user.last_name}
-                      </h4>
+                      </span>
                     </div>
-                    <p className="text-white/60 text-xs lg:text-sm">{formatTime(post.created_at)}</p>
+
+                    {/* Clickable Username and Time */}
+                    <p
+                      className="text-white/70 text-sm cursor-pointer hover:text-white/90 transition-colors duration-200"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        if (post.user.id && post.user.id !== 0) {
+                          router.push(`/profile/${post.user.id}`)
+                        }
+                      }}
+                    >
+                      @{post.user.first_name.toLowerCase()}{post.user.last_name.toLowerCase()} • {formatTime(post.created_at)}
+                    </p>
                   </div>
                 </div>
+
                 {canDeletePost(post) && (
                   <div className="relative">
-                    <button 
+                    <button
                       onClick={(e) => {
                         e.stopPropagation()
                         setOpenMenuPostId(openMenuPostId === post.id ? null : post.id)
                       }}
-                      className="p-2 text-white/70 hover:text-white hover:bg-white/10 rounded-lg lg:rounded-xl transition-all duration-200 flex-shrink-0"
+                      className="p-3 text-white/70 hover:text-white hover:bg-white/10 rounded-xl transition-all duration-200 hover:scale-105"
                       title="More options"
-                      aria-label="More options">
-                      <MoreHorizontal className="w-4 h-4 lg:w-5 lg:h-5" />
+                      aria-label="More options"
+                    >
+                      <MoreHorizontal className="w-5 h-5" />
                     </button>
-                    
+
                     {/* Dropdown Menu */}
                     <AnimatePresence>
                       {openMenuPostId === post.id && (
@@ -303,23 +331,30 @@ const GroupPostsTab: React.FC<GroupPostsTabProps> = ({ groupId, groupTitle }) =>
               </div>
 
               {/* Post Content */}
-              <p className="text-white mb-3 lg:mb-4 text-sm lg:text-base leading-relaxed">{post.content}</p>
+              <div className="mb-4">
+                <p className="text-white text-lg leading-relaxed whitespace-pre-wrap">
+                  {post.content}
+                </p>
+              </div>
 
               {/* Post Image */}
               {post.image_url && (
-                <div className="mb-3 lg:mb-4 rounded-xl lg:rounded-2xl overflow-hidden bg-white/5">
-                  <img
+                <div className="mb-4 rounded-2xl overflow-hidden bg-gradient-to-br from-white/5 to-transparent border border-white/10 group-hover:border-emerald-400/30 transition-all duration-300">
+                  <Image
                     src={post.image_url}
-                    alt="Post"
-                    className="w-full h-auto max-h-96 object-contain"
+                    alt="Post image"
+                    width={640}
+                    height={256}
+                    unoptimized={post.image_url.includes('/svg')}
+                    className="w-full h-64 object-cover hover:scale-105 transition-transform duration-500"
                   />
                 </div>
               )}
 
               {/* Post Actions */}
-              <div className="flex items-center justify-between pt-3 lg:pt-4 border-t border-white/10">
-                <div className="flex items-center space-x-2 lg:space-x-4">
-                  <motion.button
+              <div className="flex items-center justify-between pt-4 border-t border-white/10">
+                <div className="flex items-center space-x-4">
+                  <button
                     onClick={async (e) => {
                       e.stopPropagation()
                       try {
@@ -329,10 +364,10 @@ const GroupPostsTab: React.FC<GroupPostsTabProps> = ({ groupId, groupTitle }) =>
                           await api.likePost(post.id)
                         }
                         // Update the post in the local state
-                        setPosts(posts.map(p => 
-                          p.id === post.id 
-                            ? { 
-                                ...p, 
+                        setPosts(posts.map(p =>
+                          p.id === post.id
+                            ? {
+                                ...p,
                                 is_liked: !p.is_liked,
                                 is_disliked: false,
                                 like_count: p.is_liked ? p.like_count - 1 : p.like_count + 1,
@@ -344,19 +379,18 @@ const GroupPostsTab: React.FC<GroupPostsTabProps> = ({ groupId, groupTitle }) =>
                         console.error('Failed to toggle like:', error)
                       }
                     }}
-                    className={`flex items-center space-x-1 lg:space-x-2 px-2 lg:px-4 py-1.5 lg:py-2 rounded-lg lg:rounded-xl transition-all duration-200 text-xs lg:text-sm ${
+                    className={`flex items-center justify-center space-x-2 px-4 py-2 rounded-2xl transition-all duration-300 hover:scale-105 ${
                       post.is_liked
-                        ? 'text-red-400 bg-red-500/10'
-                        : 'text-white/70 hover:text-white hover:bg-white/10'
+                        ? 'text-red-400 bg-gradient-to-r from-red-500/20 to-pink-500/20 border border-red-400/30'
+                        : 'text-white/70 hover:text-white hover:bg-gradient-to-r from-white/10 to-white/5 border border-white/10'
                     }`}
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
+                    title="Like"
                   >
-                    <Heart className={`w-3 h-3 lg:w-4 lg:h-4 ${post.is_liked ? 'fill-current' : ''}`} />
-                    <span>{post.like_count}</span>
-                  </motion.button>
+                    <ThumbsUp className={`w-5 h-5 ${post.is_liked ? 'fill-current animate-pulse' : ''}`} />
+                    <span className="text-sm font-medium">{post.like_count}</span>
+                  </button>
 
-                  <motion.button
+                  <button
                     onClick={async (e) => {
                       e.stopPropagation()
                       try {
@@ -366,10 +400,10 @@ const GroupPostsTab: React.FC<GroupPostsTabProps> = ({ groupId, groupTitle }) =>
                           await api.dislikePost(post.id)
                         }
                         // Update the post in the local state
-                        setPosts(posts.map(p => 
-                          p.id === post.id 
-                            ? { 
-                                ...p, 
+                        setPosts(posts.map(p =>
+                          p.id === post.id
+                            ? {
+                                ...p,
                                 is_disliked: !p.is_disliked,
                                 is_liked: false,
                                 dislike_count: p.is_disliked ? p.dislike_count - 1 : p.dislike_count + 1,
@@ -381,17 +415,16 @@ const GroupPostsTab: React.FC<GroupPostsTabProps> = ({ groupId, groupTitle }) =>
                         console.error('Failed to toggle dislike:', error)
                       }
                     }}
-                    className={`flex items-center space-x-1 lg:space-x-2 px-2 lg:px-4 py-1.5 lg:py-2 rounded-lg lg:rounded-xl transition-all duration-200 text-xs lg:text-sm ${
+                    className={`flex items-center justify-center space-x-2 px-4 py-2 rounded-2xl transition-all duration-300 hover:scale-105 ${
                       post.is_disliked
-                        ? 'text-orange-400 bg-orange-500/10'
-                        : 'text-white/70 hover:text-white hover:bg-white/10'
+                        ? 'text-orange-400 bg-gradient-to-r from-orange-500/20 to-red-500/20 border border-orange-400/30'
+                        : 'text-white/70 hover:text-white hover:bg-gradient-to-r from-white/10 to-white/5 border border-white/10'
                     }`}
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
+                    title="Dislike"
                   >
-                    <ThumbsDown className={`w-3 h-3 lg:w-4 lg:h-4 ${post.is_disliked ? 'fill-current' : ''}`} />
-                    <span>{post.dislike_count}</span>
-                  </motion.button>
+                    <ThumbsDown className={`w-5 h-5 ${post.is_disliked ? 'fill-current animate-pulse' : ''}`} />
+                    <span className="text-sm font-medium">{post.dislike_count}</span>
+                  </button>
                 </div>
               </div>
             </motion.div>
@@ -412,73 +445,43 @@ const GroupPostsTab: React.FC<GroupPostsTabProps> = ({ groupId, groupTitle }) =>
       <AnimatePresence>
         {showDeleteConfirm && (
           <motion.div
-            className="fixed inset-0 bg-black/60 backdrop-blur-md z-[60] flex items-center justify-center p-4"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
             onClick={cancelDelete}
           >
             <motion.div
-              className="relative w-full max-w-md bg-gradient-to-br from-slate-800/95 to-slate-900/95 backdrop-blur-xl rounded-2xl border border-white/20 shadow-2xl overflow-hidden"
-              initial={{ scale: 0.9, y: 20 }}
-              animate={{ scale: 1, y: 0 }}
-              exit={{ scale: 0.9, y: 20 }}
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-gradient-to-br from-slate-800/95 to-slate-900/95 backdrop-blur-xl border border-white/20 rounded-2xl p-6 max-w-sm w-full mx-4"
               onClick={(e) => e.stopPropagation()}
             >
-              {/* Header */}
-              <div className="p-6 border-b border-white/10">
-                <div className="flex items-center space-x-3">
-                  <div className="w-12 h-12 bg-red-500/20 rounded-xl flex items-center justify-center">
-                    <Trash2 className="w-6 h-6 text-red-400" />
-                  </div>
-                  <div>
-                    <h3 className="text-xl font-bold text-white">Delete Post</h3>
-                    <p className="text-white/60 text-sm">This action cannot be undone</p>
-                  </div>
+              <div className="text-center">
+                <div className="w-12 h-12 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Trash2 className="w-6 h-6 text-red-400" />
                 </div>
-              </div>
-
-              {/* Content */}
-              <div className="p-6">
-                <p className="text-white/80 text-sm lg:text-base">
-                  Are you sure you want to delete this post? This will permanently remove the post from the group and cannot be recovered.
+                <h3 className="text-white font-semibold text-lg mb-2">Delete Post</h3>
+                <p className="text-white/70 text-sm mb-6">
+                  Are you sure you want to delete this post? This action cannot be undone.
                 </p>
-              </div>
-
-              {/* Footer */}
-              <div className="p-6 pt-0 flex flex-col sm:flex-row justify-end space-y-3 sm:space-y-0 sm:space-x-3">
-                <motion.button
-                  onClick={cancelDelete}
-                  disabled={isDeleting}
-                  className="w-full sm:w-auto px-6 py-2.5 border border-white/30 rounded-xl text-white hover:bg-white/10 hover:border-white/50 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                  whileHover={{ scale: isDeleting ? 1 : 1.05 }}
-                  whileTap={{ scale: isDeleting ? 1 : 0.95 }}
-                >
-                  Cancel
-                </motion.button>
-                <motion.button
-                  onClick={confirmDeletePost}
-                  disabled={isDeleting}
-                  className="w-full sm:w-auto px-6 py-2.5 bg-gradient-to-r from-red-500 to-red-600 rounded-xl text-white hover:from-red-600 hover:to-red-700 transition-all duration-200 shadow-lg shadow-red-500/25 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
-                  whileHover={{ scale: isDeleting ? 1 : 1.05 }}
-                  whileTap={{ scale: isDeleting ? 1 : 0.95 }}
-                >
-                  {isDeleting ? (
-                    <>
-                      <motion.div
-                        className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full"
-                        animate={{ rotate: 360 }}
-                        transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
-                      />
-                      <span>Deleting...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Trash2 className="w-4 h-4" />
-                      <span>Delete Post</span>
-                    </>
-                  )}
-                </motion.button>
+                <div className="flex space-x-3">
+                  <button
+                    onClick={cancelDelete}
+                    className="flex-1 px-4 py-2 text-white/70 hover:text-white hover:bg-white/10 rounded-xl transition-all duration-200"
+                    disabled={isDeleting}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={confirmDeletePost}
+                    className="flex-1 px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                    disabled={isDeleting}
+                  >
+                    {isDeleting ? 'Deleting...' : 'Delete'}
+                  </button>
+                </div>
               </div>
             </motion.div>
           </motion.div>

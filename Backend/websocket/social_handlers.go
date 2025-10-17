@@ -540,3 +540,17 @@ func (h *Hub) handleEventUpdate(message Message) {
 		h.handleGroupMessage(message)
 	}
 }
+
+// handlePollUpdate broadcasts poll updates to group members
+func (h *Hub) handlePollUpdate(message Message) {
+	if message.GroupID > 0 {
+		h.handleGroupMessage(message)
+	}
+}
+
+// handlePollVoteUpdate broadcasts poll vote updates to group members
+func (h *Hub) handlePollVoteUpdate(message Message) {
+	if message.GroupID > 0 {
+		h.handleGroupMessage(message)
+	}
+}

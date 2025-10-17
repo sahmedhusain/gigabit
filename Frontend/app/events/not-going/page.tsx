@@ -19,7 +19,11 @@ function EventsNotGoingPage() {
   const { 
     events: liveEvents, 
     loading: eventsLoading, 
+    create: createEvent,
     respond: respondToEvent,
+    update: updateEvent,
+    cancel,
+    delete: deleteEvent,
     refetch: refetchEvents 
   } = useRealTimeEvents()
 
@@ -57,17 +61,21 @@ function EventsNotGoingPage() {
           setShowCreateEvent(false)
           success('Event created successfully!')
         }}
+        createEvent={createEvent}
       />
 
       <CommunitySection
-        events={liveEvents}
-        isLoadingEvents={eventsLoading}
         notifications={[]}
         isLoadingNotifications={false}
         setShowCreateEvent={setShowCreateEvent}
-        onEventRespond={respondToEvent}
         communitySubTab={'events'}
         eventsSubTab="not-going"
+        events={liveEvents}
+        eventsLoading={eventsLoading}
+        respondToEvent={respondToEvent}
+        updateEvent={updateEvent}
+        cancelEvent={cancel}
+        deleteEvent={deleteEvent}
       />
     </AppLayout>
   )

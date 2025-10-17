@@ -43,6 +43,9 @@ func LoadMockData(db *sql.DB) error {
 		"polls.sql",
 		"poll_options.sql",
 		"poll_votes.sql",
+		"events.sql",
+		"event_responses.sql",
+		"notifications.sql",
 	}
 
 	mockDataDir := "mockdata"
@@ -110,6 +113,9 @@ func ClearAllData(db *sql.DB) error {
 		"groups",
 		"follows",
 		"sessions",
+		"event_responses",
+		"events",
+		"notifications",
 		"users",
 	}
 

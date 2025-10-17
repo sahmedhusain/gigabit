@@ -5,18 +5,21 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useAuth } from '@/context/AuthContext'
 import { useToast } from '@/context/ToastContext'
 import { useGroups } from '@/hooks/useGroups'
+import { useRealTimeEvents } from '@/hooks'
 import { api } from '@/lib/api'
 
 interface CreateGeneralEventProps {
   show: boolean
   onClose: () => void
   onEventCreated?: () => void
+  createEvent?: (eventGroupId: number, eventData: { title: string; description: string; event_time: string }) => Promise<any>
 }
 
 export default function CreateGeneralEvent({
   show,
   onClose,
-  onEventCreated
+  onEventCreated,
+  createEvent
 }: CreateGeneralEventProps) {
   const [eventTitle, setEventTitle] = useState('')
   const [eventDescription, setEventDescription] = useState('')
@@ -101,7 +104,11 @@ export default function CreateGeneralEvent({
     setIsLoading(true)
     
     try {
-      await api.createEvent(parseInt(selectedGroupId), eventData)
+      if (createEvent) {
+        await createEvent(parseInt(selectedGroupId), eventData)
+      } else {
+        await api.createEvent(parseInt(selectedGroupId), eventData)
+      }
       
       success('Event created successfully!')
       

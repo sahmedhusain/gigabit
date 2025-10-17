@@ -170,6 +170,8 @@ export interface Event {
   event_time: string
   created_at: string
   updated_at: string
+  canceled: boolean
+  cancel_reason: string | null
   creator: {
     id: number
     username: string
@@ -285,6 +287,8 @@ export interface EventResponse {
   event_time: string
   created_at: string
   updated_at: string
+  canceled: boolean
+  cancel_reason: string | null
   creator: {
     id: number
     username: string
@@ -328,6 +332,10 @@ export interface UpdateEventRequest {
   description?: string;
   location?: string;
   event_time?: string; // ISO string format
+}
+
+export interface CancelEventRequest {
+  cancel_reason: string;
 }
 
 export interface EventResponseDetail {
@@ -384,6 +392,7 @@ export interface PollOption {
   vote_count: number;
   percentage: number;
   voters: string[];
+  total_voters: number;
 }
 
 export interface PollResponse {
@@ -897,9 +906,10 @@ export class ApiClient {
     });
   }
 
-  async deleteEvent(eventId: number): Promise<{ message: string }> {
+  async cancelEvent(eventId: number, data: CancelEventRequest): Promise<{ message: string }> {
     return this.request<{ message: string }>(`/api/events/${eventId}`, {
       method: 'DELETE',
+      body: JSON.stringify(data),
     });
   }
 
@@ -946,6 +956,18 @@ export class ApiClient {
   async unvotePoll(pollId: number): Promise<PollResponse> {
     return this.request<PollResponse>(`/api/polls/${pollId}/vote`, {
       method: 'DELETE',
+    });
+  }
+
+  async deletePoll(pollId: number): Promise<{ message: string }> {
+    return this.request<{ message: string }>(`/api/polls/${pollId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async expirePoll(pollId: number): Promise<PollResponse> {
+    return this.request<PollResponse>(`/api/polls/${pollId}/expire`, {
+      method: 'PUT',
     });
   }
 

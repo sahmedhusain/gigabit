@@ -1,46 +1,108 @@
 'use client'
-import { useState, useEffect } from 'react'
-import { Calendar, MapPin, Users, Bell, Activity, Heart, MessageCircle, Plus, Check, X, ArrowUpDown } from 'lucide-react'
+import { useState, useEffect, useCallback } from 'react'
+import { Calendar, MapPin, Users, Bell, Activity, Heart, MessageCircle, Plus, Check, X, ArrowUpDown, Trash2, MoreVertical, Edit } from 'lucide-react'
+import { motion, AnimatePresence } from 'framer-motion'
 import { Event, type Notification as NotificationType, api } from '@/lib/api'
+import { useAuth } from '@/context/AuthContext'
+import { useToast } from '@/context/ToastContext'
+import { useRealTimeEvents } from '@/hooks'
 
 interface EventRespondResult {
   message: string
   response: string
   removed: boolean
 }
-import { useToast } from '@/context/ToastContext'
 
 interface CommunitySectionProps {
-  events: Event[]
-  isLoadingEvents: boolean
   notifications: NotificationType[]
   isLoadingNotifications: boolean
   setShowCreateEvent: (show: boolean) => void
-  // Allow handler to return data (API returns { message, response, removed })
-  onEventRespond?: (eventId: number, option: 'going' | 'not_going') => Promise<EventRespondResult | void>
   communitySubTab: string
   eventsSubTab?: string
+  events: Event[]
+  eventsLoading: boolean
+  respondToEvent: (eventId: number, option: 'going' | 'not_going') => Promise<any>
+  updateEvent: (eventId: number, eventData: { title?: string; description?: string; event_time?: string }) => Promise<any>
+  cancelEvent: (eventId: number, cancelReason: string) => Promise<any>
+  deleteEvent: (eventId: number) => Promise<any>
 }
 
 export default function CommunitySection({
-  events,
-  isLoadingEvents,
   notifications,
   isLoadingNotifications,
   setShowCreateEvent,
-  onEventRespond,
   communitySubTab,
-  eventsSubTab = 'all'
+  eventsSubTab = 'all',
+  events,
+  eventsLoading,
+  respondToEvent,
+  updateEvent,
+  cancelEvent,
+  deleteEvent
 }: CommunitySectionProps) {
   const [respondingToEvent, setRespondingToEvent] = useState<number | null>(null)
-  const [optimisticEvents, setOptimisticEvents] = useState<Event[]>(events)
+  const [optimisticEvents, setOptimisticEvents] = useState<Event[]>([])
   const [sortBy, setSortBy] = useState<'newest' | 'oldest'>('newest')
+  const [groupRoles, setGroupRoles] = useState<{ [groupId: number]: { role: string; is_admin_or_creator: boolean } }>({})
+  const [dropdownOpen, setDropdownOpen] = useState<number | null>(null)
+  const [showCancelModal, setShowCancelModal] = useState(false)
+  const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [showEditModal, setShowEditModal] = useState(false)
+  const [selectedEvent, setSelectedEvent] = useState<Event | null>(null)
+  const [cancelReason, setCancelReason] = useState('')
+  const [editLocation, setEditLocation] = useState('')
+  const [editDate, setEditDate] = useState('')
+  const [editTime, setEditTime] = useState('')
+  const { user } = useAuth()
   const { success, error } = useToast()
 
-  // Sync optimistic events with props
+  // Sync with events from props
   useEffect(() => {
     setOptimisticEvents(events)
   }, [events])
+
+  // Load user group roles
+  const loadUserGroupRoles = useCallback(async () => {
+    if (!user) return
+    try {
+      const data = await api.getUserGroups(user.id)
+      const userGroups = data.groups || []
+      
+      // Load user roles for each group
+      const rolesMap: { [groupId: number]: { role: string; is_admin_or_creator: boolean } } = {}
+      await Promise.all(
+        userGroups.map(async (group) => {
+          try {
+            const roleData = await api.getUserRole(group.id)
+            rolesMap[group.id] = roleData
+          } catch (err) {
+            console.error(`Failed to load role for group ${group.id}:`, err)
+            rolesMap[group.id] = { role: 'member', is_admin_or_creator: false }
+          }
+        })
+      )
+      setGroupRoles(rolesMap)
+    } catch (err) {
+      console.error('Failed to load user group roles:', err)
+      setGroupRoles({})
+    }
+  }, [user])
+
+  useEffect(() => {
+    loadUserGroupRoles()
+  }, [loadUserGroupRoles])
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownOpen && !(event.target as Element).closest('.relative')) {
+        setDropdownOpen(null);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [dropdownOpen])
 
   const handleEventResponse = async (eventId: number, option: 'going' | 'not_going' ) => {
     const previousResponse = optimisticEvents.find(e => e.id === eventId)?.user_response
@@ -88,17 +150,8 @@ export default function CommunitySection({
 
     try {
       setRespondingToEvent(eventId)
-      if (onEventRespond) {
-        await onEventRespond(eventId, option)
-      } else {
-        const res = await api.respondToEvent(eventId, option)
-        if (res.removed) {
-          success('Response removed')
-        } else {
-          success(`Marked as ${option === 'going' ? 'Going' : 'Not Going'}`)
-        }
-      }
-      // Real-time updates will sync the state, no need to call onEventsUpdate
+      await respondToEvent(eventId, option)
+      // Real-time updates will sync the state automatically
     } catch (err: unknown) {
       // Revert optimistic update on error
       setOptimisticEvents(events)
@@ -106,6 +159,52 @@ export default function CommunitySection({
       error(message || 'Failed to update response')
     } finally {
       setRespondingToEvent(null)
+    }
+  }
+
+  // Handle event deletion
+  const handleDeleteEvent = async (eventId: number) => {
+    try {
+      await deleteEvent(eventId)
+      success('Event deleted successfully!')
+    } catch (err) {
+      console.error('Failed to delete event:', err);
+      error('Failed to delete event. Please try again.');
+    }
+  }
+
+  // Handle event cancellation
+  const handleCancelEvent = async (eventId: number) => {
+    try {
+      await cancelEvent(eventId, cancelReason);
+      setShowCancelModal(false);
+      setSelectedEvent(null);
+      setCancelReason('');
+    } catch (err) {
+      console.error('Failed to cancel event:', err);
+      error('Failed to cancel event. Please try again.');
+    }
+  }
+
+  // Handle event editing
+  const handleEditEvent = async (eventId: number) => {
+    try {
+      const eventDateTime = new Date(`${editDate}T${editTime}`);
+      const eventData: any = {
+        event_time: eventDateTime.toISOString(),
+        location: editLocation.trim()
+      };
+
+      await updateEvent(eventId, eventData);
+      success('Event updated successfully!');
+      setShowEditModal(false);
+      setSelectedEvent(null);
+      setEditLocation('');
+      setEditDate('');
+      setEditTime('');
+    } catch (err) {
+      console.error('Failed to update event:', err);
+      error('Failed to update event. Please try again.');
     }
   }
 
@@ -138,8 +237,21 @@ export default function CommunitySection({
     })
   }
 
+  const formatCancellationReason = (reason: string) => {
+    if (!reason) return ''
+    return reason
+      .split('_')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+      .join(' ')
+  }
+
+  const isEventEnded = (event: Event) => {
+    if (event.canceled) return false
+    return new Date(event.event_time) < new Date()
+  }
+
   const renderEvents = () => {
-    if (isLoadingEvents) {
+    if (eventsLoading) {
       return (
         <div className="flex items-center justify-center py-12">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
@@ -200,12 +312,95 @@ export default function CommunitySection({
               <div className="flex-1 min-w-0">
                 <div className="flex items-start justify-between mb-4">
                   <div className="flex-1">
-                    <h3 className="text-white font-bold text-xl mb-2 group-hover:text-emerald-200 transition-colors duration-200">{event.title}</h3>
+                    <div className="flex flex-wrap items-center gap-2 mb-2">
+                      <h3 className="text-white font-bold text-xl group-hover:text-emerald-200 transition-colors duration-200">{event.title}</h3>
+                      {event.canceled && (
+                        <span className="px-2 py-1 bg-red-500 text-white text-xs rounded-full font-medium">
+                          CANCELED
+                        </span>
+                      )}
+                      {isEventEnded(event) && (
+                        <span className="px-2 py-1 bg-gray-500 text-white text-xs rounded-full font-medium">
+                          ENDED
+                        </span>
+                      )}
+                    </div>
                     <p className="text-white/80 mb-4 leading-relaxed">{event.description}</p>
+                    {event.canceled && event.cancel_reason && (
+                      <div className="mb-4 p-3 bg-red-500/10 border border-red-500/20 rounded-lg">
+                        <p className="text-red-300 text-sm">
+                          <span className="font-medium">Cancellation reason:</span> {formatCancellationReason(event.cancel_reason)}
+                        </p>
+                      </div>
+                    )}
                   </div>
-                </div>
+                  {/* Three-dots menu for event creator or group admins/creators */}
+                  {(user && event.group && (event.creator_id === user.id || groupRoles[event.group.id]?.is_admin_or_creator)) && (
+                    <div className="relative ml-2">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setDropdownOpen(dropdownOpen === event.id ? null : event.id);
+                        }}
+                        className="p-2 text-white/60 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+                        aria-label="Event options"
+                        title="Event Options"
+                      >
+                        <MoreVertical className="w-5 h-5" />
+                      </button>
 
-                {/* Event Details Grid */}
+                      {/* Dropdown Menu */}
+                      {dropdownOpen === event.id && (
+                        <div className="absolute right-0 top-full mt-1 w-48 bg-gray-800 border border-white/20 rounded-lg shadow-lg z-50">
+                          {!event.canceled && !isEventEnded(event) && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedEvent(event);
+                                setEditLocation(event.location || '');
+                                const eventDate = new Date(event.event_time);
+                                setEditDate(eventDate.toISOString().split('T')[0]);
+                                setEditTime(eventDate.toTimeString().slice(0, 5));
+                                setDropdownOpen(null);
+                                setShowEditModal(true);
+                              }}
+                              className="w-full flex items-center space-x-2 px-4 py-3 text-blue-400 hover:bg-blue-500/10 hover:text-blue-300 transition-colors rounded-t-lg"
+                            >
+                              <Edit className="w-4 h-4" />
+                              <span className="text-sm font-medium">Edit Event</span>
+                            </button>
+                          )}
+                          {!event.canceled && !isEventEnded(event) && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedEvent(event);
+                                setDropdownOpen(null);
+                                setShowCancelModal(true);
+                              }}
+                              className="w-full flex items-center space-x-2 px-4 py-3 text-orange-400 hover:bg-orange-500/10 hover:text-orange-300 transition-colors"
+                            >
+                              <X className="w-4 h-4" />
+                              <span className="text-sm font-medium">Cancel Event</span>
+                            </button>
+                          )}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedEvent(event);
+                              setDropdownOpen(null);
+                              setShowDeleteModal(true);
+                            }}
+                            className={`w-full flex items-center space-x-2 px-4 py-3 text-red-400 hover:bg-red-500/10 hover:text-red-300 transition-colors ${!isEventEnded(event) ? 'rounded-b-lg' : 'rounded-lg'}`}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                            <span className="text-sm font-medium">Delete Event</span>
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>                {/* Event Details Grid */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
                   {/* Date & Time */}
                   <div className="flex items-center space-x-3 bg-white/5 rounded-lg p-3 border border-white/10">
@@ -271,8 +466,8 @@ export default function CommunitySection({
                   {event.user_response === 'going' ? (
                     <button
                       onClick={() => handleEventResponse(event.id, 'going')}
-                      disabled={respondingToEvent === event.id}
-                      className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 flex items-center justify-center space-x-2 disabled:opacity-50 shadow-lg"
+                      disabled={respondingToEvent === event.id || event.canceled || isEventEnded(event)}
+                      className={`flex-1 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 flex items-center justify-center space-x-2 disabled:opacity-50 shadow-lg ${event.canceled || isEventEnded(event) ? 'cursor-not-allowed' : ''}`}
                     >
                       <Check className="w-4 h-4" />
                       <span>Going</span>
@@ -280,8 +475,8 @@ export default function CommunitySection({
                   ) : (
                     <button
                       onClick={() => handleEventResponse(event.id, 'going')}
-                      disabled={respondingToEvent === event.id}
-                      className="flex-1 bg-white/10 hover:bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 flex items-center justify-center space-x-2 disabled:opacity-50 border border-white/20 hover:border-emerald-400/50"
+                      disabled={respondingToEvent === event.id || event.canceled || isEventEnded(event)}
+                      className={`flex-1 bg-white/10 hover:bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 flex items-center justify-center space-x-2 disabled:opacity-50 border border-white/20 hover:border-emerald-400/50 ${event.canceled || isEventEnded(event) ? 'cursor-not-allowed' : ''}`}
                     >
                       <Check className="w-4 h-4" />
                       <span>Going</span>
@@ -291,8 +486,8 @@ export default function CommunitySection({
                   {event.user_response === 'not_going' ? (
                     <button
                       onClick={() => handleEventResponse(event.id, 'not_going')}
-                      disabled={respondingToEvent === event.id}
-                      className="flex-1 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 flex items-center justify-center space-x-2 disabled:opacity-50 shadow-lg"
+                      disabled={respondingToEvent === event.id || event.canceled || isEventEnded(event)}
+                      className={`flex-1 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 flex items-center justify-center space-x-2 disabled:opacity-50 shadow-lg ${event.canceled || isEventEnded(event) ? 'cursor-not-allowed' : ''}`}
                     >
                       <X className="w-4 h-4" />
                       <span>Not Going</span>
@@ -300,8 +495,8 @@ export default function CommunitySection({
                   ) : (
                     <button
                       onClick={() => handleEventResponse(event.id, 'not_going')}
-                      disabled={respondingToEvent === event.id}
-                      className="flex-1 bg-white/10 hover:bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 flex items-center justify-center space-x-2 disabled:opacity-50 border border-white/20 hover:border-red-400/50"
+                      disabled={respondingToEvent === event.id || event.canceled || isEventEnded(event)}
+                      className={`flex-1 bg-white/10 hover:bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 flex items-center justify-center space-x-2 disabled:opacity-50 border border-white/20 hover:border-red-400/50 ${event.canceled || isEventEnded(event) ? 'cursor-not-allowed' : ''}`}
                     >
                       <X className="w-4 h-4" />
                       <span>Not Going</span>
@@ -491,6 +686,275 @@ export default function CommunitySection({
       <div className="flex-1 overflow-y-auto">
         {renderContent()}
       </div>
+
+      {/* Cancel Event Confirmation Modal */}
+      <AnimatePresence>
+        {showCancelModal && selectedEvent && (
+          <motion.div
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setShowCancelModal(false)}
+          >
+            <motion.div
+              className="bg-gray-800 border border-white/20 rounded-xl p-6 w-full max-w-md"
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center space-x-3 mb-4">
+                <div className="w-10 h-10 bg-orange-500/20 rounded-full flex items-center justify-center">
+                  <X className="w-5 h-5 text-orange-400" />
+                </div>
+                <div>
+                  <h3 className="text-white font-bold text-lg">Cancel Event</h3>
+                  <p className="text-white/60 text-sm">Cancel "{selectedEvent.title}"</p>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label htmlFor="cancel-reason-community" className="block text-white/80 text-sm font-medium mb-2">
+                    Reason for cancellation *
+                  </label>
+                  <select
+                    id="cancel-reason-community"
+                    value={cancelReason}
+                    onChange={(e) => setCancelReason(e.target.value)}
+                    className="w-full bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-white placeholder-white/50 focus:outline-none focus:border-orange-400/50"
+                    required
+                  >
+                    <option value="">Select a reason...</option>
+                    <option value="organizer_unavailable">Organizer unavailable</option>
+                    <option value="venue_unavailable">Venue unavailable</option>
+                    <option value="low_attendance">Low attendance</option>
+                    <option value="weather_conditions">Weather conditions</option>
+                    <option value="emergency">Emergency situation</option>
+                    <option value="other">Other reason</option>
+                  </select>
+                </div>
+
+                <div className="bg-orange-500/10 border border-orange-500/20 rounded-lg p-3">
+                  <p className="text-orange-300 text-sm">
+                    This will notify all attendees that the event has been cancelled.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex space-x-3 mt-6">
+                <button
+                  onClick={() => {
+                    setShowCancelModal(false);
+                    setSelectedEvent(null);
+                    setCancelReason('');
+                  }}
+                  className="flex-1 px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded-lg transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={async () => {
+                    if (!cancelReason) {
+                      error('Please select a reason for cancellation.');
+                      return;
+                    }
+                    try {
+                      await handleCancelEvent(selectedEvent.id);
+                      setShowCancelModal(false);
+                      setSelectedEvent(null);
+                      setCancelReason('');
+                    } catch (err) {
+                      // Error already handled in handleCancelEvent
+                    }
+                  }}
+                  className="flex-1 px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg transition-colors"
+                  disabled={!cancelReason}
+                >
+                  Cancel Event
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Delete Event Confirmation Modal */}
+      <AnimatePresence>
+        {showDeleteModal && selectedEvent && (
+          <motion.div
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setShowDeleteModal(false)}
+          >
+            <motion.div
+              className="bg-gray-800 border border-white/20 rounded-xl p-6 w-full max-w-md"
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center space-x-3 mb-4">
+                <div className="w-10 h-10 bg-red-500/20 rounded-full flex items-center justify-center">
+                  <Trash2 className="w-5 h-5 text-red-400" />
+                </div>
+                <div>
+                  <h3 className="text-white font-bold text-lg">Delete Event</h3>
+                  <p className="text-white/60 text-sm">Delete "{selectedEvent.title}"</p>
+                </div>
+              </div>
+
+              <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-3 mb-4">
+                <p className="text-red-300 text-sm">
+                  This action cannot be undone. This will permanently delete the event and remove all associated data.
+                </p>
+              </div>
+
+              <div className="flex space-x-3">
+                <button
+                  onClick={() => {
+                    setShowDeleteModal(false);
+                    setSelectedEvent(null);
+                  }}
+                  className="flex-1 px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded-lg transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={async () => {
+                    try {
+                      await handleDeleteEvent(selectedEvent.id);
+                      setShowDeleteModal(false);
+                      setSelectedEvent(null);
+                    } catch (err) {
+                      // Error already handled in handleDeleteEvent
+                    }
+                  }}
+                  className="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors"
+                >
+                  Delete Event
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Edit Event Modal */}
+      <AnimatePresence>
+        {showEditModal && selectedEvent && (
+          <motion.div
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setShowEditModal(false)}
+          >
+            <motion.div
+              className="bg-gray-800 border border-white/20 rounded-xl p-6 w-full max-w-md"
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center space-x-3 mb-4">
+                <div className="w-10 h-10 bg-blue-500/20 rounded-full flex items-center justify-center">
+                  <Edit className="w-5 h-5 text-blue-400" />
+                </div>
+                <div>
+                  <h3 className="text-white font-bold text-lg">Edit Event</h3>
+                  <p className="text-white/60 text-sm">Edit "{selectedEvent.title}"</p>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label htmlFor="edit-location-community" className="block text-white/80 text-sm font-medium mb-2">
+                    Location (optional)
+                  </label>
+                  <input
+                    id="edit-location-community"
+                    type="text"
+                    value={editLocation}
+                    onChange={(e) => setEditLocation(e.target.value)}
+                    placeholder="Enter event location"
+                    className="w-full bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-white placeholder-white/50 focus:outline-none focus:border-blue-400/50"
+                  />
+                </div>
+
+                <div>
+                  <label htmlFor="edit-date-community" className="block text-white/80 text-sm font-medium mb-2">
+                    Date *
+                  </label>
+                  <input
+                    id="edit-date-community"
+                    type="date"
+                    value={editDate}
+                    onChange={(e) => setEditDate(e.target.value)}
+                    min={new Date().toISOString().split('T')[0]}
+                    className="w-full bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-400/50"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label htmlFor="edit-time-community" className="block text-white/80 text-sm font-medium mb-2">
+                    Time *
+                  </label>
+                  <input
+                    id="edit-time-community"
+                    type="time"
+                    value={editTime}
+                    onChange={(e) => setEditTime(e.target.value)}
+                    className="w-full bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-400/50"
+                    required
+                  />
+                </div>
+
+                <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3">
+                  <p className="text-blue-300 text-sm">
+                    Only location, date, and time can be edited. Title and description cannot be changed.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex space-x-3 mt-6">
+                <button
+                  onClick={() => {
+                    setShowEditModal(false);
+                    setSelectedEvent(null);
+                    setEditLocation('');
+                    setEditDate('');
+                    setEditTime('');
+                  }}
+                  className="flex-1 px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded-lg transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={async () => {
+                    if (!editDate || !editTime) {
+                      error('Please fill in both date and time.');
+                      return;
+                    }
+                    try {
+                      await handleEditEvent(selectedEvent.id);
+                    } catch (err) {
+                      // Error already handled in handleEditEvent
+                    }
+                  }}
+                  className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+                >
+                  Update Event
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }

@@ -40,52 +40,40 @@ INSERT INTO poll_options (poll_id, option_text, option_order, created_at) VALUES
 (5, 'Monochromatic', 4, datetime('now', '-25 days')),
 (5, 'Retro/Nostalgic', 5, datetime('now', '-25 days')),
 
--- Poll 6: Workout Frequency
-(6, '1-2 days per week', 1, datetime('now', '-35 days')),
-(6, '3-4 days per week', 2, datetime('now', '-35 days')),
-(6, '5-6 days per week', 3, datetime('now', '-35 days')),
-(6, 'Every day', 4, datetime('now', '-35 days')),
-(6, 'It varies', 5, datetime('now', '-35 days')),
+-- Poll 6: UI/UX Design Tools (multiple choice)
+(6, 'Figma', 1, datetime('now', '-35 days')),
+(6, 'Adobe XD', 2, datetime('now', '-35 days')),
+(6, 'Sketch', 3, datetime('now', '-35 days')),
+(6, 'InVision', 4, datetime('now', '-35 days')),
+(6, 'Principle', 5, datetime('now', '-35 days')),
+(6, 'Framer', 6, datetime('now', '-35 days')),
 
--- Poll 7: Favorite Exercise Types
-(7, 'Cardio (running, cycling)', 1, datetime('now', '-18 days')),
-(7, 'Strength training', 2, datetime('now', '-18 days')),
-(7, 'Yoga/Pilates', 3, datetime('now', '-18 days')),
-(7, 'Sports (basketball, soccer)', 4, datetime('now', '-18 days')),
-(7, 'HIIT', 5, datetime('now', '-18 days')),
-(7, 'Swimming', 6, datetime('now', '-18 days')),
+-- Poll 7: Workout Frequency (single choice)
+(7, '1-2 days per week', 1, datetime('now', '-18 days')),
+(7, '3-4 days per week', 2, datetime('now', '-18 days')),
+(7, '5-6 days per week', 3, datetime('now', '-18 days')),
+(7, 'Every day', 4, datetime('now', '-18 days')),
+(7, 'It varies', 5, datetime('now', '-18 days')),
 
--- Poll 8: Gaming Platforms
-(8, 'PC', 1, datetime('now', '-50 days')),
-(8, 'PlayStation', 2, datetime('now', '-50 days')),
-(8, 'Xbox', 3, datetime('now', '-50 days')),
-(8, 'Nintendo Switch', 4, datetime('now', '-50 days')),
-(8, 'Mobile', 5, datetime('now', '-50 days')),
+-- Poll 8: Favorite Exercise Types (single choice)
+(8, 'Cardio (running, cycling)', 1, datetime('now', '-18 days')),
+(8, 'Strength training', 2, datetime('now', '-18 days')),
+(8, 'Yoga/Pilates', 3, datetime('now', '-18 days')),
+(8, 'Sports (basketball, soccer)', 4, datetime('now', '-18 days')),
+(8, 'HIIT', 5, datetime('now', '-18 days')),
+(8, 'Swimming', 6, datetime('now', '-18 days')),
 
--- Poll 9: Game Genres
-(9, 'Action/Adventure', 1, datetime('now', '-15 days')),
-(9, 'RPG', 2, datetime('now', '-15 days')),
-(9, 'Strategy', 3, datetime('now', '-15 days')),
-(9, 'Sports', 4, datetime('now', '-15 days')),
-(9, 'Puzzle', 5, datetime('now', '-15 days')),
-(9, 'Horror', 6, datetime('now', '-15 days')),
+-- Poll 9: Gaming Platforms
+(9, 'PC', 1, '2024-08-27 10:00:00'),
+(9, 'PlayStation', 2, '2024-08-27 10:00:00'),
+(9, 'Xbox', 3, '2024-08-27 10:00:00'),
+(9, 'Nintendo Switch', 4, '2024-08-27 10:00:00'),
+(9, 'Mobile', 5, '2024-08-27 10:00:00'),
 
--- Poll 10: Weekend Plans
-(10, 'Relaxing at home', 1, datetime('now', '-10 days')),
-(10, 'Outdoor activities', 2, datetime('now', '-10 days')),
-(10, 'Socializing with friends', 3, datetime('now', '-10 days')),
-(10, 'Working on personal projects', 4, datetime('now', '-10 days')),
-(10, 'Traveling', 5, datetime('now', '-10 days')),
-
--- Poll 11: Coffee vs Tea
-(11, 'Coffee', 1, datetime('now', '-8 days')),
-(11, 'Tea', 2, datetime('now', '-8 days')),
-(11, 'Both equally', 3, datetime('now', '-8 days')),
-(11, 'Neither', 4, datetime('now', '-8 days')),
-
--- Poll 12: Music Streaming Service
-(12, 'Spotify', 1, datetime('now', '-12 days')),
-(12, 'Apple Music', 2, datetime('now', '-12 days')),
-(12, 'YouTube Music', 3, datetime('now', '-12 days')),
-(12, 'Amazon Music', 4, datetime('now', '-12 days')),
-(12, 'Tidal', 5, datetime('now', '-12 days'));
+-- Poll 10: Game Genres
+(10, 'Action/Adventure', 1, '2024-10-01 10:00:00'),
+(10, 'RPG', 2, '2024-10-01 10:00:00'),
+(10, 'Strategy', 3, '2024-10-01 10:00:00'),
+(10, 'Sports', 4, '2024-10-01 10:00:00'),
+(10, 'Puzzle', 5, '2024-10-01 10:00:00'),
+(10, 'Horror', 6, '2024-10-01 10:00:00');

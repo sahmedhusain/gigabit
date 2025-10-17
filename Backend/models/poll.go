@@ -40,7 +40,8 @@ type PollOptionResponse struct {
 	OptionOrder int      `json:"option_order"`
 	VoteCount   int64    `json:"vote_count"`
 	Percentage  float64  `json:"percentage"`
-	Voters      []string `json:"voters"` // Usernames of voters (limited to show)
+	Voters      []string `json:"voters"`       // Usernames of voters (limited to show)
+	TotalVoters int64    `json:"total_voters"` // Total unique voters for this option
 }
 
 // PollResponse includes all poll data with options and user voting status

@@ -31,6 +31,8 @@ const (
 	MessageTypeError               = "error"
 	MessageTypePing                = "ping"
 	MessageTypePong                = "pong"
+	MessageTypePollUpdate          = "poll_update"
+	MessageTypePollVoteUpdate      = "poll_vote_update"
 )
 
 // Message represents a websocket message

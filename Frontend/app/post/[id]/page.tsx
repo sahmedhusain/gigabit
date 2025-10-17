@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
-import { User, Heart, MessageSquare, MoreHorizontal, Send, Image as ImageIcon, Bookmark, ZoomIn, ZoomOut, Download, X } from 'lucide-react'
+import { User, Heart, MessageSquare, MoreHorizontal, Send, Image as ImageIcon, Bookmark, ZoomIn, ZoomOut, Download, X, Trash2 } from 'lucide-react'
 import ProtectedRoute from '@/components/ProtectedRoute'
 import AppLayout from '@/components/AppLayout'
 import { useAuth } from '@/context/AuthContext'
@@ -42,6 +42,9 @@ function PostDetailPage() {
   const [isCommentModalOpen, setIsCommentModalOpen] = useState(false)
   const [imagePopupUrl, setImagePopupUrl] = useState<string | null>(null)
   const [imageZoom, setImageZoom] = useState(1)
+  const [openMenu, setOpenMenu] = useState(false)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
 
     // Real-time optimistic updates for likes
     const { performUpdate: performOptimisticUpdate, isLoading: likePending } = useOptimisticUpdate(
@@ -172,6 +175,44 @@ function PostDetailPage() {
             } else {
                 error('Unable to update bookmark right now.')
             }
+        }
+    }
+
+    // Delete post functions
+    const canDeletePost = () => {
+        return user && post && user.id === post.user.id
+    }
+
+    const handleDeletePost = async () => {
+        if (!canDeletePost()) return
+        setShowDeleteConfirm(true)
+    }
+
+    const confirmDeletePost = async () => {
+        if (!canDeletePost() || !post) return
+
+        setIsDeleting(true)
+        try {
+            await api.deletePost(post.id)
+            success('Post deleted successfully')
+            
+            // Navigate back after deletion
+            if (from === 'feed' && subTab) {
+                router.push(`/feed/${subTab}`)
+            } else if (from === 'activity' && subTab) {
+                router.push(`/activity/${subTab}`)
+            } else if (from === 'profile' && searchParams.get('userId')) {
+                router.push(`/profile/${searchParams.get('userId')}`)
+            } else {
+                router.push('/feed/all')
+            }
+        } catch (err) {
+            console.error('Failed to delete post:', err)
+            error('Failed to delete post. Please try again.')
+        } finally {
+            setIsDeleting(false)
+            setShowDeleteConfirm(false)
+            setOpenMenu(false)
         }
     }
 
@@ -481,13 +522,42 @@ function PostDetailPage() {
               </div>
             </div>
 
-            <button
-              className="p-3 text-white/70 hover:text-white hover:bg-white/10 rounded-xl transition-all duration-200 hover:scale-105"
-              title="More options"
-              aria-label="More options"
-            >
-              <MoreHorizontal className="w-5 h-5" />
-            </button>
+            {canDeletePost() && (
+              <div className="relative">
+                <button 
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setOpenMenu(!openMenu)
+                  }}
+                  className="p-3 text-white/70 hover:text-white hover:bg-white/10 rounded-xl transition-all duration-200 hover:scale-105"
+                  title="More options"
+                  aria-label="More options">
+                  <MoreHorizontal className="w-5 h-5" />
+                </button>
+                
+                {/* Dropdown Menu */}
+                <AnimatePresence>
+                  {openMenu && (
+                    <motion.div
+                      initial={{ opacity: 0, scale: 0.95, y: -10 }}
+                      animate={{ opacity: 1, scale: 1, y: 0 }}
+                      exit={{ opacity: 0, scale: 0.95, y: -10 }}
+                      transition={{ duration: 0.15 }}
+                      className="absolute right-0 top-full mt-2 w-48 bg-gradient-to-br from-slate-800/95 to-slate-900/95 backdrop-blur-xl border border-white/20 rounded-xl shadow-2xl overflow-hidden z-50"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <button
+                        onClick={handleDeletePost}
+                        className="w-full flex items-center space-x-3 px-4 py-3 text-red-400 hover:bg-red-500/10 transition-all duration-200"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                        <span className="text-sm font-medium">Delete Post</span>
+                      </button>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            )}
           </div>      
 
           {/* Post Content */}
@@ -998,6 +1068,53 @@ function PostDetailPage() {
             </div>
           </div>
         )}
+
+        {/* Delete Confirmation Modal */}
+        <AnimatePresence>
+          {showDeleteConfirm && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+              onClick={() => setShowDeleteConfirm(false)}
+            >
+              <motion.div
+                initial={{ scale: 0.95, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.95, opacity: 0 }}
+                className="bg-gradient-to-br from-slate-800/95 to-slate-900/95 backdrop-blur-xl border border-white/20 rounded-2xl p-6 max-w-sm w-full mx-4"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="text-center">
+                  <div className="w-12 h-12 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <Trash2 className="w-6 h-6 text-red-400" />
+                  </div>
+                  <h3 className="text-white font-semibold text-lg mb-2">Delete Post</h3>
+                  <p className="text-white/70 text-sm mb-6">
+                    Are you sure you want to delete this post? This action cannot be undone.
+                  </p>
+                  <div className="flex space-x-3">
+                    <button
+                      onClick={() => setShowDeleteConfirm(false)}
+                      className="flex-1 px-4 py-2 text-white/70 hover:text-white hover:bg-white/10 rounded-xl transition-all duration-200"
+                      disabled={isDeleting}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={confirmDeletePost}
+                      className="flex-1 px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                      disabled={isDeleting}
+                    >
+                      {isDeleting ? 'Deleting...' : 'Delete'}
+                    </button>
+                  </div>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </AppLayout>
   )

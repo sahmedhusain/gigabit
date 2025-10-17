@@ -369,7 +369,6 @@ function ChatsPage() {
         onGroupCreated={() => {
           fetchGroups()
           setShowCreateGroup(false)
-          success('Group created successfully!')
         }}
       />
 

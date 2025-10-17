@@ -33,10 +33,11 @@ type GroupResponse struct {
 }
 
 type CreateGroupRequest struct {
-	Title         string `json:"title" binding:"required,min=1,max=100"`
-	Description   string `json:"description" binding:"required,min=1,max=500"`
-	Privacy       string `json:"privacy" binding:"required,oneof=public private"`
-	InviteMembers []uint `json:"invite_members"`
+	Title         string  `json:"title" binding:"required,min=1,max=100"`
+	Description   string  `json:"description" binding:"required,min=1,max=500"`
+	Privacy       string  `json:"privacy" binding:"required,oneof=public private"`
+	InviteMembers []uint  `json:"invite_members"`
+	Avatar        *string `json:"avatar,omitempty"`
 }
 
 type UpdateGroupRequest struct {

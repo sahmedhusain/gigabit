@@ -1080,16 +1080,6 @@ export default function DiscoverPage() {
           {activeTab === 'trending' && <TrendingTab />}
         </div>
       </div>
-
-      <CreateGroup
-        show={showCreateGroup}
-        onClose={() => setShowCreateGroup(false)}
-        onGroupCreated={() => {
-          fetchGroups()
-          setShowCreateGroup(false)
-          success('Group created successfully!')
-        }}
-      />
     </div>
   )
 }

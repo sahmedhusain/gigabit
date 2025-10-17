@@ -55,6 +55,7 @@ func (h *GroupHandler) CreateGroup(w http.ResponseWriter, r *http.Request) {
 		Title:       req.Title,
 		Description: req.Description,
 		Privacy:     req.Privacy,
+		Avatar:      req.Avatar,
 	}
 
 	if err := h.groupService.CreateGroup(group, req.InviteMembers); err != nil {

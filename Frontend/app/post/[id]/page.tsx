@@ -118,7 +118,7 @@ function PostDetailPage() {
         }
 
         // Use optimistic update hook
-        await performOptimisticUpdate(() => optimisticPost, async () => {
+        await performOptimisticUpdate((current) => optimisticPost, async () => {
             try {
                 if (wasLiked) {
                     await api.unlikePost(post.id)

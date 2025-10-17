@@ -378,6 +378,7 @@ export interface CreateGroupRequest {
   description: string;
   privacy: 'public' | 'private';
   invite_members?: number[];
+  avatar?: string;
 }
 
 export interface PostsResponse {

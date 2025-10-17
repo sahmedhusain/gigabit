@@ -37,9 +37,7 @@ export function useRealTimeGroups() {
           case 'created':
             if (group) {
               setGroups(prev => [group, ...prev])
-              if (group.creator_id !== user?.id && now > lastFetchTime.current) {
-                success(`New group "${group.title}" was created`)
-              }
+              // Don't show success message here - the component that creates the group handles it
             }
             break
 

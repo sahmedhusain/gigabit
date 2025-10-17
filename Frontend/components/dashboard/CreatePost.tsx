@@ -50,7 +50,7 @@ export default function CreatePost({
   const { isConnected } = useConnectionStatus()
   const { progress, isUploading } = useUpload()
 
-  const { isLoading, performUpdate } = useOptimisticUpdate({
+  const { isLoading, performUpdate } = useOptimisticUpdate(null, {
     onSuccess: () => {
       success('Post created successfully!')
       // Reset form
@@ -76,7 +76,7 @@ export default function CreatePost({
     }
 
     performUpdate(
-      (current) => ({ ...current, isCreating: true }),
+      () => null,
       async () => {
         await onCreatePost()
         return {}

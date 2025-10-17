@@ -2,9 +2,9 @@
 import Image from 'next/image'
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { X, Users, Globe, Lock, Search, Loader2, Check } from 'lucide-react'
-import { CreateGroupRequest, api, User } from '@/lib/api'
+import { CreateGroupRequest, api, User, API_BASE_URL } from '@/lib/api'
 import { v4 as uuidv4 } from 'uuid'
-import { useOptimisticUpdate, useConnectionStatus } from '@/hooks'
+import { useConnectionStatus, useUpload } from '@/hooks'
 import { useToast } from '@/context/ToastContext'
 import { useAuth } from '@/context/AuthContext'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -31,7 +31,13 @@ export default function CreateGroup({
   const [avatarFile, setAvatarFile] = useState<File | null>(null)
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
-  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false)
+  const { success, error: showError } = useToast()
+  const { isConnected } = useConnectionStatus()
+  const { user: currentUser } = useAuth()
+  const currentUserId = currentUser?.id ?? null
+
+  const { uploadImage, isUploading: isUploadingAvatar } = useUpload()
+
   // Handle avatar file selection and preview
   const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0] || null
@@ -43,51 +49,7 @@ export default function CreateGroup({
     }
   }
 
-  // Upload avatar to backend and get URL
-  const uploadAvatar = async (file: File): Promise<string> => {
-    setIsUploadingAvatar(true)
-    try {
-      const formData = new FormData()
-      formData.append('image', file)
-      const res = await fetch('/api/uploads', {
-        method: 'POST',
-        body: formData,
-        credentials: 'include',
-      })
-      if (!res.ok) throw new Error('Failed to upload avatar')
-      const data = await res.json()
-      // The backend returns { filename: ... }, so construct the URL
-      if (data.filename) {
-        return `/uploads/${data.filename}`
-      }
-      throw new Error('No filename returned from server')
-    } finally {
-      setIsUploadingAvatar(false)
-    }
-  }
-  const { success, error: showError } = useToast()
-  const { isConnected } = useConnectionStatus()
-  const { user: currentUser } = useAuth()
-  const currentUserId = currentUser?.id ?? null
-
-  const { isLoading, performUpdate } = useOptimisticUpdate({
-    onSuccess: () => {
-      success('Group created successfully!')
-      // Reset form
-      setGroupTitle('')
-      setGroupDescription('')
-      setPrivacy('public')
-      setSelectedMembers([])
-      setSearchQuery('')
-      setError('')
-      onGroupCreated?.()
-      onClose()
-    },
-    onError: (error: unknown) => {
-      const message = error instanceof Error ? error.message : String(error)
-      showError(`Failed to create group: ${message}`)
-    }
-  })
+  const [isCreating, setIsCreating] = useState(false)
 
   const formatUserName = useCallback((user: User) => {
     const nameParts = [user.first_name, user.last_name].filter(Boolean)
@@ -218,14 +180,17 @@ export default function CreateGroup({
     }
 
     setError('')
+    setIsCreating(true)
 
     let avatar = avatarUrl
     if (avatarFile && !avatarUrl) {
       try {
-        avatar = await uploadAvatar(avatarFile)
+        const result = await uploadImage(avatarFile)
+        avatar = result.url
         setAvatarUrl(avatar)
       } catch (err) {
         showError('Failed to upload avatar')
+        setIsCreating(false)
         return
       }
     }
@@ -238,13 +203,24 @@ export default function CreateGroup({
       avatar: avatar || undefined
     }
 
-    performUpdate(
-      (current) => ({ ...current, isCreating: true }),
-      async () => {
-        await api.createGroup(groupData)
-        return {}
-      }
-    )
+    try {
+      await api.createGroup(groupData)
+      
+      // Success: reset form, close popup, show success
+      setGroupTitle('')
+      setGroupDescription('')
+      setPrivacy('public')
+      setSelectedMembers([])
+      setSearchQuery('')
+      setError('')
+      onGroupCreated?.()
+      onClose()
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
+      showError(`Failed to create group: ${message}`)
+    } finally {
+      setIsCreating(false)
+    }
   }
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -734,17 +710,17 @@ export default function CreateGroup({
                 </motion.button>
                 <motion.button
                   onClick={handleCreateGroup}
-                  disabled={isLoading || !groupTitle.trim() || !isConnected}
+                  disabled={isCreating || !groupTitle.trim() || !isConnected}
                   className={`w-full sm:w-auto px-6 py-3 rounded-xl text-white font-semibold text-sm lg:text-base transition-all duration-300 shadow-lg ${
-                    isLoading || !groupTitle.trim() || !isConnected
+                    isCreating || !groupTitle.trim() || !isConnected
                       ? 'bg-white/20 cursor-not-allowed'
                       : 'bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 shadow-emerald-500/25'
                   }`}
-                  whileHover={{ scale: isLoading || !groupTitle.trim() || !isConnected ? 1 : 1.05 }}
-                  whileTap={{ scale: isLoading || !groupTitle.trim() || !isConnected ? 1 : 0.95 }}
+                  whileHover={{ scale: isCreating || !groupTitle.trim() || !isConnected ? 1 : 1.05 }}
+                  whileTap={{ scale: isCreating || !groupTitle.trim() || !isConnected ? 1 : 0.95 }}
                   transition={{ type: 'spring', stiffness: 400, damping: 17 }}
                 >
-                  {isLoading ? (
+                  {isCreating ? (
                     <div className="flex items-center justify-center space-x-2">
                       <motion.div
                         className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full"

@@ -33,12 +33,12 @@ func (s *GroupService) CreateGroup(group *models.Group, invitees []uint) error {
 	}()
 
 	groupQuery := `
-INSERT INTO groups (creator_id, name, description, privacy, created_at, updated_at)
-VALUES (?, ?, ?, ?, ?, ?)
+INSERT INTO groups (creator_id, name, description, privacy, avatar, created_at, updated_at)
+VALUES (?, ?, ?, ?, ?, ?, ?)
 `
 
 	now := time.Now()
-	result, execErr := tx.Exec(groupQuery, group.CreatorID, group.Title, group.Description, group.Privacy, now, now)
+	result, execErr := tx.Exec(groupQuery, group.CreatorID, group.Title, group.Description, group.Privacy, group.Avatar, now, now)
 	if execErr != nil {
 		err = execErr
 		return err

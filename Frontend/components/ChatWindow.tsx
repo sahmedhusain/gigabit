@@ -87,6 +87,16 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
   const { user } = useAuth()
   const router = useRouter()
 
+  // Helper function to get group initials
+  const getGroupInitials = (groupName: string): string => {
+    if (!groupName) return '??'
+    const words = groupName.trim().split(/\s+/)
+    if (words.length === 1) {
+      return words[0].substring(0, 2).toUpperCase()
+    }
+    return (words[0][0] + words[1][0]).toUpperCase()
+  }
+
   // Real-time messaging integration
   const {
     messages,
@@ -709,7 +719,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
                     className="w-full h-full object-cover rounded-full"
                   />
                 ) : (
-                  participantName?.charAt(0).toUpperCase()
+                  getGroupInitials(participantName)
                 )}
               </motion.div>
               <div className="flex-1 min-w-0">

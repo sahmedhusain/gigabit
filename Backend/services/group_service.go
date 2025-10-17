@@ -154,6 +154,7 @@ SELECT g.id, g.creator_id, g.name as title, g.description, g.privacy, g.avatar, 
 FROM groups g
 JOIN users u ON g.creator_id = u.id
 LEFT JOIN group_members gm ON g.id = gm.group_id AND gm.status = 'member'
+WHERE g.privacy = 'public'
 GROUP BY g.id, u.id
 ORDER BY g.created_at DESC
 LIMIT ? OFFSET ?
@@ -317,7 +318,7 @@ func (s *GroupService) InviteUsers(groupID, inviterID uint, userIDs []uint) erro
 		}
 
 		status, statusErr := s.GetUserMembershipStatus(groupID, userID)
-		if statusErr == nil && (status == "member" || status == "sent") {
+		if statusErr == nil && (status == "member" || status == "sent" || status == "requested") {
 			continue
 		}
 
@@ -336,26 +337,30 @@ func (s *GroupService) InviteUsers(groupID, inviterID uint, userIDs []uint) erro
 }
 
 func (s *GroupService) RequestToJoin(groupID, userID uint) error {
-	// Ensure group is public
+	// Determine group privacy
 	var privacy string
 	if err := s.db.QueryRow("SELECT privacy FROM groups WHERE id = ?", groupID).Scan(&privacy); err != nil {
 		return err
 	}
-	if privacy != "public" {
-		return sql.ErrNoRows
-	}
 
+	// Check current membership/request status
 	status, err := s.GetUserMembershipStatus(groupID, userID)
-	if err == nil && (status == "member" || status == "sent") {
+	if err == nil && (status == "member" || status == "sent" || status == "requested") {
 		return sql.ErrNoRows
 	}
 
 	now := time.Now()
+
+	if privacy == "private" {
+		// Private groups are invite-only: do not allow join requests
+		return sql.ErrNoRows
+	}
+
+	// Public group: create a join request for admins to review
 	query := `
 		INSERT INTO group_members (group_id, user_id, status, role, invited_by, requestor_id, created_at, updated_at)
-		VALUES (?, ?, 'sent', 'member', NULL, ?, ?, ?)
+		VALUES (?, ?, 'requested', 'member', NULL, ?, ?, ?)
 	`
-
 	_, err = s.db.Exec(query, groupID, userID, userID, now, now)
 	return err
 }
@@ -404,7 +409,7 @@ func (s *GroupService) RespondToJoinRequest(groupID, requestUserID, responderID 
 		return err
 	}
 
-	if status != "sent" || !requestor.Valid {
+	if status != "requested" || !requestor.Valid {
 		return sql.ErrNoRows
 	}
 
@@ -595,7 +600,7 @@ func (s *GroupService) GetPendingRequests(groupID, userID uint) ([]models.GroupM
 			   u.first_name, u.last_name, u.avatar, u.nickname
 		FROM group_members gm
 		JOIN users u ON gm.user_id = u.id
-		WHERE gm.group_id = ? AND gm.status = 'sent' AND gm.requestor_id IS NOT NULL
+		WHERE gm.group_id = ? AND gm.status = 'requested' AND gm.requestor_id IS NOT NULL
 		ORDER BY gm.created_at DESC
 	`
 
@@ -872,24 +877,25 @@ WHERE gp.id = ? AND gp.group_id = ? AND gm.user_id = ? AND gm.status = 'member'
 }
 
 func (s *GroupService) GetUserInvitations(userID uint) ([]models.GroupInvitationResponse, error) {
-	query := `
+	// 1) Regular invitations sent directly to this user (status = 'sent' and no requestor)
+	inviteQuery := `
 SELECT gm.id, gm.group_id, gm.created_at,
 	   g.name as group_name, g.description as group_description, g.privacy,
+	   g.creator_id,
 	   u.first_name, u.last_name, u.avatar, u.nickname
 FROM group_members gm
 JOIN groups g ON gm.group_id = g.id
 JOIN users u ON g.creator_id = u.id
 WHERE gm.user_id = ? AND gm.status = 'sent' AND gm.requestor_id IS NULL
-ORDER BY gm.created_at DESC
-	`
+ORDER BY gm.created_at DESC`
 
-	rows, err := s.db.Query(query, userID)
+	rows, err := s.db.Query(inviteQuery, userID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 
-	var invitations []models.GroupInvitationResponse
+	invitations := make([]models.GroupInvitationResponse, 0)
 	for rows.Next() {
 		var invitation models.GroupInvitationResponse
 		var group models.GroupResponse
@@ -898,6 +904,7 @@ ORDER BY gm.created_at DESC
 		err := rows.Scan(
 			&invitation.ID, &group.ID, &invitation.CreatedAt,
 			&group.Title, &group.Description, &group.Privacy,
+			&group.CreatorID,
 			&creator.FirstName, &creator.LastName, &creator.Avatar, &creator.Nickname,
 		)
 		if err != nil {
@@ -907,6 +914,60 @@ ORDER BY gm.created_at DESC
 		creator.ID = group.CreatorID
 		group.Creator = creator
 		invitation.Group = group
+		invitation.Type = "invite"
+		invitations = append(invitations, invitation)
+	}
+
+	// 2) Join requests for groups where this user is an admin (or creator)
+	// Show pending requests (status = 'requested' with a requestor_id)
+	joinReqQuery := `
+SELECT gm.id, gm.group_id, gm.created_at, gm.user_id, gm.requestor_id,
+	   g.name as group_name, g.description as group_description, g.privacy,
+	   g.creator_id,
+	   cu.first_name, cu.last_name, cu.avatar, cu.nickname,
+	   ru.first_name, ru.last_name, ru.avatar, ru.nickname
+FROM group_members gm
+JOIN groups g ON gm.group_id = g.id
+-- Determine if the current user is admin/creator
+JOIN group_members admin_gm ON admin_gm.group_id = g.id AND admin_gm.user_id = ? AND admin_gm.status = 'member' AND admin_gm.role = 'admin'
+JOIN users cu ON g.creator_id = cu.id
+JOIN users ru ON gm.user_id = ru.id
+WHERE gm.status = 'requested' AND gm.requestor_id IS NOT NULL
+ORDER BY gm.created_at DESC`
+
+	rows2, err := s.db.Query(joinReqQuery, userID)
+	if err != nil {
+		return invitations, nil // fall back to invitations only
+	}
+	defer rows2.Close()
+
+	for rows2.Next() {
+		var invitation models.GroupInvitationResponse
+		var group models.GroupResponse
+		var creator models.UserResponse
+		var requestUser models.UserResponse
+		var reqUserID uint
+		var requestorID uint
+
+		err := rows2.Scan(
+			&invitation.ID, &group.ID, &invitation.CreatedAt, &reqUserID, &requestorID,
+			&group.Title, &group.Description, &group.Privacy,
+			&group.CreatorID,
+			&creator.FirstName, &creator.LastName, &creator.Avatar, &creator.Nickname,
+			&requestUser.FirstName, &requestUser.LastName, &requestUser.Avatar, &requestUser.Nickname,
+		)
+		if err != nil {
+			continue
+		}
+
+		creator.ID = group.CreatorID
+		group.Creator = creator
+
+		requestUser.ID = reqUserID
+
+		invitation.Group = group
+		invitation.Type = "join_request"
+		invitation.RequestUser = &requestUser
 		invitations = append(invitations, invitation)
 	}
 

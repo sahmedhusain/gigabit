@@ -36,7 +36,7 @@ import CreateGroup from './CreateGroup'
 
 const normalizeGroupStatus = (group: { member_status?: GroupMemberStatus; is_member?: boolean }): GroupMemberStatus => {
   const status = group.member_status ?? (group.is_member ? 'member' : 'none')
-  if (status === 'member' || status === 'sent' || status === 'rejected') {
+  if (status === 'member' || status === 'sent' || status === 'requested' || status === 'rejected') {
     return status
   }
   return 'none'
@@ -86,6 +86,7 @@ export default function DiscoverPage() {
   const [groups, setGroups] = useState<GroupWithJoinStatus[]>([])
   const [filteredGroups, setFilteredGroups] = useState<GroupWithJoinStatus[]>([])
   const [groupFilter, setGroupFilter] = useState<GroupFilter>('all')
+  const [pendingRequests, setPendingRequests] = useState<{ [groupId: number]: Array<{ user: UserType; requested_at: string }> }>({})
   
   // Trending tags state
   const [trendingTags, setTrendingTags] = useState<TrendingTag[]>([])
@@ -321,6 +322,18 @@ export default function DiscoverPage() {
     }
   }, [users, groups, searchQuery, userFilter, groupFilter, sortBy, activeTab, applyUserFiltersAndSort, applyGroupFiltersAndSort])
 
+  // Fetch pending requests for admin groups
+  useEffect(() => {
+    if (currentUser && groups.length > 0) {
+      const adminGroups = groups.filter(group => group.role === 'admin' || group.role === 'creator')
+      adminGroups.forEach(group => {
+        if (!pendingRequests[group.id]) {
+          fetchPendingRequests(group.id)
+        }
+      })
+    }
+  }, [currentUser, groups, pendingRequests])
+
   const handleFollowStatusChange = (userId: number, newStatus: FollowStatus) => {
     setUsers(prevUsers => 
       prevUsers.map(user => 
@@ -353,7 +366,7 @@ export default function DiscoverPage() {
     try {
       await api.joinGroup(groupId)
       const targetGroup = groups.find(group => group.id === groupId)
-      const joinStatus: GroupMemberStatus = targetGroup?.privacy === 'private' ? 'sent' : 'member'
+      const joinStatus: GroupMemberStatus = targetGroup?.privacy === 'private' ? 'requested' : 'member'
       setGroups(prevGroups => 
         prevGroups.map(group => 
           group.id === groupId 
@@ -395,6 +408,39 @@ export default function DiscoverPage() {
       success('Successfully left the group!')
     } catch {
       error('Failed to leave group')
+    }
+  }
+
+  const fetchPendingRequests = async (groupId: number) => {
+    try {
+      const response = await api.getPendingJoinRequests(groupId)
+      setPendingRequests(prev => ({
+        ...prev,
+        [groupId]: response.requests
+      }))
+    } catch (err) {
+      console.error('Failed to fetch pending requests:', err)
+    }
+  }
+
+  const handleRespondToJoinRequest = async (groupId: number, userId: number, action: 'accept' | 'decline') => {
+    if (!isConnected) {
+      warning('Connection required to respond to requests')
+      return
+    }
+
+    try {
+      await api.respondToJoinRequest(groupId, userId, action)
+      
+      // Update the pending requests state
+      setPendingRequests(prev => ({
+        ...prev,
+        [groupId]: prev[groupId]?.filter(request => request.user.id !== userId) || []
+      }))
+
+      success(`Join request ${action === 'accept' ? 'accepted' : 'declined'}`)
+    } catch {
+      error('Failed to respond to join request')
     }
   }
 
@@ -673,6 +719,78 @@ export default function DiscoverPage() {
 
     return (
       <div className="space-y-6">
+        {/* Show pending requests for admin groups */}
+        {groups
+          .filter(group => group.role === 'admin' || group.role === 'creator')
+          .map(group => {
+            const requests = pendingRequests[group.id] || []
+            if (requests.length === 0) return null
+            
+            return (
+              <div key={`requests-${group.id}`} className="bg-white/5 backdrop-blur-xl rounded-xl border border-white/10 p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-white font-semibold flex items-center">
+                    <Clock3 className="w-5 h-5 mr-2 text-amber-400" />
+                    Pending Join Requests - {group.title}
+                  </h3>
+                  <button
+                    onClick={() => fetchPendingRequests(group.id)}
+                    className="text-emerald-400 hover:text-emerald-300 text-sm"
+                  >
+                    Refresh
+                  </button>
+                </div>
+                <div className="space-y-3">
+                  {requests.map((request) => (
+                    <div key={request.user.id} className="flex items-center justify-between bg-white/5 rounded-lg p-3">
+                      <div className="flex items-center space-x-3">
+                        {request.user.avatar ? (
+                          <Image 
+                            src={request.user.avatar} 
+                            alt={request.user.first_name || 'User'} 
+                            width={32} 
+                            height={32} 
+                            className="rounded-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-8 h-8 bg-gradient-to-br from-emerald-400 to-teal-600 rounded-full flex items-center justify-center">
+                            <span className="text-white text-xs font-bold">
+                              {(request.user.first_name?.charAt(0) || request.user.last_name?.charAt(0) || request.user.email?.charAt(0) || 'U').toUpperCase()}
+                            </span>
+                          </div>
+                        )}
+                        <div>
+                          <p className="text-white font-medium">
+                            {[request.user.first_name, request.user.last_name].filter(Boolean).join(' ') || request.user.email || 'Anonymous'}
+                          </p>
+                          <p className="text-white/60 text-xs">
+                            Requested {new Date(request.requested_at).toLocaleDateString()}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex space-x-2">
+                        <button
+                          onClick={() => handleRespondToJoinRequest(group.id, request.user.id, 'accept')}
+                          disabled={!isConnected}
+                          className="px-3 py-1 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 border border-emerald-400/20 rounded-lg transition-all duration-200 disabled:opacity-50 text-sm"
+                        >
+                          Accept
+                        </button>
+                        <button
+                          onClick={() => handleRespondToJoinRequest(group.id, request.user.id, 'decline')}
+                          disabled={!isConnected}
+                          className="px-3 py-1 bg-rose-500/20 hover:bg-rose-500/30 text-rose-400 border border-rose-400/20 rounded-lg transition-all duration-200 disabled:opacity-50 text-sm"
+                        >
+                          Decline
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )
+          })}
+
         {displayGroups.map((group) => {
           const status = normalizeGroupStatus(group)
           const role = group.role
@@ -686,6 +804,7 @@ export default function DiscoverPage() {
                   icon: role === 'admin' ? <ShieldCheck className="w-3 h-3 mr-1" /> : <Check className="w-3 h-3 mr-1" />
                 }
               case 'sent':
+              case 'requested':
                 return {
                   label: 'Pending',
                   className: 'bg-amber-500/20 text-amber-200 border border-amber-400/30',
@@ -711,13 +830,15 @@ export default function DiscoverPage() {
 
           const statusMessage = status === 'sent'
             ? 'Join request pending approval'
-            : status === 'rejected'
-              ? 'Your join request was declined'
-              : undefined
+            : status === 'requested'
+              ? 'Join request pending approval'
+              : status === 'rejected'
+                ? 'Your join request was declined'
+                : undefined
           const isMember = status === 'member'
-          const joinDisabled = !isConnected || status === 'sent'
-          const joinLabel = status === 'sent' ? 'Request Pending' : status === 'rejected' ? 'Request Again' : 'Join Group'
-          const joinButtonTone = status === 'sent'
+          const joinDisabled = !isConnected || status === 'sent' || status === 'requested'
+          const joinLabel = status === 'sent' || status === 'requested' ? 'Request Pending' : status === 'rejected' ? 'Request Again' : 'Join Group'
+          const joinButtonTone = status === 'sent' || status === 'requested'
             ? 'bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 border border-amber-400/20'
             : 'bg-gradient-to-r from-emerald-500/20 to-teal-500/20 hover:from-emerald-500/30 hover:to-teal-500/30 text-white border border-emerald-400/20'
 

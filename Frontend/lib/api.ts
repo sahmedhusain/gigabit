@@ -145,7 +145,7 @@ export interface Notification {
   isRead: boolean;
 }
 
-export type GroupMemberStatus = 'member' | 'sent' | 'rejected' | 'none'
+export type GroupMemberStatus = 'member' | 'sent' | 'requested' | 'rejected' | 'none'
 
 export interface Group {
   id: number;
@@ -1202,6 +1202,19 @@ export class ApiClient {
       return { isValid: false, error: 'Post content cannot exceed 5000 characters' };
     }
     return { isValid: true };
+  }
+
+  async getPendingJoinRequests(groupId: number): Promise<{ requests: Array<{ user: User; requested_at: string }> }> {
+    return this.request<{ requests: Array<{ user: User; requested_at: string }> }>(`/api/groups/${groupId}/requests`, {
+      method: 'GET',
+    });
+  }
+
+  async respondToJoinRequest(groupId: number, userId: number, action: 'accept' | 'decline'): Promise<{ message: string }> {
+    return this.request<{ message: string }>(`/api/groups/${groupId}/request/${userId}`, {
+      method: 'PUT',
+      body: JSON.stringify({ action }),
+    });
   }
 }
 

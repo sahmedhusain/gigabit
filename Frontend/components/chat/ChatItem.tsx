@@ -172,6 +172,16 @@ export default function ChatItem({ item, onClick, onDelete, getUserStatus, typin
     return d.toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' })
   }
 
+  // Helper function to get group initials (first two letters)
+  const getGroupInitials = (name: string): string => {
+    if (!name) return 'GR'
+    const words = name.trim().split(/\s+/)
+    if (words.length >= 2) {
+      return (words[0].charAt(0) + words[1].charAt(0)).toUpperCase()
+    }
+    return (name.charAt(0) + (name.charAt(1) || name.charAt(0))).toUpperCase()
+  }
+
   const gradient = isGroup
     ? 'from-blue-400 via-indigo-500 to-purple-600'
     : 'from-emerald-400 via-teal-500 to-cyan-600';
@@ -413,14 +423,14 @@ export default function ChatItem({ item, onClick, onDelete, getUserStatus, typin
                     className="w-full h-full object-cover rounded-full"
                     onError={() => setImageError(true)}
                   />
-                ) : (
-                  item.name?.charAt(0).toUpperCase()
-                )}
+              ) : (
+                item.name?.charAt(0).toUpperCase()
+              )}
               </motion.div>
             </div>
           ) : (
             <motion.div
-              className={`w-14 h-14 bg-gradient-to-br ${gradient} rounded-full flex items-center justify-center text-white font-bold text-xl shadow-lg ring-2 ring-white/10 group-hover:ring-white/20 transition-all duration-300 overflow-hidden`}
+              className={`w-14 h-14 bg-gradient-to-br ${gradient} rounded-full flex items-center justify-center text-white font-bold text-lg shadow-lg ring-2 ring-white/10 group-hover:ring-white/20 transition-all duration-300 overflow-hidden`}
               whileHover={{ rotate: [0, -5, 5, 0], scale: 1.05 }}
               transition={{ duration: 0.3 }}
             >
@@ -434,7 +444,7 @@ export default function ChatItem({ item, onClick, onDelete, getUserStatus, typin
                   onError={() => setImageError(true)}
                 />
               ) : (
-                item.name?.charAt(0).toUpperCase()
+                getGroupInitials(item.name || '')
               )}
             </motion.div>
           )}

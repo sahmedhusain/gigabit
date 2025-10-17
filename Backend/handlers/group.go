@@ -304,14 +304,16 @@ func (h *GroupHandler) RespondToInvitation(w http.ResponseWriter, r *http.Reques
 	}
 
 	var req struct {
-		Accept bool `json:"accept"`
+		Action string `json:"action"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, "Invalid request body")
 		return
 	}
 
-	if err := h.groupService.RespondToInvitation(uint(groupID), userID, req.Accept); err != nil {
+	accept := req.Action == "accept"
+
+	if err := h.groupService.RespondToInvitation(uint(groupID), userID, accept); err != nil {
 		if err == sql.ErrNoRows {
 			writeError(w, http.StatusNotFound, "No invitation found")
 		} else {
@@ -321,12 +323,12 @@ func (h *GroupHandler) RespondToInvitation(w http.ResponseWriter, r *http.Reques
 	}
 
 	// If invitation was accepted, add user to WebSocket group for real-time messaging
-	if req.Accept && h.hub != nil {
+	if accept && h.hub != nil {
 		h.hub.AddUserToGroup(userID, uint(groupID))
 	}
 
 	message := "Invitation declined"
-	if req.Accept {
+	if accept {
 		message = "Invitation accepted - you are now a member"
 	}
 
@@ -353,14 +355,16 @@ func (h *GroupHandler) RespondToJoinRequest(w http.ResponseWriter, r *http.Reque
 	}
 
 	var req struct {
-		Accept bool `json:"accept"`
+		Action string `json:"action"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, "Invalid request body")
 		return
 	}
 
-	if err := h.groupService.RespondToJoinRequest(uint(groupID), uint(requestUserID), userID, req.Accept); err != nil {
+	accept := req.Action == "accept"
+
+	if err := h.groupService.RespondToJoinRequest(uint(groupID), uint(requestUserID), userID, accept); err != nil {
 		if err == sql.ErrNoRows {
 			writeError(w, http.StatusForbidden, "Cannot respond to this request")
 		} else {
@@ -370,12 +374,12 @@ func (h *GroupHandler) RespondToJoinRequest(w http.ResponseWriter, r *http.Reque
 	}
 
 	// If join request was accepted, add user to WebSocket group for real-time messaging
-	if req.Accept && h.hub != nil {
+	if accept && h.hub != nil {
 		h.hub.AddUserToGroup(uint(requestUserID), uint(groupID))
 	}
 
 	message := "Join request declined"
-	if req.Accept {
+	if accept {
 		message = "Join request accepted"
 	}
 

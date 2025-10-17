@@ -27,7 +27,9 @@ export function normalizeConversation(conv: any): UnifiedChatItem {
   const name = isGroup
     ? (conv.group?.title || conv.group?.Title || 'Group')
     : `${conv.participant?.first_name || conv.participant?.FirstName || ''} ${conv.participant?.last_name || conv.participant?.LastName || ''}`.trim() || 'Unknown'
-  const avatar = conv.participant?.avatar || conv.participant?.Avatar || null
+  const avatar = isGroup
+    ? (conv.group?.avatar || conv.group?.Avatar || null)
+    : (conv.participant?.avatar || conv.participant?.Avatar || null)
   const lastMsg = conv.last_message?.content || conv.LastMessage || ''
   const lastMessageTime = conv.last_message?.created_at || conv.LastMessageTime || ''
   const unread = conv.unread_count ?? conv.UnreadCount ?? 0

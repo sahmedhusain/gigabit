@@ -168,7 +168,7 @@ func (s *ChatService) getPrivateChats(userID uint) ([]models.UnifiedChatItem, er
 
 func (s *ChatService) getGroupChats(userID uint) ([]models.UnifiedChatItem, error) {
 	query := `
-	        SELECT g.id, g.name, g.privacy, gm.created_at, gm.role, gc.id as conv_id,
+	        SELECT g.id, g.name, g.privacy, g.avatar, gm.created_at, gm.role, gc.id as conv_id,
 	               m.content, m.created_at as last_message_time, m.sender_id,
 	               u.id, u.first_name, u.last_name, u.avatar, u.nickname
 	        FROM groups g
@@ -191,6 +191,7 @@ func (s *ChatService) getGroupChats(userID uint) ([]models.UnifiedChatItem, erro
 		var groupID uint
 		var groupName string
 		var privacy string
+		var groupAvatar sql.NullString
 		var createdAt time.Time
 		var memberRole sql.NullString
 		var convID sql.NullInt64
@@ -203,7 +204,7 @@ func (s *ChatService) getGroupChats(userID uint) ([]models.UnifiedChatItem, erro
 		var senderAvatar sql.NullString
 		var senderNickname sql.NullString
 
-		err := rows.Scan(&groupID, &groupName, &privacy, &createdAt, &memberRole, &convID, &lastMessage, &lastMessageTime, &msgSenderID,
+		err := rows.Scan(&groupID, &groupName, &privacy, &groupAvatar, &createdAt, &memberRole, &convID, &lastMessage, &lastMessageTime, &msgSenderID,
 			&senderID, &senderFirstName, &senderLastName, &senderAvatar, &senderNickname)
 		if err != nil {
 			return nil, err
@@ -269,6 +270,11 @@ func (s *ChatService) getGroupChats(userID uint) ([]models.UnifiedChatItem, erro
 			role = memberRole.String
 		}
 
+		var groupAvatarPtr *string
+		if groupAvatar.Valid {
+			groupAvatarPtr = &groupAvatar.String
+		}
+
 		chat := models.UnifiedChatItem{
 			ID:                fmt.Sprintf("group_%d", convIDValue),
 			Type:              "group",
@@ -282,6 +288,7 @@ func (s *ChatService) getGroupChats(userID uint) ([]models.UnifiedChatItem, erro
 				ID:           groupID,
 				Title:        groupName,
 				Privacy:      privacy,
+				Avatar:       groupAvatarPtr,
 				IsMember:     true,
 				MemberStatus: "member",
 				Role:         role,

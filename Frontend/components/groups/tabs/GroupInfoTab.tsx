@@ -28,6 +28,16 @@ const GroupInfoTab: React.FC<GroupInfoTabProps> = ({ groupId, onLeaveGroup, onMa
   const router = useRouter()
   const { onlineUsers, isConnected } = useWebSocket()
 
+  // Helper function to get group initials
+  const getGroupInitials = (groupName: string): string => {
+    if (!groupName) return '??'
+    const words = groupName.trim().split(/\s+/)
+    if (words.length === 1) {
+      return words[0].substring(0, 2).toUpperCase()
+    }
+    return (words[0][0] + words[1][0]).toUpperCase()
+  }
+
   useEffect(() => {
     const fetchGroupData = async () => {
       try {
@@ -254,7 +264,7 @@ const GroupInfoTab: React.FC<GroupInfoTabProps> = ({ groupId, onLeaveGroup, onMa
                 className="w-full h-full object-cover rounded-full"
               />
             ) : (
-              groupInfo.title?.charAt(0).toUpperCase()
+              getGroupInitials(groupInfo.title)
             )}
           </div>
           <h1 className="text-4xl font-bold bg-gradient-to-r from-white to-white/80 bg-clip-text text-transparent mb-4">

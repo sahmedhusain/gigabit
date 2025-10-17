@@ -49,7 +49,7 @@ type GroupMember struct {
 	ID        uint      `json:"id"`
 	GroupID   uint      `json:"group_id"`
 	UserID    uint      `json:"user_id"`
-	Status    string    `json:"status"` // "member", "sent", "rejected"
+	Status    string    `json:"status"` // "member", "sent", "requested", "rejected"
 	Role      string    `json:"role"`   // "member", "admin"
 	InvitedBy *uint     `json:"invited_by,omitempty"`
 	Requestor *uint     `json:"requestor,omitempty"`
@@ -113,4 +113,10 @@ type GroupInvitationResponse struct {
 	ID        uint          `json:"id"`
 	Group     GroupResponse `json:"group"`
 	CreatedAt time.Time     `json:"created_at"`
+	// Type distinguishes between a direct invite sent to the current user ("invite")
+	// and a join request awaiting the current user's approval as an admin ("join_request").
+	Type string `json:"type,omitempty"`
+	// RequestUser is populated when Type == "join_request" and represents
+	// the user who requested to join the group.
+	RequestUser *UserResponse `json:"request_user,omitempty"`
 }

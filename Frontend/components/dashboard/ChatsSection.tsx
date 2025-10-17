@@ -211,8 +211,9 @@ export default function ChatsSection({
 
   // Debug logging for chats
   useEffect(() => {
-    console.log('🔍 [ChatsSection] Normalized chats:', normalizedChats.map(c => ({ id: c.id, type: c.type, groupId: c.groupId, name: c.name })))
-  }, [normalizedChats])
+    console.log('🔍 [ChatsSection] Normalized chats:', normalizedChats.map(c => ({ id: c.id, type: c.type, groupId: c.groupId, name: c.name, hasLastMessage: !!c.lastMessage })))
+    console.log('🔍 [ChatsSection] Current filter settings:', { normalizedSubTab, filterType, searchQuery })
+  }, [normalizedChats, normalizedSubTab, filterType, searchQuery])
 
   const filteredChats = normalizedChats.filter(chat => {
     // Allow groups without messages to be shown, but filter out private chats without messages
@@ -228,7 +229,39 @@ export default function ChatsSection({
     return matchesSearch && matchesTab && matchesFilter;
   })
 
-  const uniqueChats = filteredChats.filter((chat, index, self) =>
+  // Sort chats by last message time, then by join date/time for chats without messages
+  const sortedChats = filteredChats.sort((a, b) => {
+    // Parse timestamps for comparison
+    const parseTimestamp = (timestamp: string | number | undefined | null): number => {
+      if (!timestamp) return 0;
+      if (typeof timestamp === 'number') {
+        // If it's a number, check if it's milliseconds or seconds
+        if (timestamp > 1e11) return timestamp; // milliseconds
+        return timestamp * 1000; // seconds
+      }
+      // Parse ISO string or other date formats
+      const date = new Date(timestamp);
+      return isNaN(date.getTime()) ? 0 : date.getTime();
+    };
+
+    // Get last message time for each chat
+    const aLastMessageTime = parseTimestamp(a.lastMessageTime || a.timestamp);
+    const bLastMessageTime = parseTimestamp(b.lastMessageTime || b.timestamp);
+
+    // If both have last message times, sort by most recent first
+    if (aLastMessageTime > 0 && bLastMessageTime > 0) {
+      return bLastMessageTime - aLastMessageTime;
+    }
+
+    // If only one has last message time, prioritize the one with messages
+    if (aLastMessageTime > 0 && bLastMessageTime === 0) return -1;
+    if (bLastMessageTime > 0 && aLastMessageTime === 0) return 1;
+
+    // If neither has last message time, sort by timestamp (most recent first)
+    return bLastMessageTime - aLastMessageTime;
+  });
+
+  const uniqueChats = sortedChats.filter((chat, index, self) =>
     self.findIndex(c => c.id === chat.id) === index
   )
 

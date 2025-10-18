@@ -458,7 +458,6 @@ export default function Sidebar({
                                     ) : null
                                   })()}
                                 </div>
-                                {/* Description removed for cleaner subtab items */}
                               </div>
                             )}
                           </div>

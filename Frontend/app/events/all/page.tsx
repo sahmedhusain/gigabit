@@ -29,8 +29,29 @@ function EventsAllPage() {
 
   // Get event ID from URL params for deep linking
   const eventId = searchParams.get('event')
+  const [highlightedEventId, setHighlightedEventId] = useState<number | null>(null)
   
   const [showCreateEvent, setShowCreateEvent] = useState(false)
+
+  // Scroll to event from hash
+  useEffect(() => {
+    const hash = window.location.hash
+    if (hash.startsWith('#event-')) {
+      const id = parseInt(hash.replace('#event-', ''))
+      if (!isNaN(id) && liveEvents.length > 0) {
+        // Wait a bit for the DOM to be ready
+        setTimeout(() => {
+          const element = document.getElementById(`event-${id}`)
+          if (element) {
+            element.scrollIntoView({ behavior: 'smooth', block: 'center' })
+            setHighlightedEventId(id)
+            // Remove highlight after animation
+            setTimeout(() => setHighlightedEventId(null), 3000)
+          }
+        }, 300)
+      }
+    }
+  }, [liveEvents])
 
   // Update URL when event ID changes
   useEffect(() => {
@@ -76,6 +97,7 @@ function EventsAllPage() {
         updateEvent={updateEvent}
         cancelEvent={cancel}
         deleteEvent={deleteEvent}
+        highlightedEventId={highlightedEventId}
       />
     </AppLayout>
   )

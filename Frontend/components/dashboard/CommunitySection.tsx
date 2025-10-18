@@ -25,6 +25,7 @@ interface CommunitySectionProps {
   updateEvent: (eventId: number, eventData: { title?: string; description?: string; event_time?: string }) => Promise<any>
   cancelEvent: (eventId: number, cancelReason: string) => Promise<any>
   deleteEvent: (eventId: number) => Promise<any>
+  highlightedEventId?: number | null
 }
 
 export default function CommunitySection({
@@ -38,7 +39,8 @@ export default function CommunitySection({
   respondToEvent,
   updateEvent,
   cancelEvent,
-  deleteEvent
+  deleteEvent,
+  highlightedEventId
 }: CommunitySectionProps) {
   const [respondingToEvent, setRespondingToEvent] = useState<number | null>(null)
   const [optimisticEvents, setOptimisticEvents] = useState<Event[]>([])
@@ -323,6 +325,7 @@ export default function CommunitySection({
         {filteredEvents.map((event, index) => (
           <motion.div
             key={event.id}
+            id={`event-${event.id}`}
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{
@@ -330,11 +333,19 @@ export default function CommunitySection({
               delay: index * 0.1,
               ease: "easeOut"
             }}
-            className="group relative bg-gradient-to-br from-white/10 via-white/5 to-transparent backdrop-blur-xl rounded-3xl border border-white/20 shadow-2xl p-6 hover:shadow-emerald-500/10 transition-all duration-500 group cursor-pointer animate-fade-in animate-slide-in-from-bottom"
+            className={`group relative bg-gradient-to-br from-white/10 via-white/5 to-transparent backdrop-blur-xl rounded-3xl border shadow-2xl p-6 hover:shadow-emerald-500/10 transition-all duration-500 group cursor-pointer animate-fade-in animate-slide-in-from-bottom ${
+              highlightedEventId === event.id 
+                ? 'border-emerald-400/60 shadow-emerald-400/30 ring-4 ring-emerald-400/20' 
+                : 'border-white/20'
+            }`}
             style={{ animationDelay: `${index < 6 ? index * 100 : 500}ms` }}
           >
             {/* Subtle gradient overlay */}
-            <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/5 via-transparent to-teal-500/5 rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+            <div className={`absolute inset-0 bg-gradient-to-br rounded-3xl transition-opacity duration-300 ${
+              highlightedEventId === event.id 
+                ? 'from-emerald-500/20 via-teal-500/10 to-emerald-500/20 opacity-100' 
+                : 'from-emerald-500/5 via-transparent to-teal-500/5 opacity-0 group-hover:opacity-100'
+            }`}></div>
 
             <div className="relative flex flex-col lg:flex-row lg:items-start justify-between gap-6">
               {/* Main Content */}

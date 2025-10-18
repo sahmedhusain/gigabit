@@ -843,15 +843,21 @@ func (s *Server) handleMessageRoute(handler *handlers.MessageHandler) http.Handl
 		authMiddleware := middleware.AuthMiddleware(s.DB.GetDB())
 
 		// Handle routes that don't need targetID
-		if messageType == "read" || messageType == "unread" {
-			if r.Method != http.MethodPut {
+		if messageType == "read" || messageType == "unread" || messageType == "search" {
+			if r.Method != http.MethodPut && messageType != "search" {
+				writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
+				return
+			}
+			if r.Method != http.MethodGet && messageType == "search" {
 				writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
 				return
 			}
 			if messageType == "read" {
 				authMiddleware(http.HandlerFunc(handler.MarkConversationAsRead)).ServeHTTP(w, r)
-			} else {
+			} else if messageType == "unread" {
 				authMiddleware(http.HandlerFunc(handler.MarkConversationAsUnread)).ServeHTTP(w, r)
+			} else if messageType == "search" {
+				authMiddleware(http.HandlerFunc(handler.SearchMessages)).ServeHTTP(w, r)
 			}
 			return
 		}

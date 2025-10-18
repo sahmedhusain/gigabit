@@ -129,7 +129,7 @@ export default function CreatePollModal({
                     whileHover={{ scale: 1.05 }}
                     transition={{ type: 'spring', stiffness: 400, damping: 17 }}
                   >
-                    <div className="w-12 h-12 bg-gradient-to-br from-purple-400 via-indigo-500 to-blue-600 rounded-2xl flex items-center justify-center shadow-lg">
+                    <div className="w-12 h-12 bg-gradient-to-br from-emerald-400 via-teal-500 to-green-600 rounded-2xl flex items-center justify-center shadow-lg">
                       <BarChart3 className="w-6 h-6 text-white drop-shadow-sm" />
                     </div>
                     <motion.div
@@ -193,7 +193,7 @@ export default function CreatePollModal({
                     animate={{ opacity: 1 }}
                     transition={{ delay: 0.4, duration: 0.3 }}
                   >
-                    <div className="w-2 h-2 bg-purple-400 rounded-full"></div>
+                    <div className="w-2 h-2 bg-emerald-400 rounded-full"></div>
                     <span>Poll Question *</span>
                   </motion.label>
                   <div className="relative">
@@ -202,7 +202,7 @@ export default function CreatePollModal({
                       value={title}
                       onChange={(e) => setTitle(e.target.value)}
                       placeholder="What's your question?"
-                      className="w-full bg-white/10 border border-white/20 rounded-xl p-4 text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-purple-400/50 focus:border-purple-400/50 transition-all duration-300 hover:bg-white/15 text-sm lg:text-base"
+                      className="w-full bg-white/10 border border-white/20 rounded-xl p-4 text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-emerald-400/50 focus:border-emerald-400/50 transition-all duration-300 hover:bg-white/15 text-sm lg:text-base"
                       maxLength={200}
                       disabled={isCreating}
                       initial={{ opacity: 0, scale: 0.95 }}
@@ -241,7 +241,7 @@ export default function CreatePollModal({
                       value={description}
                       onChange={(e) => setDescription(e.target.value)}
                       placeholder="Add more context to your poll..."
-                      className="w-full h-20 lg:h-24 bg-white/10 border border-white/20 rounded-xl p-4 text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-purple-400/50 focus:border-purple-400/50 resize-none text-sm lg:text-base transition-all duration-300 hover:bg-white/15"
+                      className="w-full h-20 lg:h-24 bg-white/10 border border-white/20 rounded-xl p-4 text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-emerald-400/50 focus:border-emerald-400/50 resize-none text-sm lg:text-base transition-all duration-300 hover:bg-white/15"
                       maxLength={500}
                       disabled={isCreating}
                       initial={{ opacity: 0, scale: 0.95 }}
@@ -288,7 +288,7 @@ export default function CreatePollModal({
                           value={option}
                           onChange={(e) => handleUpdateOption(index, e.target.value)}
                           placeholder={`Option ${index + 1}`}
-                          className="flex-1 bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-purple-400/50 focus:border-purple-400/50 text-sm lg:text-base transition-all duration-300 hover:bg-white/15"
+                          className="flex-1 bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-emerald-400/50 focus:border-emerald-400/50 text-sm lg:text-base transition-all duration-300 hover:bg-white/15"
                           maxLength={100}
                           disabled={isCreating}
                         />
@@ -346,7 +346,7 @@ export default function CreatePollModal({
                       />
                       <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all duration-300 ${
                         allowMultipleChoices
-                          ? 'border-purple-400 bg-purple-400 shadow-lg shadow-purple-400/25'
+                          ? 'border-emerald-400 bg-emerald-400 shadow-lg shadow-emerald-400/25'
                           : 'border-white/40 group-hover:border-white/60'
                       }`}>
                         {allowMultipleChoices && (
@@ -377,7 +377,7 @@ export default function CreatePollModal({
                       value={expiresAt}
                       onChange={(e) => setExpiresAt(e.target.value)}
                       disabled={isCreating}
-                      className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-purple-400/50 focus:border-purple-400/50 text-sm transition-all duration-300 hover:bg-white/15"
+                      className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-emerald-400/50 focus:border-emerald-400/50 text-sm transition-all duration-300 hover:bg-white/15"
                     />
                     <p className="text-white/50 text-xs">
                       Leave empty for polls that never expire
@@ -411,7 +411,7 @@ export default function CreatePollModal({
                   className={`w-full sm:w-auto px-6 py-3 rounded-xl text-white font-semibold text-sm lg:text-base transition-all duration-300 shadow-lg ${
                     isCreating || !title.trim() || options.filter(opt => opt.trim()).length < 2
                       ? 'bg-white/20 cursor-not-allowed'
-                      : 'bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700 shadow-purple-500/25'
+                      : 'bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 shadow-emerald-500/25'
                   }`}
                   whileHover={{ scale: (isCreating || !title.trim() || options.filter(opt => opt.trim()).length < 2) ? 1 : 1.05 }}
                   whileTap={{ scale: (isCreating || !title.trim() || options.filter(opt => opt.trim()).length < 2) ? 1 : 0.95 }}

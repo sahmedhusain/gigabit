@@ -57,6 +57,7 @@ function ChatsFilterPage() {
     isGroupMember?: boolean
     userRole?: 'creator' | 'admin' | 'member'
     initialTab?: string
+    highlightMessageId?: number
   } | null>(null)
 
   // Current User Processing
@@ -369,6 +370,7 @@ function ChatsFilterPage() {
           participantName={openChatWindow.name}
           participantId={openChatWindow.participantId}
           groupId={openChatWindow.type === 'group' ? (openChatWindow.groupId || openChatWindow.conversationId) : undefined}
+          highlightMessageId={openChatWindow.highlightMessageId}
           initialTab={openChatWindow.initialTab}
           onClose={() => setOpenChatWindow(null)}
         />
@@ -391,7 +393,8 @@ function ChatsFilterPage() {
                   groupId: groupId,
                   isGroupMember: groupInfo.is_member,
                   userRole: groupInfo.role || 'member',
-                  initialTab: chat.initialTab
+                  initialTab: chat.initialTab,
+                  highlightMessageId: chat.highlightMessageId
                 })
               } catch (err) {
                 console.error('Error fetching group info:', err)
@@ -404,7 +407,8 @@ function ChatsFilterPage() {
                   groupId: chat.groupId || chat.conversationId,
                   isGroupMember: true,
                   userRole: 'member',
-                  initialTab: chat.initialTab
+                  initialTab: chat.initialTab,
+                  highlightMessageId: chat.highlightMessageId
                 })
               }
             } else {
@@ -412,8 +416,9 @@ function ChatsFilterPage() {
                 conversationId: chat.conversationId,
                 type: chat.type,
                 name: chat.name,
-                participantId: chat.participantId,
-                initialTab: chat.initialTab
+                  participantId: chat.participantId,
+                  initialTab: chat.initialTab,
+                  highlightMessageId: chat.highlightMessageId
               })
             }
           }}

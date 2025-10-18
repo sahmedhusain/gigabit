@@ -553,3 +553,53 @@ func (h *MessageHandler) MarkConversationAsUnread(w http.ResponseWriter, r *http
 		"conversation_id": req.ConversationID,
 	})
 }
+
+func (h *MessageHandler) SearchMessages(w http.ResponseWriter, r *http.Request) {
+	userID, ok := r.Context().Value("user_id").(uint)
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "User not authenticated")
+		return
+	}
+
+	query := r.URL.Query().Get("q")
+	if strings.TrimSpace(query) == "" {
+		writeJSON(w, http.StatusOK, map[string]interface{}{
+			"results": []interface{}{},
+			"count":   0,
+		})
+		return
+	}
+
+	// Get pagination parameters
+	limitStr := r.URL.Query().Get("limit")
+	if limitStr == "" {
+		limitStr = "20"
+	}
+	offsetStr := r.URL.Query().Get("offset")
+	if offsetStr == "" {
+		offsetStr = "0"
+	}
+
+	limit, err := strconv.Atoi(limitStr)
+	if err != nil || limit > 100 {
+		limit = 20
+	}
+
+	offset, err := strconv.Atoi(offsetStr)
+	if err != nil || offset < 0 {
+		offset = 0
+	}
+
+	results, err := h.messageService.SearchMessages(userID, query, limit, offset)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "Failed to search messages")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"results": results,
+		"count":   len(results),
+		"limit":   limit,
+		"offset":  offset,
+	})
+}

@@ -1,6 +1,6 @@
 'use client'
 import { useState, useEffect } from 'react'
-import { Heart, Globe, Lock, EyeOff, MessageSquare, Sparkles, Bookmark, Send, MoreHorizontal, User, Image as ImageIcon, Trash2 } from 'lucide-react'
+import { Heart, Globe, Lock, EyeOff, MessageSquare, Sparkles, Bookmark, Send, MoreHorizontal, User, Image as ImageIcon, Trash2, ArrowUp, ArrowDown } from 'lucide-react'
 import CreatePost from './CreatePost'
 import { Post } from '@/lib/api'
 import { Plus } from 'lucide-react'
@@ -33,6 +33,8 @@ interface HomeFeedProps {
   loadingUsers: boolean
   onCreatePost: () => Promise<void>
   feedSubTab: string
+  sortOrder: 'newest' | 'oldest'
+  setSortOrder: (sort: 'newest' | 'oldest') => void
 }
 
 export default function HomeFeed({
@@ -52,7 +54,9 @@ export default function HomeFeed({
   availableUsers,
   loadingUsers,
   onCreatePost,
-  feedSubTab
+  feedSubTab,
+  sortOrder,
+  setSortOrder
 }: HomeFeedProps) {
   const router = useRouter()
   // Feed filter state
@@ -226,16 +230,34 @@ export default function HomeFeed({
     }
   }
 
-  // Filter posts based on active filter
+  // Filter and sort posts based on active filter and sort order
   const filteredPosts = () => {
+    let filtered = posts
+
+    // Apply filter
     switch (feedSubTab) {
       case 'following':
-        return posts // Filter posts from users the current user follows
+        filtered = posts // Filter posts from users the current user follows
+        break
       case 'friends':
-        return posts // Filter posts from mutual followers
+        filtered = posts // Filter posts from mutual followers
+        break
       default:
-        return posts // All posts
+        filtered = posts // All posts
+        break
     }
+
+    // Apply sorting
+    return filtered.sort((a, b) => {
+      const dateA = new Date(a.created_at).getTime()
+      const dateB = new Date(b.created_at).getTime()
+
+      if (sortOrder === 'newest') {
+        return dateB - dateA // Newest first
+      } else {
+        return dateA - dateB // Oldest first
+      }
+    })
   }
 
   const renderPost = (post: Post, index: number) => {
@@ -496,22 +518,52 @@ export default function HomeFeed({
               </div>
             </div>
 
-            {/* Enhanced Create Post Button */}
-            <button
-              onClick={() => setShowCreatePost(true)}
-              className="bg-gradient-to-r from-emerald-500 via-teal-600 to-cyan-600 hover:from-emerald-600 hover:via-teal-700 hover:to-cyan-700 text-white px-4 py-2 rounded-lg transition-all duration-300 hover:scale-105 shadow-md hover:shadow-emerald-500/25 flex items-center space-x-2 font-medium border border-white/20 hover:border-emerald-400/50 group/btn"
-            >
-              <div className="w-4 h-4 bg-white/20 rounded-md flex items-center justify-center group-hover/btn:bg-white/30 transition-colors">
-                <Plus className="w-3 h-3" />
+            {/* Sort Toggle and Create Post Button */}
+            <div className="flex items-center space-x-3">
+              {/* Sort Toggle */}
+              <div className="flex items-center bg-white/10 rounded-xl p-1 border border-white/20">
+                <button
+                  onClick={() => setSortOrder('newest')}
+                  className={`flex items-center space-x-1 px-3 py-1 rounded-lg text-sm font-medium transition-all duration-200 ${
+                    sortOrder === 'newest'
+                      ? 'bg-emerald-500 text-white shadow-md'
+                      : 'text-white/70 hover:text-white hover:bg-white/5'
+                  }`}
+                >
+                  <ArrowUp className="w-4 h-4" />
+                  <span>Newest</span>
+                </button>
+                <button
+                  onClick={() => setSortOrder('oldest')}
+                  className={`flex items-center space-x-1 px-3 py-1 rounded-lg text-sm font-medium transition-all duration-200 ${
+                    sortOrder === 'oldest'
+                      ? 'bg-emerald-500 text-white shadow-md'
+                      : 'text-white/70 hover:text-white hover:bg-white/5'
+                  }`}
+                >
+                  <ArrowDown className="w-4 h-4" />
+                  <span>Oldest</span>
+                </button>
               </div>
-              <span>Create Post</span>
-            </button>
+
+              {/* Enhanced Create Post Button */}
+              <motion.button
+                whileHover={{ scale: 1.02, y: -1 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={() => setShowCreatePost(true)}
+                className="group relative overflow-hidden bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white px-6 py-3 rounded-2xl transition-all duration-300 flex items-center space-x-3 shadow-lg hover:shadow-xl"
+              >
+                <div className="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-20 transition-opacity duration-300"></div>
+                <Plus className="w-5 h-5 relative z-10" />
+                <span className="font-semibold relative z-10">Create Post</span>
+              </motion.button>
+            </div>
           </div>
         </div>
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-scroll scrollbar-hide" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
         {renderContent()}
       </div>
 

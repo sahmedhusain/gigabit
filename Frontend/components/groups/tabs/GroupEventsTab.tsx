@@ -205,7 +205,7 @@ const GroupEventsTab: React.FC<GroupEventsTabProps> = ({ groupId, groupTitle }) 
       </div>
 
       {/* Events Content */}
-      <div className="flex-1 overflow-y-auto p-6 space-y-4">
+      <div className="flex-1 overflow-y-scroll scrollbar-hide p-6 space-y-4" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
         {isLoading ? (
           <div className="flex items-center justify-center h-full">
             <motion.div
@@ -220,13 +220,13 @@ const GroupEventsTab: React.FC<GroupEventsTabProps> = ({ groupId, groupTitle }) 
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
           >
-            <div className="text-center">
-              <div className="text-6xl mb-4">📅</div>
+            <div className="text-center max-w-md mx-auto">
+              <Calendar className="w-16 h-16 text-white/40 mx-auto mb-6" />
               <h3 className="text-xl font-bold text-white mb-2">No events yet</h3>
               <p className="text-white/60 mb-6">Create an event to bring the group together!</p>
               <motion.button
                 onClick={() => setShowCreateModal(true)}
-                  className="px-6 py-3 bg-gradient-to-r from-purple-500 to-indigo-500 rounded-xl text-white hover:from-purple-600 hover:to-indigo-600 transition-all duration-200 shadow-lg"
+                className="px-6 py-3 bg-gradient-to-r from-emerald-500 to-teal-600 rounded-xl text-white font-medium hover:from-emerald-600 hover:to-teal-700 transition-all duration-200"
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
               >

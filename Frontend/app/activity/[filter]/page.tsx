@@ -1,6 +1,6 @@
 "use client"
 import { useState, useEffect, useCallback } from 'react'
-import { useRouter, useParams } from 'next/navigation'
+import { useRouter, useParams, useSearchParams } from 'next/navigation'
 import ProtectedRoute from '@/components/ProtectedRoute'
 import { useAuth } from '@/context/AuthContext'
 import { useWebSocket } from '@/context/WebSocketContext'
@@ -36,12 +36,14 @@ const formatTimeAgo = (dateString: string) => {
 function ActivityFilterPage() {
   const router = useRouter()
   const params = useParams()
+  const searchParams = useSearchParams()
   const filter = params.filter as string
   const { user } = useAuth()
   const { isConnected, addMessageListener } = useWebSocket()
   const { error } = useToast()
 
   const [activitySubTab, setActivitySubTab] = useState(filter || 'liked')
+  const [sortOrder, setSortOrder] = useState<'newest' | 'oldest'>((searchParams.get('sort') as 'newest' | 'oldest') || 'newest')
 
   // Data State
   const [posts, setPosts] = useState<Post[]>([])
@@ -53,6 +55,18 @@ function ActivityFilterPage() {
       router.replace(`/activity/${activitySubTab}`)
     }
   }, [activitySubTab, filter, router])
+
+  // Update URL when sort changes
+  useEffect(() => {
+    const params = new URLSearchParams(searchParams.toString())
+    if (sortOrder !== 'newest') {
+      params.set('sort', sortOrder)
+    } else {
+      params.delete('sort')
+    }
+    const newUrl = params.toString() ? `/activity/${activitySubTab}?${params.toString()}` : `/activity/${activitySubTab}`
+    router.replace(newUrl)
+  }, [sortOrder, activitySubTab, searchParams, router])
 
   // Fetch data when component loads
   const fetchActivityPosts = useCallback(async () => {
@@ -117,7 +131,8 @@ function ActivityFilterPage() {
           timeAgo: formatTimeAgo(post.created_at),
           privacy: post.privacy,
           isLiked: post.is_liked,
-          isBookmarked: 'is_bookmarked' in post ? (post as APIPost).is_bookmarked : false
+          isBookmarked: 'is_bookmarked' in post ? (post as APIPost).is_bookmarked : false,
+          created_at: post.created_at
         }
       })
 
@@ -262,6 +277,8 @@ function ActivityFilterPage() {
         onPostLike={handleLikePost}
         onPostBookmark={handleBookmarkPost}
         activitySubTab={activitySubTab}
+        sortOrder={sortOrder}
+        setSortOrder={setSortOrder}
       />
     </AppLayout>
   )

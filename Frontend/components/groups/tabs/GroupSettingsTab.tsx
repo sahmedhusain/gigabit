@@ -179,7 +179,7 @@ const GroupSettingsTab: React.FC<GroupSettingsTabProps> = ({ groupId }) => {
       </div>
 
       {/* Members Management Section */}
-      <div className="flex-1 overflow-y-auto p-6">
+      <div className="flex-1 overflow-y-scroll scrollbar-hide p-6" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
         <div className="flex items-center space-x-3 mb-6">
           <Users className="w-5 h-5 text-white" />
           <h3 className="text-lg font-semibold text-white">Manage Members</h3>

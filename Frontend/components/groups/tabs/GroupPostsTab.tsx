@@ -1,6 +1,6 @@
 'use client'
 import React, { useState, useEffect } from 'react'
-import { Plus, MoreHorizontal, User as UserIcon, ThumbsDown, ThumbsUp, Trash2 } from 'lucide-react'
+import { Plus, MoreHorizontal, User as UserIcon, Newspaper, ThumbsDown, ThumbsUp, Trash2 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useAuth } from '@/context/AuthContext'
 import { api, PostResponse } from '@/lib/api'
@@ -173,7 +173,7 @@ const GroupPostsTab: React.FC<GroupPostsTabProps> = ({ groupId, groupTitle }) =>
       </div>
 
       {/* Posts Content */}
-      <div className="flex-1 overflow-y-auto p-6 space-y-6">
+      <div className="flex-1 overflow-y-scroll scrollbar-hide p-6 space-y-6" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
         {isLoading ? (
           <div className="flex items-center justify-center h-full">
             <motion.div
@@ -188,8 +188,8 @@ const GroupPostsTab: React.FC<GroupPostsTabProps> = ({ groupId, groupTitle }) =>
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
           >
-            <div className="text-center">
-              <div className="text-6xl mb-4">📝</div>
+            <div className="text-center max-w-md mx-auto">
+              <Newspaper className="w-16 h-16 text-white/40 mx-auto mb-6" />
               <h3 className="text-xl font-bold text-white mb-2">No posts yet</h3>
               <p className="text-white/60 mb-6">Be the first to share something with the group!</p>
               <motion.button

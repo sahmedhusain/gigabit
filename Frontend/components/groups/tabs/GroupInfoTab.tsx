@@ -227,7 +227,7 @@ const GroupInfoTab: React.FC<GroupInfoTabProps> = ({ groupId, onLeaveGroup, onMa
   }
 
   return (
-    <div className="h-full overflow-y-auto p-6">
+    <div className="h-full overflow-y-scroll scrollbar-hide p-6" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
       <div className="max-w-4xl mx-auto space-y-8">
         {/* Group Header */}
         <motion.div
@@ -384,7 +384,7 @@ const GroupInfoTab: React.FC<GroupInfoTabProps> = ({ groupId, onLeaveGroup, onMa
               </div>
             </h3>
             
-            <div className="space-y-3 max-h-96 overflow-y-auto">
+            <div className="space-y-3 max-h-96 overflow-y-scroll scrollbar-hide" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
               {[...members].sort((a, b) => {
                 const roleOrder = { creator: 0, admin: 1, member: 2 }
                 const aOrder = roleOrder[a.role as keyof typeof roleOrder] ?? 3

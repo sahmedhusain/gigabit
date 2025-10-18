@@ -57,7 +57,9 @@ function ChatsPage() {
     type: 'private' | 'group',
     name: string
     participantId?: number
+    groupId?: number
     initialTab?: string
+    highlightMessageId?: number
   } | null>(null)
 
   // Current User Processing
@@ -384,6 +386,8 @@ function ChatsPage() {
                   conversationType={openChatWindow.type}
                   participantName={openChatWindow.name}
                   participantId={openChatWindow.participantId}
+                  groupId={openChatWindow.type === 'group' ? (openChatWindow.groupId || openChatWindow.conversationId) : undefined}
+                  highlightMessageId={openChatWindow.highlightMessageId}
                   initialTab={openChatWindow.initialTab}
                   onClose={() => setOpenChatWindow(null)}
                 />
@@ -407,7 +411,9 @@ function ChatsPage() {
                       type: chat.type,
                       name: chat.name,
                       participantId: participantId,
-                      initialTab: chat.initialTab
+                      groupId: chat.groupId,
+                      initialTab: chat.initialTab,
+                      highlightMessageId: chat.highlightMessageId
                     });
                   }}
                   getUserStatus={getUserStatus}

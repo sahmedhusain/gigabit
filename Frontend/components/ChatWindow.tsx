@@ -11,6 +11,7 @@ import { api, User } from '@/lib/api'
 import EmojiPicker from 'emoji-picker-react'
 import { getAvatarUrl } from '@/utils/avatarUtils'
 import { useRouter } from 'next/navigation'
+import { MessageRounded } from '@mui/icons-material'
 
 // Import tab components
 import GroupChatTab from './groups/tabs/GroupChatTab'
@@ -55,6 +56,7 @@ interface ChatWindowProps {
   onClose?: () => void // Optional for minimal UI
   hideHeader?: boolean // Hide the chat header if true
   initialTab?: string // Initial tab to open ('info', 'settings', etc.)
+  highlightMessageId?: number // If provided, scroll to and highlight this message on open
 }
 
 const ChatWindow: React.FC<ChatWindowProps> = ({
@@ -65,6 +67,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
   participantName,
   groupId,
   initialTab,
+  highlightMessageId,
   onConversationResolved,
   onClose,
   hideHeader
@@ -81,6 +84,8 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
   const [isLoadingMembers, setIsLoadingMembers] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const messagesContainerRef = useRef<HTMLDivElement>(null)
+  const highlightedRef = useRef<HTMLDivElement | null>(null)
+  const highlightLoadAttemptsRef = useRef<number>(0)
   const [participantData, setParticipantData] = useState<User | null>(null)
   const [wasAtBottom, setWasAtBottom] = useState(true)
   const [isLoadingHistorical, setIsLoadingHistorical] = useState(false)
@@ -174,6 +179,57 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
       fetchConversationMessages(effectiveConversationId, conversationType, participantId, 20, 0, false)
     }
   }, [effectiveConversationId, conversationType, participantId, fetchConversationMessages])
+
+  // After messages load, if we have a highlight target, try to scroll to it
+  // NOTE: This only applies to PRIVATE chats. Group chats handle highlighting in GroupChatTab.
+  useEffect(() => {
+    if (!highlightMessageId) return
+    if (conversationType === 'group') {
+      // Skip for groups - GroupChatTab handles it
+      console.log('[ChatWindow] Skipping highlight for group chat, GroupChatTab will handle it', { highlightMessageId })
+      return
+    }
+    
+    const list = Array.from(messages.get(effectiveConversationId) || [])
+    console.log('[ChatWindow] Private chat highlight effect:', { highlightMessageId, messageCount: list.length })
+    
+    if (list.length === 0) return
+    
+    // Delay to ensure DOM is fully rendered
+    setTimeout(() => {
+      // Try to find the DOM node for this message id
+      const el = document.querySelector(`[data-message-id="${highlightMessageId}"]`) as HTMLDivElement | null
+      console.log('[ChatWindow] Looking for private message element:', { highlightMessageId, found: !!el })
+      
+      if (el && messagesContainerRef.current) {
+        highlightedRef.current = el
+        console.log('[ChatWindow] Scrolling to and highlighting private message:', highlightMessageId)
+        el.classList.add('ring-2', 'ring-amber-400', 'ring-offset-2', 'ring-offset-transparent')
+        
+        // Scroll to center the message in view with a small additional delay
+        setTimeout(() => {
+          el.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' })
+        }, 50)
+        
+        // Remove highlight after a delay
+        setTimeout(() => {
+          el.classList.remove('ring-2', 'ring-amber-400', 'ring-offset-2', 'ring-offset-transparent')
+        }, 2500)
+        // Reset attempts
+        highlightLoadAttemptsRef.current = 0
+      } else {
+        // Not found yet; try loading more history up to a small number of attempts
+        const attempts = highlightLoadAttemptsRef.current
+        const canLoadMore = hasMoreMessages.get(effectiveConversationId) && !isLoadingMore.get(effectiveConversationId)
+        console.log('[ChatWindow] Private message not found, can load more?', { attempts, canLoadMore })
+        if (attempts < 5 && canLoadMore) {
+          highlightLoadAttemptsRef.current = attempts + 1
+          console.log('[ChatWindow] Loading more private messages, attempt:', attempts + 1)
+          loadMoreMessages(effectiveConversationId, conversationType, participantId)
+        }
+      }
+    }, 100)
+  }, [messages, effectiveConversationId, highlightMessageId, hasMoreMessages, isLoadingMore, loadMoreMessages, conversationType, participantId])
 
   // Mark messages as read when viewing a conversation and sync unread counts
   useEffect(() => {
@@ -637,6 +693,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
                   ? 'bg-gradient-to-br from-emerald-500 via-teal-500 to-cyan-600 text-white border-emerald-400/40 rounded-br-lg shadow-emerald-500/20'
                   : 'bg-gradient-to-br from-white/15 to-white/10 text-white border-white/25 rounded-bl-lg hover:from-white/20 hover:to-white/15 shadow-white/10'
               }`}
+              data-message-id={message.id}
             >
               {/* Message content */}
               <div className="text-sm leading-relaxed break-words font-medium">
@@ -851,6 +908,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
                 <GroupChatTab
                   conversationId={effectiveConversationId}
                   groupId={groupId}
+                  highlightMessageId={highlightMessageId}
                   onConversationResolved={onConversationResolved}
                 />
               )}
@@ -1031,13 +1089,15 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
       {/* Enhanced Messages Area */}
       <motion.div
         ref={messagesContainerRef}
-        className="flex-1 overflow-y-auto px-6 py-4 space-y-4 min-h-0 scrollbar-thin scrollbar-thumb-emerald-400/30 scrollbar-track-emerald-900/10 hover:scrollbar-thumb-emerald-400/50 transition-colors duration-200"
+        className="flex-1 overflow-y-scroll scrollbar-hide px-6 py-4 space-y-4 min-h-0 transition-colors duration-200"
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.3, duration: 0.5, ease: [0.23, 1, 0.320, 1] }}
         onScroll={handleScroll}
         style={{
-          background: 'linear-gradient(180deg, rgba(255,255,255,0.02) 0%, rgba(255,255,255,0.00) 100%)'
+          background: 'linear-gradient(180deg, rgba(255,255,255,0.02) 0%, rgba(255,255,255,0.00) 100%)',
+          scrollbarWidth: 'none',
+          msOverflowStyle: 'none'
         }}
       >
           {/* Load Previous Messages Button */}
@@ -1124,7 +1184,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
                       }}
                       className="text-6xl mb-6 filter drop-shadow-lg"
                     >
-                      💬
+                    <MessageRounded className="w-16 h-16 text-white/40 mx-auto mb-6" />
                     </motion.div>
                     <motion.div
                       initial={{ opacity: 0, y: 10 }}

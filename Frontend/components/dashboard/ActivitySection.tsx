@@ -1,6 +1,6 @@
 'use client'
 import { useState, useEffect } from 'react'
-import { Heart, MessageSquare, Bookmark, Send, Sparkles, User, Image as ImageIcon, X, MoreHorizontal, Globe, Lock, EyeOff, Plus } from 'lucide-react'
+import { Heart, MessageSquare, Bookmark, Send, Sparkles, User, Image as ImageIcon, X, MoreHorizontal, Globe, Lock, EyeOff, Plus, ArrowUp, ArrowDown } from 'lucide-react'
 import { Post, Comment } from '@/lib/api'
 import { useRouter } from 'next/navigation'
 import { useToast } from '@/context/ToastContext'
@@ -12,13 +12,17 @@ interface ActivitySectionProps {
   posts: Post[]
   onPostLike: (postId: number) => void
   onPostBookmark?: (postId: number) => void
+  sortOrder?: 'newest' | 'oldest'
+  setSortOrder?: (sort: 'newest' | 'oldest') => void
 }
 
 export default function ActivitySection({
   activitySubTab,
   posts,
   onPostLike,
-  onPostBookmark
+  onPostBookmark,
+  sortOrder = 'newest',
+  setSortOrder
 }: ActivitySectionProps) {
   const router = useRouter()
   const { success, error } = useToast()
@@ -412,6 +416,18 @@ export default function ActivitySection({
       }
     }
 
+    // Apply sorting
+    postsToShow = postsToShow.sort((a, b) => {
+      const dateA = new Date(a.created_at).getTime()
+      const dateB = new Date(b.created_at).getTime()
+
+      if (sortOrder === 'newest') {
+        return dateB - dateA // Newest first
+      } else {
+        return dateA - dateB // Oldest first
+      }
+    })
+
     if (postsToShow.length === 0) {
       return (
         <div className="text-center py-16">
@@ -460,12 +476,38 @@ export default function ActivitySection({
                 </p>
               </div>
             </div>
+
+            {/* Sort Toggle */}
+            {setSortOrder && (
+              <div className="flex items-center bg-white/10 rounded-xl p-1 border border-white/20">
+                <button
+                  onClick={() => setSortOrder('newest')}
+                  className={`flex items-center space-x-2 px-3 py-1 rounded-lg text-sm font-medium transition-all duration-200 ${
+                    sortOrder === 'newest'
+                      ? 'bg-emerald-500 text-white shadow-md'
+                      : 'text-white/70 hover:text-white hover:bg-white/5'
+                  }`}
+                >
+                  <ArrowUp className="w-4 h-4" />
+                  <span>Newest</span>
+                </button>
+                <button
+                  onClick={() => setSortOrder('oldest')}
+                  className={`flex items-center space-x-2 px-3 py-1 rounded-lg text-sm font-medium transition-all duration-200 ${
+                    sortOrder === 'oldest'
+                      ? 'bg-emerald-500 text-white shadow-md'
+                      : 'text-white/70 hover:text-white hover:bg-white/5'
+                  }`}
+                >
+                  <ArrowDown className="w-4 h-4" />
+                  <span>Oldest</span>
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>
-
-      {/* Content */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-scroll scrollbar-hide" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
         {renderContent()}
       </div>
 

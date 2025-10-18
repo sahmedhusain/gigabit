@@ -106,6 +106,7 @@ export interface Post {
   privacy: string;
   isLiked: boolean;
   isBookmarked?: boolean;
+  created_at: string;
 }
 
 // Backend API Post interface
@@ -359,6 +360,22 @@ export interface ConversationResponse {
   };
   unread_count: number;
   updated_at: string;
+}
+
+export interface ConversationSearchResult {
+  type: 'private' | 'group';
+  conversation_id: number;
+  participant_id?: number;
+  group_id?: number;
+  group_name?: string;
+  group_avatar?: string;
+  participant_name: string;
+  participant_avatar?: string;
+  sender_name: string;
+  sender_avatar?: string;
+  matching_message_id: number;
+  matching_message: string;
+  message_time: string;
 }
 
 export interface CreatePostRequest {
@@ -1047,6 +1064,17 @@ export class ApiClient {
 
   async getConversationMessages(conversationId: number, limit: number = 50, offset: number = 0): Promise<{ messages: MessageItem[]; count: number; limit: number; offset: number }> {
     return this.request<{ messages: MessageItem[]; count: number; limit: number; offset: number }>(`/api/messages/conversation/${conversationId}?limit=${limit}&offset=${offset}`, {
+      method: 'GET',
+    });
+  }
+
+  async searchMessages(query: string, limit: number = 20, offset: number = 0): Promise<{ results: ConversationSearchResult[]; count: number; limit: number; offset: number }> {
+    const params = new URLSearchParams({
+      q: query,
+      limit: limit.toString(),
+      offset: offset.toString(),
+    });
+    return this.request<{ results: ConversationSearchResult[]; count: number; limit: number; offset: number }>(`/api/messages/search?${params}`, {
       method: 'GET',
     });
   }

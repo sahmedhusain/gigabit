@@ -102,7 +102,7 @@ const GroupMembersTab: React.FC<GroupMembersTabProps> = ({ groupId }) => {
       </div>
 
       {/* Members Content */}
-      <div className="flex-1 overflow-y-auto p-6">
+      <div className="flex-1 overflow-y-scroll scrollbar-hide p-6" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
         {isLoading ? (
           <div className="flex items-center justify-center h-full">
             <motion.div

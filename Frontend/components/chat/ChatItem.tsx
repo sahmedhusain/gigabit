@@ -183,7 +183,7 @@ export default function ChatItem({ item, onClick, onDelete, getUserStatus, typin
   }
 
   const gradient = isGroup
-    ? 'from-blue-400 via-indigo-500 to-purple-600'
+    ? 'from-emerald-400 via-teal-500 to-cyan-600'
     : 'from-emerald-400 via-teal-500 to-cyan-600';
 
   const hasTypingUsers = typingUsers && typingUsers.length > 0;

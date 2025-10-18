@@ -29,5 +29,17 @@ module.exports = {
       };
       addUtilities(animationDelays);
     },
+    function({ addUtilities }) {
+      addUtilities({
+        '.scrollbar-hide': {
+          /* Firefox */
+          'scrollbar-width': 'none',
+          /* Safari and Chrome */
+          '&::-webkit-scrollbar': {
+            display: 'none'
+          }
+        }
+      });
+    },
   ],
 }

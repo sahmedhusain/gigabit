@@ -166,7 +166,7 @@ export default function PollCard({ poll, onVote, onUnvote, onDelete, onExpire, c
                 className="w-8 h-8 rounded-full object-cover border border-white/20"
               />
             ) : (
-              <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-full flex items-center justify-center">
+              <div className="w-8 h-8 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-full flex items-center justify-center">
                 <span className="text-white text-xs font-bold">
                   {poll.creator.first_name[0]}{poll.creator.last_name[0]}
                 </span>
@@ -190,7 +190,7 @@ export default function PollCard({ poll, onVote, onUnvote, onDelete, onExpire, c
           {poll.allow_multiple_choices && (
             <>
               <span>•</span>
-              <div className="flex items-center space-x-1 text-purple-300">
+              <div className="flex items-center space-x-1 text-emerald-300">
                 <CheckCircle className="w-3 h-3" />
                 <span>Multiple choice</span>
               </div>
@@ -212,11 +212,11 @@ export default function PollCard({ poll, onVote, onUnvote, onDelete, onExpire, c
                 key={option.id}
                 className={`relative p-4 rounded-xl border transition-all duration-300 cursor-pointer overflow-hidden ${
                   canVote
-                    ? 'hover:border-purple-400/50 hover:shadow-lg hover:shadow-purple-500/10'
+                    ? 'hover:border-emerald-400/50 hover:shadow-lg hover:shadow-emerald-500/10'
                     : ''
                 } ${
                   isSelected || isUserVote
-                    ? 'bg-purple-500/20 border-purple-400/50 shadow-md shadow-purple-500/20'
+                    ? 'bg-emerald-500/20 border-emerald-400/50 shadow-md shadow-emerald-500/20'
                     : 'bg-white/5 border-white/20'
                 }`}
                 onClick={() => canVote && handleOptionClick(option.id)}
@@ -229,7 +229,7 @@ export default function PollCard({ poll, onVote, onUnvote, onDelete, onExpire, c
                 {/* Vote percentage background */}
                 <motion.div
                   className={`absolute inset-y-0 left-0 rounded-xl transition-all duration-500 ${
-                    isSelected || isUserVote ? 'bg-purple-500/30' : 'bg-white/10'
+                    isSelected || isUserVote ? 'bg-emerald-500/30' : 'bg-white/10'
                   }`}
                   initial={{ width: 0 }}
                   animate={{ width: `${Math.min(percentage, 100)}%` }}
@@ -242,7 +242,7 @@ export default function PollCard({ poll, onVote, onUnvote, onDelete, onExpire, c
                     {!isExpired && (
                       <div className={`w-5 h-5 rounded-${poll.allow_multiple_choices ? 'lg' : 'full'} border-2 flex-shrink-0 transition-all duration-300 flex items-center justify-center ${
                         isSelected || isUserVote
-                          ? 'border-purple-300 bg-purple-400 shadow-lg shadow-purple-400/30'
+                          ? 'border-emerald-300 bg-emerald-400 shadow-lg shadow-emerald-400/30'
                           : 'border-white/40'
                       }`}>
                         {(isSelected || isUserVote) && (
@@ -299,7 +299,7 @@ export default function PollCard({ poll, onVote, onUnvote, onDelete, onExpire, c
         </div>
         {poll.user_voted && (
           <motion.div
-            className="flex items-center space-x-1 text-purple-300 font-semibold"
+            className="flex items-center space-x-1 text-emerald-300 font-semibold"
             initial={{ opacity: 0, x: 10 }}
             animate={{ opacity: 1, x: 0 }}
           >
@@ -312,11 +312,11 @@ export default function PollCard({ poll, onVote, onUnvote, onDelete, onExpire, c
       {/* Voting indicator */}
       {isVoting && (
         <motion.div
-          className="mt-3 flex items-center justify-center space-x-2 text-purple-300 text-sm"
+          className="mt-3 flex items-center justify-center space-x-2 text-emerald-300 text-sm"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
         >
-          <div className="w-4 h-4 border-2 border-purple-300/30 border-t-purple-300 rounded-full animate-spin"></div>
+          <div className="w-4 h-4 border-2 border-emerald-300/30 border-t-emerald-300 rounded-full animate-spin"></div>
           <span>Updating vote...</span>
         </motion.div>
       )}

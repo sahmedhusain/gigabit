@@ -6,6 +6,7 @@ import { useAuth } from '@/context/AuthContext'
 import { useWebSocket } from '@/context/WebSocketContext'
 import { useRealTimeMessages, useTypingIndicator } from '@/hooks'
 import EmojiPicker from 'emoji-picker-react'
+import { MessageRounded } from '@mui/icons-material'
 
 interface EmojiData {
   emoji: string
@@ -17,17 +18,21 @@ interface GroupChatTabProps {
   conversationId: number
   groupId?: number
   onConversationResolved?: (conversationId: number) => void
+  highlightMessageId?: number
 }
 
 const GroupChatTab: React.FC<GroupChatTabProps> = ({
   conversationId,
   groupId,
-  onConversationResolved
+  onConversationResolved,
+  highlightMessageId
 }) => {
   const [newMessage, setNewMessage] = useState('')
   const [showEmojiPicker, setShowEmojiPicker] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const messagesContainerRef = useRef<HTMLDivElement>(null)
+  const highlightedRef = useRef<HTMLDivElement | null>(null)
+  const highlightLoadAttemptsRef = useRef<number>(0)
   const [wasAtBottom, setWasAtBottom] = useState(true)
   const [isLoadingHistorical, setIsLoadingHistorical] = useState(false)
   const { user } = useAuth()
@@ -62,6 +67,58 @@ const GroupChatTab: React.FC<GroupChatTabProps> = ({
       fetchConversationMessages(effectiveConversationId, 'group', undefined, 20, 0, false)
     }
   }, [effectiveConversationId, fetchConversationMessages])
+
+  // Scroll to and highlight a specific message if provided
+  useEffect(() => {
+    const targetId = (typeof highlightMessageId === 'number' ? highlightMessageId : undefined)
+    if (!targetId) return
+    
+    const list = Array.from(messages.get(effectiveConversationId) || [])
+    console.log('[GroupChatTab] Highlight effect triggered:', {
+      targetId,
+      effectiveConversationId,
+      messageCount: list.length,
+      attempts: highlightLoadAttemptsRef.current
+    })
+    
+    if (list.length === 0) return
+    
+    // Delay to ensure DOM is fully rendered
+    setTimeout(() => {
+      // Try to find the DOM node for this message id
+      const el = document.querySelector(`[data-message-id="${targetId}"]`) as HTMLDivElement | null
+      console.log('[GroupChatTab] Looking for message element:', { targetId, found: !!el })
+      
+      if (el && messagesContainerRef.current) {
+        highlightedRef.current = el
+        console.log('[GroupChatTab] Scrolling to and highlighting message:', targetId)
+        // Add highlight ring with amber color
+        el.classList.add('ring-2', 'ring-amber-400', 'ring-offset-2', 'ring-offset-transparent')
+        
+        // Scroll to center the message in view with a small additional delay
+        setTimeout(() => {
+          el.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' })
+        }, 50)
+        
+        // Remove highlight after delay
+        setTimeout(() => {
+          el.classList.remove('ring-2', 'ring-amber-400', 'ring-offset-2', 'ring-offset-transparent')
+        }, 2500)
+        // Reset load attempts counter
+        highlightLoadAttemptsRef.current = 0
+      } else {
+        // Message not found yet; try loading more history up to a few attempts
+        const attempts = highlightLoadAttemptsRef.current
+        const canLoadMore = hasMoreMessages.get(effectiveConversationId) && !isLoadingMore.get(effectiveConversationId)
+        console.log('[GroupChatTab] Message not found, can load more?', { attempts, canLoadMore })
+        if (attempts < 5 && canLoadMore) {
+          highlightLoadAttemptsRef.current = attempts + 1
+          console.log('[GroupChatTab] Loading more messages, attempt:', attempts + 1)
+          loadMoreMessages(effectiveConversationId, 'group', undefined)
+        }
+      }
+    }, 100)
+  }, [messages, effectiveConversationId, highlightMessageId, hasMoreMessages, isLoadingMore, loadMoreMessages])
 
   // Handle conversation ID resolution for new group conversations
   useEffect(() => {
@@ -289,20 +346,19 @@ const GroupChatTab: React.FC<GroupChatTabProps> = ({
 
             {/* Message bubble */}
             <div
-              className={`relative px-5 py-4 rounded-2xl shadow-xl backdrop-blur-lg border transition-all duration-300 hover:shadow-2xl hover:scale-[1.02] ${
-                isCurrentUser
+              className={`relative px-5 py-4 rounded-2xl shadow-xl backdrop-blur-lg border transition-all duration-300 hover:shadow-2xl hover:scale-[1.02] ${isCurrentUser
                   ? 'bg-gradient-to-br from-emerald-500 via-teal-500 to-cyan-600 text-white border-emerald-400/40 rounded-br-lg shadow-emerald-500/20'
                   : 'bg-gradient-to-br from-white/15 to-white/10 text-white border-white/25 rounded-bl-lg hover:from-white/20 hover:to-white/15 shadow-white/10'
-              }`}
+                }`}
+              data-message-id={message.id}
             >
               <div className="text-sm leading-relaxed break-words font-medium">
                 {message.content}
               </div>
 
               <motion.div
-                className={`flex items-center justify-between mt-2 space-x-2 ${
-                  isCurrentUser ? 'text-emerald-100' : 'text-white/60'
-                }`}
+                className={`flex items-center justify-between mt-2 space-x-2 ${isCurrentUser ? 'text-emerald-100' : 'text-white/60'
+                  }`}
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ delay: 0.3 }}
@@ -323,10 +379,12 @@ const GroupChatTab: React.FC<GroupChatTabProps> = ({
       {/* Messages Area */}
       <div
         ref={messagesContainerRef}
-        className="flex-1 overflow-y-auto px-6 py-4 space-y-4 min-h-0 scrollbar-thin scrollbar-thumb-emerald-400/30 scrollbar-track-emerald-900/10 hover:scrollbar-thumb-emerald-400/50 transition-colors duration-200"
+        className="flex-1 overflow-y-scroll scrollbar-hide px-6 py-4 space-y-4 min-h-0 transition-colors duration-200"
         onScroll={handleScroll}
         style={{
-          background: 'linear-gradient(180deg, rgba(255,255,255,0.02) 0%, rgba(255,255,255,0.00) 100%)'
+          background: 'linear-gradient(180deg, rgba(255,255,255,0.02) 0%, rgba(255,255,255,0.00) 100%)',
+          scrollbarWidth: 'none',
+          msOverflowStyle: 'none'
         }}
       >
         {/* Load Previous Messages Button */}
@@ -389,18 +447,18 @@ const GroupChatTab: React.FC<GroupChatTabProps> = ({
               >
                 <div className="text-center max-w-md mx-auto">
                   <motion.div
-                    animate={{ 
+                    animate={{
                       scale: [1, 1.1, 1],
-                      rotate: [0, 5, -5, 0] 
+                      rotate: [0, 5, -5, 0]
                     }}
-                    transition={{ 
-                      duration: 3, 
+                    transition={{
+                      duration: 3,
                       repeat: Infinity,
                       repeatType: "reverse"
                     }}
                     className="text-6xl mb-6 filter drop-shadow-lg"
                   >
-                    💬
+                    <MessageRounded className="w-16 h-16 text-white/40 mx-auto mb-6" />
                   </motion.div>
                   <h3 className="text-2xl font-bold bg-gradient-to-r from-white to-white/70 bg-clip-text text-transparent mb-3">
                     No messages yet
@@ -423,7 +481,7 @@ const GroupChatTab: React.FC<GroupChatTabProps> = ({
       {/* Input Area */}
       <div className="bg-gradient-to-t from-white/10 via-white/5 to-white/8 backdrop-blur-2xl border-t border-white/25 p-6 flex-shrink-0 relative">
         <div className="absolute inset-0 bg-gradient-to-t from-emerald-500/5 via-teal-500/5 to-cyan-500/5" />
-        
+
         <div className="flex items-center space-x-4 relative z-10">
           {/* Emoji Picker Button */}
           <motion.button

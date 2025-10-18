@@ -414,13 +414,23 @@ body {
   }
 }
 
-/* Enhanced transparent scrollbar design */
-.sidebar-scroll,
-.scrollbar-thin,
-* {
+/* Hide scrollbars completely for specific containers */
+.scrollbar-hide {
   /* Firefox */
-  scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
+  scrollbar-width: none !important;
+  /* Safari and Chrome */
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+/* Ensure scrollbar-hide overrides global scrollbar styles */
+.scrollbar-hide {
+  scrollbar-width: none !important;
+  scrollbar-color: transparent transparent !important;
 }
 
 .sidebar-scroll::-webkit-scrollbar,

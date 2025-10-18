@@ -767,7 +767,7 @@ export default function RightSidebar({
                         </div>
 
                         {/* Events List */}
-                        <div className="max-h-60 overflow-y-auto p-4 space-y-3">
+                        <div className="max-h-60 overflow-y-scroll scrollbar-hide p-4 space-y-3" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
                           {(() => {
                             const eventsForDate = getEventsForDate(slideUpDate);
                             return eventsForDate.map((event) => {
@@ -846,15 +846,21 @@ export default function RightSidebar({
               </h3>
               <div className="flex items-center space-x-2">
                 {(() => {
-                  // Count online users with status 'online' excluding current user
-                  const onlineCount = onlineUsers.filter(user =>
+                  // Use followingUsers if available, otherwise fall back to onlineUsers
+                  const allFollowing = followingUsers.length > 0 ? followingUsers : onlineUsers;
+                  const filteredUsers = allFollowing.filter(user =>
                     (user.username !== currentUser?.username) &&
                     (user.id !== currentUser?.id) &&
-                    (user.user_id !== currentUser?.id) &&
-                    user.status === 'online'
-                  ).length;
+                    (user.user_id !== currentUser?.id)
+                  );
 
-                  // Only show online indicator if there are online users
+                  // Count online following users (users with status 'online')
+                  const onlineCount = filteredUsers.filter(user => {
+                    const onlineUser = onlineUsers.find(u => u.user_id === (user.id || user.user_id))
+                    return onlineUser?.status === 'online'
+                  }).length;
+
+                  // Only show online indicator if there are online following users
                   if (onlineCount > 0) {
                     return (
                       <div className="flex items-center space-x-1">
@@ -873,7 +879,7 @@ export default function RightSidebar({
 
             {expandedSection === 'following' && (
               <div className="section-content following-content flex-1 flex flex-col min-h-0">
-                <div className="flex-1 overflow-y-auto">
+                <div className="flex-1 overflow-y-scroll scrollbar-hide" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
                   <div className="space-y-2">
                     {(() => {
                       // Use followingUsers if available, otherwise fall back to onlineUsers
@@ -1229,7 +1235,7 @@ export default function RightSidebar({
             {/* Expanded State */}
             {expandedSection === 'invitations' && (
               <div className="section-content invitation-content flex-1 flex flex-col min-h-0">
-                <div className="flex-1 overflow-y-auto">
+                <div className="flex-1 overflow-y-scroll scrollbar-hide" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
                   <div className="space-y-3">
                     {loadingInvitations ? (
                       <div className="flex items-center justify-center py-8">

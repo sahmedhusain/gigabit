@@ -829,3 +829,195 @@ func (s *MessageService) MarkConversationAsUnread(conversationID uint, userID ui
 		return err
 	}
 }
+
+// SearchMessages searches for messages containing the query text
+// Returns conversations that have messages matching the search
+func (s *MessageService) SearchMessages(userID uint, query string, limit, offset int) ([]models.ConversationSearchResult, error) {
+	if strings.TrimSpace(query) == "" {
+		return []models.ConversationSearchResult{}, nil
+	}
+
+	searchPattern := "%" + strings.ToLower(query) + "%"
+	fmt.Printf("SearchMessages called with userID=%d, query='%s', limit=%d, offset=%d\n", userID, query, limit, offset)
+	fmt.Printf("Search pattern: '%s'\n", searchPattern)
+
+	// Search in private messages - simplified query
+	privateQuery := `
+		SELECT DISTINCT
+			'private' as type,
+			pc.id as conversation_id,
+			CASE WHEN pc.participant1_id = ? THEN pc.participant2_id ELSE pc.participant1_id END as participant_id,
+			pm.id as matching_message_id,
+			pm.content as matching_message,
+			pm.created_at as message_time,
+			u.first_name,
+			u.last_name,
+			u.avatar
+		FROM private_messages pm
+		JOIN private_conversations pc ON pm.conversation_id = pc.id
+		JOIN users u ON u.id = CASE WHEN pc.participant1_id = ? THEN pc.participant2_id ELSE pc.participant1_id END
+		WHERE (pc.participant1_id = ? OR pc.participant2_id = ?)
+		AND LOWER(pm.content) LIKE ?
+		ORDER BY pm.created_at DESC
+		LIMIT ? OFFSET ?
+	`
+
+	// Search in group messages - simplified query
+	groupQuery := `
+		SELECT DISTINCT
+			'group' as type,
+			gc.id as conversation_id,
+			g.id as group_id,
+			g.name as group_name,
+			g.avatar as group_avatar,
+			gm.id as matching_message_id,
+			gm.content as matching_message,
+			gm.created_at as message_time,
+			u.first_name,
+			u.last_name,
+			u.avatar
+		FROM group_messages gm
+		JOIN group_conversations gc ON gm.conversation_id = gc.id
+		JOIN groups g ON gc.group_id = g.id
+		JOIN group_members gmbr ON g.id = gmbr.group_id AND gmbr.user_id = ?
+		JOIN users u ON gm.sender_id = u.id
+		WHERE LOWER(gm.content) LIKE ?
+		ORDER BY gm.created_at DESC
+		LIMIT ? OFFSET ?
+	`
+
+	var results []models.ConversationSearchResult
+
+	// Flexible timestamp parser to handle various SQLite datetime formats
+	parseTS := func(s string) time.Time {
+		layouts := []string{
+			time.RFC3339,
+			"2006-01-02 15:04:05Z07:00",
+			"2006-01-02 15:04:05",
+		}
+		for _, l := range layouts {
+			if t, err := time.Parse(l, s); err == nil {
+				return t
+			}
+		}
+		// Fallback to now to avoid failing the whole search on parse issues
+		fmt.Printf("SearchMessages: failed to parse time '%s', defaulting to now\n", s)
+		return time.Now()
+	}
+
+	// Search private messages
+	fmt.Printf("Executing private query...\n")
+	privateRows, err := s.db.Query(privateQuery,
+		userID, userID, userID, userID, searchPattern, limit, offset)
+	if err != nil {
+		// Non-fatal: continue with group messages
+		fmt.Printf("Private query error (non-fatal): %v\n", err)
+	} else {
+		defer privateRows.Close()
+
+		fmt.Printf("Processing private results...\n")
+		for privateRows.Next() {
+			var result models.ConversationSearchResult
+			var participantID uint
+			var firstName, lastName sql.NullString
+			var avatar sql.NullString
+			var messageTimeStr string
+
+			err := privateRows.Scan(
+				&result.Type,
+				&result.ConversationID,
+				&participantID,
+				&result.MatchingMessageID,
+				&result.MatchingMessage,
+				&messageTimeStr,
+				&firstName,
+				&lastName,
+				&avatar,
+			)
+			if err != nil {
+				// Non-fatal scan issue: skip this row and continue
+				fmt.Printf("Private scan error (skipping row): %v\n", err)
+				continue
+			}
+
+			// Parse timestamp
+			result.MessageTime = parseTS(messageTimeStr)
+
+			// Set participant info
+			result.ParticipantID = participantID
+			if firstName.Valid && lastName.Valid {
+				result.ParticipantName = firstName.String + " " + lastName.String
+			}
+			if avatar.Valid {
+				result.ParticipantAvatar = &avatar.String
+			}
+
+			results = append(results, result)
+			fmt.Printf("Added private result: %+v\n", result)
+		}
+	}
+
+	// Search group messages
+	fmt.Printf("Executing group query...\n")
+	groupRows, err := s.db.Query(groupQuery, userID, searchPattern, limit, offset)
+	if err != nil {
+		// Non-fatal: return whatever private results we have
+		fmt.Printf("Group query error (non-fatal): %v\n", err)
+	} else {
+		defer groupRows.Close()
+
+		fmt.Printf("Processing group results...\n")
+		for groupRows.Next() {
+			var result models.ConversationSearchResult
+			var groupID uint
+			var groupName, groupAvatar sql.NullString
+			var senderFirstName, senderLastName, senderAvatar sql.NullString
+			var messageTimeStr string
+
+			err := groupRows.Scan(
+				&result.Type,
+				&result.ConversationID,
+				&groupID,
+				&groupName,
+				&groupAvatar,
+				&result.MatchingMessageID,
+				&result.MatchingMessage,
+				&messageTimeStr,
+				&senderFirstName,
+				&senderLastName,
+				&senderAvatar,
+			)
+			if err != nil {
+				// Non-fatal scan issue: skip this row and continue
+				fmt.Printf("Group scan error (skipping row): %v\n", err)
+				continue
+			}
+
+			// Parse timestamp
+			result.MessageTime = parseTS(messageTimeStr)
+
+			// Set group info
+			result.GroupID = &groupID
+			if groupName.Valid {
+				result.GroupName = &groupName.String
+			}
+			if groupAvatar.Valid {
+				result.GroupAvatar = &groupAvatar.String
+			}
+
+			// Set sender info
+			if senderFirstName.Valid && senderLastName.Valid {
+				result.SenderName = senderFirstName.String + " " + senderLastName.String
+			}
+			if senderAvatar.Valid {
+				result.SenderAvatar = &senderAvatar.String
+			}
+
+			results = append(results, result)
+			fmt.Printf("Added group result: %+v\n", result)
+		}
+	}
+
+	fmt.Printf("SearchMessages returning %d results\n", len(results))
+	return results, nil
+}

@@ -19,7 +19,9 @@ function FeedPage() {
 
   // Get filter from URL params
   const filterParam = searchParams.get('filter') || 'all'
+  const sortParam = searchParams.get('sort') || 'newest'
   const [feedSubTab, setFeedSubTab] = useState(filterParam)
+  const [sortOrder, setSortOrder] = useState<'newest' | 'oldest'>(sortParam as 'newest' | 'oldest')
   const [showCreatePost, setShowCreatePost] = useState(false)
 
   // Post Creation State
@@ -33,11 +35,14 @@ function FeedPage() {
   // Data State
   const [posts, setPosts] = useState<Post[]>([])
 
-  // Update URL when filter changes
+  // Update URL when filter or sort changes
   useEffect(() => {
-    const newUrl = feedSubTab === 'all' ? '/feed' : `/feed?filter=${feedSubTab}`
+    const params = new URLSearchParams()
+    if (feedSubTab !== 'all') params.set('filter', feedSubTab)
+    if (sortOrder !== 'newest') params.set('sort', sortOrder)
+    const newUrl = params.toString() ? `/feed?${params.toString()}` : '/feed'
     router.replace(newUrl)
-  }, [feedSubTab, router])
+  }, [feedSubTab, sortOrder, router])
 
   const fetchFeedPosts = useCallback(async () => {
     try {
@@ -73,7 +78,8 @@ function FeedPage() {
           shares: 0,
           timeAgo: formatTimeAgo(String(p['created_at'] ?? '')),
           privacy: String(p['privacy'] ?? ''),
-          isLiked: Boolean(p['is_liked'])
+          isLiked: Boolean(p['is_liked']),
+          created_at: String(p['created_at'] ?? '')
         }
       })
 
@@ -284,6 +290,8 @@ function FeedPage() {
         loadingUsers={loadingUsers}
         onCreatePost={handleCreatePost}
         feedSubTab={feedSubTab}
+        sortOrder={sortOrder}
+        setSortOrder={setSortOrder}
       />
     </AppLayout>
   )

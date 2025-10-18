@@ -65,10 +65,18 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
   const reconnectTimeout = useRef<NodeJS.Timeout | null>(null)
   const pingInterval = useRef<NodeJS.Timeout | null>(null)
   const pongTimeout = useRef<NodeJS.Timeout | null>(null)
+  const messageQueue = useRef<Omit<WebSocketMessage, 'timestamp'>[]>([])
+  const isReconnecting = useRef(false)
 
   const connect = useCallback(() => {
-    if (!isAuthenticated || !user || socket?.readyState === WebSocket.CONNECTING) {
-      console.log('WebSocket connection skipped:', { isAuthenticated, user: !!user, socketState: socket?.readyState })
+    if (!isAuthenticated || !user) {
+      console.log('WebSocket connection skipped:', { isAuthenticated, user: !!user })
+      return
+    }
+
+    // Prevent multiple simultaneous connection attempts
+    if (socket?.readyState === WebSocket.CONNECTING || socket?.readyState === WebSocket.OPEN) {
+      console.log('WebSocket already connecting or connected:', socket.readyState)
       return
     }
 
@@ -88,6 +96,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
       console.log('WebSocket connected successfully')
       setIsConnected(true)
       reconnectAttempts.current = 0
+      isReconnecting.current = false
       
       // Start heartbeat
       startPingInterval(newSocket)
@@ -98,6 +107,19 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
         data: { action: 'get_online_users' }
       }
       newSocket.send(JSON.stringify({ ...message, timestamp: Date.now() }))
+      
+      // Send any queued messages while ws was disconnected
+      if (messageQueue.current.length > 0) {
+        console.log(`Sending ${messageQueue.current.length} queued messages`)
+        messageQueue.current.forEach(queuedMessage => {
+          const fullMessage: WebSocketMessage = {
+            ...queuedMessage,
+            timestamp: Date.now()
+          }
+          newSocket.send(JSON.stringify(fullMessage))
+        })
+        messageQueue.current = []
+      }
     }
 
     newSocket.onmessage = (event) => {
@@ -196,18 +218,26 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
       setSocket(null)
       stopPingInterval()
       
-      // Attempt reconnection if not a manual close
-      if (event.code !== 1000 && reconnectAttempts.current < maxReconnectAttempts && isAuthenticated) {
+      // Attempt reconnection if not a manual close (code 1000) and user is still authenticated
+      if (event.code !== 1000 && isAuthenticated && !isReconnecting.current) {
+        isReconnecting.current = true
         reconnectAttempts.current++
-        const delay = Math.min(1000 * Math.pow(2, reconnectAttempts.current), 30000)
-        console.log(`Attempting to reconnect in ${delay}ms (attempt ${reconnectAttempts.current}/${maxReconnectAttempts})`)
+        const baseDelay = Math.min(1000 * Math.pow(1.5, reconnectAttempts.current), 30000)
+        const jitter = Math.random() * 1000 // Add 0-1s of jitter to prevent thundering herd
+        const delay = baseDelay + jitter
+        console.log(`Attempting to reconnect in ${Math.round(delay)}ms (attempt ${reconnectAttempts.current})`)
         
         if (reconnectTimeout.current) {
           clearTimeout(reconnectTimeout.current)
         }
         reconnectTimeout.current = setTimeout(() => {
+          isReconnecting.current = false
           connect()
         }, delay)
+      } else if (event.code === 1000) {
+        console.log('WebSocket closed normally, no reconnection needed')
+      } else {
+        console.log('WebSocket closed and user not authenticated, no reconnection')
       }
     }
 
@@ -277,6 +307,8 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
     setIsConnected(false)
     setOnlineUsers([])
     reconnectAttempts.current = 0
+    isReconnecting.current = false
+    messageQueue.current = [] // Clear queued messages on manual disconnect
   }, [socket])
 
   const sendMessage = useCallback((message: Omit<WebSocketMessage, 'timestamp'>) => {
@@ -287,9 +319,17 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
       }
       socket.send(JSON.stringify(fullMessage))
     } else {
-      console.warn('WebSocket is not connected. Cannot send message:', message)
+      console.warn('WebSocket is not connected. Queueing message:', message.type)
+      // Queue the message to be sent when connection is restored
+      messageQueue.current.push(message)
+      
+      // If not currently reconnecting, try to reconnect
+      if (!isReconnecting.current && isAuthenticated && user) {
+        console.log('WebSocket disconnected, attempting to reconnect...')
+        connect()
+      }
     }
-  }, [socket])
+  }, [socket, isAuthenticated, user, connect])
 
   const addMessageListener = useCallback((callback: (message: WebSocketMessage) => void) => {
     messageListeners.current.push(callback)

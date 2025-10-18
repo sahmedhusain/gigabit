@@ -113,6 +113,7 @@ func (s *Server) setupRoutes() {
 	chatHandler := handlers.NewChatHandler(s.DB.GetDB())
 	conversationHandler := handlers.NewConversationHandler(s.DB.GetDB())
 	statusHandler := handlers.NewStatusHandler(s.DB.GetDB())
+	searchHandler := handlers.NewSearchHandler(s.DB.GetDB())
 
 	// Health check
 	s.router.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
@@ -143,6 +144,9 @@ func (s *Server) setupRoutes() {
 	s.router.HandleFunc("/api/users/search", s.handleRoute(profileHandler.SearchUsers, true))
 	// Public stats route (no authentication required)
 	s.router.HandleFunc("/api/stats/", s.handlePublicStatsRoute(profileHandler))
+
+	// Search routes
+	s.router.HandleFunc("/api/search/suggestions", s.handleRoute(searchHandler.UnifiedSearch, true))
 
 	// User routes
 	s.router.HandleFunc("/api/users", s.handleRoute(userHandler.GetAllUsers, true))

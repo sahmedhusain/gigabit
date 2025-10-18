@@ -35,6 +35,10 @@ function ChatsPage() {
   // Get filter from URL params
   const filterParam = searchParams.get('filter') || 'all'
   const chatId = searchParams.get('chat')
+  // Support deep link params from search suggestions (legacy)
+  const groupParam = searchParams.get('group')
+  const userParam = searchParams.get('user')
+  const highlightMessageParam = searchParams.get('message')
   
   const [chatSubTab, setChatSubTab] = useState(filterParam)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
@@ -83,35 +87,69 @@ function ChatsPage() {
     lastStatusChange: user.last_status_change
   } : null
 
-  // Update URL when filter changes
+  // Update URL when filter or open chat changes (preserve deep-link params for highlight)
   useEffect(() => {
     const params = new URLSearchParams()
-    if (chatSubTab !== 'all') {
-      params.set('filter', chatSubTab)
-    }
+    // lock to /chats/all as per requirement, but preserve filter in param for state
+    params.set('filter', chatSubTab)
     if (openChatWindow && openChatWindow.conversationId) {
       params.set('chat', openChatWindow.conversationId.toString())
     }
-    
-    const queryString = params.toString()
-    const newUrl = queryString ? `/chats?${queryString}` : '/chats'
-    router.replace(newUrl)
+    if (openChatWindow?.highlightMessageId || highlightMessageParam) {
+      params.set('message', (openChatWindow?.highlightMessageId || highlightMessageParam)!.toString())
+    }
+    router.replace(`/chats/all?${params}`)
   }, [chatSubTab, openChatWindow, router])
 
-  // Open chat from URL parameter
+  // Open chat from various URL parameters
   useEffect(() => {
-    if (chatId && chats.length > 0) {
-      const chat = chats.find(c => c.id === parseInt(chatId))
-      if (chat) {
+    // Direct conversation open via ?chat=
+    if (chatId) {
+      const id = parseInt(chatId)
+      if (!isNaN(id)) {
+        // If chats already loaded, try to find details; otherwise open with minimal info
+        const chat = chats.find(c => c.id === id)
         setOpenChatWindow({
-          conversationId: chat.id,
-          type: chat.isGroup ? 'group' : 'private',
-          name: chat.name,
-          participantId: chat.participantId
+          conversationId: id,
+          type: chat?.isGroup ? 'group' : 'private',
+          name: chat?.name || 'Chat',
+          participantId: chat?.participantId,
+          groupId: chat?.isGroup ? chat.groupId : undefined,
+          highlightMessageId: highlightMessageParam ? parseInt(highlightMessageParam) : undefined
+        })
+        return
+      }
+    }
+
+    // Legacy support
+    if (groupParam) {
+      const groupId = parseInt(groupParam)
+      if (!isNaN(groupId)) {
+        setOpenChatWindow({
+          conversationId: groupId,
+          type: 'group',
+          name: `Group #${groupId}`,
+          groupId,
+          highlightMessageId: highlightMessageParam ? parseInt(highlightMessageParam) : undefined
+        })
+        return
+      }
+    }
+
+    if (userParam) {
+      const participantId = parseInt(userParam)
+      if (!isNaN(participantId)) {
+        const existing = chats.find(c => !c.isGroup && c.participantId === participantId)
+        setOpenChatWindow({
+          conversationId: existing?.id || 0,
+          type: 'private',
+          name: existing?.name || 'Direct Message',
+          participantId,
+          highlightMessageId: highlightMessageParam ? parseInt(highlightMessageParam) : undefined
         })
       }
     }
-  }, [chatId, chats])
+  }, [chatId, chats, groupParam, userParam, highlightMessageParam])
 
   const formatTimeAgo = (dateString: string) => {
     const date = new Date(dateString)
@@ -159,7 +197,8 @@ function ChatsPage() {
           participantAvatar: conversation.participant?.avatar,
           lastMessageSenderId: conversation.last_message?.sender_id,
           // Store the actual group/participant ID for API calls
-          actualId: conversation.group?.id || conversation.participant?.id
+          // For group chats, keep the raw group id so we can fetch group data or resolve conversation id
+          groupId: conversation.group?.id
         }
       }))
     } catch (err) {

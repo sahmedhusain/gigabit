@@ -1,11 +1,14 @@
 'use client'
-import { useState, useEffect } from 'react'
-import { Heart, MessageSquare, Bookmark, Send, Sparkles, User, Image as ImageIcon, X, MoreHorizontal, Globe, Lock, EyeOff, Plus, ArrowUp, ArrowDown } from 'lucide-react'
+import { useState, useEffect, useRef } from 'react'
+import { Heart, MessageSquare, Bookmark, Send, Sparkles, User, Image as ImageIcon, X, MoreHorizontal, Globe, Lock, EyeOff, Plus, ArrowUp, ArrowDown, Trash2 } from 'lucide-react'
 import { Post, Comment } from '@/lib/api'
 import { useRouter } from 'next/navigation'
 import { useToast } from '@/context/ToastContext'
 import Image from 'next/image'
 import { getAvatarUrl } from '@/utils/avatarUtils'
+import { useAuth } from '@/context/AuthContext'
+import { api } from '@/lib/api'
+import { AnimatePresence, motion } from 'framer-motion'
 
 interface ActivitySectionProps {
   activitySubTab: string
@@ -14,6 +17,10 @@ interface ActivitySectionProps {
   onPostBookmark?: (postId: number) => void
   sortOrder?: 'newest' | 'oldest'
   setSortOrder?: (sort: 'newest' | 'oldest') => void
+  hasMoreResults?: boolean
+  isLoadingMore?: boolean
+  onLoadMore?: () => void
+  resultsContainerRef?: React.RefObject<HTMLDivElement | null>
 }
 
 export default function ActivitySection({
@@ -22,10 +29,20 @@ export default function ActivitySection({
   onPostLike,
   onPostBookmark,
   sortOrder = 'newest',
-  setSortOrder
+  setSortOrder,
+  hasMoreResults = false,
+  isLoadingMore = false,
+  onLoadMore,
+  resultsContainerRef
 }: ActivitySectionProps) {
   const router = useRouter()
   const { success, error } = useToast()
+  const { user } = useAuth()
+
+  // Three-dot menu state
+  const [openMenu, setOpenMenu] = useState<{[key: number]: boolean}>({})
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState<{[key: number]: boolean}>({})
+  const [isDeleting, setIsDeleting] = useState<{[key: number]: boolean}>({})
 
   // Comment modal state
   const [isCommentModalOpen, setIsCommentModalOpen] = useState(false)
@@ -50,6 +67,31 @@ export default function ActivitySection({
     e.stopPropagation()
     setSelectedPostForComment(post)
     setIsCommentModalOpen(true)
+  }
+
+  const canDeletePost = (post: Post) => {
+    return user && user.id === post.user.id
+  }
+
+  const handleDeletePost = (postId: number) => {
+    setShowDeleteConfirm(prev => ({ ...prev, [postId]: true }))
+  }
+
+  const confirmDeletePost = async (postId: number) => {
+    setIsDeleting(prev => ({ ...prev, [postId]: true }))
+    try {
+      await api.deletePost(postId)
+      success('Post deleted successfully')
+      // Optionally refresh posts or remove from local state
+      window.location.reload() // Simple refresh for now
+    } catch (err) {
+      console.error('Failed to delete post:', err)
+      error('Failed to delete post. Please try again.')
+    } finally {
+      setIsDeleting(prev => ({ ...prev, [postId]: false }))
+      setShowDeleteConfirm(prev => ({ ...prev, [postId]: false }))
+      setOpenMenu(prev => ({ ...prev, [postId]: false }))
+    }
   }
 
   const handleSubmitComment = async () => {
@@ -111,6 +153,21 @@ export default function ActivitySection({
       error('Failed to post comment. Please try again.')
     } finally {
       setIsSubmittingComment(false)
+    }
+  }
+
+  const getPrivacyIcon = (privacy: string) => {
+    switch (privacy) {
+      case 'public':
+        return <Globe className="w-4 h-4" />
+      case 'followers':
+        return <EyeOff className="w-4 h-4" />
+      case 'friends':
+        return <Lock className="w-4 h-4" />
+      case 'listed':
+        return <User className="w-4 h-4" />
+      default:
+        return <Globe className="w-4 h-4" />
     }
   }
 
@@ -244,13 +301,49 @@ export default function ActivitySection({
           </div>
         </div>
 
-        <button
-          className="p-3 text-white/70 hover:text-white hover:bg-white/10 rounded-xl transition-all duration-200 hover:scale-105"
-          title="More options"
-          aria-label="More options"
-        >
-          <MoreHorizontal className="w-5 h-5" />
-        </button>
+        {/* Privacy Indicator */}
+        <div className="flex items-center space-x-2 text-white/60">
+          {getPrivacyIcon(post.privacy)}
+          <span className="text-xs capitalize">{post.privacy}</span>
+        </div>
+
+        {canDeletePost(post) && (
+          <div className="relative">
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                setOpenMenu(prev => ({ ...prev, [post.id]: !prev[post.id] }))
+              }}
+              className="p-3 text-white/70 hover:text-white hover:bg-white/10 rounded-xl transition-all duration-200 hover:scale-105"
+              title="More options"
+              aria-label="More options"
+            >
+              <MoreHorizontal className="w-5 h-5" />
+            </button>
+
+            {/* Dropdown Menu */}
+            <AnimatePresence>
+              {openMenu[post.id] && (
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.95, y: -10 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.95, y: -10 }}
+                  transition={{ duration: 0.15 }}
+                  className="absolute right-0 top-full mt-2 w-48 bg-gradient-to-br from-slate-800/95 to-slate-900/95 backdrop-blur-xl border border-white/20 rounded-xl shadow-2xl overflow-hidden z-50"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <button
+                    onClick={() => handleDeletePost(post.id)}
+                    className="w-full flex items-center space-x-3 px-4 py-3 text-red-400 hover:bg-red-500/10 transition-all duration-200"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    <span className="text-sm font-medium">Delete Post</span>
+                  </button>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        )}
       </div>
 
       {/* Post Content */}
@@ -441,6 +534,24 @@ export default function ActivitySection({
     return (
       <div className="space-y-6">
         {postsToShow.map((post, index) => renderPostCard(post, activitySubTab, index))}
+        {hasMoreResults && onLoadMore && (
+          <div className="flex justify-center py-6">
+            <button
+              onClick={onLoadMore}
+              disabled={isLoadingMore}
+              className="px-6 py-3 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 disabled:from-gray-500 disabled:to-gray-600 text-white rounded-2xl font-semibold transition-all duration-300 hover:scale-105 disabled:hover:scale-100 disabled:cursor-not-allowed shadow-lg hover:shadow-xl flex items-center space-x-2"
+            >
+              {isLoadingMore ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                  <span>Loading...</span>
+                </>
+              ) : (
+                <span>Load More Posts</span>
+              )}
+            </button>
+          </div>
+        )}
       </div>
     )
   }
@@ -507,7 +618,7 @@ export default function ActivitySection({
           </div>
         </div>
       </div>
-      <div className="flex-1 overflow-y-scroll scrollbar-hide" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+      <div ref={resultsContainerRef} className="flex-1 overflow-y-scroll scrollbar-hide" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
         {renderContent()}
       </div>
 
@@ -663,5 +774,57 @@ export default function ActivitySection({
           </div>
         </div>
       )}
+
+      {/* Delete Confirmation Modal */}
+      <AnimatePresence>
+        {Object.entries(showDeleteConfirm).some(([_, show]) => show) && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+            onClick={() => setShowDeleteConfirm({})}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-gradient-to-br from-slate-800/95 to-slate-900/95 backdrop-blur-xl border border-white/20 rounded-2xl p-6 max-w-sm w-full mx-4"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="text-center">
+                <div className="w-12 h-12 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Trash2 className="w-6 h-6 text-red-400" />
+                </div>
+                <h3 className="text-white font-semibold text-lg mb-2">Delete Post</h3>
+                <p className="text-white/70 text-sm mb-6">
+                  Are you sure you want to delete this post? This action cannot be undone.
+                </p>
+                <div className="flex space-x-3">
+                  <button
+                    onClick={() => setShowDeleteConfirm({})}
+                    className="flex-1 px-4 py-2 text-white/70 hover:text-white hover:bg-white/10 rounded-xl transition-all duration-200"
+                    disabled={Object.values(isDeleting).some(deleting => deleting)}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => {
+                      const postId = Object.keys(showDeleteConfirm).find((key) => showDeleteConfirm[parseInt(key)] !== false)
+                      if (postId) {
+                        confirmDeletePost(parseInt(postId))
+                      }
+                    }}
+                    className="flex-1 px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                    disabled={Object.values(isDeleting).some(deleting => deleting)}
+                  >
+                    {Object.values(isDeleting).some(deleting => deleting) ? 'Deleting...' : 'Delete'}
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )}

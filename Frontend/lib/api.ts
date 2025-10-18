@@ -646,27 +646,25 @@ export class ApiClient {
   }
 
   // Posts endpoints
-  async getFeed(limit: number = 20, offset: number = 0, filter?: string): Promise<{ data: PostResponse[] }> {
+  async getFeed(limit: number = 20, offset: number = 0, filter?: string): Promise<{ posts: PostResponse[]; limit: number; offset: number }> {
     let url = `/api/feed?limit=${limit}&offset=${offset}`;
     if (filter) {
       url += `&filter=${filter}`;
     }
-    const response = await this.request<{ count: number; limit: number; offset: number; posts: PostResponse[] }>(url, {
+    return this.request<{ limit: number; offset: number; posts: PostResponse[] }>(url, {
       method: 'GET',
     });
-    // Transform the response to match the expected format
-    return { data: response.posts };
   }
 
-  async getAllFeed(limit: number = 20, offset: number = 0): Promise<{ data: PostResponse[] }> {
+  async getAllFeed(limit: number = 20, offset: number = 0): Promise<{ posts: PostResponse[]; limit: number; offset: number }> {
     return this.getFeed(limit, offset, 'all');
   }
 
-  async getFollowingFeed(limit: number = 20, offset: number = 0): Promise<{ data: PostResponse[] }> {
+  async getFollowingFeed(limit: number = 20, offset: number = 0): Promise<{ posts: PostResponse[]; limit: number; offset: number }> {
     return this.getFeed(limit, offset, 'following');
   }
 
-  async getFriendsFeed(limit: number = 20, offset: number = 0): Promise<{ data: PostResponse[] }> {
+  async getFriendsFeed(limit: number = 20, offset: number = 0): Promise<{ posts: PostResponse[]; limit: number; offset: number }> {
     return this.getFeed(limit, offset, 'friends');
   }
 

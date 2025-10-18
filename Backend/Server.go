@@ -147,6 +147,7 @@ func (s *Server) setupRoutes() {
 
 	// Search routes
 	s.router.HandleFunc("/api/search/suggestions", s.handleRoute(searchHandler.UnifiedSearch, true))
+	s.router.HandleFunc("/api/search", s.handleRoute(searchHandler.SearchAll, true))
 
 	// User routes
 	s.router.HandleFunc("/api/users", s.handleRoute(userHandler.GetAllUsers, true))

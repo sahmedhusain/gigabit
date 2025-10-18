@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter, useParams, useSearchParams } from 'next/navigation'
 import ProtectedRoute from '@/components/ProtectedRoute'
 import AppLayout from '@/components/AppLayout'
@@ -46,6 +46,20 @@ function FeedFilterPage() {
   const [posts, setPosts] = useState<Post[]>([])
   const [, setIsLoadingPosts] = useState(true)
 
+  // Ref for scroll position management
+  const resultsContainerRef = useRef<HTMLDivElement>(null)
+
+  // Pagination state for each feed type
+  const [paginationState, setPaginationState] = useState<{
+    following: { currentPage: number; hasMoreResults: boolean; isLoadingMore: boolean };
+    friends: { currentPage: number; hasMoreResults: boolean; isLoadingMore: boolean };
+    all: { currentPage: number; hasMoreResults: boolean; isLoadingMore: boolean };
+  }>({
+    following: { currentPage: 0, hasMoreResults: true, isLoadingMore: false },
+    friends: { currentPage: 0, hasMoreResults: true, isLoadingMore: false },
+    all: { currentPage: 0, hasMoreResults: true, isLoadingMore: false }
+  })
+
   // Update URL when filter changes
   useEffect(() => {
     if (feedSubTab !== filter) {
@@ -65,32 +79,44 @@ function FeedFilterPage() {
     router.replace(newUrl)
   }, [sortOrder, feedSubTab, searchParams, router])
 
-  const fetchFeedPosts = useCallback(async () => {
+  const fetchFeedPosts = useCallback(async (page: number = 0, append: boolean = false) => {
     try {
-      setIsLoadingPosts(true)
+      if (append) {
+        setPaginationState(prev => ({
+          ...prev,
+          [feedSubTab as keyof typeof prev]: { ...prev[feedSubTab as keyof typeof prev], isLoadingMore: true }
+        }))
+      } else {
+        setIsLoadingPosts(true)
+      }
+
       console.log('Fetching feed posts...')
       let response: unknown
 
       switch (feedSubTab) {
         case 'following':
           // Fetch posts from users the current user is following
-          response = await api.getFollowingFeed(20, 0)
+          response = await api.getFollowingFeed(20, page * 20)
           break
         case 'friends':
           // Fetch posts from friends (mutual follows)
-          response = await api.getFriendsFeed(20, 0)
+          response = await api.getFriendsFeed(20, page * 20)
           break
         default: // 'all'
-          response = await api.getAllFeed(20, 0)
+          response = await api.getAllFeed(20, page * 20)
       }
 
       const respRec = response as Record<string, unknown>
-      const postsArr = Array.isArray(respRec['data'] as unknown) ? respRec['data'] as unknown[] : [];
-      
-      console.log('Feed response:', { total: postsArr.length, sample: postsArr[0] })
+      const postsArr = Array.isArray(respRec['posts'] as unknown) ? respRec['posts'] as unknown[] : [];
       
       if (!postsArr.length) {
-        setPosts([])
+        if (!append) {
+          setPosts([])
+        }
+        setPaginationState(prev => ({
+          ...prev,
+          [feedSubTab as keyof typeof prev]: { ...prev[feedSubTab as keyof typeof prev], hasMoreResults: false }
+        }))
         return
       }
 
@@ -122,7 +148,35 @@ function FeedFilterPage() {
         return mappedPost
       })
       
-      setPosts(mappedPosts)
+      if (append) {
+        setPosts(prevPosts => [...prevPosts, ...mappedPosts])
+        setPaginationState(prev => ({
+          ...prev,
+          [feedSubTab as keyof typeof prev]: {
+            ...prev[feedSubTab as keyof typeof prev],
+            currentPage: page,
+            isLoadingMore: false
+          }
+        }))
+      } else {
+        setPosts(mappedPosts)
+        setPaginationState(prev => ({
+          ...prev,
+          [feedSubTab as keyof typeof prev]: {
+            currentPage: 0,
+            hasMoreResults: true,
+            isLoadingMore: false
+          }
+        }))
+      }
+
+      // Check if we got fewer posts than requested, indicating no more results
+      if (mappedPosts.length < 20) {
+        setPaginationState(prev => ({
+          ...prev,
+          [feedSubTab as keyof typeof prev]: { ...prev[feedSubTab as keyof typeof prev], hasMoreResults: false }
+        }))
+      }
     } catch (err) {
       console.error('Error fetching posts:', err)
       if (err instanceof NetworkError) {
@@ -134,12 +188,16 @@ function FeedFilterPage() {
       }
     } finally {
       setIsLoadingPosts(false)
+      setPaginationState(prev => ({
+        ...prev,
+        [feedSubTab as keyof typeof prev]: { ...prev[feedSubTab as keyof typeof prev], isLoadingMore: false }
+      }))
     }
   }, [feedSubTab, error])
 
   // Fetch posts on mount and when filter changes
   useEffect(() => {
-    fetchFeedPosts()
+    fetchFeedPosts(0, false) // Reset to first page
   }, [fetchFeedPosts])
 
   // WebSocket real-time notifications
@@ -307,6 +365,23 @@ function FeedFilterPage() {
     }
   }
 
+  const handleLoadMore = useCallback(() => {
+    const currentState = paginationState[feedSubTab as keyof typeof paginationState]
+    if (!currentState.isLoadingMore && currentState.hasMoreResults && resultsContainerRef.current) {
+      // Save current scroll position
+      const scrollTop = resultsContainerRef.current.scrollTop
+
+      fetchFeedPosts(currentState.currentPage + 1, true).then(() => {
+        // Restore scroll position after new posts are loaded
+        requestAnimationFrame(() => {
+          if (resultsContainerRef.current) {
+            resultsContainerRef.current.scrollTop = scrollTop
+          }
+        })
+      })
+    }
+  }, [feedSubTab, paginationState, fetchFeedPosts])
+
   return (
     <AppLayout 
       activeTab="feed"
@@ -349,6 +424,10 @@ function FeedFilterPage() {
         feedSubTab={feedSubTab}
         sortOrder={sortOrder}
         setSortOrder={setSortOrder}
+        hasMoreResults={paginationState[feedSubTab as keyof typeof paginationState].hasMoreResults}
+        isLoadingMore={paginationState[feedSubTab as keyof typeof paginationState].isLoadingMore}
+        onLoadMore={handleLoadMore}
+        resultsContainerRef={resultsContainerRef}
       />
     </AppLayout>
   )

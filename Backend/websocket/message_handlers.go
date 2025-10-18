@@ -51,6 +51,8 @@ func (h *Hub) handleMessage(message Message) {
 		h.handlePollVoteUpdate(message)
 	case MessageTypeLayoutSync:
 		h.handleLayoutSync(message)
+	case MessageTypeSearch:
+		h.handleSearch(message)
 	case MessageTypePing:
 		h.handlePing(message)
 	case MessageTypePong:

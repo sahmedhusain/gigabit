@@ -181,7 +181,6 @@ func (h *PostHandler) GetPosts(w http.ResponseWriter, r *http.Request) {
 
 	writeJSON(w, http.StatusOK, map[string]interface{}{
 		"posts":  posts,
-		"count":  len(posts),
 		"limit":  limit,
 		"offset": offset,
 	})
@@ -215,13 +214,13 @@ func (h *PostHandler) GetUserPosts(w http.ResponseWriter, r *http.Request, userI
 		offsetStr = "0"
 	}
 
-	limit, err := strconv.Atoi(limitStr)
-	if err != nil || limit > 50 {
+	limit, err1 := strconv.Atoi(limitStr)
+	if err1 != nil || limit > 50 {
 		limit = 20
 	}
 
-	offset, err := strconv.Atoi(offsetStr)
-	if err != nil || offset < 0 {
+	offset, err2 := strconv.Atoi(offsetStr)
+	if err2 != nil || offset < 0 {
 		offset = 0
 	}
 
@@ -261,13 +260,13 @@ func (h *PostHandler) GetFeedPosts(w http.ResponseWriter, r *http.Request) {
 		offsetStr = "0"
 	}
 
-	limit, err := strconv.Atoi(limitStr)
-	if err != nil || limit > 50 {
+	limit, errLimit := strconv.Atoi(limitStr)
+	if errLimit != nil || limit > 50 {
 		limit = 20
 	}
 
-	offset, err := strconv.Atoi(offsetStr)
-	if err != nil || offset < 0 {
+	offset, errOffset := strconv.Atoi(offsetStr)
+	if errOffset != nil || offset < 0 {
 		offset = 0
 	}
 
@@ -275,24 +274,30 @@ func (h *PostHandler) GetFeedPosts(w http.ResponseWriter, r *http.Request) {
 	filter := r.URL.Query().Get("filter")
 
 	var posts []models.PostResponse
-
+	var err error
 	switch filter {
 	case "following":
 		posts, err = h.postService.GetFollowingFeedPosts(currentUserID.(uint), limit, offset)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "Failed to get feed")
+			return
+		}
 	case "friends":
 		posts, err = h.postService.GetFriendsFeedPosts(currentUserID.(uint), limit, offset)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "Failed to get feed")
+			return
+		}
 	default: // "all" or empty
 		posts, err = h.postService.GetFeedPosts(currentUserID.(uint), limit, offset)
-	}
-
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, "Failed to get feed")
-		return
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "Failed to get feed")
+			return
+		}
 	}
 
 	writeJSON(w, http.StatusOK, map[string]interface{}{
 		"posts":  posts,
-		"count":  len(posts),
 		"limit":  limit,
 		"offset": offset,
 	})

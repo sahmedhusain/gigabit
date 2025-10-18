@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Heart, Globe, Lock, EyeOff, MessageSquare, Sparkles, Bookmark, Send, MoreHorizontal, User, Image as ImageIcon, Trash2, ArrowUp, ArrowDown } from 'lucide-react'
 import CreatePost from './CreatePost'
 import { Post } from '@/lib/api'
@@ -35,6 +35,10 @@ interface HomeFeedProps {
   feedSubTab: string
   sortOrder: 'newest' | 'oldest'
   setSortOrder: (sort: 'newest' | 'oldest') => void
+  hasMoreResults?: boolean
+  isLoadingMore?: boolean
+  onLoadMore?: () => void
+  resultsContainerRef?: React.RefObject<HTMLDivElement | null>
 }
 
 export default function HomeFeed({
@@ -56,7 +60,11 @@ export default function HomeFeed({
   onCreatePost,
   feedSubTab,
   sortOrder,
-  setSortOrder
+  setSortOrder,
+  hasMoreResults = false,
+  isLoadingMore = false,
+  onLoadMore,
+  resultsContainerRef
 }: HomeFeedProps) {
   const router = useRouter()
   // Feed filter state
@@ -221,10 +229,12 @@ export default function HomeFeed({
     switch (privacy) {
       case 'public':
         return <Globe className="w-4 h-4" />
-      case 'private':
-        return <Lock className="w-4 h-4" />
-      case 'almost_private':
+      case 'followers':
         return <EyeOff className="w-4 h-4" />
+      case 'friends':
+        return <Lock className="w-4 h-4" />
+      case 'listed':
+        return <User className="w-4 h-4" />
       default:
         return <Globe className="w-4 h-4" />
     }
@@ -334,6 +344,12 @@ export default function HomeFeed({
               @{post.user.username} • {post.timeAgo}
             </p>
           </div>
+        </div>
+
+        {/* Privacy Indicator */}
+        <div className="flex items-center space-x-2 text-white/60">
+          {getPrivacyIcon(post.privacy)}
+          <span className="text-xs capitalize">{post.privacy}</span>
         </div>
 
         {canDeletePost(post) && (
@@ -482,6 +498,24 @@ export default function HomeFeed({
     return (
       <div className="space-y-6">
         {postsToShow.map((post, index) => renderPost(post, index))}
+        {hasMoreResults && onLoadMore && (
+          <div className="flex justify-center py-6">
+            <button
+              onClick={onLoadMore}
+              disabled={isLoadingMore}
+              className="px-6 py-3 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 disabled:from-gray-500 disabled:to-gray-600 text-white rounded-2xl font-semibold transition-all duration-300 hover:scale-105 disabled:hover:scale-100 disabled:cursor-not-allowed shadow-lg hover:shadow-xl flex items-center space-x-2"
+            >
+              {isLoadingMore ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                  <span>Loading...</span>
+                </>
+              ) : (
+                <span>Load More Posts</span>
+              )}
+            </button>
+          </div>
+        )}
       </div>
     )
   }
@@ -563,7 +597,7 @@ export default function HomeFeed({
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-scroll scrollbar-hide" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+      <div ref={resultsContainerRef} className="flex-1 overflow-y-scroll scrollbar-hide" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
         {renderContent()}
       </div>
 

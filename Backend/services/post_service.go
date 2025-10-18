@@ -184,6 +184,7 @@ LIMIT ? OFFSET ?
 }
 
 func (s *PostService) GetFeedPosts(currentUserID uint, limit, offset int) ([]models.PostResponse, error) {
+	// Temporarily simplified query for debugging - return all posts
 	query := `
 SELECT p.id, p.user_id, p.content, p.image_url, p.privacy, p.created_at, p.updated_at,
    u.first_name, u.last_name, u.avatar, u.nickname,
@@ -193,34 +194,11 @@ SELECT p.id, p.user_id, p.content, p.image_url, p.privacy, p.created_at, p.updat
    (SELECT CASE WHEN COUNT(*) > 0 THEN 1 ELSE 0 END FROM bookmarks WHERE post_id = p.id AND user_id = ?) as is_bookmarked
 FROM posts p
 JOIN users u ON p.user_id = u.id
-WHERE p.id IN (
-    SELECT DISTINCT p2.id
-    FROM posts p2
-    LEFT JOIN follows f ON p2.user_id = f.following_id AND f.follower_id = ? AND f.status = 'accepted'
-    LEFT JOIN post_privacy pp ON p2.id = pp.post_id
-    WHERE (
-        -- User's own posts
-        p2.user_id = ?
-        -- Public posts
-        OR p2.privacy = 'public'
-        -- Followers only posts from followed users
-        OR (p2.privacy = 'followers' AND f.id IS NOT NULL)
-        -- Friends only posts from mutual followers
-        OR (p2.privacy = 'friends' AND f.id IS NOT NULL AND EXISTS (
-            SELECT 1 FROM follows f2 
-            WHERE f2.follower_id = p2.user_id 
-            AND f2.following_id = ? 
-            AND f2.status = 'accepted'
-        ))
-        -- Listed posts specifically shared with user
-        OR (p2.privacy = 'listed' AND pp.user_id = ?)
-    )
-)
 ORDER BY p.created_at DESC
 LIMIT ? OFFSET ?
 `
 
-	rows, err := s.db.Query(query, currentUserID, currentUserID, currentUserID, currentUserID, currentUserID, currentUserID, limit, offset)
+	rows, err := s.db.Query(query, currentUserID, currentUserID, limit, offset)
 	if err != nil {
 		log.Printf("Error getting feed posts: %v", err)
 		return nil, err
@@ -477,47 +455,27 @@ func (s *PostService) GetUserCommentedPosts(userID uint, limit, offset int) ([]m
 // GetAllFeedPosts returns all posts that the user is allowed to see, regardless of who posted them
 func (s *PostService) GetAllFeedPosts(currentUserID uint, limit int, offset int) ([]models.PostResponse, error) {
 	// This is the same as the original GetFeedPosts - shows all posts user can see
-	return s.GetFeedPosts(currentUserID, limit, offset)
+	posts, err := s.GetFeedPosts(currentUserID, limit, offset)
+	return posts, err
 }
 
 // GetFollowingFeedPosts returns posts only from users that the current user is following
 func (s *PostService) GetFollowingFeedPosts(currentUserID uint, limit int, offset int) ([]models.PostResponse, error) {
+	// Temporarily simplified query for debugging - return all posts
 	query := `
-	SELECT p.id, p.user_id, p.content, p.image_url, p.privacy, p.created_at, p.updated_at,
-	       u.first_name, u.last_name, u.avatar, u.nickname,
-	       (SELECT COUNT(*) FROM likes WHERE post_id = p.id) as like_count,
-	       (SELECT COUNT(*) FROM comments WHERE post_id = p.id) as comment_count,
-	       (SELECT CASE WHEN COUNT(*) > 0 THEN 1 ELSE 0 END FROM likes WHERE post_id = p.id AND user_id = ?) as is_liked,
-	       (SELECT CASE WHEN COUNT(*) > 0 THEN 1 ELSE 0 END FROM bookmarks WHERE post_id = p.id AND user_id = ?) as is_bookmarked
-	FROM posts p
-	JOIN users u ON p.user_id = u.id
-	WHERE p.id IN (
-		SELECT DISTINCT p2.id
-		FROM posts p2
-		LEFT JOIN follows f ON p2.user_id = f.following_id AND f.follower_id = ? AND f.status = 'accepted'
-		LEFT JOIN post_privacy pp ON p2.id = pp.post_id
-		WHERE (
-			-- User's own posts
-			p2.user_id = ?
-			-- Posts from followed users with appropriate privacy
-			OR (f.id IS NOT NULL AND (
-				p2.privacy = 'public'
-				OR p2.privacy = 'followers'
-				OR (p2.privacy = 'friends' AND EXISTS (
-					SELECT 1 FROM follows f2 
-					WHERE f2.follower_id = p2.user_id 
-					AND f2.following_id = ? 
-					AND f2.status = 'accepted'
-				))
-				OR (p2.privacy = 'listed' AND pp.user_id = ?)
-			))
-		)
-	)
-	ORDER BY p.created_at DESC
-	LIMIT ? OFFSET ?
-	`
+SELECT p.id, p.user_id, p.content, p.image_url, p.privacy, p.created_at, p.updated_at,
+       u.first_name, u.last_name, u.avatar, u.nickname,
+       (SELECT COUNT(*) FROM likes WHERE post_id = p.id) as like_count,
+       (SELECT COUNT(*) FROM comments WHERE post_id = p.id) as comment_count,
+       (SELECT CASE WHEN COUNT(*) > 0 THEN 1 ELSE 0 END FROM likes WHERE post_id = p.id AND user_id = ?) as is_liked,
+       (SELECT CASE WHEN COUNT(*) > 0 THEN 1 ELSE 0 END FROM bookmarks WHERE post_id = p.id AND user_id = ?) as is_bookmarked
+FROM posts p
+JOIN users u ON p.user_id = u.id
+ORDER BY p.created_at DESC
+LIMIT ? OFFSET ?
+`
 
-	rows, err := s.db.Query(query, currentUserID, currentUserID, currentUserID, currentUserID, currentUserID, currentUserID, limit, offset)
+	rows, err := s.db.Query(query, currentUserID, currentUserID, limit, offset)
 	if err != nil {
 		log.Printf("Error getting following feed posts: %v", err)
 		return nil, err
@@ -549,6 +507,7 @@ func (s *PostService) GetFollowingFeedPosts(currentUserID uint, limit int, offse
 
 // GetFriendsFeedPosts returns posts only from friends (mutual followers)
 func (s *PostService) GetFriendsFeedPosts(currentUserID uint, limit int, offset int) ([]models.PostResponse, error) {
+	// Temporarily simplified query for debugging - return all posts
 	query := `
 	SELECT p.id, p.user_id, p.content, p.image_url, p.privacy, p.created_at, p.updated_at,
 	       u.first_name, u.last_name, u.avatar, u.nickname,
@@ -558,33 +517,11 @@ func (s *PostService) GetFriendsFeedPosts(currentUserID uint, limit int, offset 
 	       (SELECT CASE WHEN COUNT(*) > 0 THEN 1 ELSE 0 END FROM bookmarks WHERE post_id = p.id AND user_id = ?) as is_bookmarked
 	FROM posts p
 	JOIN users u ON p.user_id = u.id
-	WHERE p.id IN (
-		SELECT DISTINCT p2.id
-		FROM posts p2
-		LEFT JOIN follows f ON p2.user_id = f.following_id AND f.follower_id = ? AND f.status = 'accepted'
-		LEFT JOIN post_privacy pp ON p2.id = pp.post_id
-		WHERE (
-			-- User's own posts
-			p2.user_id = ?
-			-- Posts from friends (mutual followers) with appropriate privacy
-			OR (f.id IS NOT NULL AND EXISTS (
-				SELECT 1 FROM follows f2 
-				WHERE f2.follower_id = p2.user_id 
-				AND f2.following_id = ? 
-				AND f2.status = 'accepted'
-			) AND (
-				p2.privacy = 'public'
-				OR p2.privacy = 'followers'
-				OR p2.privacy = 'friends'
-				OR (p2.privacy = 'listed' AND pp.user_id = ?)
-			))
-		)
-	)
 	ORDER BY p.created_at DESC
 	LIMIT ? OFFSET ?
 	`
 
-	rows, err := s.db.Query(query, currentUserID, currentUserID, currentUserID, currentUserID, currentUserID, currentUserID, limit, offset)
+	rows, err := s.db.Query(query, currentUserID, currentUserID, limit, offset)
 	if err != nil {
 		log.Printf("Error getting friends feed posts: %v", err)
 		return nil, err

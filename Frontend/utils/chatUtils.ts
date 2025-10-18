@@ -1,5 +1,5 @@
 'use client'
-import { ConversationResponse, Group, User } from '@/lib/api'
+import { ConversationResponse, Group, GroupResponse, User } from '@/lib/api'
 
 export interface UnifiedChatItem {
   id: string | number
@@ -13,35 +13,48 @@ export interface UnifiedChatItem {
   isGroup?: boolean
   participantId?: number
   lastMessageSenderId?: number
+  groupStatus?: Group['memberStatus'] | GroupResponse['member_status']
+  groupPrivacy?: Group['privacy'] | GroupResponse['privacy']
+  groupRole?: Group['role'] | GroupResponse['role']
+  groupId?: number // Add group ID for group chats
 }
 
 /**
  * Normalize a ConversationResponse from the API into a UnifiedChatItem
  */
-export function normalizeConversation(conv: ConversationResponse, currentUserId?: number): UnifiedChatItem {
+export function normalizeConversation(conv: any): UnifiedChatItem {
   const isGroup = conv.type === 'group'
   const name = isGroup
-    ? (conv.group?.title || 'Group')
-    : `${conv.participant?.first_name || ''} ${conv.participant?.last_name || ''}`.trim() || 'Unknown'
-  const avatar = conv.participant?.avatar ?? null
-  const lastMsg = formatConversationPreview(conv, currentUserId)
-  const lastMessageTime = conv.last_message?.created_at ?? conv.updated_at ?? undefined
-  const unread = conv.unread_count ?? 0
-  const participantId = conv.participant?.id
-  const lastMessageSenderId = conv.last_message?.sender_id
+    ? (conv.group?.title || conv.group?.Title || 'Group')
+    : `${conv.participant?.first_name || conv.participant?.FirstName || ''} ${conv.participant?.last_name || conv.participant?.LastName || ''}`.trim() || 'Unknown'
+  const avatar = isGroup
+    ? (conv.group?.avatar || conv.group?.Avatar || null)
+    : (conv.participant?.avatar || conv.participant?.Avatar || null)
+  const lastMsg = conv.last_message?.content || conv.LastMessage || ''
+  const lastMessageTime = conv.last_message?.created_at || conv.LastMessageTime || ''
+  const unread = conv.unread_count ?? conv.UnreadCount ?? 0
+  const participantId = conv.participant?.id || conv.participant?.ID
+  const lastMessageSenderId = conv.last_message?.sender_id || conv.last_message?.sender?.id || conv.LastMessageSender?.ID
+  const groupStatus = conv.group?.member_status || conv.group?.MemberStatus
+  const groupPrivacy = conv.group?.privacy || conv.group?.Privacy
+  const groupRole = conv.group?.role || conv.group?.Role
 
   return {
-    id: conv.id,
-    type: conv.type,
+    id: conv.id || conv.ID,
+    type: conv.type || conv.Type,
     name,
     avatar,
     lastMessage: lastMsg,
     lastMessageTime,
-    timestamp: conv.updated_at,
+    timestamp: conv.updated_at || conv.LastMessageTime || conv.UpdatedAt,
     unread,
     isGroup,
     participantId,
-    lastMessageSenderId: lastMessageSenderId ?? undefined
+    lastMessageSenderId: lastMessageSenderId ?? undefined,
+    groupStatus,
+    groupPrivacy,
+    groupRole,
+    groupId: conv.group?.id || conv.group?.ID
   }
 }
 
@@ -55,34 +68,9 @@ const getDisplayName = (user?: User | null): string => {
 }
 
 export function formatConversationPreview(conv: ConversationResponse, currentUserId?: number): string {
-  const content = conv.last_message?.content?.trim()
-  if (!content) return ''
-
-  const senderId = conv.last_message?.sender_id
-  const isFromCurrentUser = currentUserId && senderId === currentUserId
-
-  // Remove any existing "You: " prefix to avoid duplication
-  const cleanContent = content.replace(/^You: /, '')
-
-  if (isFromCurrentUser) {
-    return `You: ${cleanContent}`
-  }
-
-  // For private chats: show the other user's name (participant)
-  if (conv.type === 'private') {
-    const senderName = getDisplayName(conv.participant)
-    if (senderName) return `${senderName}: ${cleanContent}`
-    return `Someone: ${cleanContent}`
-  }
-
-  // For group chats: show the sender's name
-  if (conv.type === 'group') {
-    const senderName = getDisplayName(conv.last_message?.sender)
-    if (senderName) return `${senderName}: ${cleanContent}`
-    return `Someone: ${cleanContent}`
-  }
-
-  return cleanContent
+  // The backend already formats the message content correctly with "You:" prefixes
+  // So we just return the content as-is
+  return conv.last_message?.content?.trim() || ''
 }
 
 /**
@@ -100,7 +88,11 @@ export function normalizeGroupAsChatItem(group: Group): UnifiedChatItem {
     timestamp: group.timestamp ?? group.lastActivity ?? undefined,
     unread: 0,
     isGroup: true,
-    participantId: undefined
+    participantId: undefined,
+    groupStatus: group.memberStatus,
+    groupPrivacy: group.privacy,
+    groupRole: group.role,
+    groupId: group.id
   }
 }
 

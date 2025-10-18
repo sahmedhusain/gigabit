@@ -21,13 +21,26 @@ import {
   ArrowUp,
   ArrowDown,
   Minus,
-  Check
+  Check,
+  Clock3,
+  XCircle,
+  ShieldCheck,
+  Lock
 } from 'lucide-react'
-import { api, User as UserType, GroupResponse } from '@/lib/api'
+import { api, User as UserType, GroupResponse, GroupMemberStatus } from '@/lib/api'
 import { useAuth } from '@/context/AuthContext'
 import { useToast } from '@/context/ToastContext'
 import { useConnectionStatus } from '@/hooks'
 import FollowHandler, { FollowStatus, getFollowStatusFromAPI } from './FollowHandler'
+import CreateGroup from './CreateGroup'
+
+const normalizeGroupStatus = (group: { member_status?: GroupMemberStatus; is_member?: boolean }): GroupMemberStatus => {
+  const status = group.member_status ?? (group.is_member ? 'member' : 'none')
+  if (status === 'member' || status === 'sent' || status === 'requested' || status === 'rejected') {
+    return status
+  }
+  return 'none'
+}
 
 interface UserWithFollowStatus extends UserType {
   followStatus: FollowStatus
@@ -73,6 +86,7 @@ export default function DiscoverPage() {
   const [groups, setGroups] = useState<GroupWithJoinStatus[]>([])
   const [filteredGroups, setFilteredGroups] = useState<GroupWithJoinStatus[]>([])
   const [groupFilter, setGroupFilter] = useState<GroupFilter>('all')
+  const [pendingRequests, setPendingRequests] = useState<{ [groupId: number]: Array<{ user: UserType; requested_at: string }> }>({})
   
   // Trending tags state
   const [trendingTags, setTrendingTags] = useState<TrendingTag[]>([])
@@ -82,6 +96,7 @@ export default function DiscoverPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [sortBy, setSortBy] = useState<SortBy>('newest')
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
+  const [showCreateGroup, setShowCreateGroup] = useState(false)
 
   const fetchUsers = useCallback(async () => {
     try {
@@ -117,30 +132,41 @@ export default function DiscoverPage() {
     try {
       const response = await api.getAllGroups(50, 0)
       
-      // Check which groups the current user is a member of
+      let userGroups: GroupResponse[] = []
       try {
         const userGroupsResponse = await api.getUserGroups(currentUser!.id)
-        const userGroupIds = new Set(userGroupsResponse.groups?.map((g: GroupResponse) => g.id) || [])
-        
-        const groupsWithStatus: GroupWithJoinStatus[] = (response.groups || []).map(group => ({
-          ...group,
-          is_member: userGroupIds.has(group.id),
-          recent_activity: Math.random() > 0.6 ? `${Math.floor(Math.random() * 10) + 1} recent posts` : undefined,
-          trending_score: Math.random() * 100
-        }))
-        
-        setGroups(groupsWithStatus)
+        userGroups = Array.isArray(userGroupsResponse.groups) ? userGroupsResponse.groups : []
       } catch {
-        // If getUserGroups fails, just set is_member to false for all groups
-        const groupsWithStatus: GroupWithJoinStatus[] = (response.groups || []).map(group => ({
+        userGroups = []
+      }
+
+      const userGroupMeta = new Map(
+        userGroups.map(group => [
+          group.id,
+          {
+            status: normalizeGroupStatus(group),
+            role: group.role
+          }
+        ])
+      )
+
+      const groupsWithStatus: GroupWithJoinStatus[] = (response.groups || []).map(group => {
+        const meta = userGroupMeta.get(group.id)
+        const normalizedStatus = normalizeGroupStatus({
+          member_status: group.member_status ?? meta?.status,
+          is_member: group.is_member ?? (meta?.status === 'member')
+        })
+        return {
           ...group,
-          is_member: false,
+          is_member: normalizedStatus === 'member',
+          member_status: normalizedStatus,
+          role: group.role ?? meta?.role,
           recent_activity: Math.random() > 0.6 ? `${Math.floor(Math.random() * 10) + 1} recent posts` : undefined,
           trending_score: Math.random() * 100
-        }))
-        
-        setGroups(groupsWithStatus)
-      }
+        }
+      })
+
+      setGroups(groupsWithStatus)
     } catch (err: unknown) {
       console.error('Failed to fetch groups:', err)
     }
@@ -254,10 +280,13 @@ export default function DiscoverPage() {
     // Apply category filter
     switch (groupFilter) {
       case 'available':
-        filtered = filtered.filter(group => !group.is_member)
+        filtered = filtered.filter(group => {
+          const status = normalizeGroupStatus(group)
+          return status === 'none' || status === 'rejected'
+        })
         break
       case 'joined':
-        filtered = filtered.filter(group => group.is_member)
+        filtered = filtered.filter(group => normalizeGroupStatus(group) === 'member')
         break
       case 'active':
         filtered = filtered.filter(group => group.recent_activity)
@@ -293,6 +322,18 @@ export default function DiscoverPage() {
     }
   }, [users, groups, searchQuery, userFilter, groupFilter, sortBy, activeTab, applyUserFiltersAndSort, applyGroupFiltersAndSort])
 
+  // Fetch pending requests for admin groups
+  useEffect(() => {
+    if (currentUser && groups.length > 0) {
+      const adminGroups = groups.filter(group => group.role === 'admin' || group.role === 'creator')
+      adminGroups.forEach(group => {
+        if (!pendingRequests[group.id]) {
+          fetchPendingRequests(group.id)
+        }
+      })
+    }
+  }, [currentUser, groups, pendingRequests])
+
   const handleFollowStatusChange = (userId: number, newStatus: FollowStatus) => {
     setUsers(prevUsers => 
       prevUsers.map(user => 
@@ -324,14 +365,21 @@ export default function DiscoverPage() {
 
     try {
       await api.joinGroup(groupId)
+      const targetGroup = groups.find(group => group.id === groupId)
+      const joinStatus: GroupMemberStatus = targetGroup?.privacy === 'private' ? 'requested' : 'member'
       setGroups(prevGroups => 
         prevGroups.map(group => 
           group.id === groupId 
-            ? { ...group, is_member: true }
+            ? { 
+                ...group, 
+                is_member: joinStatus === 'member',
+                member_status: joinStatus,
+                role: joinStatus === 'member' ? (group.role ?? 'member') : group.role
+              }
             : group
         )
       )
-      success('Successfully joined the group!')
+      success(joinStatus === 'member' ? 'Successfully joined the group!' : 'Join request sent for approval')
     } catch {
       error('Failed to join group')
     }
@@ -348,13 +396,51 @@ export default function DiscoverPage() {
       setGroups(prevGroups => 
         prevGroups.map(group => 
           group.id === groupId 
-            ? { ...group, is_member: false }
+            ? { 
+                ...group, 
+                is_member: false,
+                member_status: 'none',
+                role: undefined
+              }
             : group
         )
       )
       success('Successfully left the group!')
     } catch {
       error('Failed to leave group')
+    }
+  }
+
+  const fetchPendingRequests = async (groupId: number) => {
+    try {
+      const response = await api.getPendingJoinRequests(groupId)
+      setPendingRequests(prev => ({
+        ...prev,
+        [groupId]: response.requests
+      }))
+    } catch (err) {
+      console.error('Failed to fetch pending requests:', err)
+    }
+  }
+
+  const handleRespondToJoinRequest = async (groupId: number, userId: number, action: 'accept' | 'decline') => {
+    if (!isConnected) {
+      warning('Connection required to respond to requests')
+      return
+    }
+
+    try {
+      await api.respondToJoinRequest(groupId, userId, action)
+      
+      // Update the pending requests state
+      setPendingRequests(prev => ({
+        ...prev,
+        [groupId]: prev[groupId]?.filter(request => request.user.id !== userId) || []
+      }))
+
+      success(`Join request ${action === 'accept' ? 'accepted' : 'declined'}`)
+    } catch {
+      error('Failed to respond to join request')
     }
   }
 
@@ -367,8 +453,11 @@ export default function DiscoverPage() {
 
   const groupFilters = [
     { id: 'all', label: 'All Groups', icon: <Users className="w-4 h-4" />, count: groups.length },
-    { id: 'available', label: 'Available to Join', icon: <Plus className="w-4 h-4" />, count: groups.filter(g => !g.is_member).length },
-    { id: 'joined', label: 'Already Joined', icon: <Check className="w-4 h-4" />, count: groups.filter(g => g.is_member).length },
+    { id: 'available', label: 'Available to Join', icon: <Plus className="w-4 h-4" />, count: groups.filter(g => {
+      const status = normalizeGroupStatus(g)
+      return status === 'none' || status === 'rejected'
+    }).length },
+    { id: 'joined', label: 'Already Joined', icon: <Check className="w-4 h-4" />, count: groups.filter(g => normalizeGroupStatus(g) === 'member').length },
     { id: 'active', label: 'Most Active', icon: <TrendingUp className="w-4 h-4" />, count: groups.filter(g => g.recent_activity).length }
   ]
 
@@ -434,6 +523,534 @@ export default function DiscoverPage() {
             </div>
           </div>
         </div>
+      </div>
+    )
+  }
+
+  // Users Tab Component
+  function UsersTab() {
+    const displayUsers = filteredUsers
+
+    if (displayUsers.length === 0) {
+      return (
+        <div className="bg-white/5 backdrop-blur-xl rounded-2xl border border-white/10 p-12 text-center">
+          <Users className="w-16 h-16 text-white/30 mx-auto mb-4" />
+          <h3 className="text-xl font-semibold text-white mb-2">No users found</h3>
+          <p className="text-white/60">
+            {searchQuery ? 'Try adjusting your search or filters' : 'No users match the selected filters'}
+          </p>
+        </div>
+      )
+    }
+
+    return (
+      <div className={viewMode === 'grid' 
+        ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4'
+        : 'space-y-3'
+      }>
+        {displayUsers.map((user) => (
+          <div 
+            key={user.id} 
+            className={`group cursor-pointer ${
+              viewMode === 'grid' 
+                ? 'bg-white/5 backdrop-blur-xl rounded-xl border border-white/10 p-6 hover:bg-white/10 transition-all duration-300 text-center'
+                : 'bg-white/5 backdrop-blur-xl rounded-xl border border-white/10 p-4 hover:bg-white/10 transition-all duration-300'
+            }`}
+            onClick={() => handleUserClick(user.id)}
+          >
+            {viewMode === 'grid' ? (
+              // Grid View
+              <>
+                <div className="relative mb-4">
+                  {user.avatar ? (
+                    <Image 
+                      src={user.avatar} 
+                      alt={`${user.first_name} ${user.last_name}`} 
+                      width={80} 
+                      height={80} 
+                      className="rounded-full mx-auto object-cover"
+                    />
+                  ) : (
+                    <div className="w-20 h-20 bg-gradient-to-br from-emerald-400 to-teal-600 rounded-full flex items-center justify-center mx-auto">
+                      <span className="text-white text-2xl font-bold">
+                        {(user.first_name?.charAt(0) || user.last_name?.charAt(0) || user.email?.charAt(0) || 'U').toUpperCase()}
+                      </span>
+                    </div>
+                  )}
+                  {user.isOnline && (
+                    <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-green-500 border-2 border-white rounded-full"></div>
+                  )}
+                </div>
+                <div className="space-y-2">
+                  <h3 className="font-semibold text-white group-hover:text-emerald-200 transition-colors">
+                    {[user.first_name, user.last_name].filter(Boolean).join(' ') || user.email || 'Anonymous'}
+                  </h3>
+                  {user.mutualFollowers !== undefined && user.mutualFollowers > 0 && (
+                    <p className="text-emerald-400 text-sm">
+                      {user.mutualFollowers} mutual connection{user.mutualFollowers !== 1 ? 's' : ''}
+                    </p>
+                  )}
+                  <div className="flex justify-center space-x-2">
+                    <FollowHandler
+                      targetUser={user}
+                      currentFollowStatus={user.followStatus || { isFollowing: false, isPending: false, status: 'not_following' }}
+                      onStatusChange={(newStatus) => handleFollowStatusChange(user.id, newStatus)}
+                      disabled={!isConnected}
+                      size="sm"
+                    />
+                    <button
+                      disabled={!isConnected}
+                      className={`p-2 rounded-lg transition-all duration-200 ${
+                        isConnected 
+                          ? 'text-white/70 hover:text-white hover:bg-white/10' 
+                          : 'text-white/30 cursor-not-allowed'
+                      }`}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        warning('Messaging feature coming soon!')
+                      }}
+                      title="Send message"
+                    >
+                      <MessageCircle className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              </>
+            ) : (
+              // List View
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-4 flex-1 min-w-0">
+                  <div className="relative flex-shrink-0">
+                    {user.avatar ? (
+                      <Image 
+                        src={user.avatar} 
+                        alt={`${user.first_name} ${user.last_name}`} 
+                        width={48} 
+                        height={48} 
+                        className="rounded-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-12 h-12 bg-gradient-to-br from-emerald-400 to-teal-600 rounded-full flex items-center justify-center">
+                        <span className="text-white text-lg font-bold">
+                          {(user.first_name?.charAt(0) || user.last_name?.charAt(0) || user.email?.charAt(0) || 'U').toUpperCase()}
+                        </span>
+                      </div>
+                    )}
+                    {user.isOnline && (
+                      <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-green-500 border-2 border-white rounded-full"></div>
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="font-semibold text-white group-hover:text-emerald-200 transition-colors truncate">
+                      {[user.first_name, user.last_name].filter(Boolean).join(' ') || user.email || 'Anonymous'}
+                    </div>
+                    {user.mutualFollowers !== undefined && user.mutualFollowers > 0 && (
+                      <div className="text-emerald-400 text-sm">
+                        {user.mutualFollowers} mutual connection{user.mutualFollowers !== 1 ? 's' : ''}
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <div className="flex items-center space-x-2 flex-shrink-0">
+                  <FollowHandler
+                    targetUser={user}
+                    currentFollowStatus={user.followStatus || { isFollowing: false, isPending: false, status: 'not_following' }}
+                    onStatusChange={(newStatus) => handleFollowStatusChange(user.id, newStatus)}
+                    disabled={!isConnected}
+                    size="sm"
+                  />
+                  <button
+                    disabled={!isConnected}
+                    className={`p-2 rounded-lg transition-all duration-200 ${
+                      isConnected 
+                        ? 'text-white/70 hover:text-white hover:bg-white/10' 
+                        : 'text-white/30 cursor-not-allowed'
+                    }`}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      warning('Messaging feature coming soon!')
+                    }}
+                    title="Send message"
+                  >
+                    <MessageCircle className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    )
+  }
+
+  // Groups Tab Component
+  function GroupsTab() {
+    const displayGroups = filteredGroups
+
+    if (displayGroups.length === 0) {
+      return (
+        <div className="space-y-6">
+          {/* Create Group CTA */}
+          <div className="bg-gradient-to-r from-emerald-500/10 to-teal-500/10 backdrop-blur-xl rounded-2xl border border-emerald-400/20 p-8 text-center">
+            <Users className="w-16 h-16 text-emerald-400 mx-auto mb-4" />
+            <h3 className="text-xl font-semibold text-white mb-2">Create Your First Group</h3>
+            <p className="text-white/60 mb-6">
+              Start a community around shared interests and connect with like-minded people.
+            </p>
+            <button
+              onClick={() => setShowCreateGroup(true)}
+              disabled={!isConnected}
+              className="px-6 py-3 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 rounded-xl text-white font-semibold transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isConnected ? 'Create Group' : 'Offline'}
+            </button>
+          </div>
+
+          <div className="bg-white/5 backdrop-blur-xl rounded-2xl border border-white/10 p-12 text-center">
+            <Users className="w-16 h-16 text-white/30 mx-auto mb-4" />
+            <h3 className="text-xl font-semibold text-white mb-2">No groups found</h3>
+            <p className="text-white/60">
+              {searchQuery ? 'Try adjusting your search or filters' : 'No groups match the selected filters'}
+            </p>
+          </div>
+        </div>
+      )
+    }
+
+    return (
+      <div className="space-y-6">
+        {/* Show pending requests for admin groups */}
+        {groups
+          .filter(group => group.role === 'admin' || group.role === 'creator')
+          .map(group => {
+            const requests = pendingRequests[group.id] || []
+            if (requests.length === 0) return null
+            
+            return (
+              <div key={`requests-${group.id}`} className="bg-white/5 backdrop-blur-xl rounded-xl border border-white/10 p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-white font-semibold flex items-center">
+                    <Clock3 className="w-5 h-5 mr-2 text-amber-400" />
+                    Pending Join Requests - {group.title}
+                  </h3>
+                  <button
+                    onClick={() => fetchPendingRequests(group.id)}
+                    className="text-emerald-400 hover:text-emerald-300 text-sm"
+                  >
+                    Refresh
+                  </button>
+                </div>
+                <div className="space-y-3">
+                  {requests.map((request) => (
+                    <div key={request.user.id} className="flex items-center justify-between bg-white/5 rounded-lg p-3">
+                      <div className="flex items-center space-x-3">
+                        {request.user.avatar ? (
+                          <Image 
+                            src={request.user.avatar} 
+                            alt={request.user.first_name || 'User'} 
+                            width={32} 
+                            height={32} 
+                            className="rounded-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-8 h-8 bg-gradient-to-br from-emerald-400 to-teal-600 rounded-full flex items-center justify-center">
+                            <span className="text-white text-xs font-bold">
+                              {(request.user.first_name?.charAt(0) || request.user.last_name?.charAt(0) || request.user.email?.charAt(0) || 'U').toUpperCase()}
+                            </span>
+                          </div>
+                        )}
+                        <div>
+                          <p className="text-white font-medium">
+                            {[request.user.first_name, request.user.last_name].filter(Boolean).join(' ') || request.user.email || 'Anonymous'}
+                          </p>
+                          <p className="text-white/60 text-xs">
+                            Requested {new Date(request.requested_at).toLocaleDateString()}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex space-x-2">
+                        <button
+                          onClick={() => handleRespondToJoinRequest(group.id, request.user.id, 'accept')}
+                          disabled={!isConnected}
+                          className="px-3 py-1 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 border border-emerald-400/20 rounded-lg transition-all duration-200 disabled:opacity-50 text-sm"
+                        >
+                          Accept
+                        </button>
+                        <button
+                          onClick={() => handleRespondToJoinRequest(group.id, request.user.id, 'decline')}
+                          disabled={!isConnected}
+                          className="px-3 py-1 bg-rose-500/20 hover:bg-rose-500/30 text-rose-400 border border-rose-400/20 rounded-lg transition-all duration-200 disabled:opacity-50 text-sm"
+                        >
+                          Decline
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )
+          })}
+
+        {displayGroups.map((group) => {
+          const status = normalizeGroupStatus(group)
+          const role = group.role
+          const privacy = group.privacy
+          const statusBadge = (() => {
+            switch (status) {
+              case 'member':
+                return {
+                  label: role === 'admin' ? 'Admin' : 'Member',
+                  className: 'bg-emerald-500/20 text-emerald-200 border border-emerald-400/30',
+                  icon: role === 'admin' ? <ShieldCheck className="w-3 h-3 mr-1" /> : <Check className="w-3 h-3 mr-1" />
+                }
+              case 'sent':
+              case 'requested':
+                return {
+                  label: 'Pending',
+                  className: 'bg-amber-500/20 text-amber-200 border border-amber-400/30',
+                  icon: <Clock3 className="w-3 h-3 mr-1" />
+                }
+              case 'rejected':
+                return {
+                  label: 'Declined',
+                  className: 'bg-rose-500/20 text-rose-200 border border-rose-400/30',
+                  icon: <XCircle className="w-3 h-3 mr-1" />
+                }
+              default:
+                return null
+            }
+          })()
+          const privacyBadge = privacy ? {
+            label: privacy === 'private' ? 'Private' : 'Public',
+            className: privacy === 'private'
+              ? 'bg-slate-500/30 text-slate-200 border border-slate-400/30'
+              : 'bg-cyan-500/20 text-cyan-200 border border-cyan-400/30',
+            icon: privacy === 'private' ? <Lock className="w-3 h-3 mr-1" /> : <Users className="w-3 h-3 mr-1" />
+          } : null
+
+          const statusMessage = status === 'sent'
+            ? 'Join request pending approval'
+            : status === 'requested'
+              ? 'Join request pending approval'
+              : status === 'rejected'
+                ? 'Your join request was declined'
+                : undefined
+          const isMember = status === 'member'
+          const joinDisabled = !isConnected || status === 'sent' || status === 'requested'
+          const joinLabel = status === 'sent' || status === 'requested' ? 'Request Pending' : status === 'rejected' ? 'Request Again' : 'Join Group'
+          const joinButtonTone = status === 'sent' || status === 'requested'
+            ? 'bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 border border-amber-400/20'
+            : 'bg-gradient-to-r from-emerald-500/20 to-teal-500/20 hover:from-emerald-500/30 hover:to-teal-500/30 text-white border border-emerald-400/20'
+
+          return (
+            <div key={group.id} className={`group ${
+              viewMode === 'grid' 
+                ? 'bg-white/5 backdrop-blur-xl rounded-xl border border-white/10 p-6 hover:bg-white/10 transition-all duration-300'
+                : 'bg-white/5 backdrop-blur-xl rounded-xl border border-white/10 p-4 hover:bg-white/10 transition-all duration-300'
+            }`}>
+              {viewMode === 'grid' ? (
+                // Grid View
+                <>
+                  <div className="mb-4">
+                    <div className="flex items-start justify-between mb-2">
+                      <h3 className="text-white font-semibold group-hover:text-emerald-200 transition-colors flex-1">
+                        {group.title}
+                      </h3>
+                      <div className="flex flex-wrap gap-2 justify-end ml-2">
+                        {statusBadge && (
+                          <span className={`inline-flex items-center px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider rounded-full ${statusBadge.className}`}>
+                            {statusBadge.icon}
+                            {statusBadge.label}
+                          </span>
+                        )}
+                        {privacyBadge && (
+                          <span className={`inline-flex items-center px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider rounded-full ${privacyBadge.className}`}>
+                            {privacyBadge.icon}
+                            {privacyBadge.label}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    {group.description && (
+                      <p className="text-white/70 text-sm line-clamp-2">
+                        {group.description}
+                      </p>
+                    )}
+                    {statusMessage && (
+                      <div className={`text-xs mt-2 ${status === 'rejected' ? 'text-rose-200' : 'text-amber-200'}`}>
+                        {statusMessage}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="space-y-2 mb-4">
+                    <div className="flex items-center text-white/60 text-sm">
+                      <Users className="w-4 h-4 mr-2" />
+                      {group.member_count} members
+                    </div>
+                    {group.recent_activity && (
+                      <div className="flex items-center text-emerald-400 text-sm">
+                        <Sparkles className="w-4 h-4 mr-2" />
+                        {group.recent_activity}
+                      </div>
+                    )}
+                    <div className="flex items-center text-white/60 text-sm">
+                      <Calendar className="w-4 h-4 mr-2" />
+                      Created {new Date(group.created_at || '').toLocaleDateString()}
+                    </div>
+                  </div>
+
+                  <div className="flex space-x-2">
+                    {isMember ? (
+                      <button
+                        onClick={() => handleLeaveGroup(group.id)}
+                        disabled={!isConnected}
+                        className="flex-1 py-2 px-4 bg-red-500/20 hover:bg-red-500/30 text-red-400 border border-red-400/20 rounded-lg transition-all duration-200 disabled:opacity-50 text-sm font-medium"
+                      >
+                        Leave Group
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => handleJoinGroup(group.id)}
+                        disabled={joinDisabled}
+                        className={`flex-1 py-2 px-4 rounded-lg transition-all duration-200 disabled:opacity-60 disabled:cursor-not-allowed text-sm font-medium ${joinButtonTone}`}
+                      >
+                        {joinLabel}
+                      </button>
+                    )}
+                    <button
+                      className="p-2 text-white/60 hover:text-white hover:bg-white/10 rounded-lg transition-all duration-200"
+                      title="View group"
+                      onClick={() => warning('Group details coming soon!')}
+                    >
+                      <Eye className="w-4 h-4" />
+                    </button>
+                  </div>
+                </>
+              ) : (
+                // List View
+                <div className="flex items-center justify-between">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center flex-wrap gap-2 mb-1">
+                      <h3 className="text-white font-semibold group-hover:text-emerald-200 transition-colors truncate">
+                        {group.title}
+                      </h3>
+                      {statusBadge && (
+                        <span className={`inline-flex items-center px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider rounded-full ${statusBadge.className}`}>
+                          {statusBadge.icon}
+                          {statusBadge.label}
+                        </span>
+                      )}
+                      {privacyBadge && (
+                        <span className={`inline-flex items-center px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider rounded-full ${privacyBadge.className}`}>
+                          {privacyBadge.icon}
+                          {privacyBadge.label}
+                        </span>
+                      )}
+                    </div>
+                    {group.description && (
+                      <p className="text-white/70 text-sm truncate mb-2">
+                        {group.description}
+                      </p>
+                    )}
+                    {statusMessage && (
+                      <div className={`text-xs mb-2 ${status === 'rejected' ? 'text-rose-200' : 'text-amber-200'}`}>
+                        {statusMessage}
+                      </div>
+                    )}
+                    <div className="flex items-center space-x-4 text-xs text-white/50">
+                      <span className="flex items-center">
+                        <Users className="w-3 h-3 mr-1" />
+                        {group.member_count} members
+                      </span>
+                      {group.recent_activity && (
+                        <span className="flex items-center text-emerald-400">
+                          <Sparkles className="w-3 h-3 mr-1" />
+                          {group.recent_activity}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center space-x-2 flex-shrink-0">
+                    {isMember ? (
+                      <button
+                        onClick={() => handleLeaveGroup(group.id)}
+                        disabled={!isConnected}
+                        className="py-1.5 px-3 bg-red-500/20 hover:bg-red-500/30 text-red-400 border border-red-400/20 rounded-lg transition-all duration-200 disabled:opacity-50 text-sm"
+                      >
+                        Leave
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => handleJoinGroup(group.id)}
+                        disabled={joinDisabled}
+                        className={`py-1.5 px-3 rounded-lg transition-all duration-200 disabled:opacity-60 disabled:cursor-not-allowed text-sm ${joinButtonTone}`}
+                      >
+                        {joinLabel === 'Join Group' ? 'Join' : joinLabel}
+                      </button>
+                    )}
+                    <button
+                      className="p-2 text-white/60 hover:text-white hover:bg-white/10 rounded-lg transition-all duration-200"
+                      title="View group"
+                      onClick={() => warning('Group details coming soon!')}
+                    >
+                      <Eye className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )
+        })}
+      </div>
+    )
+  }
+
+  // Trending Tab Component
+  function TrendingTab() {
+    return (
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {trendingTags.map((tag, index) => (
+          <div key={tag.tag} className="bg-white/5 backdrop-blur-xl rounded-xl border border-white/10 p-6 hover:bg-white/10 transition-all duration-300 group">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center space-x-2">
+                <div className={`p-2 rounded-lg ${
+                  index < 3 ? 'bg-gradient-to-r from-yellow-500/20 to-orange-500/20 border border-yellow-400/20' : 'bg-white/10'
+                }`}>
+                  <Hash className={`w-5 h-5 ${index < 3 ? 'text-yellow-400' : 'text-white/60'}`} />
+                </div>
+                <span className={`text-xs font-medium px-2 py-1 rounded-full ${
+                  index < 3 ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-400/20' : 'bg-white/10 text-white/60'
+                }`}>
+                  #{index + 1}
+                </span>
+              </div>
+              <div className="flex items-center space-x-1">
+                <TrendingUp className={`w-4 h-4 ${index < 3 ? 'text-yellow-400' : 'text-white/60'}`} />
+                <span className={`text-xs font-medium ${index < 3 ? 'text-yellow-400' : 'text-white/60'}`}>
+                  Trending
+                </span>
+              </div>
+            </div>
+            
+            <div className="space-y-3">
+              <h3 className="text-lg font-bold text-white group-hover:text-emerald-200 transition-colors">
+                #{tag.tag}
+              </h3>
+              <p className="text-white/70 text-sm">
+                {tag.count.toLocaleString()} posts
+              </p>
+            </div>
+            
+            <button 
+              className="w-full py-2 px-4 bg-gradient-to-r from-emerald-500/20 to-teal-500/20 hover:from-emerald-500/30 hover:to-teal-500/30 text-white border border-emerald-400/20 rounded-lg transition-all duration-200 text-sm font-medium"
+              onClick={() => warning('Tag exploration coming soon!')}
+            >
+              Explore Tag
+            </button>
+          </div>
+        ))}
       </div>
     )
   }
@@ -586,422 +1203,4 @@ export default function DiscoverPage() {
       </div>
     </div>
   )
-
-  // Users Tab Component
-  function UsersTab() {
-    const displayUsers = filteredUsers
-
-    if (displayUsers.length === 0) {
-      return (
-        <div className="bg-white/5 backdrop-blur-xl rounded-2xl border border-white/10 p-12 text-center">
-          <Users className="w-16 h-16 text-white/30 mx-auto mb-4" />
-          <h3 className="text-xl font-semibold text-white mb-2">No users found</h3>
-          <p className="text-white/60">
-            {searchQuery ? 'Try adjusting your search or filters' : 'No users match the selected filters'}
-          </p>
-        </div>
-      )
-    }
-
-    return (
-      <div className={viewMode === 'grid' 
-        ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4'
-        : 'space-y-3'
-      }>
-        {displayUsers.map((user) => (
-          <div 
-            key={user.id} 
-            className={`group cursor-pointer ${
-              viewMode === 'grid' 
-                ? 'bg-white/5 backdrop-blur-xl rounded-xl border border-white/10 p-6 hover:bg-white/10 transition-all duration-300 text-center'
-                : 'bg-white/5 backdrop-blur-xl rounded-xl border border-white/10 p-4 hover:bg-white/10 transition-all duration-300'
-            }`}
-            onClick={() => handleUserClick(user.id)}
-          >
-            {viewMode === 'grid' ? (
-              // Grid View
-              <>
-                <div className="relative mb-4">
-                  {user.avatar ? (
-                    <Image 
-                      src={user.avatar} 
-                      alt={`${user.first_name} ${user.last_name}`}
-                      width={64}
-                      height={64}
-                      unoptimized={user.avatar.includes('/svg')}
-                      className="w-16 h-16 rounded-full object-cover border-2 border-white/20 group-hover:border-white/40 transition-colors mx-auto"
-                    />
-                  ) : (
-                    <div className="w-16 h-16 bg-gradient-to-br from-emerald-400 to-teal-600 rounded-full flex items-center justify-center border-2 border-white/20 group-hover:border-white/40 transition-colors mx-auto">
-                      <User className="w-7 h-7 text-white" />
-                    </div>
-                  )}
-                  {user.isOnline && (
-                    <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-white/20"></div>
-                  )}
-                </div>
-                
-                <div className="mb-4">
-                  <h3 className="text-white font-semibold group-hover:text-emerald-200 transition-colors mb-1">
-                    {user.first_name} {user.last_name}
-                  </h3>
-                  <p className="text-white/70 text-sm">
-                    {user.nickname ? `@${user.nickname}` : `@${user.email.split('@')[0]}`}
-                  </p>
-                  {user.location && (
-                    <p className="text-white/50 text-xs mt-1 flex items-center justify-center">
-                      <MapPin className="w-3 h-3 mr-1" />
-                      {user.location}
-                    </p>
-                  )}
-                </div>
-
-                <div className="mb-4 space-y-2">
-                  {user.mutualFollowers && user.mutualFollowers > 0 && (
-                    <div className="text-xs text-white/60 flex items-center justify-center">
-                      <UserCheck className="w-3 h-3 mr-1" />
-                      {user.mutualFollowers} mutual connections
-                    </div>
-                  )}
-                  {user.recentActivity && (
-                    <div className="text-xs text-emerald-400 flex items-center justify-center">
-                      <Sparkles className="w-3 h-3 mr-1" />
-                      {user.recentActivity}
-                    </div>
-                  )}
-                </div>
-
-                <div className="flex justify-center space-x-2">
-                  <div onClick={(e) => e.stopPropagation()}>
-                    <FollowHandler
-                      targetUser={user}
-                      currentFollowStatus={user.followStatus}
-                      onStatusChange={(newStatus) => handleFollowStatusChange(user.id, newStatus)}
-                      disabled={!isConnected}
-                      size="sm"
-                    />
-                  </div>
-                  {user.followStatus.isFollowing && (
-                    <button
-                      className="p-2 text-white/60 hover:text-white hover:bg-white/10 rounded-lg transition-all duration-200"
-                      title="Send message"
-                      disabled={!isConnected}
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        warning('Messaging feature coming soon!')
-                      }}
-                    >
-                      <MessageCircle className="w-4 h-4" />
-                    </button>
-                  )}
-                </div>
-              </>
-            ) : (
-              // List View
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-4 flex-1">
-                  <div className="relative flex-shrink-0">
-                    {user.avatar ? (
-                      <Image 
-                        src={user.avatar} 
-                        alt={`${user.first_name} ${user.last_name}`}
-                        width={48}
-                        height={48}
-                        unoptimized={user.avatar.includes('/svg')}
-                        className="w-12 h-12 rounded-full object-cover border-2 border-white/20 group-hover:border-white/40 transition-colors"
-                      />
-                    ) : (
-                      <div className="w-12 h-12 bg-gradient-to-br from-emerald-400 to-teal-600 rounded-full flex items-center justify-center border-2 border-white/20 group-hover:border-white/40 transition-colors">
-                        <User className="w-5 h-5 text-white" />
-                      </div>
-                    )}
-                    {user.isOnline && (
-                      <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 rounded-full border-2 border-white/20"></div>
-                    )}
-                  </div>
-                  
-                  <div className="flex-1 min-w-0">
-                    <h3 className="text-white font-semibold group-hover:text-emerald-200 transition-colors truncate">
-                      {user.first_name} {user.last_name}
-                    </h3>
-                    <p className="text-white/70 text-sm truncate">
-                      {user.nickname ? `@${user.nickname}` : `@${user.email.split('@')[0]}`}
-                    </p>
-                    
-                    <div className="flex items-center space-x-4 mt-1 text-xs text-white/50">
-                      {user.location && (
-                        <span className="flex items-center">
-                          <MapPin className="w-3 h-3 mr-1" />
-                          {user.location}
-                        </span>
-                      )}
-                      {user.mutualFollowers && user.mutualFollowers > 0 && (
-                        <span className="flex items-center">
-                          <UserCheck className="w-3 h-3 mr-1" />
-                          {user.mutualFollowers} mutual
-                        </span>
-                      )}
-                      {user.recentActivity && (
-                        <span className="flex items-center text-emerald-400">
-                          <Sparkles className="w-3 h-3 mr-1" />
-                          {user.recentActivity}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="flex items-center space-x-2 flex-shrink-0">
-                  <div onClick={(e) => e.stopPropagation()}>
-                    <FollowHandler
-                      targetUser={user}
-                      currentFollowStatus={user.followStatus}
-                      onStatusChange={(newStatus) => handleFollowStatusChange(user.id, newStatus)}
-                      disabled={!isConnected}
-                      size="sm"
-                    />
-                  </div>
-                  {user.followStatus.isFollowing && (
-                    <button
-                      className="p-2 text-white/60 hover:text-white hover:bg-white/10 rounded-lg transition-all duration-200"
-                      title="Send message"
-                      disabled={!isConnected}
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        warning('Messaging feature coming soon!')
-                      }}
-                    >
-                      <MessageCircle className="w-4 h-4" />
-                    </button>
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
-        ))}
-      </div>
-    )
-  }
-
-  // Groups Tab Component
-  function GroupsTab() {
-    const displayGroups = filteredGroups
-
-    if (displayGroups.length === 0) {
-      return (
-        <div className="bg-white/5 backdrop-blur-xl rounded-2xl border border-white/10 p-12 text-center">
-          <Users className="w-16 h-16 text-white/30 mx-auto mb-4" />
-          <h3 className="text-xl font-semibold text-white mb-2">No groups found</h3>
-          <p className="text-white/60">
-            {searchQuery ? 'Try adjusting your search or filters' : 'No groups match the selected filters'}
-          </p>
-        </div>
-      )
-    }
-
-    return (
-      <div className={viewMode === 'grid' 
-        ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4'
-        : 'space-y-3'
-      }>
-        {displayGroups.map((group) => (
-          <div key={group.id} className={`group ${
-            viewMode === 'grid' 
-              ? 'bg-white/5 backdrop-blur-xl rounded-xl border border-white/10 p-6 hover:bg-white/10 transition-all duration-300'
-              : 'bg-white/5 backdrop-blur-xl rounded-xl border border-white/10 p-4 hover:bg-white/10 transition-all duration-300'
-          }`}>
-            {viewMode === 'grid' ? (
-              // Grid View
-              <>
-                <div className="mb-4">
-                  <div className="flex items-start justify-between mb-2">
-                    <h3 className="text-white font-semibold group-hover:text-emerald-200 transition-colors flex-1">
-                      {group.title}
-                    </h3>
-                    {group.is_member ? (
-                      <span className="bg-green-500/20 text-green-400 text-xs px-2 py-1 rounded-full border border-green-400/20 flex items-center">
-                        <Check className="w-3 h-3 mr-1" />
-                        Joined
-                      </span>
-                    ) : (
-                      <span className="bg-blue-500/20 text-blue-400 text-xs px-2 py-1 rounded-full border border-blue-400/20">
-                        Public
-                      </span>
-                    )}
-                  </div>
-                  {group.description && (
-                    <p className="text-white/70 text-sm line-clamp-2">
-                      {group.description}
-                    </p>
-                  )}
-                </div>
-
-                <div className="space-y-2 mb-4">
-                  <div className="flex items-center text-white/60 text-sm">
-                    <Users className="w-4 h-4 mr-2" />
-                    {group.member_count} members
-                  </div>
-                  {group.recent_activity && (
-                    <div className="flex items-center text-emerald-400 text-sm">
-                      <Sparkles className="w-4 h-4 mr-2" />
-                      {group.recent_activity}
-                    </div>
-                  )}
-                  <div className="flex items-center text-white/60 text-sm">
-                    <Calendar className="w-4 h-4 mr-2" />
-                    Created {new Date(group.created_at || '').toLocaleDateString()}
-                  </div>
-                </div>
-
-                <div className="flex space-x-2">
-                  {group.is_member ? (
-                    <button
-                      onClick={() => handleLeaveGroup(group.id)}
-                      disabled={!isConnected}
-                      className="flex-1 py-2 px-4 bg-red-500/20 hover:bg-red-500/30 text-red-400 border border-red-400/20 rounded-lg transition-all duration-200 disabled:opacity-50 text-sm font-medium"
-                    >
-                      Leave Group
-                    </button>
-                  ) : (
-                    <button
-                      onClick={() => handleJoinGroup(group.id)}
-                      disabled={!isConnected}
-                      className="flex-1 py-2 px-4 bg-gradient-to-r from-emerald-500/20 to-teal-500/20 hover:from-emerald-500/30 hover:to-teal-500/30 text-white border border-emerald-400/20 rounded-lg transition-all duration-200 disabled:opacity-50 text-sm font-medium"
-                    >
-                      Join Group
-                    </button>
-                  )}
-                  <button
-                    className="p-2 text-white/60 hover:text-white hover:bg-white/10 rounded-lg transition-all duration-200"
-                    title="View group"
-                    onClick={() => warning('Group details coming soon!')}
-                  >
-                    <Eye className="w-4 h-4" />
-                  </button>
-                </div>
-              </>
-            ) : (
-              // List View
-              <div className="flex items-center justify-between">
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center space-x-2 mb-1">
-                    <h3 className="text-white font-semibold group-hover:text-emerald-200 transition-colors truncate">
-                      {group.title}
-                    </h3>
-                    {group.is_member ? (
-                      <span className="bg-green-500/20 text-green-400 text-xs px-2 py-0.5 rounded-full border border-green-400/20 flex items-center flex-shrink-0">
-                        <Check className="w-3 h-3 mr-1" />
-                        Joined
-                      </span>
-                    ) : (
-                      <span className="bg-blue-500/20 text-blue-400 text-xs px-2 py-0.5 rounded-full border border-blue-400/20 flex-shrink-0">
-                        Public
-                      </span>
-                    )}
-                  </div>
-                  {group.description && (
-                    <p className="text-white/70 text-sm truncate mb-2">
-                      {group.description}
-                    </p>
-                  )}
-                  <div className="flex items-center space-x-4 text-xs text-white/50">
-                    <span className="flex items-center">
-                      <Users className="w-3 h-3 mr-1" />
-                      {group.member_count} members
-                    </span>
-                    {group.recent_activity && (
-                      <span className="flex items-center text-emerald-400">
-                        <Sparkles className="w-3 h-3 mr-1" />
-                        {group.recent_activity}
-                      </span>
-                    )}
-                  </div>
-                </div>
-                
-                <div className="flex items-center space-x-2 flex-shrink-0">
-                  {group.is_member ? (
-                    <button
-                      onClick={() => handleLeaveGroup(group.id)}
-                      disabled={!isConnected}
-                      className="py-1.5 px-3 bg-red-500/20 hover:bg-red-500/30 text-red-400 border border-red-400/20 rounded-lg transition-all duration-200 disabled:opacity-50 text-sm"
-                    >
-                      Leave
-                    </button>
-                  ) : (
-                    <button
-                      onClick={() => handleJoinGroup(group.id)}
-                      disabled={!isConnected}
-                      className="py-1.5 px-3 bg-gradient-to-r from-emerald-500/20 to-teal-500/20 hover:from-emerald-500/30 hover:to-teal-500/30 text-white border border-emerald-400/20 rounded-lg transition-all duration-200 disabled:opacity-50 text-sm"
-                    >
-                      Join
-                    </button>
-                  )}
-                  <button
-                    className="p-2 text-white/60 hover:text-white hover:bg-white/10 rounded-lg transition-all duration-200"
-                    title="View group"
-                    onClick={() => warning('Group details coming soon!')}
-                  >
-                    <Eye className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        ))}
-      </div>
-    )
-  }
-
-  // Trending Tab Component
-  function TrendingTab() {
-    return (
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {trendingTags.map((tag, index) => (
-          <div key={tag.tag} className="bg-white/5 backdrop-blur-xl rounded-xl border border-white/10 p-6 hover:bg-white/10 transition-all duration-300 group">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center space-x-2">
-                <div className={`p-2 rounded-lg ${
-                  index < 3 ? 'bg-gradient-to-r from-yellow-500/20 to-orange-500/20 border border-yellow-400/20' : 'bg-white/10'
-                }`}>
-                  <Hash className={`w-5 h-5 ${index < 3 ? 'text-yellow-400' : 'text-white/60'}`} />
-                </div>
-                <span className={`text-xs font-medium px-2 py-1 rounded-full ${
-                  index < 3 ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-400/20' : 'bg-white/10 text-white/60'
-                }`}>
-                  #{index + 1}
-                </span>
-              </div>
-              <div className="flex items-center space-x-1">
-                {tag.trend === 'up' && <ArrowUp className="w-4 h-4 text-green-400" />}
-                {tag.trend === 'down' && <ArrowDown className="w-4 h-4 text-red-400" />}
-                {tag.trend === 'stable' && <Minus className="w-4 h-4 text-white/60" />}
-                <span className={`text-sm font-medium ${
-                  tag.trend === 'up' ? 'text-green-400' : 
-                  tag.trend === 'down' ? 'text-red-400' : 'text-white/60'
-                }`}>
-                  {tag.growth > 0 ? '+' : ''}{tag.growth.toFixed(1)}%
-                </span>
-              </div>
-            </div>
-            
-            <div className="mb-4">
-              <h3 className="text-xl font-bold text-white group-hover:text-emerald-200 transition-colors">
-                #{tag.tag}
-              </h3>
-              <p className="text-white/70 text-sm">
-                {tag.count.toLocaleString()} posts
-              </p>
-            </div>
-            
-            <button 
-              className="w-full py-2 px-4 bg-gradient-to-r from-emerald-500/20 to-teal-500/20 hover:from-emerald-500/30 hover:to-teal-500/30 text-white border border-emerald-400/20 rounded-lg transition-all duration-200 text-sm font-medium"
-              onClick={() => warning('Tag exploration coming soon!')}
-            >
-              Explore Tag
-            </button>
-          </div>
-        ))}
-      </div>
-    )
-  }
 }

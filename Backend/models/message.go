@@ -102,3 +102,19 @@ type MessageSummary struct {
 	SenderID  uint          `json:"sender_id,omitempty"`
 	Sender    *UserResponse `json:"sender,omitempty"`
 }
+
+type ConversationSearchResult struct {
+	Type              string    `json:"type"` // "private" or "group"
+	ConversationID    uint      `json:"conversation_id"`
+	ParticipantID     uint      `json:"participant_id,omitempty"` // For private chats
+	GroupID           *uint     `json:"group_id,omitempty"`       // For group chats
+	GroupName         *string   `json:"group_name,omitempty"`
+	GroupAvatar       *string   `json:"group_avatar,omitempty"`
+	ParticipantName   string    `json:"participant_name"`
+	ParticipantAvatar *string   `json:"participant_avatar,omitempty"`
+	SenderName        string    `json:"sender_name"`
+	SenderAvatar      *string   `json:"sender_avatar,omitempty"`
+	MatchingMessageID uint      `json:"matching_message_id"`
+	MatchingMessage   string    `json:"matching_message"`
+	MessageTime       time.Time `json:"message_time"`
+}

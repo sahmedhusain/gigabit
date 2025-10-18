@@ -27,23 +27,26 @@ const (
 	MessageTypeFollowerCountUpdate = "follower_count_update"
 	MessageTypeGroupUpdate         = "group_update"
 	MessageTypeEventUpdate         = "event_update"
+	MessageTypeLayoutSync          = "layout_sync"
 	MessageTypeError               = "error"
 	MessageTypePing                = "ping"
 	MessageTypePong                = "pong"
+	MessageTypePollUpdate          = "poll_update"
+	MessageTypePollVoteUpdate      = "poll_vote_update"
 )
 
 // Message represents a websocket message
 type Message struct {
 	Type      string      `json:"type"`
 	From      uint        `json:"from"`
-	To        uint        `json:"to,omitempty"`       // For private messages
-	GroupID   uint        `json:"group_id,omitempty"` // For group messages
-	PostID    uint        `json:"post_id,omitempty"`  // For post updates
-	EventID   uint        `json:"event_id,omitempty"` // For event updates
+	To        uint        `json:"to,omitempty"`
+	GroupID   uint        `json:"group_id,omitempty"`
+	PostID    uint        `json:"post_id,omitempty"`
+	EventID   uint        `json:"event_id,omitempty"`
 	Content   string      `json:"content"`
-	Action    string      `json:"action,omitempty"` // create, update, delete, like, unlike
+	Action    string      `json:"action,omitempty"`
 	Data      interface{} `json:"data,omitempty"`
-	MessageID string      `json:"message_id,omitempty"` // For message deduplication
+	MessageID string      `json:"message_id,omitempty"`
 	Timestamp int64       `json:"timestamp"`
 }
 
@@ -53,9 +56,9 @@ type Client struct {
 	Hub       *Hub
 	Conn      *websocket.Conn
 	Send      chan Message
-	Groups    map[uint]bool // Groups the user is member of
-	Following map[uint]bool // Users this client is following (for feed updates)
-	LastPing  time.Time     // Last ping time for connection health
+	Groups    map[uint]bool
+	Following map[uint]bool
+	LastPing  time.Time
+	Closed    bool // Flag to track if the client's send channel is closed
 	mu        sync.RWMutex
 }
-

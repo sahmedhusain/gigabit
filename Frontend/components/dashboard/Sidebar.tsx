@@ -379,7 +379,7 @@ export default function Sidebar({
                               </div>
                             </div>
                             {section.id === 'chats' && expandedSection !== 'chats' && chatUnreadAll > 0 && (
-                              <span className="text-xs px-2 py-1 rounded-full font-medium bg-white/20 text-white">
+                              <span className="text-xs px-2 py-1 rounded-full font-medium bg-red-500/20 text-red-400">
                                 {chatUnreadAll}
                               </span>
                             )}
@@ -450,8 +450,8 @@ export default function Sidebar({
                                     return count > 0 ? (
                                       <span className={`text-xs px-2 py-1 rounded-full font-medium ${
                                         isActive 
-                                          ? 'bg-white/20 text-white' 
-                                          : 'bg-white/10 text-white/70 group-hover:bg-white/20 group-hover:text-white'
+                                          ? 'bg-red-400/30 text-white' 
+                                          : 'bg-red-500/20 text-white group-hover:bg-red-400/30 group-hover:text-white'
                                       }`}>
                                         {count}
                                       </span>

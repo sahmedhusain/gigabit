@@ -29,6 +29,7 @@ export function useRealTimeMessages() {
   const [isLoadingMore, setIsLoadingMore] = useState<Map<number, boolean>>(new Map())
   const [hasMoreMessages, setHasMoreMessages] = useState<Map<number, boolean>>(new Map())
   const [error, setError] = useState<string | null>(null)
+  const [conversationIdCallbacks, setConversationIdCallbacks] = useState<Map<number, (newId: number) => void>>(new Map())
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
@@ -75,21 +76,33 @@ export function useRealTimeMessages() {
           const updated = new Map(prev)
           
           // Check if message already exists to prevent duplicates
-          // Match by ID first, then by content+sender+time window
-          const messageExists = conversationMessages.some(msg => {
-            // If both have real IDs (not timestamps), compare them
-            if (msg.id && newMessage.id && 
-                msg.id < 1000000000000 && newMessage.id < 1000000000000) {
-              return msg.id === newMessage.id
-            }
-            
-            // Otherwise, use content-based matching (for optimistic messages)
-            return msg.content === newMessage.content && 
-                   msg.sender_id === newMessage.sender_id && 
-                   Math.abs(new Date(msg.created_at).getTime() - new Date(newMessage.created_at).getTime()) < 10000 // Within 10 seconds
-          })
+          let messageExists = false
+          let optimisticMessageIndex = -1
           
-          if (!messageExists) {
+          // Look for exact ID match first (for real messages with server IDs)
+          if (newMessage.id && newMessage.id < 1000000000000) {
+            messageExists = conversationMessages.some(msg => msg.id === newMessage.id)
+          }
+          
+          // If no exact ID match, look for optimistic message to replace
+          if (!messageExists && newMessage.sender_id === user?.id) {
+            optimisticMessageIndex = conversationMessages.findIndex(msg => {
+              // Check if this is an optimistic message (high ID) with same content/sender
+              return msg.id >= 1000000000000 && 
+                     msg.content === newMessage.content && 
+                     msg.sender_id === newMessage.sender_id &&
+                     Math.abs(new Date(msg.created_at).getTime() - new Date(newMessage.created_at).getTime()) < 30000 // Within 30 seconds
+            })
+          }
+          
+          if (optimisticMessageIndex !== -1) {
+            // Replace optimistic message with real message
+            const updatedMessages = [...conversationMessages]
+            updatedMessages[optimisticMessageIndex] = newMessage
+            updated.set(conversationId, updatedMessages)
+            console.log(`🔄 Replaced optimistic message in conversation ${conversationId}:`, newMessage.content.substring(0, 50))
+          } else if (!messageExists) {
+            // Add new message
             updated.set(conversationId, [...conversationMessages, newMessage])
             console.log(`✅ Added new message to conversation ${conversationId}:`, newMessage.content.substring(0, 50))
           } else {
@@ -242,6 +255,22 @@ export function useRealTimeMessages() {
     }
   }, [messages, isLoadingMore, fetchConversationMessages])
 
+  const registerConversationIdCallback = useCallback((placeholderId: number, callback: (newId: number) => void) => {
+    setConversationIdCallbacks(prev => {
+      const updated = new Map(prev)
+      updated.set(placeholderId, callback)
+      return updated
+    })
+  }, [])
+
+  const unregisterConversationIdCallback = useCallback((placeholderId: number) => {
+    setConversationIdCallbacks(prev => {
+      const updated = new Map(prev)
+      updated.delete(placeholderId)
+      return updated
+    })
+  }, [])
+
   const sendMessage = useCallback(async (
     conversationId: number,
     content: string,
@@ -254,9 +283,12 @@ export function useRealTimeMessages() {
     }
 
     try {
+      // Generate unique optimistic message ID
+      const optimisticId = Date.now() + Math.random()
+      
       // Create optimistic message
       const optimisticMessage: Message = {
-        id: Date.now(),
+        id: optimisticId,
         conversation_id: conversationId,
         sender_id: user.id,
         content,
@@ -297,20 +329,48 @@ export function useRealTimeMessages() {
         // If this is a new conversation, update the conversation ID
         if (apiResponse.conversation_id && apiResponse.conversation_id !== conversationId) {
           console.log(`Conversation ID updated from ${conversationId} to ${apiResponse.conversation_id}`)
-          // Update the optimistic message with correct conversation ID
+          
+          // Notify any registered callback about the conversation ID change
+          const callback = conversationIdCallbacks.get(conversationId)
+          if (callback) {
+            callback(apiResponse.conversation_id)
+            // Clean up the callback
+            setConversationIdCallbacks(prev => {
+              const updated = new Map(prev)
+              updated.delete(conversationId)
+              return updated
+            })
+          }
+
+          // Update the optimistic message with correct conversation ID and move it
           setMessages(prev => {
             const conversationMessages = prev.get(conversationId) || []
             const updated = new Map(prev)
-            const messageIndex = conversationMessages.findIndex(msg => msg.id === optimisticMessage.id)
+            const messageIndex = conversationMessages.findIndex(msg => msg.id === optimisticId)
+            
             if (messageIndex !== -1) {
-              conversationMessages[messageIndex].conversation_id = apiResponse.conversation_id
+              const updatedMessage = {
+                ...conversationMessages[messageIndex],
+                conversation_id: apiResponse.conversation_id
+              }
+              
               // Move message to correct conversation
               const correctConversationMessages = updated.get(apiResponse.conversation_id) || []
-              updated.set(apiResponse.conversation_id, [...correctConversationMessages.filter(msg => msg.id !== optimisticMessage.id), conversationMessages[messageIndex]])
-              updated.set(conversationId, conversationMessages.filter(msg => msg.id !== optimisticMessage.id))
+              updated.set(apiResponse.conversation_id, [
+                ...correctConversationMessages.filter(msg => msg.id !== optimisticId), 
+                updatedMessage
+              ])
+              
+              // Remove from old conversation
+              updated.set(conversationId, conversationMessages.filter(msg => msg.id !== optimisticId))
             }
             return updated
           })
+
+          // Refresh conversations to get the new conversation in the list
+          setTimeout(() => {
+            fetchConversations()
+          }, 100)
         }
       } catch (apiError) {
         console.error('Failed to persist message to backend:', apiError)
@@ -323,14 +383,15 @@ export function useRealTimeMessages() {
       setMessages(prev => {
         const conversationMessages = prev.get(conversationId) || []
         const updated = new Map(prev)
-        updated.set(conversationId, conversationMessages.filter(msg =>
-          msg.id !== Date.now() // Remove the optimistic message
-        ))
+        updated.set(conversationId, conversationMessages.filter(msg => {
+          // Remove messages with high ID (optimistic messages use Date.now())
+          return msg.id < 1000000000000 
+        }))
         return updated
       })
       throw err
     }
-  }, [user, isConnected, send])
+  }, [user, isConnected, conversationIdCallbacks, fetchConversations])
 
   const markAsRead = useCallback(async (conversationId: number) => {
     try {
@@ -397,6 +458,8 @@ export function useRealTimeMessages() {
     scrollToBottom,
     refreshConversations: fetchConversations,
     fetchConversationMessages,
-    loadMoreMessages
+    loadMoreMessages,
+    registerConversationIdCallback,
+    unregisterConversationIdCallback
   }
 }

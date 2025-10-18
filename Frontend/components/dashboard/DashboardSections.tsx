@@ -1,8 +1,9 @@
 "use client"
 import React from 'react'
 import { useRouter } from 'next/navigation'
-import { User, Plus, MessageCircle, Calendar } from 'lucide-react'
+import { User, Users, Plus, MessageCircle, Calendar, Check, Clock3, XCircle, ShieldCheck, Lock } from 'lucide-react'
 import { useRealTimeGroups, useRealTimeEvents, useConnectionStatus, useOnlineStatus } from '@/hooks'
+import type { GroupResponse, GroupMemberStatus } from '@/lib/api'
 
 // Clean DashboardSections: Followers, Groups, Settings
 
@@ -88,6 +89,9 @@ interface Group {
   members?: number
   isJoined?: boolean
   lastActivity?: string
+  memberStatus?: GroupMemberStatus
+  privacy?: 'public' | 'private'
+  role?: 'admin' | 'member'
 }
 
 interface GroupsSectionProps {
@@ -139,13 +143,61 @@ export function GroupsSection({ groups, onCreateGroup }: GroupsSectionProps) {
           <div className="text-white/60">No groups yet.</div>
         ) : (
           (displayGroups || []).map((g: Group) => {
+            const rawGroup = g as Group & Partial<GroupResponse>
+            const isMember = g.isJoined ?? rawGroup.is_member ?? false
             const unreadCount = unreadUpdates.get(g.id) || 0
+            const status: GroupMemberStatus | undefined = g.memberStatus ?? rawGroup.member_status ?? (isMember ? 'member' : undefined)
+            const role = g.role ?? rawGroup.role
+            const privacy = g.privacy ?? rawGroup.privacy
+            const statusBadge = (() => {
+              switch (status) {
+                case 'member':
+                  return {
+                    label: role === 'admin' ? 'Admin' : 'Member',
+                    className: 'bg-emerald-500/20 text-emerald-200 border border-emerald-400/30',
+                    icon: role === 'admin' ? <ShieldCheck className="w-3 h-3 mr-1" /> : <Check className="w-3 h-3 mr-1" />
+                  }
+                case 'sent':
+                  return {
+                    label: 'Pending',
+                    className: 'bg-amber-500/20 text-amber-200 border border-amber-400/30',
+                    icon: <Clock3 className="w-3 h-3 mr-1" />
+                  }
+                case 'rejected':
+                  return {
+                    label: 'Declined',
+                    className: 'bg-rose-500/20 text-rose-200 border border-rose-400/30',
+                    icon: <XCircle className="w-3 h-3 mr-1" />
+                  }
+                default:
+                  return null
+              }
+            })()
+            const privacyBadge = privacy ? {
+              label: privacy === 'private' ? 'Private' : 'Public',
+              className: privacy === 'private'
+                ? 'bg-slate-500/30 text-slate-200 border border-slate-400/30'
+                : 'bg-cyan-500/20 text-cyan-200 border border-cyan-400/30',
+              icon: privacy === 'private' ? <Lock className="w-3 h-3 mr-1" /> : <Users className="w-3 h-3 mr-1" />
+            } : null
             return (
               <div key={g.id} className="p-3 mb-2 bg-white/3 rounded-md text-white cursor-pointer hover:bg-white/5 transition-colors" onClick={() => handleGroupClick(g.id)}>
                 <div className="flex items-center justify-between">
                   <div>
                     <div className="font-semibold flex items-center space-x-2">
                       <span>{g.title || g.name}</span>
+                      {statusBadge && (
+                        <span className={`inline-flex items-center px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider rounded-full ${statusBadge.className}`}>
+                          {statusBadge.icon}
+                          {statusBadge.label}
+                        </span>
+                      )}
+                      {privacyBadge && (
+                        <span className={`inline-flex items-center px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider rounded-full ${privacyBadge.className}`}>
+                          {privacyBadge.icon}
+                          {privacyBadge.label}
+                        </span>
+                      )}
                       {unreadCount > 0 && (
                         <div className="bg-red-500 text-white text-xs rounded-full min-w-5 h-5 flex items-center justify-center px-1">
                           {unreadCount > 99 ? '99+' : unreadCount}
@@ -153,6 +205,12 @@ export function GroupsSection({ groups, onCreateGroup }: GroupsSectionProps) {
                       )}
                     </div>
                     <div className="text-sm text-white/70">{g.description}</div>
+                    {status === 'sent' && (
+                      <div className="text-xs text-amber-200 mt-1">Join request pending approval</div>
+                    )}
+                    {status === 'rejected' && (
+                      <div className="text-xs text-rose-200 mt-1">Your join request was declined</div>
+                    )}
                   </div>
                   <div className="flex items-center space-x-2">
                     <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-gray-500'}`}></div>

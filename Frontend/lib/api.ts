@@ -106,6 +106,7 @@ export interface Post {
   privacy: string;
   isLiked: boolean;
   isBookmarked?: boolean;
+  created_at: string;
 }
 
 // Backend API Post interface
@@ -145,6 +146,8 @@ export interface Notification {
   isRead: boolean;
 }
 
+export type GroupMemberStatus = 'member' | 'sent' | 'requested' | 'rejected' | 'none'
+
 export interface Group {
   id: number;
   name: string;
@@ -153,6 +156,9 @@ export interface Group {
   isJoined: boolean;
   lastActivity: string;
   timestamp?: string; // Add timestamp for sorting
+  privacy?: 'public' | 'private';
+  memberStatus?: GroupMemberStatus;
+  role?: 'admin' | 'member';
 }
 
 export interface Event {
@@ -165,6 +171,8 @@ export interface Event {
   event_time: string
   created_at: string
   updated_at: string
+  canceled: boolean
+  cancel_reason: string | null
   creator: {
     id: number
     username: string
@@ -207,6 +215,7 @@ export interface Chat {
   isGroup: boolean;
   participantId?: number;
   participantAvatar?: string; // Add participant avatar
+  groupId?: number; // Add group ID for group chats
 }
 
 // API Response types
@@ -217,8 +226,10 @@ export interface PostResponse {
   privacy: string;
   user: User;
   like_count: number;
+  dislike_count: number;
   comment_count: number;
   is_liked: boolean;
+  is_disliked: boolean;
   is_bookmarked: boolean;
   created_at: string;
   updated_at: string;
@@ -237,11 +248,34 @@ export interface GroupResponse {
   id: number;
   title: string;
   description: string;
+  privacy: 'public' | 'private';
+  avatar?: string;
   creator_id: number;
   member_count: number;
   is_member: boolean;
+  member_status?: GroupMemberStatus;
+  role?: 'admin' | 'member' | 'creator';
   created_at: string;
   updated_at: string;
+  creator?: {
+    id: number;
+    first_name: string;
+    last_name: string;
+    avatar?: string;
+    nickname?: string;
+  };
+  members?: Array<{
+    id: number;
+    user: {
+      id: number;
+      first_name: string;
+      last_name: string;
+      avatar?: string;
+      nickname?: string;
+    };
+    role: string;
+    joined_at: string;
+  }>;
 }
 
 export interface EventResponse {
@@ -254,6 +288,8 @@ export interface EventResponse {
   event_time: string
   created_at: string
   updated_at: string
+  canceled: boolean
+  cancel_reason: string | null
   creator: {
     id: number
     username: string
@@ -299,6 +335,10 @@ export interface UpdateEventRequest {
   event_time?: string; // ISO string format
 }
 
+export interface CancelEventRequest {
+  cancel_reason: string;
+}
+
 export interface EventResponseDetail {
   id: number;
   event_id: number;
@@ -322,6 +362,22 @@ export interface ConversationResponse {
   updated_at: string;
 }
 
+export interface ConversationSearchResult {
+  type: 'private' | 'group';
+  conversation_id: number;
+  participant_id?: number;
+  group_id?: number;
+  group_name?: string;
+  group_avatar?: string;
+  participant_name: string;
+  participant_avatar?: string;
+  sender_name: string;
+  sender_avatar?: string;
+  matching_message_id: number;
+  matching_message: string;
+  message_time: string;
+}
+
 export interface CreatePostRequest {
   content: string;
   privacy?: 'public' | 'followers' | 'friends' | 'listed';
@@ -337,10 +393,55 @@ export interface UpdatePostRequest {
 export interface CreateGroupRequest {
   title: string;
   description: string;
+  privacy: 'public' | 'private';
+  invite_members?: number[];
+  avatar?: string;
 }
 
 export interface PostsResponse {
   posts: APIPost[];
+}
+
+// Poll interfaces
+export interface PollOption {
+  id: number;
+  option_text: string;
+  option_order: number;
+  vote_count: number;
+  percentage: number;
+  voters: string[];
+  total_voters: number;
+}
+
+export interface PollResponse {
+  id: number;
+  user_id: number;
+  group_id?: number;
+  title: string;
+  description?: string;
+  allow_multiple_choices: boolean;
+  expires_at?: string;
+  created_at: string;
+  updated_at: string;
+  creator: User;
+  options: PollOption[];
+  total_votes: number;
+  user_voted: boolean;
+  user_votes: number[]; // Option IDs user voted for
+  is_expired: boolean;
+}
+
+export interface CreatePollRequest {
+  group_id?: number;
+  title: string;
+  description?: string;
+  options: string[];
+  allow_multiple_choices: boolean;
+  expires_at?: string;
+}
+
+export interface VotePollRequest {
+  option_ids: number[];
 }
 
 // Error types
@@ -613,6 +714,18 @@ export class ApiClient {
     });
   }
 
+  async dislikePost(postId: number): Promise<{ success: boolean }> {
+    return this.request<{ success: boolean }>(`/api/posts/${postId}/dislike`, {
+      method: 'POST',
+    });
+  }
+
+  async undislikePost(postId: number): Promise<{ success: boolean }> {
+    return this.request<{ success: boolean }>(`/api/posts/${postId}/dislike`, {
+      method: 'DELETE',
+    });
+  }
+
   // Alternative like endpoint that returns detailed info
   async toggleBookmark(id: number): Promise<{ message: string; is_bookmarked: boolean }> {
     return this.request<{ message: string; is_bookmarked: boolean }>(`/api/bookmarks/${id}`, {
@@ -674,7 +787,7 @@ export class ApiClient {
   }
 
   async getGroup(groupId: number): Promise<GroupResponse> {
-    return this.request<GroupResponse>(`/api/groups/${groupId}`, {
+    return this.request<GroupResponse>(`/api/chats?group=${groupId}`, {
       method: 'GET',
     });
   }
@@ -694,7 +807,7 @@ export class ApiClient {
 
   async leaveGroup(groupId: number): Promise<{ message: string }> {
     return this.request<{ message: string }>(`/api/groups/${groupId}/leave`, {
-      method: 'POST',
+      method: 'DELETE',
     });
   }
 
@@ -745,16 +858,29 @@ export class ApiClient {
     });
   }
 
+  async getNextAdmin(groupId: number): Promise<{ next_admin: string; has_admins: boolean; first_member: string }> {
+    return this.request<{ next_admin: string; has_admins: boolean; first_member: string }>(`/api/groups/${groupId}/next-admin`, {
+      method: 'GET',
+    });
+  }
+
   async getGroupPosts(groupId: number, limit: number = 20, offset: number = 0): Promise<{ posts: PostResponse[], count: number }> {
     return this.request<{ posts: PostResponse[], count: number }>(`/api/groups/${groupId}/posts?limit=${limit}&offset=${offset}`, {
       method: 'GET',
     });
   }
 
-  async createGroupPost(groupId: number, data: CreatePostRequest): Promise<PostResponse> {
-    return this.request<PostResponse>(`/api/groups/${groupId}/posts`, {
+    async createGroupPost(groupId: number, data: CreatePostRequest): Promise<PostResponse> {
+      const response = await this.request<{ message: string, post: PostResponse }>(`/api/groups/${groupId}/posts`, {
       method: 'POST',
       body: JSON.stringify(data),
+    });
+      return response.post;
+  }
+
+  async deleteGroupPost(groupId: number, postId: number): Promise<{ message: string }> {
+    return this.request<{ message: string }>(`/api/groups/${groupId}/posts/${postId}`, {
+      method: 'DELETE',
     });
   }
 
@@ -798,9 +924,10 @@ export class ApiClient {
     });
   }
 
-  async deleteEvent(eventId: number): Promise<{ message: string }> {
+  async cancelEvent(eventId: number, data: CancelEventRequest): Promise<{ message: string }> {
     return this.request<{ message: string }>(`/api/events/${eventId}`, {
       method: 'DELETE',
+      body: JSON.stringify(data),
     });
   }
 
@@ -814,6 +941,51 @@ export class ApiClient {
   async getEventResponses(eventId: number): Promise<{ responses: { going: EventResponseDetail[], not_going: EventResponseDetail[] }, counts: { going: number, not_going: number, total: number } }> {
     return this.request<{ responses: { going: EventResponseDetail[], not_going: EventResponseDetail[] }, counts: { going: number, not_going: number, total: number } }>(`/api/events/${eventId}/responses`, {
       method: 'GET',
+    });
+  }
+
+  // Poll endpoints
+  async createPoll(data: CreatePollRequest): Promise<PollResponse> {
+    return this.request<PollResponse>('/api/polls', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async getPoll(pollId: number): Promise<PollResponse> {
+    return this.request<PollResponse>(`/api/polls/${pollId}`, {
+      method: 'GET',
+    });
+  }
+
+  async getGroupPolls(groupId: number, limit: number = 20, offset: number = 0): Promise<PollResponse[]> {
+    return this.request<PollResponse[]>(`/api/groups/${groupId}/polls?limit=${limit}&offset=${offset}`, {
+      method: 'GET',
+    });
+  }
+
+  async votePoll(pollId: number, optionIds: number[]): Promise<PollResponse> {
+    return this.request<PollResponse>(`/api/polls/${pollId}/vote`, {
+      method: 'POST',
+      body: JSON.stringify({ option_ids: optionIds }),
+    });
+  }
+
+  async unvotePoll(pollId: number): Promise<PollResponse> {
+    return this.request<PollResponse>(`/api/polls/${pollId}/vote`, {
+      method: 'DELETE',
+    });
+  }
+
+  async deletePoll(pollId: number): Promise<{ message: string }> {
+    return this.request<{ message: string }>(`/api/polls/${pollId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async expirePoll(pollId: number): Promise<PollResponse> {
+    return this.request<PollResponse>(`/api/polls/${pollId}/expire`, {
+      method: 'PUT',
     });
   }
 
@@ -856,8 +1028,60 @@ export class ApiClient {
     });
   }
 
+  async markMessagesAsUnread(messageIds: number[]): Promise<{ message: string; count: number }> {
+    return this.request<{ message: string; count: number }>('/api/messages/unread', {
+      method: 'PUT',
+      body: JSON.stringify({ message_ids: messageIds }),
+    });
+  }
+
+  // Conversation-level read/unread methods
+  async markConversationAsRead(conversationId: number, conversationType: 'private' | 'group'): Promise<{ message: string; conversation_id: number }> {
+    return this.request<{ message: string; conversation_id: number }>('/api/messages/read', {
+      method: 'PUT',
+      body: JSON.stringify({ 
+        conversation_id: conversationId, 
+        conversation_type: conversationType 
+      }),
+    });
+  }
+
+  async markConversationAsUnread(conversationId: number, conversationType: 'private' | 'group'): Promise<{ message: string; conversation_id: number }> {
+    return this.request<{ message: string; conversation_id: number }>('/api/messages/unread', {
+      method: 'PUT',
+      body: JSON.stringify({ 
+        conversation_id: conversationId, 
+        conversation_type: conversationType 
+      }),
+    });
+  }
+
+  async deleteConversation(conversationId: number): Promise<{ message: string }> {
+    return this.request<{ message: string }>(`/api/conversations/${conversationId}`, {
+      method: 'DELETE',
+    });
+  }
+
   async getConversationMessages(conversationId: number, limit: number = 50, offset: number = 0): Promise<{ messages: MessageItem[]; count: number; limit: number; offset: number }> {
     return this.request<{ messages: MessageItem[]; count: number; limit: number; offset: number }>(`/api/messages/conversation/${conversationId}?limit=${limit}&offset=${offset}`, {
+      method: 'GET',
+    });
+  }
+
+  async searchMessages(query: string, limit: number = 20, offset: number = 0): Promise<{ results: ConversationSearchResult[]; count: number; limit: number; offset: number }> {
+    const params = new URLSearchParams({
+      q: query,
+      limit: limit.toString(),
+      offset: offset.toString(),
+    });
+    return this.request<{ results: ConversationSearchResult[]; count: number; limit: number; offset: number }>(`/api/messages/search?${params}`, {
+      method: 'GET',
+    });
+  }
+
+  // New method for getting private chat data using query parameters
+  async getPrivateChat(chatId: number): Promise<{ messages: MessageItem[]; count: number; limit: number; offset: number }> {
+    return this.request<{ messages: MessageItem[]; count: number; limit: number; offset: number }>(`/api/chats?chats=${chatId}`, {
       method: 'GET',
     });
   }
@@ -943,6 +1167,26 @@ export class ApiClient {
     });
   }
 
+  // Status endpoints
+  async getMyStatus(): Promise<{ user_id: number; status: string; last_status_change: string; is_online: boolean }> {
+    return this.request<{ user_id: number; status: string; last_status_change: string; is_online: boolean }>('/api/status/me', {
+      method: 'GET',
+    });
+  }
+
+  async updateMyStatus(status: 'online' | 'busy' | 'away' | 'invisible'): Promise<{ message: string }> {
+    return this.request<{ message: string }>('/api/status/update', {
+      method: 'PUT',
+      body: JSON.stringify({ status }),
+    });
+  }
+
+  async getOnlineUsers(): Promise<{ users: Array<{ user_id: number; username: string; status: string; last_status_change: string }> }> {
+    return this.request<{ users: Array<{ user_id: number; username: string; status: string; last_status_change: string }> }>('/api/status/online', {
+      method: 'GET',
+    });
+  }
+
   async updateUserPrivacy(userId: number, isPrivate: boolean): Promise<{ message: string; user: User }> {
     return this.request<{ message: string; user: User }>(`/api/profile/privacy`, {
       method: 'PUT',
@@ -986,6 +1230,19 @@ export class ApiClient {
       return { isValid: false, error: 'Post content cannot exceed 5000 characters' };
     }
     return { isValid: true };
+  }
+
+  async getPendingJoinRequests(groupId: number): Promise<{ requests: Array<{ user: User; requested_at: string }> }> {
+    return this.request<{ requests: Array<{ user: User; requested_at: string }> }>(`/api/groups/${groupId}/requests`, {
+      method: 'GET',
+    });
+  }
+
+  async respondToJoinRequest(groupId: number, userId: number, action: 'accept' | 'decline'): Promise<{ message: string }> {
+    return this.request<{ message: string }>(`/api/groups/${groupId}/request/${userId}`, {
+      method: 'PUT',
+      body: JSON.stringify({ action }),
+    });
   }
 }
 

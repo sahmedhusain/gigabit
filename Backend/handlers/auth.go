@@ -174,7 +174,7 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 	session := &models.Session{
 		UserID:    user.ID,
 		Token:     token,
-		ExpiresAt: time.Now().Add(30 * time.Minute),
+		ExpiresAt: time.Now().Add(60 * time.Minute), // 1 hour session timeout
 	}
 
 	if err := h.sessionService.CreateSession(session); err != nil {
@@ -235,7 +235,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	session := &models.Session{
 		UserID:    user.ID,
 		Token:     token,
-		ExpiresAt: time.Now().Add(30 * time.Minute),
+		ExpiresAt: time.Now().Add(60 * time.Minute), // 1 hour session timeout
 	}
 
 	if err := h.sessionService.CreateSession(session); err != nil {
@@ -297,25 +297,25 @@ func validateNickname(nickname string) error {
 	if nickname == "" {
 		return nil // nickname is optional
 	}
-	
+
 	// Allow only English letters (a-z, A-Z), numbers (0-9), underscore (_), hyphen (-), and dot (.)
 	allowedChars := regexp.MustCompile(`^[a-zA-Z0-9._-]+$`)
 	if !allowedChars.MatchString(nickname) {
-		return errors.New("Nickname can only contain English letters, numbers, underscore (_), hyphen (-), and dot (.)")
+		return errors.New("nickname can only contain English letters, numbers, underscore (_), hyphen (-), and dot (.)")
 	}
-	
+
 	// Must start with a letter or number (not special characters)
 	startsWithAlphanumeric := regexp.MustCompile(`^[a-zA-Z0-9]`)
 	if !startsWithAlphanumeric.MatchString(nickname) {
-		return errors.New("Nickname must start with a letter or number")
+		return errors.New("nickname must start with a letter or number")
 	}
-	
+
 	// Must end with a letter or number (not special characters)
 	endsWithAlphanumeric := regexp.MustCompile(`[a-zA-Z0-9]$`)
 	if !endsWithAlphanumeric.MatchString(nickname) {
-		return errors.New("Nickname must end with a letter or number")
+		return errors.New("nickname must end with a letter or number")
 	}
-	
+
 	return nil
 }
 
@@ -323,17 +323,17 @@ func validateDoB(dobStr string) error {
 	log.Println("Date of birth format:", dobStr)
 	parsedDob, err := time.Parse("2006-01-02", dobStr)
 	if err != nil {
-		return errors.New("Date of birth must be in YYYY-MM-DD format")
+		return errors.New("date of birth must be in YYYY-MM-DD format")
 	}
 	today := time.Now()
 	hundredYearsAgo := today.AddDate(-100, 0, 0)
 
 	if parsedDob.After(today) {
-		return errors.New("Date of birth cannot be in the future")
+		return errors.New("date of birth cannot be in the future")
 	}
 
 	if parsedDob.Before(hundredYearsAgo) {
-		return errors.New("Date of birth is too far in the past")
+		return errors.New("date of birth is too far in the past")
 	}
 
 	return nil

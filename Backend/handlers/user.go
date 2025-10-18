@@ -208,9 +208,10 @@ func (h *UserHandler) UpdateStatus(w http.ResponseWriter, r *http.Request) {
 		"invisible": true,
 		"busy":      true,
 		"away":      true,
+		"offline":   true,
 	}
 	if !validStatuses[req.Status] {
-		writeError(w, http.StatusBadRequest, "Invalid status. Must be one of: online, invisible, busy, away")
+		writeError(w, http.StatusBadRequest, "Invalid status. Must be one of: online, invisible, busy, away, offline")
 		return
 	}
 
@@ -219,8 +220,15 @@ func (h *UserHandler) UpdateStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Determine what status to broadcast to other users
+	broadcastStatus := req.Status
+	if req.Status == "invisible" {
+		// If user is going invisible, broadcast offline status instead
+		broadcastStatus = "offline"
+	}
+
 	// Broadcast status change to all connected clients via WebSocket
-	h.hub.BroadcastUserStatus(userID, req.Status)
+	h.hub.BroadcastUserStatus(userID, broadcastStatus)
 
 	// Get updated user
 	user, err := h.userService.GetUserByID(userID)

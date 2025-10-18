@@ -2,6 +2,7 @@ package services
 
 import (
 	"database/sql"
+	"fmt"
 	"social/models"
 	"time"
 )
@@ -142,6 +143,28 @@ UPDATE sessions SET token = ? WHERE id = ?
 	}
 
 	return nil
+}
+
+func (s *SessionService) ExtendSession(sessionID uint, extensionDuration time.Duration) error {
+	query := `
+UPDATE sessions SET expires_at = datetime(expires_at, ?) WHERE id = ?
+`
+
+	// Convert duration to SQLite datetime modifier format (e.g., "+60 minutes")
+	minutes := int(extensionDuration.Minutes())
+	modifier := fmt.Sprintf("+%d minutes", minutes)
+
+	_, err := s.db.Exec(query, modifier, sessionID)
+	return err
+}
+
+func (s *SessionService) RefreshSessionExpiry(sessionID uint) error {
+	query := `
+UPDATE sessions SET expires_at = datetime('now', '+60 minutes') WHERE id = ?
+`
+
+	_, err := s.db.Exec(query, sessionID)
+	return err
 }
 
 func (s *SessionService) DeleteSession(sessionID uint) error {

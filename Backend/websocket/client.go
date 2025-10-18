@@ -12,8 +12,6 @@ var upgrader = websocket.Upgrader{
 	ReadBufferSize:  1024,
 	WriteBufferSize: 1024,
 	CheckOrigin: func(r *http.Request) bool {
-		// Allow connections from any origin in development
-		// In production, implement proper origin checking
 		return true
 	},
 }
@@ -106,6 +104,7 @@ func (h *Hub) ServeWS(w http.ResponseWriter, r *http.Request, userID uint) {
 		Groups:    make(map[uint]bool),
 		Following: make(map[uint]bool),
 		LastPing:  time.Now(),
+		Closed:    false,
 	}
 
 	// Load user's group memberships
@@ -219,4 +218,3 @@ func (h *Hub) CleanupStaleConnections() {
 		client.Conn.Close()
 	}
 }
-

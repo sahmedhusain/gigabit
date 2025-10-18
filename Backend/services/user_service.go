@@ -220,7 +220,6 @@ func (s *UserService) UpdateUserStatus(userID uint, status string) error {
 }
 
 // GenerateUniqueNickname generates a unique nickname from email
-// If the base nickname (part before @) is taken, it adds a counter
 func (s *UserService) GenerateUniqueNickname(email string) (string, error) {
 	// Extract the part before @ from email
 	atIndex := -1
@@ -240,11 +239,9 @@ func (s *UserService) GenerateUniqueNickname(email string) (string, error) {
 	// Check if the base nickname is available
 	_, err := s.GetUserByNickname(baseNickname)
 	if err != nil {
-		// If user not found, nickname is available
 		if err == sql.ErrNoRows {
 			return baseNickname, nil
 		}
-		// If other error, return it
 		return "", err
 	}
 
@@ -259,7 +256,6 @@ func (s *UserService) GenerateUniqueNickname(email string) (string, error) {
 				// Nickname with counter is available
 				return candidateNickname, nil
 			}
-			// If other error, return it
 			return "", err
 		}
 

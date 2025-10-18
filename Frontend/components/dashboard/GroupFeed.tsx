@@ -176,12 +176,6 @@ export default function GroupFeed({ groupId }: Props) {
                     <p className="font-semibold text-white">
                       {post.user.nickname || `${post.user.first_name} ${post.user.last_name}`}
                     </p>
-                    {isAuthorOnline && (
-                      <div className="flex items-center space-x-1">
-                        <div className="w-2 h-2 bg-green-400 rounded-full"></div>
-                        <span className="text-green-400 text-xs">Online</span>
-                      </div>
-                    )}
                   </div>
                   <p className="text-sm text-white/60">
                     {formatDate(post.created_at)}
@@ -189,7 +183,7 @@ export default function GroupFeed({ groupId }: Props) {
                 </div>
               </div>
               
-              <button className="p-2 text-white/50 hover:text-white hover:bg-white/10 rounded-xl transition-all duration-200">
+              <button className="p-2 text-white/50 hover:text-white hover:bg-white/10 rounded-xl transition-all duration-200" title="More options">
                 <MoreHorizontal className="w-5 h-5" />
               </button>
             </div>

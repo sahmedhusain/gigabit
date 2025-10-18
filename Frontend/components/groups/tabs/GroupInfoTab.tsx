@@ -1,0 +1,713 @@
+'use client'
+import React, { useState, useEffect } from 'react'
+import { Users, Calendar, Globe, Lock, Crown, Shield, User, LogOut, Settings } from 'lucide-react'
+import { motion, AnimatePresence } from 'framer-motion'
+import { useRouter } from 'next/navigation'
+import { useAuth } from '@/context/AuthContext'
+import { useWebSocket } from '@/context/WebSocketContext'
+import { api, GroupResponse, Member } from '@/lib/api'
+import { getAvatarUrl } from '@/utils/avatarUtils'
+
+interface GroupInfoTabProps {
+  groupId: number
+  onLeaveGroup?: (groupId: number) => void
+  onManageAdmins?: () => void
+  onClose?: () => void
+}
+
+const GroupInfoTab: React.FC<GroupInfoTabProps> = ({ groupId, onLeaveGroup, onManageAdmins, onClose }) => {
+  const [groupInfo, setGroupInfo] = useState<GroupResponse | null>(null)
+  const [members, setMembers] = useState<Member[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [showLeaveConfirm, setShowLeaveConfirm] = useState(false)
+  const [userRole, setUserRole] = useState<string>('')
+  const [nextAdmin, setNextAdmin] = useState<string>('')
+  const [hasExistingAdmins, setHasExistingAdmins] = useState(false)
+  const [hasOtherAdmins, setHasOtherAdmins] = useState(false)
+  const { user } = useAuth()
+  const router = useRouter()
+  const { onlineUsers, isConnected } = useWebSocket()
+
+  // Helper function to get group initials
+  const getGroupInitials = (groupName: string): string => {
+    if (!groupName) return '??'
+    const words = groupName.trim().split(/\s+/)
+    if (words.length === 1) {
+      return words[0].substring(0, 2).toUpperCase()
+    }
+    return (words[0][0] + words[1][0]).toUpperCase()
+  }
+
+  useEffect(() => {
+    const fetchGroupData = async () => {
+      try {
+        setIsLoading(true)
+        const [groupData, membersData, roleData] = await Promise.all([
+          api.getGroup(groupId),
+          api.getGroupMembers(groupId),
+          api.getUserRole(groupId)
+        ])
+        setGroupInfo(groupData)
+        setMembers(membersData.members)
+        setUserRole(roleData.role)
+        
+        // Fetch next admin info for creators and check other admins for admin users
+        if (roleData.role === 'creator') {
+          try {
+            const nextAdminData = await api.getNextAdmin(groupId)
+            setHasExistingAdmins(nextAdminData.has_admins)
+            // Use first_member as next admin if no admins exist
+            setNextAdmin(nextAdminData.has_admins ? nextAdminData.next_admin : nextAdminData.first_member)
+          } catch (error) {
+            console.error('Failed to fetch next admin:', error)
+            setNextAdmin('No eligible members')
+            setHasExistingAdmins(false)
+          }
+        } else if (roleData.role === 'admin') {
+          try {
+            const nextAdminData = await api.getNextAdmin(groupId)
+            // For admins, check if there are other admins (has_admins means there are admins besides creator)
+            setHasOtherAdmins(nextAdminData.has_admins)
+          } catch (error) {
+            console.error('Failed to check other admins:', error)
+            setHasOtherAdmins(false)
+          }
+        }
+      } catch (error) {
+        console.error('Failed to fetch group data:', error)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    fetchGroupData()
+  }, [groupId])
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString)
+    return date.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    })
+  }
+
+  const getRoleIcon = (role?: string) => {
+    switch (role) {
+      case 'creator':
+        return <Crown className="w-4 h-4 text-yellow-400" />
+      case 'admin':
+        return <Shield className="w-4 h-4 text-blue-400" />
+      default:
+        return <User className="w-4 h-4 text-gray-400" />
+    }
+  }
+
+  const getRoleLabel = (role?: string) => {
+    switch (role) {
+      case 'creator':
+        return 'Creator'
+      case 'admin':
+        return 'Admin'
+      default:
+        return 'Member'
+    }
+  }
+
+  const getRoleColor = (role?: string) => {
+    switch (role) {
+      case 'creator':
+        return 'text-yellow-400 bg-yellow-400/20 border-yellow-400/30'
+      case 'admin':
+        return 'text-blue-400 bg-blue-400/20 border-blue-400/30'
+      default:
+        return 'text-gray-400 bg-gray-400/20 border-gray-400/30'
+    }
+  }
+
+  const formatJoinDate = (dateString?: string) => {
+    if (!dateString) return 'Recently joined'
+    const date = new Date(dateString)
+    return date.toLocaleDateString('en-US', {
+      month: 'long',
+      day: 'numeric',
+      year: 'numeric'
+    })
+  }
+
+  const getUserStatus = (userId: number) => {
+    const onlineUser = onlineUsers.find(ou => ou.user_id === userId)
+    // Normalize to lowercase and fallback: if it's the current user and WS is connected, show online
+    const raw = onlineUser?.status ?? ((userId === user?.id && isConnected) ? 'online' : 'offline')
+    return String(raw).toLowerCase() as 'online' | 'busy' | 'away' | 'invisible' | 'offline'
+  }
+
+  const handleMemberClick = (memberId: number) => {
+    router.push(`/profile/${memberId}`)
+  }
+
+  const handleLeaveGroup = () => {
+    // Find next admin if user is creator
+    if (userRole === 'creator') {
+      const admins = members.filter(member => 
+        member.role === 'admin' && member.user.id !== user?.id
+      );
+      
+      if (admins.length === 0) {
+        // No other admins, find first non-creator member
+        const firstMember = members.find(member => 
+          member.role === 'member' && member.user.id !== user?.id
+        );
+        setNextAdmin(firstMember ? `${firstMember.user.first_name} ${firstMember.user.last_name}` : 'No eligible members');
+      } else {
+        setNextAdmin('');
+      }
+    }
+    setShowLeaveConfirm(true)
+  }
+
+  const confirmLeaveGroup = async () => {
+    try {
+      if (onLeaveGroup) {
+        onLeaveGroup(groupId)
+      } else {
+        await api.leaveGroup(groupId)
+      }
+      setShowLeaveConfirm(false)
+      setUserRole('')
+      setNextAdmin('')
+      // Close the chat window after leaving
+      if (onClose) {
+        onClose()
+      }
+    } catch (error) {
+      console.error('Failed to leave group:', error)
+      setShowLeaveConfirm(false)
+    }
+  }
+
+  const handleManageAdmins = () => {
+    setShowLeaveConfirm(false)
+    if (onManageAdmins) {
+      onManageAdmins()
+    }
+  }
+
+  const getOnlineGroupMembersCount = () => {
+    if (!isConnected || !members.length) return 0
+    
+    return members.filter(member => {
+      // Exclude current user
+      if (member.user.id === user?.id) return false
+      
+      // Check if member is online
+      const onlineUser = onlineUsers.find(ou => ou.user_id === member.user.id)
+      return onlineUser && onlineUser.status === 'online'
+    }).length
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <motion.div
+          animate={{ rotate: 360 }}
+          transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
+          className="w-8 h-8 border-2 border-emerald-500/30 border-t-emerald-500 rounded-full"
+        />
+      </div>
+    )
+  }
+
+  if (!groupInfo) {
+    return (
+      <div className="flex items-center justify-center h-full text-white/60">
+        Failed to load group information
+      </div>
+    )
+  }
+
+  return (
+    <div className="h-full overflow-y-scroll scrollbar-hide p-6" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+      <div className="max-w-4xl mx-auto space-y-8">
+        {/* Group Header */}
+        <motion.div
+          className="relative text-center"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6 }}
+        >
+          {/* Leave Group Button - Top Right */}
+          {groupInfo.is_member && (
+            <motion.div
+              className="absolute top-0 right-0"
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.5, delay: 0.3 }}
+            >
+              <motion.button
+                onClick={handleLeaveGroup}
+                className="px-4 py-2 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-400/40 hover:border-amber-400/60 text-amber-400 hover:text-amber-300 rounded-xl transition-all duration-200 flex items-center space-x-2 font-medium text-sm"
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+              >
+                <LogOut className="w-4 h-4" />
+                <span>Leave Group</span>
+              </motion.button>
+            </motion.div>
+          )}
+
+          <div className="w-32 h-32 mx-auto mb-6 rounded-full bg-gradient-to-br from-emerald-400 via-teal-500 to-cyan-600 flex items-center justify-center text-white text-4xl font-bold shadow-2xl ring-4 ring-white/20 overflow-hidden">
+            {groupInfo.avatar && getAvatarUrl(groupInfo.avatar) ? (
+              <img
+                src={getAvatarUrl(groupInfo.avatar)!}
+                alt={groupInfo.title}
+                className="w-full h-full object-cover rounded-full"
+              />
+            ) : (
+              getGroupInitials(groupInfo.title)
+            )}
+          </div>
+          <h1 className="text-4xl font-bold bg-gradient-to-r from-white to-white/80 bg-clip-text text-transparent mb-4">
+            {groupInfo.title}
+          </h1>
+          <p className="text-white/70 text-lg leading-relaxed max-w-2xl mx-auto">
+            {groupInfo.description}
+          </p>
+        </motion.div>
+
+        {/* Group Stats */}
+        <motion.div
+          className="grid grid-cols-1 md:grid-cols-4 gap-6"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, delay: 0.2 }}
+        >
+          <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-2xl p-6 text-center">
+            <Users className="w-8 h-8 text-emerald-400 mx-auto mb-3" />
+            <div className="text-2xl font-bold text-white mb-1">{groupInfo.member_count}</div>
+            <div className="text-white/60 text-sm">Members</div>
+          </div>
+
+          <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-2xl p-6 text-center">
+            <div className="w-8 h-8 mx-auto mb-3 relative flex items-center justify-center">
+              <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
+            </div>
+            <div className="text-2xl font-bold text-white mb-1">{getOnlineGroupMembersCount()}</div>
+            <div className="text-white/60 text-sm">Online</div>
+          </div>
+          
+          <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-2xl p-6 text-center">
+            <Calendar className="w-8 h-8 text-teal-400 mx-auto mb-3" />
+            <div className="text-lg font-semibold text-white mb-1">{formatDate(groupInfo.created_at)}</div>
+            <div className="text-white/60 text-sm">Created</div>
+          </div>
+
+          <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-2xl p-6 text-center">
+            {groupInfo.privacy === 'public' ? (
+              <Globe className="w-8 h-8 text-cyan-400 mx-auto mb-3" />
+            ) : (
+              <Lock className="w-8 h-8 text-orange-400 mx-auto mb-3" />
+            )}
+            <div className="text-lg font-semibold text-white mb-1 capitalize">{groupInfo.privacy}</div>
+            <div className="text-white/60 text-sm">Group</div>
+          </div>
+        </motion.div>
+
+        {/* Group Creator */}
+        {groupInfo.creator && (
+          <motion.div
+            className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-2xl p-6"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.4 }}
+          >
+            <h3 className="text-xl font-bold text-white mb-4 flex items-center">
+              <Crown className="w-5 h-5 text-yellow-400 mr-2" />
+              Group Creator
+            </h3>
+            <div 
+              className="flex items-center space-x-4 cursor-pointer hover:bg-white/5 rounded-xl p-4 -m-4 transition-all duration-200"
+              onClick={() => groupInfo.creator && handleMemberClick(groupInfo.creator.id)}
+            >
+              <div className="relative">
+                {groupInfo.creator.avatar ? (
+                  <img
+                    src={groupInfo.creator.avatar}
+                    alt={`${groupInfo.creator.first_name} ${groupInfo.creator.last_name}`}
+                    className="w-16 h-16 rounded-full object-cover shadow-lg"
+                  />
+                ) : (
+                  <div className="w-16 h-16 rounded-full bg-gradient-to-br from-yellow-400 to-orange-500 flex items-center justify-center text-white font-bold text-xl shadow-lg">
+                    {groupInfo.creator.first_name[0]}{groupInfo.creator.last_name[0]}
+                  </div>
+                )}
+                
+                {/* Status Indicator */}
+                {isConnected && groupInfo.creator && (
+                  <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-white/20 ${
+                    getUserStatus(groupInfo.creator.id) === 'online' ? 'bg-green-500' :
+                    getUserStatus(groupInfo.creator.id) === 'busy' ? 'bg-red-500' :
+                    getUserStatus(groupInfo.creator.id) === 'away' ? 'bg-yellow-500' :
+                    getUserStatus(groupInfo.creator.id) === 'invisible' ? 'bg-gray-500' :
+                    'bg-gray-400' // offline
+                  }`}></div>
+                )}
+              </div>
+              <div>
+                <h4 className="text-lg font-semibold text-white">
+                  {groupInfo.creator.first_name} {groupInfo.creator.last_name}
+                </h4>
+                <div className="flex items-center space-x-2 mt-1">
+                  <div className={`flex items-center space-x-1 px-2 py-1 rounded-full text-xs font-medium border ${getRoleColor('creator')}`}>
+                    {getRoleIcon('creator')}
+                    <span>Creator</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        )}
+
+        {/* All Members */}
+        {members.length > 0 && (
+          <motion.div
+            className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-2xl p-6"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.6 }}
+          >
+            <h3 className="text-xl font-bold text-white mb-6 flex items-center">
+              <Users className="w-5 h-5 text-emerald-400 mr-2" />
+              All Members
+              <div className="ml-3 px-3 py-1 bg-white/10 rounded-full">
+                <span className="text-white/70 text-sm font-medium">{members.length}</span>
+              </div>
+            </h3>
+            
+            <div className="space-y-3 max-h-96 overflow-y-scroll scrollbar-hide" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+              {[...members].sort((a, b) => {
+                const roleOrder = { creator: 0, admin: 1, member: 2 }
+                const aOrder = roleOrder[a.role as keyof typeof roleOrder] ?? 3
+                const bOrder = roleOrder[b.role as keyof typeof roleOrder] ?? 3
+                return aOrder - bOrder
+              }).map((member, index) => {
+                const userStatus = getUserStatus(member.user.id)
+                return (
+                  <motion.div
+                    key={member.id}
+                    className="flex items-center space-x-4 p-4 bg-white/5 rounded-xl hover:bg-white/10 transition-all duration-200 cursor-pointer"
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: index * 0.05 }}
+                    onClick={() => handleMemberClick(member.user.id)}
+                  >
+                    {/* Avatar */}
+                    <div className="relative">
+                      {member.user.avatar ? (
+                        <img
+                          src={member.user.avatar}
+                          alt={`${member.user.first_name} ${member.user.last_name}`}
+                          className="w-12 h-12 rounded-full object-cover shadow-lg"
+                        />
+                      ) : (
+                        <div className="w-12 h-12 rounded-full bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center text-white font-semibold shadow-lg">
+                          {member.user.first_name[0]}{member.user.last_name[0]}
+                        </div>
+                      )}
+                      
+                      {/* Status Indicator (show for all, including current user) */}
+                      {isConnected && (
+                        <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-white/20 ${
+                          userStatus === 'online' ? 'bg-green-500' :
+                          userStatus === 'busy' ? 'bg-red-500' :
+                          userStatus === 'away' ? 'bg-yellow-500' :
+                          userStatus === 'invisible' ? 'bg-gray-500' :
+                          'bg-gray-400' // offline
+                        }`}></div>
+                      )}
+                    </div>
+
+                    {/* Member Info */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center space-x-3">
+                        <h4 className="font-semibold text-white truncate">
+                          {member.user.first_name} {member.user.last_name}
+                          {member.user.id === user?.id && (
+                            <span className="text-white/60 text-sm font-normal ml-1">(You)</span>
+                          )}
+                        </h4>
+                        
+                        {/* Role Badge - Only show for admins and creators */}
+                        {(member.role === 'admin' || member.role === 'creator') && (
+                          <div className={`flex items-center space-x-1 px-2 py-1 rounded-full text-xs font-medium border ${getRoleColor(member.role)}`}>
+                            {getRoleIcon(member.role)}
+                            <span>{getRoleLabel(member.role)}</span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Username */}
+                      {member.user.nickname && (
+                        <p className="text-white/50 text-sm mt-1">
+                          @{member.user.nickname}
+                        </p>
+                      )}
+
+                      {/* Join Date */}
+                      <p className="text-white/60 text-xs mt-2">
+                        Joined {formatJoinDate(member.joined_at)}
+                      </p>
+                    </div>
+                  </motion.div>
+                )
+              })}
+            </div>
+          </motion.div>
+        )}
+      </div>
+      
+      {/* Leave Group Confirmation Dialog */}
+      <AnimatePresence>
+        {showLeaveConfirm && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+            onMouseDown={(e) => {
+              e.stopPropagation();
+              (e as any).nativeEvent?.stopImmediatePropagation?.();
+            }}
+            onClick={(e) => {
+              e.stopPropagation();
+              setShowLeaveConfirm(false);
+              (e as any).nativeEvent?.stopImmediatePropagation?.();
+            }}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-white/10 backdrop-blur-xl rounded-2xl p-6 border border-white/20 max-w-sm mx-4"
+              onMouseDown={(e) => {
+                e.stopPropagation();
+                (e as any).nativeEvent?.stopImmediatePropagation?.();
+              }}
+              onClick={(e) => {
+                e.stopPropagation();
+                (e as any).nativeEvent?.stopImmediatePropagation?.();
+              }}
+            >
+              <h3 className="text-white text-lg font-semibold mb-4 flex items-center">
+                {userRole === 'creator' ? <Crown className="w-4 h-4 text-yellow-400 mr-2" /> :
+                 userRole === 'admin' ? <Shield className="w-4 h-4 text-blue-400 mr-2" /> : null}
+                Leave Group
+              </h3>
+              
+              {/* Different messages based on user role */}
+              {userRole === 'creator' && (
+                <div className="mb-6">
+                  {hasExistingAdmins ? (
+                    <p className="text-white/70 mb-3">
+                      As the group creator, leaving will transfer ownership to the next admin.
+                    </p>
+                  ) : (
+                    <p className="text-white/70 mb-3">
+                      As the group creator, since there are no admins, ownership will be transferred to the first added member (like WhatsApp).
+                    </p>
+                  )}
+                  
+                  {nextAdmin && nextAdmin !== 'No eligible members' ? (
+                    <div className="bg-yellow-500/10 border border-yellow-400/30 rounded-lg p-3 mb-4">
+                      <p className="text-yellow-200 text-sm font-medium flex items-center">
+                        <Crown className="w-4 h-4 mr-2" />
+                        {hasExistingAdmins ? 'Next Admin Owner:' : 'Next Owner (First Member):'} {nextAdmin}
+                      </p>
+                    </div>
+                  ) : nextAdmin === 'No eligible members' ? (
+                    <div className="bg-red-500/10 border border-red-400/30 rounded-lg p-3 mb-4">
+                      <p className="text-red-200 text-sm font-medium">
+                        No eligible members to transfer ownership to.
+                      </p>
+                    </div>
+                  ) : null}
+                  
+                  {!hasExistingAdmins && nextAdmin && nextAdmin !== 'No eligible members' ? (
+                    <p className="text-white/60 text-sm">
+                      You can select an admin before leaving, or proceed to transfer ownership to the first member.
+                    </p>
+                  ) : hasExistingAdmins ? (
+                    <p className="text-white/60 text-sm">
+                      You can manage admins before leaving, or proceed to leave the group.
+                    </p>
+                  ) : (
+                    <p className="text-white/60 text-sm">
+                      Add some admins first, or the group will be transferred to the first member.
+                    </p>
+                  )}
+                </div>
+              )}
+              
+              {userRole === 'admin' && (
+                <div className="mb-6">
+                  <p className="text-white/70 mb-3">
+                    Are you sure you want to leave "{groupInfo?.title}"? As an admin, you will lose your administrative privileges.
+                  </p>
+                  {hasOtherAdmins ? (
+                    <p className="text-white/60 text-sm">
+                      Since there are other admins in the group, you can leave normally. You will need to be re-invited to rejoin.
+                    </p>
+                  ) : (
+                    <div className="bg-yellow-500/10 border border-yellow-400/30 rounded-lg p-3">
+                      <p className="text-yellow-200 text-sm font-medium flex items-center">
+                        <Shield className="w-4 h-4 mr-2" />
+                        You are the only admin. Consider promoting someone before leaving.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+              
+              {userRole === 'member' && (
+                <p className="text-white/70 mb-6">
+                  Are you sure you want to leave "{groupInfo?.title}"? You will no longer receive messages from this group and will need to be re-invited to rejoin.
+                </p>
+              )}
+
+              {/* Buttons based on user role and conditions */}
+              {userRole === 'creator' ? (
+                nextAdmin && nextAdmin !== 'No eligible members' ? (
+                  <div className="space-y-3">
+                    <div className="flex space-x-3">
+                      <motion.button
+                        onClick={() => setShowLeaveConfirm(false)}
+                        className="flex-1 py-2 px-4 bg-white/10 hover:bg-white/20 text-white rounded-lg transition-colors"
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                      >
+                        Cancel
+                      </motion.button>
+                      <motion.button
+                        onClick={handleManageAdmins}
+                        className="flex-1 py-2 px-4 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors flex items-center justify-center space-x-2"
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                      >
+                        <Settings className="w-4 h-4" />
+                        <span>{hasExistingAdmins ? 'Manage Admins' : 'Add Admin'}</span>
+                      </motion.button>
+                    </div>
+                    <motion.button
+                      onClick={confirmLeaveGroup}
+                      className="w-full py-2 px-4 bg-amber-500 hover:bg-amber-600 text-white rounded-lg transition-colors"
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                    >
+                      {hasExistingAdmins ? 'Leave Group' : 'Leave & Transfer to First Member'}
+                    </motion.button>
+                  </div>
+                ) : (
+                  /* No eligible members case */
+                  <div className="flex space-x-3">
+                    <motion.button
+                      onClick={() => setShowLeaveConfirm(false)}
+                      className="flex-1 py-2 px-4 bg-white/10 hover:bg-white/20 text-white rounded-lg transition-colors"
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                    >
+                      Cancel
+                    </motion.button>
+                    <motion.button
+                      onClick={handleManageAdmins}
+                      className="flex-1 py-2 px-4 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors flex items-center justify-center space-x-2"
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                    >
+                      <Settings className="w-4 h-4" />
+                      <span>Add Members</span>
+                    </motion.button>
+                  </div>
+                )
+              ) : userRole === 'admin' ? (
+                /* Admin buttons - show manage admins only if they're the only admin */
+                !hasOtherAdmins ? (
+                  <div className="space-y-3">
+                    <div className="flex space-x-3">
+                      <motion.button
+                        onClick={() => setShowLeaveConfirm(false)}
+                        className="flex-1 py-2 px-4 bg-white/10 hover:bg-white/20 text-white rounded-lg transition-colors"
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                      >
+                        Cancel
+                      </motion.button>
+                      <motion.button
+                        onClick={handleManageAdmins}
+                        className="flex-1 py-2 px-4 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors flex items-center justify-center space-x-2"
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                      >
+                        <Settings className="w-4 h-4" />
+                        <span>Add Admin</span>
+                      </motion.button>
+                    </div>
+                    <motion.button
+                      onClick={confirmLeaveGroup}
+                      className="w-full py-2 px-4 bg-amber-500 hover:bg-amber-600 text-white rounded-lg transition-colors"
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                    >
+                      Leave Anyway
+                    </motion.button>
+                  </div>
+                ) : (
+                  /* Normal admin leave when other admins exist */
+                  <div className="flex space-x-3">
+                    <motion.button
+                      onClick={() => setShowLeaveConfirm(false)}
+                      className="flex-1 py-2 px-4 bg-white/10 hover:bg-white/20 text-white rounded-lg transition-colors"
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                    >
+                      Cancel
+                    </motion.button>
+                    <motion.button
+                      onClick={confirmLeaveGroup}
+                      className="flex-1 py-2 px-4 bg-amber-500 hover:bg-amber-600 text-white rounded-lg transition-colors"
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                    >
+                      Leave Group
+                    </motion.button>
+                  </div>
+                )
+              ) : (
+                /* Member buttons - simple leave */
+                <div className="flex space-x-3">
+                  <motion.button
+                    onClick={() => setShowLeaveConfirm(false)}
+                    className="flex-1 py-2 px-4 bg-white/10 hover:bg-white/20 text-white rounded-lg transition-colors"
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                  >
+                    Cancel
+                  </motion.button>
+                  <motion.button
+                    onClick={confirmLeaveGroup}
+                    className="flex-1 py-2 px-4 bg-amber-500 hover:bg-amber-600 text-white rounded-lg transition-colors"
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                  >
+                    Leave Group
+                  </motion.button>
+                </div>
+              )}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  )
+}
+
+export default GroupInfoTab

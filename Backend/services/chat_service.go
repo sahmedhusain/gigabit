@@ -51,21 +51,46 @@ func (s *ChatService) GetUnifiedChats(userID uint) ([]models.UnifiedChatItem, er
 }
 
 func (s *ChatService) getPrivateChats(userID uint) ([]models.UnifiedChatItem, error) {
+	// Calculate unread count dynamically: count messages where current user is NOT the sender and is_read = false
 	query := `
 		SELECT c.id, c.participant1_id, c.participant2_id, c.last_message_id, c.updated_at,
 			   u1.id, u1.first_name, u1.last_name, u1.avatar, u1.nickname,
 			   u2.id, u2.first_name, u2.last_name, u2.avatar, u2.nickname,
 			   m.id, m.content, m.created_at, m.sender_id,
-			   CASE WHEN c.participant1_id = ? THEN c.unread_count1 ELSE c.unread_count2 END as unread_count
+			   (
+				   SELECT COUNT(*) FROM private_messages pm 
+				   WHERE pm.conversation_id = c.id 
+					 AND pm.sender_id != ? 
+					 AND pm.is_read = 0
+					 AND (
+						 CASE 
+							 WHEN c.participant1_id = ? AND c.participant1_deleted_at IS NOT NULL THEN pm.created_at > c.participant1_deleted_at
+							 WHEN c.participant2_id = ? AND c.participant2_deleted_at IS NOT NULL THEN pm.created_at > c.participant2_deleted_at
+							 ELSE 1
+						 END
+					 )
+			   ) as unread_count
 		FROM private_conversations c
 		JOIN users u1 ON c.participant1_id = u1.id
 		JOIN users u2 ON c.participant2_id = u2.id
-		LEFT JOIN private_messages m ON c.last_message_id = m.id
+		LEFT JOIN private_messages m ON m.id = (
+			SELECT pm.id FROM private_messages pm
+			WHERE pm.conversation_id = c.id
+			  AND (
+				  CASE 
+					  WHEN c.participant1_id = ? AND c.participant1_deleted_at IS NOT NULL THEN pm.created_at > c.participant1_deleted_at
+					  WHEN c.participant2_id = ? AND c.participant2_deleted_at IS NOT NULL THEN pm.created_at > c.participant2_deleted_at
+					  ELSE 1
+				  END
+			  )
+			ORDER BY pm.created_at DESC
+			LIMIT 1
+		)
 		WHERE ((c.participant1_id = ? AND c.participant1_deleted = FALSE) OR (c.participant2_id = ? AND c.participant2_deleted = FALSE))
 		ORDER BY c.updated_at DESC
 	`
 
-	rows, err := s.db.Query(query, userID, userID, userID)
+	rows, err := s.db.Query(query, userID, userID, userID, userID, userID, userID, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -143,16 +168,16 @@ func (s *ChatService) getPrivateChats(userID uint) ([]models.UnifiedChatItem, er
 
 func (s *ChatService) getGroupChats(userID uint) ([]models.UnifiedChatItem, error) {
 	query := `
-        SELECT g.id, g.name, gm.created_at, gc.id as conv_id,
-               m.content, m.created_at as last_message_time, m.sender_id,
-               u.id, u.first_name, u.last_name, u.avatar, u.nickname
-        FROM groups g
-        JOIN group_members gm ON g.id = gm.group_id
-        LEFT JOIN group_conversations gc ON g.id = gc.group_id
-        LEFT JOIN group_messages m ON gc.last_message_id = m.id
-        LEFT JOIN users u ON m.sender_id = u.id
-        WHERE gm.user_id = ? AND gm.status = 'accepted'
-        ORDER BY COALESCE(m.created_at, gm.created_at) DESC
+	        SELECT g.id, g.name, g.privacy, g.avatar, gm.created_at, gm.role, gc.id as conv_id,
+	               m.content, m.created_at as last_message_time, m.sender_id,
+	               u.id, u.first_name, u.last_name, u.avatar, u.nickname
+	        FROM groups g
+	        JOIN group_members gm ON g.id = gm.group_id
+	        LEFT JOIN group_conversations gc ON g.id = gc.group_id
+	        LEFT JOIN group_messages m ON gc.last_message_id = m.id
+	        LEFT JOIN users u ON m.sender_id = u.id
+	        WHERE gm.user_id = ? AND gm.status = 'member'
+	        ORDER BY COALESCE(m.created_at, gm.created_at) DESC
 	`
 
 	rows, err := s.db.Query(query, userID)
@@ -165,7 +190,10 @@ func (s *ChatService) getGroupChats(userID uint) ([]models.UnifiedChatItem, erro
 	for rows.Next() {
 		var groupID uint
 		var groupName string
+		var privacy string
+		var groupAvatar sql.NullString
 		var createdAt time.Time
+		var memberRole sql.NullString
 		var convID sql.NullInt64
 		var lastMessage sql.NullString
 		var lastMessageTime sql.NullTime
@@ -176,7 +204,7 @@ func (s *ChatService) getGroupChats(userID uint) ([]models.UnifiedChatItem, erro
 		var senderAvatar sql.NullString
 		var senderNickname sql.NullString
 
-		err := rows.Scan(&groupID, &groupName, &createdAt, &convID, &lastMessage, &lastMessageTime, &msgSenderID,
+		err := rows.Scan(&groupID, &groupName, &privacy, &groupAvatar, &createdAt, &memberRole, &convID, &lastMessage, &lastMessageTime, &msgSenderID,
 			&senderID, &senderFirstName, &senderLastName, &senderAvatar, &senderNickname)
 		if err != nil {
 			return nil, err
@@ -237,6 +265,16 @@ func (s *ChatService) getGroupChats(userID uint) ([]models.UnifiedChatItem, erro
 			s.db.QueryRow(unreadQuery, groupID, userID, convIDValue, userID).Scan(&unreadCount)
 		}
 
+		role := ""
+		if memberRole.Valid {
+			role = memberRole.String
+		}
+
+		var groupAvatarPtr *string
+		if groupAvatar.Valid {
+			groupAvatarPtr = &groupAvatar.String
+		}
+
 		chat := models.UnifiedChatItem{
 			ID:                fmt.Sprintf("group_%d", convIDValue),
 			Type:              "group",
@@ -247,8 +285,13 @@ func (s *ChatService) getGroupChats(userID uint) ([]models.UnifiedChatItem, erro
 			HasUnread:         unreadCount > 0,
 			UnreadCount:       unreadCount,
 			Group: &models.GroupResponse{
-				ID:    groupID,
-				Title: groupName,
+				ID:           groupID,
+				Title:        groupName,
+				Privacy:      privacy,
+				Avatar:       groupAvatarPtr,
+				IsMember:     true,
+				MemberStatus: "member",
+				Role:         role,
 			},
 			ConversationID: convIDValue,
 		}
@@ -262,11 +305,15 @@ func (s *ChatService) DeleteConversation(conversationID, userID uint) error {
 	query := `
 		UPDATE private_conversations
 		SET participant1_deleted = CASE WHEN participant1_id = ? THEN TRUE ELSE participant1_deleted END,
-		    participant2_deleted = CASE WHEN participant2_id = ? THEN TRUE ELSE participant2_deleted END,
-		    updated_at = CURRENT_TIMESTAMP
+			participant2_deleted = CASE WHEN participant2_id = ? THEN TRUE ELSE participant2_deleted END,
+			participant1_deleted_at = CASE WHEN participant1_id = ? THEN CURRENT_TIMESTAMP ELSE participant1_deleted_at END,
+			participant2_deleted_at = CASE WHEN participant2_id = ? THEN CURRENT_TIMESTAMP ELSE participant2_deleted_at END,
+			unread_count1 = CASE WHEN participant1_id = ? THEN 0 ELSE unread_count1 END,
+			unread_count2 = CASE WHEN participant2_id = ? THEN 0 ELSE unread_count2 END,
+			updated_at = CURRENT_TIMESTAMP
 		WHERE id = ?
 	`
 
-	_, err := s.db.Exec(query, userID, userID, conversationID)
+	_, err := s.db.Exec(query, userID, userID, userID, userID, userID, userID, conversationID)
 	return err
 }

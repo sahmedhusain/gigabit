@@ -1,6 +1,7 @@
 package websocket
 
 import (
+	"database/sql"
 	"log"
 	"time"
 )
@@ -11,12 +12,11 @@ func (h *Hub) handlePostUpdate(message Message) {
 	defer h.mu.RUnlock()
 
 	for userID, client := range h.clients {
-		if userID != message.From { // Don't send back to sender
+		if userID != message.From {
 			client.mu.RLock()
 			isFollowing := client.Following[message.From]
 			client.mu.RUnlock()
 
-			// Send to followers or if it's a public post update
 			if isFollowing || message.Action == "create" {
 				select {
 				case client.Send <- message:
@@ -50,10 +50,9 @@ func (h *Hub) handleCommentCreate(message Message) {
 		content, contentOk := commentData["content"].(string)
 		if !contentOk || content == "" {
 			log.Printf("Invalid comment content from user %d", userID)
-			// Send error back to client
 			errorMsg := Message{
 				Type:      MessageTypeError,
-				From:      0, // System message
+				From:      0,
 				To:        userID,
 				Content:   "Invalid comment content",
 				Timestamp: time.Now().Unix(),
@@ -77,7 +76,6 @@ func (h *Hub) handleCommentCreate(message Message) {
 		result, err := h.db.Exec(query, postID, userID, content, imageURL, now, now)
 		if err != nil {
 			log.Printf("Failed to create comment via WebSocket: %v", err)
-			// Send error back to client
 			errorMsg := Message{
 				Type:      MessageTypeError,
 				From:      0,
@@ -98,12 +96,21 @@ func (h *Hub) handleCommentCreate(message Message) {
 		// Get user information for the response
 		userQuery := `SELECT first_name, last_name, avatar, nickname FROM users WHERE id = ?`
 		var firstName, lastName string
-		var avatar, nickname *string
+		var avatar, nickname sql.NullString
 
 		err = h.db.QueryRow(userQuery, userID).Scan(&firstName, &lastName, &avatar, &nickname)
 		if err != nil {
 			log.Printf("Failed to get user info: %v", err)
 			return
+		}
+
+		// Handle nullable fields properly
+		var avatarStr, nicknameStr *string
+		if avatar.Valid {
+			avatarStr = &avatar.String
+		}
+		if nickname.Valid {
+			nicknameStr = &nickname.String
 		}
 
 		// Create response data with complete comment information
@@ -112,15 +119,21 @@ func (h *Hub) handleCommentCreate(message Message) {
 			"post_id":    postID,
 			"user_id":    userID,
 			"content":    content,
-			"image_url":  imageURL,
-			"created_at": now.Format("2006-01-02T15:04:05Z"),
-			"updated_at": now.Format("2006-01-02T15:04:05Z"),
+			"image_url":  imageURL, // This is already a *string or nil
+			"created_at": now.Format("2006-01-02T15:04:05Z07:00"),
+			"updated_at": now.Format("2006-01-02T15:04:05Z07:00"),
 			"user": map[string]interface{}{
-				"id":         userID,
-				"first_name": firstName,
-				"last_name":  lastName,
-				"avatar":     avatar,
-				"nickname":   nickname,
+				"id":            userID,
+				"first_name":    firstName,
+				"last_name":     lastName,
+				"avatar":        avatarStr,   // Send as *string to match frontend expectations
+				"nickname":      nicknameStr, // Send as *string to match frontend expectations
+				"email":         "",          // Add missing fields that frontend expects
+				"date_of_birth": "",
+				"about_me":      nil,
+				"is_private":    false,
+				"created_at":    "",
+				"updated_at":    "",
 			},
 		}
 
@@ -138,10 +151,8 @@ func (h *Hub) handleCommentUpdate(message Message) {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
 
-	// For now, broadcast to all connected clients
-	// In a real implementation, you'd track who should receive comment updates
 	for userID, client := range h.clients {
-		if userID != message.From { // Don't send back to sender
+		if userID != message.From {
 			select {
 			case client.Send <- message:
 			default:
@@ -153,15 +164,15 @@ func (h *Hub) handleCommentUpdate(message Message) {
 
 // handleLikeUpdate broadcasts like updates to post author
 func (h *Hub) handleLikeUpdate(message Message) {
-	if message.To > 0 { // If we know who to send to
+	if message.To > 0 {
 		h.handlePrivateMessage(message)
 	} else {
-		// Broadcast to interested parties
+
 		h.mu.RLock()
 		defer h.mu.RUnlock()
 
 		for userID, client := range h.clients {
-			if userID != message.From { // Don't send back to sender
+			if userID != message.From {
 				select {
 				case client.Send <- message:
 				default:
@@ -174,14 +185,13 @@ func (h *Hub) handleLikeUpdate(message Message) {
 
 // handleLike broadcasts like updates
 func (h *Hub) handleLike(message Message) {
-	// Broadcast like updates to all connected clients except sender
 	h.mu.RLock()
 	defer h.mu.RUnlock()
 
 	log.Printf("Broadcasting like update for post %d by user %d", message.PostID, message.From)
 
 	for userID, client := range h.clients {
-		if userID != message.From { // Don't send back to sender
+		if userID != message.From {
 			select {
 			case client.Send <- message:
 				log.Printf("Successfully sent like update to user %d", userID)
@@ -531,3 +541,16 @@ func (h *Hub) handleEventUpdate(message Message) {
 	}
 }
 
+// handlePollUpdate broadcasts poll updates to group members
+func (h *Hub) handlePollUpdate(message Message) {
+	if message.GroupID > 0 {
+		h.handleGroupMessage(message)
+	}
+}
+
+// handlePollVoteUpdate broadcasts poll vote updates to group members
+func (h *Hub) handlePollVoteUpdate(message Message) {
+	if message.GroupID > 0 {
+		h.handleGroupMessage(message)
+	}
+}

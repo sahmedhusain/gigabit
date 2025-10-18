@@ -4,11 +4,13 @@ import (
 	"database/sql"
 	"encoding/json"
 	"net/http"
+	"strconv"
+	"strings"
+	"time"
+
 	"social/models"
 	"social/services"
 	"social/websocket"
-	"strconv"
-	"time"
 )
 
 type GroupHandler struct {
@@ -35,16 +37,35 @@ func (h *GroupHandler) CreateGroup(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "Invalid request body")
 		return
 	}
+	if strings.TrimSpace(req.Title) == "" {
+		writeError(w, http.StatusBadRequest, "Group title is required")
+		return
+	}
+	if strings.TrimSpace(req.Description) == "" {
+		writeError(w, http.StatusBadRequest, "Group description is required")
+		return
+	}
+	if req.Privacy != "public" && req.Privacy != "private" {
+		writeError(w, http.StatusBadRequest, "Invalid privacy option")
+		return
+	}
 
 	group := &models.Group{
 		CreatorID:   userID,
 		Title:       req.Title,
 		Description: req.Description,
+		Privacy:     req.Privacy,
+		Avatar:      req.Avatar,
 	}
 
-	if err := h.groupService.CreateGroup(group); err != nil {
+	if err := h.groupService.CreateGroup(group, req.InviteMembers); err != nil {
 		writeError(w, http.StatusInternalServerError, "Failed to create group")
 		return
+	}
+
+	// Add creator to WebSocket group for real-time messaging
+	if h.hub != nil {
+		h.hub.AddUserToGroup(userID, group.ID)
 	}
 
 	writeJSON(w, http.StatusCreated, map[string]interface{}{
@@ -283,14 +304,16 @@ func (h *GroupHandler) RespondToInvitation(w http.ResponseWriter, r *http.Reques
 	}
 
 	var req struct {
-		Accept bool `json:"accept"`
+		Action string `json:"action"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, "Invalid request body")
 		return
 	}
 
-	if err := h.groupService.RespondToInvitation(uint(groupID), userID, req.Accept); err != nil {
+	accept := req.Action == "accept"
+
+	if err := h.groupService.RespondToInvitation(uint(groupID), userID, accept); err != nil {
 		if err == sql.ErrNoRows {
 			writeError(w, http.StatusNotFound, "No invitation found")
 		} else {
@@ -299,8 +322,13 @@ func (h *GroupHandler) RespondToInvitation(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
+	// If invitation was accepted, add user to WebSocket group for real-time messaging
+	if accept && h.hub != nil {
+		h.hub.AddUserToGroup(userID, uint(groupID))
+	}
+
 	message := "Invitation declined"
-	if req.Accept {
+	if accept {
 		message = "Invitation accepted - you are now a member"
 	}
 
@@ -327,14 +355,16 @@ func (h *GroupHandler) RespondToJoinRequest(w http.ResponseWriter, r *http.Reque
 	}
 
 	var req struct {
-		Accept bool `json:"accept"`
+		Action string `json:"action"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, "Invalid request body")
 		return
 	}
 
-	if err := h.groupService.RespondToJoinRequest(uint(groupID), uint(requestUserID), userID, req.Accept); err != nil {
+	accept := req.Action == "accept"
+
+	if err := h.groupService.RespondToJoinRequest(uint(groupID), uint(requestUserID), userID, accept); err != nil {
 		if err == sql.ErrNoRows {
 			writeError(w, http.StatusForbidden, "Cannot respond to this request")
 		} else {
@@ -343,8 +373,13 @@ func (h *GroupHandler) RespondToJoinRequest(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
+	// If join request was accepted, add user to WebSocket group for real-time messaging
+	if accept && h.hub != nil {
+		h.hub.AddUserToGroup(uint(requestUserID), uint(groupID))
+	}
+
 	message := "Join request declined"
-	if req.Accept {
+	if accept {
 		message = "Join request accepted"
 	}
 
@@ -365,12 +400,13 @@ func (h *GroupHandler) LeaveGroup(w http.ResponseWriter, r *http.Request, groupI
 	}
 
 	if err := h.groupService.LeaveGroup(uint(groupID), userID); err != nil {
-		if err == sql.ErrNoRows {
-			writeError(w, http.StatusForbidden, "Cannot leave this group (creators must delete the group)")
-		} else {
-			writeError(w, http.StatusInternalServerError, "Failed to leave group")
-		}
+		writeError(w, http.StatusInternalServerError, "Failed to leave group")
 		return
+	}
+
+	// Remove user from WebSocket group
+	if h.hub != nil {
+		h.hub.RemoveUserFromGroup(userID, uint(groupID))
 	}
 
 	writeJSON(w, http.StatusOK, map[string]interface{}{"message": "Left group successfully"})
@@ -739,5 +775,157 @@ func (h *GroupHandler) DemoteAdmin(w http.ResponseWriter, r *http.Request, group
 
 	writeJSON(w, http.StatusOK, map[string]string{
 		"message": "Admin demoted to member successfully",
+	})
+}
+
+// UpdateMemberRole updates the role of a group member
+func (h *GroupHandler) UpdateMemberRole(w http.ResponseWriter, r *http.Request, groupIDStr, userIDStr string) {
+	groupID, err := strconv.ParseUint(groupIDStr, 10, 32)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "Invalid group ID")
+		return
+	}
+
+	userID, err := strconv.ParseUint(userIDStr, 10, 32)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "Invalid user ID")
+		return
+	}
+
+	currentUserID, ok := r.Context().Value("user_id").(uint)
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "User not authenticated")
+		return
+	}
+
+	// Check if current user is admin of the group
+	isAdmin, err := h.groupService.IsUserAdminOrCreator(uint(groupID), currentUserID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "Failed to check admin status")
+		return
+	}
+	if !isAdmin {
+		writeError(w, http.StatusForbidden, "Only admins can update member roles")
+		return
+	}
+
+	var req struct {
+		Role string `json:"role"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "Invalid request body")
+		return
+	}
+
+	if req.Role != "admin" && req.Role != "member" {
+		writeError(w, http.StatusBadRequest, "Role must be 'admin' or 'member'")
+		return
+	}
+
+	// If promoting to admin, check admin limit
+	if req.Role == "admin" {
+		adminCount, err := h.groupService.CountAdmins(uint(groupID))
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "Failed to count admins")
+			return
+		}
+		if adminCount >= 3 {
+			writeError(w, http.StatusBadRequest, "Maximum number of admins reached")
+			return
+		}
+	}
+
+	err = h.groupService.UpdateUserRole(uint(groupID), uint(userID), req.Role)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "Failed to update user role")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]string{
+		"message": "User role updated successfully",
+	})
+}
+
+// KickMember removes a member from the group
+func (h *GroupHandler) GetNextAdmin(w http.ResponseWriter, r *http.Request, groupIDStr string) {
+	groupID, err := strconv.ParseUint(groupIDStr, 10, 32)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "Invalid group ID")
+		return
+	}
+
+	userID, ok := r.Context().Value("user_id").(uint)
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "User not authenticated")
+		return
+	}
+
+	nextAdminInfo, err := h.groupService.GetNextAdmin(uint(groupID), userID)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			writeError(w, http.StatusForbidden, "User is not a member of this group")
+		} else {
+			writeError(w, http.StatusInternalServerError, "Failed to get next admin info")
+		}
+		return
+	}
+
+	writeJSON(w, http.StatusOK, nextAdminInfo)
+}
+
+func (h *GroupHandler) KickMember(w http.ResponseWriter, r *http.Request, groupIDStr, userIDStr string) {
+	groupID, err := strconv.ParseUint(groupIDStr, 10, 32)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "Invalid group ID")
+		return
+	}
+
+	userID, err := strconv.ParseUint(userIDStr, 10, 32)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "Invalid user ID")
+		return
+	}
+
+	currentUserID, ok := r.Context().Value("user_id").(uint)
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "User not authenticated")
+		return
+	}
+
+	// Check if current user is admin of the group
+	isAdmin, err := h.groupService.IsUserAdminOrCreator(uint(groupID), currentUserID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "Failed to check admin status")
+		return
+	}
+	if !isAdmin {
+		writeError(w, http.StatusForbidden, "Only admins can kick members")
+		return
+	}
+
+	// Check if the user being kicked is also an admin
+	targetUserRole, err := h.groupService.GetUserRole(uint(groupID), uint(userID))
+	if err != nil && err != sql.ErrNoRows {
+		writeError(w, http.StatusInternalServerError, "Failed to check target user role")
+		return
+	}
+	if targetUserRole == "admin" {
+		writeError(w, http.StatusBadRequest, "Cannot kick another admin")
+		return
+	}
+
+	err = h.groupService.RemoveMember(uint(groupID), uint(userID))
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "Failed to remove member")
+		return
+	}
+
+	// Remove kicked user from WebSocket group
+	if h.hub != nil {
+		h.hub.RemoveUserFromGroup(uint(userID), uint(groupID))
+	}
+
+	writeJSON(w, http.StatusOK, map[string]string{
+		"message": "Member removed successfully",
 	})
 }

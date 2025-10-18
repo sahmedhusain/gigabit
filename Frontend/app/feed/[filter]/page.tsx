@@ -1,6 +1,6 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
-import { useRouter, useParams } from 'next/navigation'
+import { useRouter, useParams, useSearchParams } from 'next/navigation'
 import ProtectedRoute from '@/components/ProtectedRoute'
 import AppLayout from '@/components/AppLayout'
 import { useAuth } from '@/context/AuthContext'
@@ -24,12 +24,14 @@ import HomeFeed from '@/components/dashboard/HomeFeed'
 function FeedFilterPage() {
   const router = useRouter()
   const params = useParams()
+  const searchParams = useSearchParams()
   const filter = params.filter as string
   const { user } = useAuth()
   const { isConnected, addMessageListener } = useWebSocket()
   const { success, error } = useToast()
 
   const [feedSubTab, setFeedSubTab] = useState(filter || 'all')
+  const [sortOrder, setSortOrder] = useState<'newest' | 'oldest'>((searchParams.get('sort') as 'newest' | 'oldest') || 'newest')
   const [showCreatePost, setShowCreatePost] = useState(false)
 
   // Post Creation State
@@ -50,6 +52,18 @@ function FeedFilterPage() {
       router.replace(`/feed/${feedSubTab}`)
     }
   }, [feedSubTab, filter, router])
+
+  // Update URL when sort changes
+  useEffect(() => {
+    const params = new URLSearchParams(searchParams.toString())
+    if (sortOrder !== 'newest') {
+      params.set('sort', sortOrder)
+    } else {
+      params.delete('sort')
+    }
+    const newUrl = params.toString() ? `/feed/${feedSubTab}?${params.toString()}` : `/feed/${feedSubTab}`
+    router.replace(newUrl)
+  }, [sortOrder, feedSubTab, searchParams, router])
 
   const fetchFeedPosts = useCallback(async () => {
     try {
@@ -101,7 +115,8 @@ function FeedFilterPage() {
           timeAgo: formatTimeAgo(String(p['created_at'] ?? '')),
           privacy: String(p['privacy'] ?? ''),
           isLiked: Boolean(p['is_liked']),
-          isBookmarked: Boolean(p['is_bookmarked'])
+          isBookmarked: Boolean(p['is_bookmarked']),
+          created_at: String(p['created_at'] ?? '')
         }
         
         return mappedPost
@@ -332,6 +347,8 @@ function FeedFilterPage() {
         loadingUsers={loadingUsers}
         onCreatePost={handleCreatePost}
         feedSubTab={feedSubTab}
+        sortOrder={sortOrder}
+        setSortOrder={setSortOrder}
       />
     </AppLayout>
   )

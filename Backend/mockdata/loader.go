@@ -30,14 +30,21 @@ func LoadMockData(db *sql.DB) error {
 		"groups.sql",
 		"group_members.sql",
 		"group_conversations.sql",
+		"group_messages.sql",
 		"private_conversations.sql",
 		"private_messages.sql",
 		"posts.sql",
+		"group_posts.sql",
+		"post_privacy.sql",
 		"likes.sql",
-		// "comments.sql", // Temporarily disabled due to syntax errors
+		"comments.sql",
+		"bookmarks.sql",
+		"invitations.sql",
+		"polls.sql",
+		"poll_options.sql",
+		"poll_votes.sql",
 		"events.sql",
 		"event_responses.sql",
-		"messages.sql",
 		"notifications.sql",
 	}
 
@@ -47,6 +54,12 @@ func LoadMockData(db *sql.DB) error {
 		filePath := filepath.Join(mockDataDir, filename)
 
 		log.Printf("Loading %s...", filename)
+
+		// Check if file exists
+		if _, err := os.Stat(filePath); os.IsNotExist(err) {
+			log.Printf("Warning: %s not found, skipping", filename)
+			continue
+		}
 
 		// Read the SQL file
 		content, err := os.ReadFile(filePath)
@@ -82,20 +95,27 @@ func ClearAllData(db *sql.DB) error {
 
 	// Define tables to clear in reverse order to handle foreign keys
 	tables := []string{
-		"notifications",
-		"group_messages",
-		"private_messages",
-		"group_conversations",
-		"private_conversations",
-		"event_responses",
-		"events",
-		"group_members",
-		"groups",
+		"poll_votes",
+		"poll_options",
+		"polls",
+		"invitations",
+		"bookmarks",
 		"comments",
 		"likes",
+		"post_privacy",
+		"group_posts",
 		"posts",
+		"private_messages",
+		"group_messages",
+		"group_conversations",
+		"private_conversations",
+		"group_members",
+		"groups",
 		"follows",
 		"sessions",
+		"event_responses",
+		"events",
+		"notifications",
 		"users",
 	}
 

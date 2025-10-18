@@ -16,18 +16,23 @@ function EventsPage() {
   const searchParams = useSearchParams()
   const { user } = useAuth()
   const { success } = useToast()
-  const { 
-    events: liveEvents, 
-    loading: eventsLoading, 
-    respond: respondToEvent,
-    refetch: refetchEvents 
-  } = useRealTimeEvents()
 
   // Get event ID from URL params for deep linking
   const eventId = searchParams.get('event')
   
   const [showCreateEvent, setShowCreateEvent] = useState(false)
   const [eventsSubTab, setEventsSubTab] = useState('all')
+
+  // Use real-time events hook
+  const { 
+    events, 
+    loading: eventsLoading, 
+    create: createEvent,
+    respond: respondToEvent,
+    update: updateEvent,
+    cancel,
+    delete: deleteEvent
+  } = useRealTimeEvents()
 
   // Update URL when event ID changes
   useEffect(() => {
@@ -36,13 +41,6 @@ function EventsPage() {
       router.replace(newUrl)
     }
   }, [eventId, router])
-
-  // Fetch data when component loads
-  useEffect(() => {
-    if (user) {
-      refetchEvents()
-    }
-  }, [user, refetchEvents])
 
   return (
     <AppLayout 
@@ -54,21 +52,24 @@ function EventsPage() {
         show={showCreateEvent}
         onClose={() => setShowCreateEvent(false)}
         onEventCreated={() => {
-          refetchEvents()
           setShowCreateEvent(false)
           success('Event created successfully!')
         }}
+        createEvent={createEvent}
       />
 
       <CommunitySection
-        events={liveEvents}
-        isLoadingEvents={eventsLoading}
         notifications={[]}
         isLoadingNotifications={false}
         setShowCreateEvent={setShowCreateEvent}
-        onEventRespond={respondToEvent}
         communitySubTab={'events'}
         eventsSubTab={eventsSubTab}
+        events={events}
+        eventsLoading={eventsLoading}
+        respondToEvent={respondToEvent}
+        updateEvent={updateEvent}
+        cancelEvent={cancel}
+        deleteEvent={deleteEvent}
       />
     </AppLayout>
   )

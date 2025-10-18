@@ -45,6 +45,12 @@ func (h *Hub) handleMessage(message Message) {
 		h.handleGroupUpdate(message)
 	case MessageTypeEventUpdate:
 		h.handleEventUpdate(message)
+	case MessageTypePollUpdate:
+		h.handlePollUpdate(message)
+	case MessageTypePollVoteUpdate:
+		h.handlePollVoteUpdate(message)
+	case MessageTypeLayoutSync:
+		h.handleLayoutSync(message)
 	case MessageTypePing:
 		h.handlePing(message)
 	case MessageTypePong:
@@ -53,4 +59,3 @@ func (h *Hub) handleMessage(message Message) {
 		log.Printf("Unknown message type: %s", message.Type)
 	}
 }
-

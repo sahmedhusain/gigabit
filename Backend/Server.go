@@ -108,9 +108,11 @@ func (s *Server) setupRoutes() {
 	messageHandler := handlers.NewMessageHandler(s.DB.GetDB(), s.Hub)
 	notificationHandler := handlers.NewNotificationHandler(s.DB.GetDB(), s.Hub)
 	bookmarkHandler := handlers.NewBookmarkHandler(s.DB.GetDB(), s.Hub)
+	pollHandler := handlers.NewPollHandler(s.DB.GetDB(), s.Hub)
 	wsHandler := handlers.NewWebSocketHandler(s.Hub)
 	chatHandler := handlers.NewChatHandler(s.DB.GetDB())
 	conversationHandler := handlers.NewConversationHandler(s.DB.GetDB())
+	statusHandler := handlers.NewStatusHandler(s.DB.GetDB())
 
 	// Health check
 	s.router.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
@@ -147,6 +149,11 @@ func (s *Server) setupRoutes() {
 	s.router.HandleFunc("/api/users/status", s.handleRoute(userHandler.UpdateStatus, true))
 	s.router.HandleFunc("/api/users/", s.handleUserRoute(followHandler, wsHandler))
 
+	// Status routes
+	s.router.HandleFunc("/api/status/me", s.handleRoute(statusHandler.GetMyStatus, true))
+	s.router.HandleFunc("/api/status/update", s.handleRoute(statusHandler.UpdateMyStatus, true))
+	s.router.HandleFunc("/api/status/online", s.handleRoute(statusHandler.GetOnlineUsers, true))
+
 	// Post routes
 	s.router.HandleFunc("/api/posts", s.handlePostsRoute(postHandler))
 	s.router.HandleFunc("/api/posts/", s.handlePostRoute(postHandler))
@@ -162,7 +169,7 @@ func (s *Server) setupRoutes() {
 
 	// Group routes
 	s.router.HandleFunc("/api/groups", s.handleGroupsRoute(groupHandler))
-	s.router.HandleFunc("/api/groups/", s.handleGroupRoute(groupHandler, eventHandler))
+	s.router.HandleFunc("/api/groups/", s.handleGroupRoute(groupHandler, eventHandler, pollHandler))
 	s.router.HandleFunc("/api/groups/invitations", s.handleRoute(groupHandler.GetUserInvitations, true))
 	s.router.HandleFunc("/api/follow/requests", s.handleRoute(followHandler.GetFollowRequests, true))
 
@@ -175,7 +182,7 @@ func (s *Server) setupRoutes() {
 	s.router.HandleFunc("/api/messages/", s.handleMessageRoute(messageHandler))
 	s.router.HandleFunc("/api/conversations", s.handleRoute(messageHandler.GetConversations, true))
 	s.router.HandleFunc("/api/conversations/", s.handleConversationRoute(conversationHandler))
-	s.router.HandleFunc("/api/chats", s.handleRoute(chatHandler.GetUnifiedChats, true))
+	s.router.HandleFunc("/api/chats", s.handleChatsRoute(chatHandler, messageHandler, groupHandler))
 
 	// Notification routes
 	s.router.HandleFunc("/api/notifications", s.handleNotificationsRoute(notificationHandler))
@@ -187,6 +194,10 @@ func (s *Server) setupRoutes() {
 
 	// Upload routes
 	s.router.HandleFunc("/api/uploads", s.handleRoute(uploadHandler.UploadImage, true))
+
+	// Poll routes
+	s.router.HandleFunc("/api/polls", s.handlePollsRoute(pollHandler))
+	s.router.HandleFunc("/api/polls/", s.handlePollRoute(pollHandler))
 
 	// Dev-only debug routes (enable by setting ENABLE_DEBUG=1 in environment)
 	if os.Getenv("ENABLE_DEBUG") == "1" {
@@ -409,6 +420,19 @@ func (s *Server) handlePostRoute(handler *handlers.PostHandler) http.HandlerFunc
 				default:
 					writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
 				}
+			case "dislike":
+				switch r.Method {
+				case http.MethodPost:
+					authMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+						handler.DislikePost(w, r, postID)
+					})).ServeHTTP(w, r)
+				case http.MethodDelete:
+					authMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+						handler.UndislikePost(w, r, postID)
+					})).ServeHTTP(w, r)
+				default:
+					writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
+				}
 			case "comments":
 				switch r.Method {
 				case http.MethodGet:
@@ -482,7 +506,7 @@ func (s *Server) handleGroupsRoute(handler *handlers.GroupHandler) http.HandlerF
 	}
 }
 
-func (s *Server) handleGroupRoute(groupHandler *handlers.GroupHandler, eventHandler *handlers.EventHandler) http.HandlerFunc {
+func (s *Server) handleGroupRoute(groupHandler *handlers.GroupHandler, eventHandler *handlers.EventHandler, pollHandler *handlers.PollHandler) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		path := strings.TrimPrefix(r.URL.Path, "/api/groups/")
 		parts := strings.Split(path, "/")
@@ -567,13 +591,42 @@ func (s *Server) handleGroupRoute(groupHandler *handlers.GroupHandler, eventHand
 					groupHandler.LeaveGroup(w, r, groupID)
 				})).ServeHTTP(w, r)
 			case "members":
-				if r.Method != http.MethodGet {
-					writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
-					return
+				if len(parts) == 2 {
+					// GET /api/groups/{groupID}/members
+					if r.Method != http.MethodGet {
+						writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
+						return
+					}
+					authMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+						groupHandler.GetGroupMembers(w, r, groupID)
+					})).ServeHTTP(w, r)
+				} else if len(parts) >= 4 {
+					// Handle /api/groups/{groupID}/members/{userID}/role or /api/groups/{groupID}/members/{userID}
+					userID := parts[2]
+					if len(parts) == 4 && parts[3] == "role" {
+						// PUT /api/groups/{groupID}/members/{userID}/role
+						if r.Method != http.MethodPut {
+							writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
+							return
+						}
+						authMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+							groupHandler.UpdateMemberRole(w, r, groupID, userID)
+						})).ServeHTTP(w, r)
+					} else if len(parts) == 3 {
+						// DELETE /api/groups/{groupID}/members/{userID}
+						if r.Method != http.MethodDelete {
+							writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
+							return
+						}
+						authMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+							groupHandler.KickMember(w, r, groupID, userID)
+						})).ServeHTTP(w, r)
+					} else {
+						writeError(w, http.StatusNotFound, "Not found")
+					}
+				} else {
+					writeError(w, http.StatusNotFound, "Invalid members route")
 				}
-				authMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-					groupHandler.GetGroupMembers(w, r, groupID)
-				})).ServeHTTP(w, r)
 			case "requests":
 				if r.Method != http.MethodGet {
 					writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
@@ -589,6 +642,14 @@ func (s *Server) handleGroupRoute(groupHandler *handlers.GroupHandler, eventHand
 				}
 				authMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					groupHandler.GetUserRole(w, r, groupID)
+				})).ServeHTTP(w, r)
+			case "next-admin":
+				if r.Method != http.MethodGet {
+					writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
+					return
+				}
+				authMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					groupHandler.GetNextAdmin(w, r, groupID)
 				})).ServeHTTP(w, r)
 			case "promote":
 				if r.Method != http.MethodPost {
@@ -671,6 +732,20 @@ func (s *Server) handleGroupRoute(groupHandler *handlers.GroupHandler, eventHand
 						writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
 					}
 				}
+			case "polls":
+				// Handle group polls: /api/groups/{groupID}/polls
+				if r.Method != http.MethodGet {
+					writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
+					return
+				}
+				authMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					userID, ok := middleware.GetUserID(r)
+					if !ok {
+						writeError(w, http.StatusUnauthorized, "Unauthorized")
+						return
+					}
+					pollHandler.GetGroupPolls(w, r, userID)
+				})).ServeHTTP(w, r)
 			default:
 				writeError(w, http.StatusNotFound, "Route not found")
 			}
@@ -759,14 +834,41 @@ func (s *Server) handleMessageRoute(handler *handlers.MessageHandler) http.Handl
 		path := strings.TrimPrefix(r.URL.Path, "/api/messages/")
 		parts := strings.Split(path, "/")
 
-		if len(parts) < 2 {
+		if len(parts) == 0 || parts[0] == "" {
 			writeError(w, http.StatusNotFound, "Invalid route")
 			return
 		}
 
 		messageType := parts[0]
-		targetID := parts[1]
 		authMiddleware := middleware.AuthMiddleware(s.DB.GetDB())
+
+		// Handle routes that don't need targetID
+		if messageType == "read" || messageType == "unread" || messageType == "search" {
+			if r.Method != http.MethodPut && messageType != "search" {
+				writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
+				return
+			}
+			if r.Method != http.MethodGet && messageType == "search" {
+				writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
+				return
+			}
+			if messageType == "read" {
+				authMiddleware(http.HandlerFunc(handler.MarkConversationAsRead)).ServeHTTP(w, r)
+			} else if messageType == "unread" {
+				authMiddleware(http.HandlerFunc(handler.MarkConversationAsUnread)).ServeHTTP(w, r)
+			} else if messageType == "search" {
+				authMiddleware(http.HandlerFunc(handler.SearchMessages)).ServeHTTP(w, r)
+			}
+			return
+		}
+
+		// For routes that need targetID
+		if len(parts) < 2 {
+			writeError(w, http.StatusNotFound, "Invalid route")
+			return
+		}
+
+		targetID := parts[1]
 
 		switch messageType {
 		case "private":
@@ -785,12 +887,6 @@ func (s *Server) handleMessageRoute(handler *handlers.MessageHandler) http.Handl
 			authMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				handler.GetGroupMessages(w, r, targetID)
 			})).ServeHTTP(w, r)
-		case "read":
-			if r.Method != http.MethodPut {
-				writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
-				return
-			}
-			authMiddleware(http.HandlerFunc(handler.MarkAsRead)).ServeHTTP(w, r)
 		case "conversation":
 			if r.Method != http.MethodGet {
 				writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
@@ -899,6 +995,140 @@ func (s *Server) handleConversationRoute(handler *handlers.ConversationHandler) 
 					handler.DeleteConversation(w, r, conversationID)
 				})).ServeHTTP(w, r)
 			default:
+				writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
+			}
+		} else {
+			writeError(w, http.StatusNotFound, "Route not found")
+		}
+	}
+}
+
+func (s *Server) handleChatsRoute(chatHandler *handlers.ChatHandler, messageHandler *handlers.MessageHandler, groupHandler *handlers.GroupHandler) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// Apply auth middleware
+		authMiddleware := middleware.AuthMiddleware(s.DB.GetDB())
+
+		authMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			query := r.URL.Query()
+
+			// Check for ?chats=id (private chat)
+			if chatID := query.Get("chats"); chatID != "" {
+				switch r.Method {
+				case http.MethodGet:
+					// Get private conversation messages
+					messageHandler.GetConversationMessages(w, r, chatID)
+				default:
+					writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
+				}
+				return
+			}
+
+			// Check for ?group=id (group chat)
+			if groupID := query.Get("group"); groupID != "" {
+				switch r.Method {
+				case http.MethodGet:
+					// Get group details
+					groupHandler.GetGroup(w, r, groupID)
+				default:
+					writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
+				}
+				return
+			}
+
+			// No query parameters - return unified chats list
+			if r.Method == http.MethodGet {
+				chatHandler.GetUnifiedChats(w, r)
+			} else {
+				writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
+			}
+		})).ServeHTTP(w, r)
+	}
+}
+
+// handlePollsRoute handles /api/polls (POST - create poll)
+func (s *Server) handlePollsRoute(handler *handlers.PollHandler) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		authMiddleware := middleware.AuthMiddleware(s.DB.GetDB())
+
+		if r.Method == http.MethodPost {
+			authMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				userID, ok := middleware.GetUserID(r)
+				if !ok {
+					writeError(w, http.StatusUnauthorized, "Unauthorized")
+					return
+				}
+				handler.CreatePoll(w, r, userID)
+			})).ServeHTTP(w, r)
+		} else {
+			writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
+		}
+	}
+}
+
+// handlePollRoute handles /api/polls/{id} and /api/polls/{id}/vote and /api/polls/{id}/expire
+func (s *Server) handlePollRoute(handler *handlers.PollHandler) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		path := strings.TrimPrefix(r.URL.Path, "/api/polls/")
+		parts := strings.Split(path, "/")
+
+		if len(parts) == 0 || parts[0] == "" {
+			writeError(w, http.StatusNotFound, "Poll ID required")
+			return
+		}
+
+		authMiddleware := middleware.AuthMiddleware(s.DB.GetDB())
+
+		if len(parts) == 1 {
+			// GET /api/polls/{id} - Get single poll
+			// DELETE /api/polls/{id} - Delete poll
+			if r.Method == http.MethodGet {
+				authMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					userID, ok := middleware.GetUserID(r)
+					if !ok {
+						writeError(w, http.StatusUnauthorized, "Unauthorized")
+						return
+					}
+					handler.GetPoll(w, r, userID)
+				})).ServeHTTP(w, r)
+			} else if r.Method == http.MethodDelete {
+				authMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					userID, ok := middleware.GetUserID(r)
+					if !ok {
+						writeError(w, http.StatusUnauthorized, "Unauthorized")
+						return
+					}
+					handler.DeletePoll(w, r, userID)
+				})).ServeHTTP(w, r)
+			} else {
+				writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
+			}
+		} else if len(parts) == 2 && parts[1] == "vote" {
+			authMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				userID, ok := middleware.GetUserID(r)
+				if !ok {
+					writeError(w, http.StatusUnauthorized, "Unauthorized")
+					return
+				}
+				if r.Method == http.MethodPost {
+					handler.VotePoll(w, r, userID)
+				} else if r.Method == http.MethodDelete {
+					handler.UnvotePoll(w, r, userID)
+				} else {
+					writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
+				}
+			})).ServeHTTP(w, r)
+		} else if len(parts) == 2 && parts[1] == "expire" {
+			// PUT /api/polls/{id}/expire - Expire poll
+			if r.Method == http.MethodPut {
+				authMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					userID, ok := middleware.GetUserID(r)
+					if !ok {
+						writeError(w, http.StatusUnauthorized, "Unauthorized")
+						return
+					}
+					handler.ExpirePoll(w, r, userID)
+				})).ServeHTTP(w, r)
+			} else {
 				writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
 			}
 		} else {

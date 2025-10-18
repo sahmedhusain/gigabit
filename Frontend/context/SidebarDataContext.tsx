@@ -111,8 +111,11 @@ export function SidebarDataProvider({ children }: { children: ReactNode }) {
         id: group.id,
         name: group.title ?? group.name ?? '',
         description: group.description ?? '',
-        members: group.member_count ?? 0,
-        isJoined: !!group.is_member,
+  members: group.member_count ?? 0,
+  memberStatus: group.member_status ?? (group.is_member ? 'member' : 'none'),
+  isJoined: (group.member_status ?? (group.is_member ? 'member' : 'none')) === 'member',
+        role: group.role ?? undefined,
+        privacy: group.privacy ?? undefined,
         lastActivity: formatTimeAgo(group.updated_at ?? group.updatedAt ?? new Date().toISOString()),
         timestamp: group.updated_at ?? group.updatedAt ?? new Date().toISOString()
       })))

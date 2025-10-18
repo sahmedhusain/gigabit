@@ -113,10 +113,10 @@ export default function AppLayout({
     handleTabChange('discover')
   }
 
-  // Calculate unread counts
-  const chatUnreadAll = (chats || []).reduce((sum, c) => sum + (c.unread || 0), 0)
-  const chatUnreadDirect = (chats || []).filter(c => !c.isGroup).reduce((sum, c) => sum + (c.unread || 0), 0)
-  const chatUnreadGroups = (chats || []).filter(c => c.isGroup).reduce((sum, c) => sum + (c.unread || 0), 0)
+  // Calculate unread counts (conversation count, not message count)
+  const chatUnreadAll = (chats || []).filter(c => (c.unread || 0) > 0).length
+  const chatUnreadDirect = (chats || []).filter(c => !c.isGroup && (c.unread || 0) > 0).length
+  const chatUnreadGroups = (chats || []).filter(c => c.isGroup && (c.unread || 0) > 0).length
 
   return (
     <div className="min-h-screen relative overflow-hidden bg-gradient-to-br from-emerald-900 via-teal-900 to-cyan-800">

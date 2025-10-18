@@ -7,6 +7,7 @@ import { useAuth } from '@/context/AuthContext'
 import { useWebSocket } from '@/context/WebSocketContext'
 import { useToast } from '@/context/ToastContext'
 import { useNotifications, useConversations } from '@/hooks'
+import { X } from 'lucide-react'
 import {
   api,
   Group,
@@ -52,6 +53,11 @@ function ChatsFilterPage() {
     type: 'private' | 'group',
     name: string
     participantId?: number
+    groupId?: number
+    isGroupMember?: boolean
+    userRole?: 'creator' | 'admin' | 'member'
+    initialTab?: string
+    highlightMessageId?: number
   } | null>(null)
 
   // Current User Processing
@@ -161,7 +167,8 @@ function ChatsFilterPage() {
           participantId,
           participantAvatar: String(participant?.['avatar'] ?? ''),
           lastMessageSenderId: Number(last_message?.['sender_id'] ?? 0),
-          actualId: group?.['id'] ?? participant?.['id']
+          actualId: group?.['id'] ?? participant?.['id'],
+          groupId: group?.['id'] ? Number(group['id']) : undefined
         }
       }))
     } catch (err) {
@@ -302,10 +309,10 @@ function ChatsFilterPage() {
     router.push(`/${newTab}`)
   }
 
-  // Calculate unread counts
-  const _chatUnreadAll = (chats || []).reduce((sum, c) => sum + (c.unread || 0), 0)
-  const _chatUnreadDirect = (chats || []).filter(c => !c.isGroup).reduce((sum, c) => sum + (c.unread || 0), 0)
-  const _chatUnreadGroups = (chats || []).filter(c => c.isGroup).reduce((sum, c) => sum + (c.unread || 0), 0)
+  // Calculate unread counts (conversation count, not message count)
+  const _chatUnreadAll = (chats || []).filter(c => (c.unread || 0) > 0).length
+  const _chatUnreadDirect = (chats || []).filter(c => !c.isGroup && (c.unread || 0) > 0).length
+  const _chatUnreadGroups = (chats || []).filter(c => c.isGroup && (c.unread || 0) > 0).length
 
   // Mark intentionally unused values as used so the linter doesn't complain.
   // These values are kept for clarity and future use but aren't referenced in this view.
@@ -359,20 +366,61 @@ function ChatsFilterPage() {
         <ChatWindow
           conversationId={openChatWindow.conversationId}
           conversationType={openChatWindow.type}
+          chatType={openChatWindow.type} // Explicitly set chatType to trigger tabbed interface for groups
           participantName={openChatWindow.name}
           participantId={openChatWindow.participantId}
+          groupId={openChatWindow.type === 'group' ? (openChatWindow.groupId || openChatWindow.conversationId) : undefined}
+          highlightMessageId={openChatWindow.highlightMessageId}
+          initialTab={openChatWindow.initialTab}
           onClose={() => setOpenChatWindow(null)}
         />
       ) : (
         <ChatsSection
           chatSubTab={chatSubTab}
-          onChatClick={(chat) => {
-            setOpenChatWindow({
-              conversationId: chat.conversationId,
-              type: chat.type,
-              name: chat.name,
-              participantId: chat.participantId
-            });
+          onChatClick={async (chat) => {
+            if (chat.type === 'group') {
+              try {
+                // For groups, we need to fetch group details to get membership info
+                const groupId = chat.groupId || chat.conversationId
+                
+                const groupInfo = await api.getGroup(groupId)
+                
+                setOpenChatWindow({
+                  conversationId: chat.conversationId,
+                  type: chat.type,
+                  name: chat.name,
+                  participantId: chat.participantId,
+                  groupId: groupId,
+                  isGroupMember: groupInfo.is_member,
+                  userRole: groupInfo.role || 'member',
+                  initialTab: chat.initialTab,
+                  highlightMessageId: chat.highlightMessageId
+                })
+              } catch (err) {
+                console.error('Error fetching group info:', err)
+                // Fallback to basic group window
+                setOpenChatWindow({
+                  conversationId: chat.conversationId,
+                  type: chat.type,
+                  name: chat.name,
+                  participantId: chat.participantId,
+                  groupId: chat.groupId || chat.conversationId,
+                  isGroupMember: true,
+                  userRole: 'member',
+                  initialTab: chat.initialTab,
+                  highlightMessageId: chat.highlightMessageId
+                })
+              }
+            } else {
+              setOpenChatWindow({
+                conversationId: chat.conversationId,
+                type: chat.type,
+                name: chat.name,
+                  participantId: chat.participantId,
+                  initialTab: chat.initialTab,
+                  highlightMessageId: chat.highlightMessageId
+              })
+            }
           }}
           getUserStatus={getUserStatus}
           currentUser={user}

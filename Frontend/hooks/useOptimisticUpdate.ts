@@ -8,45 +8,47 @@ export interface OptimisticUpdateOptions<T> {
 }
 
 export function useOptimisticUpdate<T>(
-  initialData: T,
+  initialState: T | null,
   options: OptimisticUpdateOptions<T> = {}
 ) {
-  const [data, setData] = useState<T>(initialData)
+  const [data, setData] = useState<T | null>(initialState)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const rollbackTimer = useRef<NodeJS.Timeout | null>(null)
-  const previousData = useRef<T>(initialData)
+  const previousData = useRef<T | null>(null)
 
   const performUpdate = useCallback(
     async <R>(
-      optimisticUpdate: (current: T) => T,
+      optimisticUpdate: (current: T | null) => T | null,
       asyncOperation: () => Promise<R>
     ): Promise<R> => {
       try {
         setIsLoading(true)
         setError(null)
         
-        // Store current data for potential rollback
-        previousData.current = data
-        
         // Apply optimistic update immediately
-        const optimisticData = optimisticUpdate(data)
-        setData(optimisticData)
+        const newData = optimisticUpdate(data)
+        previousData.current = data
+        setData(newData)
         
         // Perform the actual async operation
         const result = await asyncOperation()
         
-        // If successful, call onSuccess callback
-        options.onSuccess?.(optimisticData)
+        // If successful, call onSuccess callback with the optimistic data
+        if (options.onSuccess && newData !== null) {
+          options.onSuccess(newData)
+        }
         
         return result
       } catch (err: any) {
         // Rollback optimistic update on error
-        setData(previousData.current)
+        if (previousData.current !== null) {
+          setData(previousData.current)
+        }
         setError(err.message || 'Operation failed')
         
         // Call error callback with rollback data
-        options.onError?.(err, previousData.current)
+        options.onError?.(err, previousData.current ?? undefined)
         
         throw err
       } finally {
@@ -57,7 +59,9 @@ export function useOptimisticUpdate<T>(
   )
 
   const rollback = useCallback(() => {
-    setData(previousData.current)
+    if (previousData.current !== null) {
+      setData(previousData.current)
+    }
     setError('Operation was rolled back')
   }, [])
 
@@ -78,13 +82,16 @@ export function useOptimisticUpdate<T>(
     }
   }, [])
 
-  const setOptimisticData = useCallback((newData: T | ((current: T) => T)) => {
-    previousData.current = data
-    setData(typeof newData === 'function' ? (newData as (current: T) => T)(data) : newData)
-  }, [data])
+  const setOptimisticData = useCallback((newData: T | null | ((current: T | null) => T | null)) => {
+    setData((currentData) => {
+      previousData.current = currentData
+      return typeof newData === 'function' ? (newData as (current: T | null) => T | null)(currentData) : newData
+    })
+  }, [])
 
   return {
     data,
+    setData,
     isLoading,
     error,
     performUpdate,

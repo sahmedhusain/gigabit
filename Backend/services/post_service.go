@@ -57,6 +57,28 @@ func (s *PostService) CreatePost(post *models.Post) error {
 	return nil
 }
 
+func (s *PostService) GetPostPrivacyUsers(postID uint) ([]uint, error) {
+	query := `SELECT user_id FROM post_privacy WHERE post_id = ?`
+
+	rows, err := s.db.Query(query, postID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var userIDs []uint
+	for rows.Next() {
+		var userID uint
+		err := rows.Scan(&userID)
+		if err != nil {
+			return nil, err
+		}
+		userIDs = append(userIDs, userID)
+	}
+
+	return userIDs, nil
+}
+
 func (s *PostService) AddPostPrivacyUsers(postID uint, userIDs []uint) error {
 	if len(userIDs) == 0 {
 		return nil
@@ -75,8 +97,12 @@ func (s *PostService) AddPostPrivacyUsers(postID uint, userIDs []uint) error {
 }
 
 func (s *PostService) GetPostByID(postID uint, currentUserID uint) (*models.PostResponse, error) {
+	return s.GetPostByIDWithSort(postID, currentUserID, "newest")
+}
+
+func (s *PostService) GetPostByIDWithSort(postID uint, currentUserID uint, sort string) (*models.PostResponse, error) {
 	query := `
-SELECT p.id, p.user_id, p.content, p.image_url, p.privacy, p.created_at, p.updated_at,
+SELECT p.id, p.user_id, p.content, p.image_url, p.privacy, p.share_count, p.created_at, p.updated_at,
        u.first_name, u.last_name, u.avatar, u.nickname,
        COUNT(DISTINCT l.id) as like_count,
        COUNT(DISTINCT c.id) as comment_count,
@@ -96,7 +122,7 @@ GROUP BY p.id, u.id
 	var user models.UserResponse
 
 	err := s.db.QueryRow(query, currentUserID, currentUserID, postID).Scan(
-		&post.ID, &post.UserID, &post.Content, &post.ImageURL, &post.Privacy,
+		&post.ID, &post.UserID, &post.Content, &post.ImageURL, &post.Privacy, &post.ShareCount,
 		&post.CreatedAt, &post.UpdatedAt,
 		&user.FirstName, &user.LastName, &user.Avatar, &user.Nickname,
 		&post.LikeCount, &post.CommentCount, &post.IsLiked, &post.IsBookmarked,
@@ -114,9 +140,21 @@ GROUP BY p.id, u.id
 		return nil, err
 	}
 
+	// Fetch specific user IDs for listed posts
+	if post.Privacy == "listed" {
+		userIDs, err := s.GetPostPrivacyUsers(postID)
+		if err != nil {
+			log.Printf("Failed to get privacy users for post %d: %v", postID, err)
+			// Don't fail the request, just set empty list
+			post.SpecificUserIDs = []uint{}
+		} else {
+			post.SpecificUserIDs = userIDs
+		}
+	}
+
 	// Fetch comments for this post
 	commentService := NewCommentService(s.db, s.hub)
-	comments, err := commentService.GetPostComments(postID, 50, 0) // Get up to 50 comments
+	comments, err := commentService.GetPostCommentsSorted(postID, 50, 0, sort) // Get up to 50 comments
 	if err != nil {
 		log.Printf("Failed to get comments for post %d: %v", postID, err)
 		// Don't fail the request, just set empty comments
@@ -130,7 +168,7 @@ GROUP BY p.id, u.id
 
 func (s *PostService) GetUserPosts(userID uint, currentUserID uint, limit, offset int) ([]models.PostResponse, error) {
 	query := `
-SELECT p.id, p.user_id, p.content, p.image_url, p.privacy, p.created_at, p.updated_at,
+SELECT p.id, p.user_id, p.content, p.image_url, p.privacy, p.share_count, p.created_at, p.updated_at,
    u.first_name, u.last_name, u.avatar, u.nickname,
    COUNT(DISTINCT l.id) as like_count,
    COUNT(DISTINCT c.id) as comment_count,
@@ -160,7 +198,7 @@ LIMIT ? OFFSET ?
 		var user models.UserResponse
 
 		err := rows.Scan(
-			&post.ID, &post.UserID, &post.Content, &post.ImageURL, &post.Privacy,
+			&post.ID, &post.UserID, &post.Content, &post.ImageURL, &post.Privacy, &post.ShareCount,
 			&post.CreatedAt, &post.UpdatedAt,
 			&user.FirstName, &user.LastName, &user.Avatar, &user.Nickname,
 			&post.LikeCount, &post.CommentCount, &post.IsLiked, &post.IsBookmarked,
@@ -184,9 +222,8 @@ LIMIT ? OFFSET ?
 }
 
 func (s *PostService) GetFeedPosts(currentUserID uint, limit, offset int) ([]models.PostResponse, error) {
-	// Temporarily simplified query for debugging - return all posts
 	query := `
-SELECT p.id, p.user_id, p.content, p.image_url, p.privacy, p.created_at, p.updated_at,
+SELECT p.id, p.user_id, p.content, p.image_url, p.privacy, p.share_count, p.created_at, p.updated_at,
    u.first_name, u.last_name, u.avatar, u.nickname,
    (SELECT COUNT(*) FROM likes WHERE post_id = p.id) as like_count,
    (SELECT COUNT(*) FROM comments WHERE post_id = p.id) as comment_count,
@@ -211,13 +248,19 @@ LIMIT ? OFFSET ?
 		var user models.UserResponse
 
 		err := rows.Scan(
-			&post.ID, &post.UserID, &post.Content, &post.ImageURL, &post.Privacy,
+			&post.ID, &post.UserID, &post.Content, &post.ImageURL, &post.Privacy, &post.ShareCount,
 			&post.CreatedAt, &post.UpdatedAt,
 			&user.FirstName, &user.LastName, &user.Avatar, &user.Nickname,
 			&post.LikeCount, &post.CommentCount, &post.IsLiked, &post.IsBookmarked,
 		)
 		if err != nil {
 			return nil, err
+		}
+
+		// Check if current user can view this post
+		canView, err := s.CanViewPost(post.ID, currentUserID)
+		if err != nil || !canView {
+			continue
 		}
 
 		user.ID = post.UserID
@@ -356,7 +399,7 @@ WHERE post_id = ? AND user_id = ?
 // GetUserLikedPosts returns posts that the user has liked
 func (s *PostService) GetUserLikedPosts(userID uint, limit, offset int) ([]models.PostResponse, error) {
 	query := `
-SELECT DISTINCT p.id, p.user_id, p.content, p.image_url, p.privacy, p.created_at, p.updated_at,
+SELECT DISTINCT p.id, p.user_id, p.content, p.image_url, p.privacy, p.share_count, p.created_at, p.updated_at,
        u.first_name, u.last_name, u.avatar, u.nickname,
        COUNT(DISTINCT l2.id) as like_count,
        COUNT(DISTINCT c.id) as comment_count,
@@ -385,7 +428,7 @@ LIMIT ? OFFSET ?
 		var user models.UserResponse
 
 		err := rows.Scan(
-			&post.ID, &post.UserID, &post.Content, &post.ImageURL, &post.Privacy,
+			&post.ID, &post.UserID, &post.Content, &post.ImageURL, &post.Privacy, &post.ShareCount,
 			&post.CreatedAt, &post.UpdatedAt,
 			&user.FirstName, &user.LastName, &user.Avatar, &user.Nickname,
 			&post.LikeCount, &post.CommentCount, &post.IsLiked, &post.IsBookmarked,
@@ -405,7 +448,7 @@ LIMIT ? OFFSET ?
 // GetUserCommentedPosts returns posts that the user has commented on
 func (s *PostService) GetUserCommentedPosts(userID uint, limit, offset int) ([]models.PostResponse, error) {
 	query := `
-	SELECT DISTINCT p.id, p.user_id, p.content, p.image_url, p.privacy, p.created_at, p.updated_at,
+	SELECT DISTINCT p.id, p.user_id, p.content, p.image_url, p.privacy, p.share_count, p.created_at, p.updated_at,
 	       u.first_name, u.last_name, u.avatar, u.nickname,
 	       COUNT(DISTINCT l.id) as like_count,
 	       COUNT(DISTINCT c2.id) as comment_count,
@@ -435,7 +478,7 @@ func (s *PostService) GetUserCommentedPosts(userID uint, limit, offset int) ([]m
 		var user models.UserResponse
 
 		err := rows.Scan(
-			&post.ID, &post.UserID, &post.Content, &post.ImageURL, &post.Privacy,
+			&post.ID, &post.UserID, &post.Content, &post.ImageURL, &post.Privacy, &post.ShareCount,
 			&post.CreatedAt, &post.UpdatedAt,
 			&user.FirstName, &user.LastName, &user.Avatar, &user.Nickname,
 			&post.LikeCount, &post.CommentCount, &post.IsLiked, &post.IsBookmarked,
@@ -461,9 +504,8 @@ func (s *PostService) GetAllFeedPosts(currentUserID uint, limit int, offset int)
 
 // GetFollowingFeedPosts returns posts only from users that the current user is following
 func (s *PostService) GetFollowingFeedPosts(currentUserID uint, limit int, offset int) ([]models.PostResponse, error) {
-	// Temporarily simplified query for debugging - return all posts
 	query := `
-SELECT p.id, p.user_id, p.content, p.image_url, p.privacy, p.created_at, p.updated_at,
+SELECT p.id, p.user_id, p.content, p.image_url, p.privacy, p.share_count, p.created_at, p.updated_at,
        u.first_name, u.last_name, u.avatar, u.nickname,
        (SELECT COUNT(*) FROM likes WHERE post_id = p.id) as like_count,
        (SELECT COUNT(*) FROM comments WHERE post_id = p.id) as comment_count,
@@ -471,11 +513,12 @@ SELECT p.id, p.user_id, p.content, p.image_url, p.privacy, p.created_at, p.updat
        (SELECT CASE WHEN COUNT(*) > 0 THEN 1 ELSE 0 END FROM bookmarks WHERE post_id = p.id AND user_id = ?) as is_bookmarked
 FROM posts p
 JOIN users u ON p.user_id = u.id
+JOIN follows f ON p.user_id = f.following_id AND f.follower_id = ? AND f.status = 'accepted'
 ORDER BY p.created_at DESC
 LIMIT ? OFFSET ?
 `
 
-	rows, err := s.db.Query(query, currentUserID, currentUserID, limit, offset)
+	rows, err := s.db.Query(query, currentUserID, currentUserID, currentUserID, limit, offset)
 	if err != nil {
 		log.Printf("Error getting following feed posts: %v", err)
 		return nil, err
@@ -488,13 +531,19 @@ LIMIT ? OFFSET ?
 		var user models.UserResponse
 
 		err := rows.Scan(
-			&post.ID, &post.UserID, &post.Content, &post.ImageURL, &post.Privacy,
+			&post.ID, &post.UserID, &post.Content, &post.ImageURL, &post.Privacy, &post.ShareCount,
 			&post.CreatedAt, &post.UpdatedAt,
 			&user.FirstName, &user.LastName, &user.Avatar, &user.Nickname,
 			&post.LikeCount, &post.CommentCount, &post.IsLiked, &post.IsBookmarked,
 		)
 		if err != nil {
 			return nil, err
+		}
+
+		// Check if current user can view this post (respects privacy settings)
+		canView, err := s.CanViewPost(post.ID, currentUserID)
+		if err != nil || !canView {
+			continue
 		}
 
 		user.ID = post.UserID
@@ -507,21 +556,26 @@ LIMIT ? OFFSET ?
 
 // GetFriendsFeedPosts returns posts only from friends (mutual followers)
 func (s *PostService) GetFriendsFeedPosts(currentUserID uint, limit int, offset int) ([]models.PostResponse, error) {
-	// Temporarily simplified query for debugging - return all posts
 	query := `
-	SELECT p.id, p.user_id, p.content, p.image_url, p.privacy, p.created_at, p.updated_at,
-	       u.first_name, u.last_name, u.avatar, u.nickname,
-	       (SELECT COUNT(*) FROM likes WHERE post_id = p.id) as like_count,
-	       (SELECT COUNT(*) FROM comments WHERE post_id = p.id) as comment_count,
-	       (SELECT CASE WHEN COUNT(*) > 0 THEN 1 ELSE 0 END FROM likes WHERE post_id = p.id AND user_id = ?) as is_liked,
-	       (SELECT CASE WHEN COUNT(*) > 0 THEN 1 ELSE 0 END FROM bookmarks WHERE post_id = p.id AND user_id = ?) as is_bookmarked
-	FROM posts p
-	JOIN users u ON p.user_id = u.id
-	ORDER BY p.created_at DESC
-	LIMIT ? OFFSET ?
-	`
+SELECT p.id, p.user_id, p.content, p.image_url, p.privacy, p.share_count, p.created_at, p.updated_at,
+       u.first_name, u.last_name, u.avatar, u.nickname,
+       (SELECT COUNT(*) FROM likes WHERE post_id = p.id) as like_count,
+       (SELECT COUNT(*) FROM comments WHERE post_id = p.id) as comment_count,
+       (SELECT CASE WHEN COUNT(*) > 0 THEN 1 ELSE 0 END FROM likes WHERE post_id = p.id AND user_id = ?) as is_liked,
+       (SELECT CASE WHEN COUNT(*) > 0 THEN 1 ELSE 0 END FROM bookmarks WHERE post_id = p.id AND user_id = ?) as is_bookmarked
+FROM posts p
+JOIN users u ON p.user_id = u.id
+WHERE p.user_id IN (
+    SELECT f1.following_id
+    FROM follows f1
+    JOIN follows f2 ON f1.follower_id = f2.following_id AND f1.following_id = f2.follower_id
+    WHERE f1.follower_id = ? AND f1.status = 'accepted' AND f2.status = 'accepted'
+)
+ORDER BY p.created_at DESC
+LIMIT ? OFFSET ?
+`
 
-	rows, err := s.db.Query(query, currentUserID, currentUserID, limit, offset)
+	rows, err := s.db.Query(query, currentUserID, currentUserID, currentUserID, limit, offset)
 	if err != nil {
 		log.Printf("Error getting friends feed posts: %v", err)
 		return nil, err
@@ -534,13 +588,19 @@ func (s *PostService) GetFriendsFeedPosts(currentUserID uint, limit int, offset 
 		var user models.UserResponse
 
 		err := rows.Scan(
-			&post.ID, &post.UserID, &post.Content, &post.ImageURL, &post.Privacy,
+			&post.ID, &post.UserID, &post.Content, &post.ImageURL, &post.Privacy, &post.ShareCount,
 			&post.CreatedAt, &post.UpdatedAt,
 			&user.FirstName, &user.LastName, &user.Avatar, &user.Nickname,
 			&post.LikeCount, &post.CommentCount, &post.IsLiked, &post.IsBookmarked,
 		)
 		if err != nil {
 			return nil, err
+		}
+
+		// Check if current user can view this post (respects privacy settings)
+		canView, err := s.CanViewPost(post.ID, currentUserID)
+		if err != nil || !canView {
+			continue
 		}
 
 		user.ID = post.UserID

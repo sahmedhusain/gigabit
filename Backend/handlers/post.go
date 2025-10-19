@@ -131,7 +131,16 @@ func (h *PostHandler) GetPost(w http.ResponseWriter, r *http.Request, postIDStr 
 		return
 	}
 
-	post, err := h.postService.GetPostByID(uint(postID), userID.(uint))
+	// Get sort parameter
+	sort := r.URL.Query().Get("sort")
+	if sort == "" {
+		sort = "newest" // Default to newest first
+	}
+	if sort != "newest" && sort != "oldest" {
+		sort = "newest" // Default to newest if invalid
+	}
+
+	post, err := h.postService.GetPostByIDWithSort(uint(postID), userID.(uint), sort)
 	if err != nil {
 		writeError(w, http.StatusNotFound, "Post not found")
 		return
@@ -594,6 +603,58 @@ func (h *PostHandler) GetPostComments(w http.ResponseWriter, r *http.Request, po
 		"offset":   offset,
 		"post_id":  postID,
 	})
+}
+
+// DeleteComment handles deleting a specific comment
+func (h *PostHandler) DeleteComment(w http.ResponseWriter, r *http.Request, postIDStr string, commentIDStr string) {
+	if r.Method != http.MethodDelete {
+		writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
+
+	postID, err := strconv.ParseUint(postIDStr, 10, 32)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "Invalid post ID")
+		return
+	}
+
+	commentID, err := strconv.ParseUint(commentIDStr, 10, 32)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "Invalid comment ID")
+		return
+	}
+
+	userID := r.Context().Value("user_id")
+	if userID == nil {
+		writeError(w, http.StatusUnauthorized, "User not authenticated")
+		return
+	}
+
+	// Verify the comment belongs to the specified post
+	var commentPostID uint
+	err = h.commentService.GetCommentPostID(uint(commentID), &commentPostID)
+	if err != nil {
+		writeError(w, http.StatusNotFound, "Comment not found")
+		return
+	}
+
+	if commentPostID != uint(postID) {
+		writeError(w, http.StatusBadRequest, "Comment does not belong to this post")
+		return
+	}
+
+	if err := h.commentService.DeleteComment(uint(commentID), userID.(uint)); err != nil {
+		if err == sql.ErrNoRows {
+			writeError(w, http.StatusForbidden, "Cannot delete this comment")
+		} else {
+			log.Printf("Failed to delete comment %d: %v", commentID, err)
+			writeError(w, http.StatusInternalServerError, "Failed to delete comment")
+		}
+		return
+	}
+
+	log.Printf("Comment %d deleted successfully by user %v", commentID, userID)
+	writeJSON(w, http.StatusOK, map[string]string{"message": "Comment deleted successfully"})
 }
 
 func (h *PostHandler) GetUserLikedPosts(w http.ResponseWriter, r *http.Request) {

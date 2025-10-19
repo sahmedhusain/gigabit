@@ -29,13 +29,27 @@ type MessageResponse struct {
 	CreatedAt   time.Time             `json:"created_at"`
 	UpdatedAt   time.Time             `json:"updated_at"`
 	Sender      UserResponse          `json:"sender"`
-	Receiver    *UserResponse         `json:"receiver,omitempty"` // Null for group messages
-	Group       *GroupMessageResponse `json:"group,omitempty"`    // Null for private messages
+	Receiver    *UserResponse         `json:"receiver,omitempty"`    // Null for group messages
+	Group       *GroupMessageResponse `json:"group,omitempty"`       // Null for group messages
+	SharedPost  *SharedPostResponse   `json:"shared_post,omitempty"` // Null if not a share
 }
 
 type GroupMessageResponse struct {
 	ID    uint   `json:"id"`
 	Title string `json:"title"`
+}
+
+type SharedPostResponse struct {
+	ID           uint         `json:"id"`
+	UserID       uint         `json:"user_id"`
+	Content      string       `json:"content"`
+	ImageURL     *string      `json:"image_url"`
+	Privacy      string       `json:"privacy"`
+	CreatedAt    time.Time    `json:"created_at"`
+	User         UserResponse `json:"user"`
+	LikeCount    int64        `json:"like_count"`
+	CommentCount int64        `json:"comment_count"`
+	ShareCount   int64        `json:"share_count"`
 }
 
 type CreateMessageRequest struct {

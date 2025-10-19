@@ -67,17 +67,28 @@ function FeedFilterPage() {
     }
   }, [feedSubTab, filter, router])
 
-  // Update URL when sort changes
-  useEffect(() => {
-    const params = new URLSearchParams(searchParams.toString())
-    if (sortOrder !== 'newest') {
-      params.set('sort', sortOrder)
-    } else {
-      params.delete('sort')
+  // Fetch available users (followers) for listed privacy
+  const fetchAvailableUsers = async () => {
+    if (availableUsers.length > 0) return // Already fetched
+
+    try {
+      setLoadingUsers(true)
+      const response = await api.getFollowers(user?.id || 0)
+      setAvailableUsers(response.followers || [])
+    } catch (err) {
+      console.error('Failed to fetch followers:', err)
+      error('Failed to load followers for privacy settings.')
+    } finally {
+      setLoadingUsers(false)
     }
-    const newUrl = params.toString() ? `/feed/${feedSubTab}?${params.toString()}` : `/feed/${feedSubTab}`
-    router.replace(newUrl)
-  }, [sortOrder, feedSubTab, searchParams, router])
+  }
+
+  // Fetch users when privacy changes to 'listed' or when create post modal opens
+  useEffect(() => {
+    if (showCreatePost && postPrivacy === 'listed') {
+      fetchAvailableUsers()
+    }
+  }, [showCreatePost, postPrivacy])
 
   const fetchFeedPosts = useCallback(async (page: number = 0, append: boolean = false) => {
     try {
@@ -137,7 +148,7 @@ function FeedFilterPage() {
           image: imageUrl ? (imageUrl.startsWith('http') ? imageUrl : `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}${imageUrl}`) : undefined,
           likes: Number(p['like_count']) || 0,
           comments: Number(p['comment_count']) || 0,
-          shares: 0,
+          shares: (p.share_count as number) || 0,
           timeAgo: formatTimeAgo(String(p['created_at'] ?? '')),
           privacy: String(p['privacy'] ?? ''),
           isLiked: Boolean(p['is_liked']),
@@ -252,6 +263,11 @@ function FeedFilterPage() {
     const validation = ApiClient.validatePostContent(newPostContent)
     if (!validation.isValid) {
       error(validation.error || 'Invalid post content')
+      return
+    }
+
+    if (postPrivacy === 'listed' && selectedUsers.length === 0) {
+      error('Please select at least one user for listed privacy.')
       return
     }
 

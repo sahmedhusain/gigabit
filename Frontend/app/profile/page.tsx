@@ -89,7 +89,7 @@ export default function ProfilePage() {
             image,
             likes: (p.like_count as number) ?? 0,
             comments: (p.comment_count as number) ?? 0,
-            shares: 0,
+            shares: (p.share_count as number) ?? 0,
             timeAgo: typeof p.created_at === 'string' ? formatTimeAgo(p.created_at as string) : 'Unknown',
             privacy: (p.privacy as string) ?? 'public',
             isLiked: Boolean(p.is_liked)

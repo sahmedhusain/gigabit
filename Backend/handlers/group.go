@@ -41,10 +41,6 @@ func (h *GroupHandler) CreateGroup(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "Group title is required")
 		return
 	}
-	if strings.TrimSpace(req.Description) == "" {
-		writeError(w, http.StatusBadRequest, "Group description is required")
-		return
-	}
 	if req.Privacy != "public" && req.Privacy != "private" {
 		writeError(w, http.StatusBadRequest, "Invalid privacy option")
 		return

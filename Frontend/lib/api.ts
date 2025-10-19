@@ -63,6 +63,18 @@ export interface MessageItem {
   message_type: 'private' | 'group';
   image_url?: string;
   created_at: string;
+  shared_post?: {
+    id: number;
+    user_id: number;
+    content: string;
+    image_url?: string;
+    privacy: string;
+    created_at: string;
+    user: User;
+    like_count: number;
+    comment_count: number;
+    share_count: number;
+  };
   [key: string]: unknown;
 }
 
@@ -121,8 +133,10 @@ export interface APIPost {
   user: User;
   like_count: number;
   comment_count: number;
+  share_count: number;
   is_liked: boolean;
   is_bookmarked: boolean;
+  specific_user_ids?: number[];
   comments?: Comment[];
 }
 
@@ -228,6 +242,7 @@ export interface PostResponse {
   like_count: number;
   dislike_count: number;
   comment_count: number;
+  share_count: number;
   is_liked: boolean;
   is_disliked: boolean;
   is_bookmarked: boolean;
@@ -386,13 +401,15 @@ export interface CreatePostRequest {
 }
 
 export interface UpdatePostRequest {
-  content: string;
+  content?: string;
   image_url?: string;
+  privacy?: 'public' | 'followers' | 'friends' | 'listed';
+  specific_user_ids?: number[];
 }
 
 export interface CreateGroupRequest {
   title: string;
-  description: string;
+  description?: string;
   privacy: 'public' | 'private';
   invite_members?: number[];
   avatar?: string;
@@ -674,8 +691,14 @@ export class ApiClient {
     });
   }
 
-  async getPost(id: number): Promise<APIPost> {
-    return this.request<APIPost>(`/api/posts/${id}`, {
+  async getPost(id: number, sort?: 'newest' | 'oldest'): Promise<APIPost> {
+    const params = new URLSearchParams();
+    if (sort) {
+      params.append('sort', sort);
+    }
+    const queryString = params.toString();
+    const url = queryString ? `/api/posts/${id}?${queryString}` : `/api/posts/${id}`;
+    return this.request<APIPost>(url, {
       method: 'GET',
     });
   }
@@ -745,6 +768,27 @@ export class ApiClient {
 
   async getUserBookmarks(limit: number = 20, offset: number = 0): Promise<{ bookmarks: Bookmark[]; count: number }> {
     return this.request<{ bookmarks: Bookmark[]; count: number }>(`/api/bookmarks?limit=${limit}&offset=${offset}`, {
+      method: 'GET',
+    });
+  }
+
+  // Share endpoints
+  async sharePost(data: { post_id: number; conversation_ids: number[]; group_ids: number[]; user_ids?: number[] }): Promise<{ message: string }> {
+    return this.request<{ message: string }>('/api/share', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async getRecentChatsAndGroups(): Promise<{ chats: any[] }> {
+    return this.request<{ chats: any[] }>('/api/share/recent', {
+      method: 'GET',
+    });
+  }
+
+  async searchShareableEntities(query: string): Promise<{ chats: any[] }> {
+    const params = new URLSearchParams({ q: query });
+    return this.request<{ chats: any[] }>(`/api/share/search?${params}`, {
       method: 'GET',
     });
   }

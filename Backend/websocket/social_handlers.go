@@ -44,6 +44,13 @@ func (h *Hub) handleCommentCreate(message Message) {
 
 	// Extract comment data from the message
 	if commentData, ok := message.Data.(map[string]interface{}); ok {
+		// Check if this is a broadcast of an already-created comment (has ID)
+		if _, hasID := commentData["id"]; hasID {
+			// This is a broadcast from HTTP API, just relay to other clients
+			h.handleCommentUpdate(message)
+			return
+		}
+
 		postID := message.PostID
 		userID := message.From
 

@@ -74,7 +74,7 @@ func (s *BookmarkService) IsPostBookmarked(userID, postID uint) (bool, error) {
 func (s *BookmarkService) GetUserBookmarks(userID uint, limit, offset int) ([]models.BookmarkResponse, error) {
 	query := `
 		SELECT b.id, b.user_id, b.post_id, b.created_at, b.updated_at,
-			   p.id, p.user_id, p.content, p.image_url, p.privacy, p.created_at, p.updated_at,
+			   p.id, p.user_id, p.content, p.image_url, p.privacy, p.created_at, p.updated_at, p.share_count,
 			   u.id, u.email, u.first_name, u.last_name, u.avatar, u.nickname,
 			   COUNT(DISTINCT l.id) as like_count,
 			   COUNT(DISTINCT c.id) as comment_count,
@@ -108,7 +108,7 @@ func (s *BookmarkService) GetUserBookmarks(userID uint, limit, offset int) ([]mo
 		var avatar, nickname sql.NullString
 		err := rows.Scan(
 			&bookmark.ID, &bookmark.UserID, &bookmark.PostID, &bookmark.CreatedAt, &bookmark.UpdatedAt,
-			&post.ID, &post.UserID, &post.Content, &post.ImageURL, &post.Privacy, &post.CreatedAt, &post.UpdatedAt,
+			&post.ID, &post.UserID, &post.Content, &post.ImageURL, &post.Privacy, &post.CreatedAt, &post.UpdatedAt, &post.ShareCount,
 			&user.ID, &user.Email, &user.FirstName, &user.LastName, &avatar, &nickname,
 			&post.LikeCount, &post.CommentCount, &post.IsLiked, &post.IsBookmarked,
 		)

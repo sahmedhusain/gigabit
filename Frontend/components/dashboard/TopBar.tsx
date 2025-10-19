@@ -538,6 +538,10 @@ export default function TopBar({
                                 <span className="text-white font-bold text-sm">
                                   {suggestion.title.substring(0, 2).toUpperCase()}
                                 </span>
+                              ) : suggestion.type === 'user' ? (
+                                <span className="text-white font-bold text-sm">
+                                  {suggestion.title?.charAt(0).toUpperCase() || '?'}{suggestion.title?.charAt(1)?.toUpperCase() || ''}
+                                </span>
                               ) : (
                                 <IconComponent className="w-5 h-5" />
                               )}

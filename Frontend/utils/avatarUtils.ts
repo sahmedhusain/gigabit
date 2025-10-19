@@ -19,8 +19,8 @@ export function getAvatarUrl(avatar: string | null | undefined): string | null {
     'defaultFM': '/avatars/defaultFM.png'
   };
   
-  // Return mapped path or fallback to default
-  return avatarMap[avatar] || '/avatars/defaultM.png';
+  // Return mapped path or null if not found
+  return avatarMap[avatar] || null;
 }
 
 // Get avatar options for registration page

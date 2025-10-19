@@ -192,7 +192,7 @@ export default function ChatItem({ item, onClick, onDelete, getUserStatus, typin
   const hasUnread = resolvedUnread > 0 || hasManualUnread;
 
   // Normalize avatar to a usable URL if it's an ID or relative token
-  const normalizedAvatar = item.avatar && !imageError ? getAvatarUrl(item.avatar) || undefined : undefined;
+  const normalizedAvatar = !imageError ? getAvatarUrl(item.avatar) : null;
 
   // Close menu when clicking outside
   useEffect(() => {
@@ -410,7 +410,7 @@ export default function ChatItem({ item, onClick, onDelete, getUserStatus, typin
                   'bg-gradient-to-r from-gray-400 to-gray-500'
               }`}>
               <motion.div
-                className="w-full h-full bg-gradient-to-br from-slate-600 to-slate-800 rounded-full flex items-center justify-center text-white font-bold text-xl shadow-lg overflow-hidden"
+                className="w-full h-full bg-gradient-to-br from-emerald-400 to-teal-600 rounded-full flex items-center justify-center text-white font-bold text-xl shadow-lg overflow-hidden"
                 whileHover={{ rotate: [0, -5, 5, 0], scale: 1.05 }}
                 transition={{ duration: 0.3 }}
               >
@@ -424,7 +424,9 @@ export default function ChatItem({ item, onClick, onDelete, getUserStatus, typin
                     onError={() => setImageError(true)}
                   />
               ) : (
-                item.name?.charAt(0).toUpperCase()
+                <span className="text-white font-bold text-xl">
+                  {item.name?.charAt(0).toUpperCase() || '?'}
+                </span>
               )}
               </motion.div>
             </div>
@@ -437,14 +439,18 @@ export default function ChatItem({ item, onClick, onDelete, getUserStatus, typin
               {normalizedAvatar ? (
                 <Image
                   src={normalizedAvatar}
-                  alt={item.name || 'Avatar'}
+                  alt={item.name || 'Group Avatar'}
                   width={56}
                   height={56}
-                  className="w-full h-full object-cover"
+                  className="w-full h-full object-cover rounded-full"
                   onError={() => setImageError(true)}
                 />
               ) : (
-                getGroupInitials(item.name || '')
+                <div className="w-full h-full bg-gradient-to-br from-emerald-400 to-teal-600 rounded-full flex items-center justify-center">
+                  <span className="text-white font-bold text-xl">
+                    {getGroupInitials(item.name || 'Group')}
+                  </span>
+                </div>
               )}
             </motion.div>
           )}

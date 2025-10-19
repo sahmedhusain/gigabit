@@ -155,7 +155,7 @@ function ActivityFilterPage() {
             ) : undefined,
           likes: post.like_count,
           comments: post.comment_count,
-          shares: 0,
+          shares: post.share_count,
           timeAgo: formatTimeAgo(post.created_at),
           privacy: post.privacy,
           isLiked: post.is_liked,

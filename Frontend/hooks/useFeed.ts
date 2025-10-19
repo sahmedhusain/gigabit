@@ -50,7 +50,7 @@ export function useFeed(options: { pageSize?: number; autoRefresh?: boolean } = 
     image: post.image_url,
     likes: post.like_count,
     comments: post.comment_count,
-    shares: 0,
+    shares: post.share_count,
     timeAgo: formatTimeAgo(post.created_at),
     privacy: post.privacy,
     isLiked: post.is_liked

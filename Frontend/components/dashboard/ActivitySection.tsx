@@ -1,6 +1,6 @@
 'use client'
 import { useState, useEffect, useRef } from 'react'
-import { Heart, MessageSquare, Bookmark, Send, Sparkles, User, Image as ImageIcon, X, MoreHorizontal, Globe, Lock, EyeOff, Plus, ArrowUp, ArrowDown, Trash2 } from 'lucide-react'
+import { Heart, MessageSquare, Bookmark, Send, Sparkles, User, Image as ImageIcon, X, MoreHorizontal, Trash2, ArrowUp, ArrowDown, Globe, Lock, EyeOff } from 'lucide-react'
 import { Post, Comment } from '@/lib/api'
 import { useRouter } from 'next/navigation'
 import { useToast } from '@/context/ToastContext'
@@ -9,6 +9,8 @@ import { getAvatarUrl } from '@/utils/avatarUtils'
 import { useAuth } from '@/context/AuthContext'
 import { api } from '@/lib/api'
 import { AnimatePresence, motion } from 'framer-motion'
+import ManagePrivacy from './ManagePrivacy'
+import SharePopup from '../SharePopup'
 
 interface ActivitySectionProps {
   activitySubTab: string
@@ -44,6 +46,13 @@ export default function ActivitySection({
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<{[key: number]: boolean}>({})
   const [isDeleting, setIsDeleting] = useState<{[key: number]: boolean}>({})
 
+  // Manage Privacy state
+  const [showManagePrivacy, setShowManagePrivacy] = useState(false)
+  const [selectedPostForPrivacy, setSelectedPostForPrivacy] = useState<Post | null>(null)
+  const [currentSelectedUsers, setCurrentSelectedUsers] = useState<number[]>([])
+  const [availableUsers, setAvailableUsers] = useState<{ id: number; email: string; first_name: string; last_name: string; avatar?: string; nickname?: string; display_name?: string; }[]>([])
+  const [loadingUsers, setLoadingUsers] = useState(false)
+
   // Comment modal state
   const [isCommentModalOpen, setIsCommentModalOpen] = useState(false)
   const [selectedPostForComment, setSelectedPostForComment] = useState<Post | null>(null)
@@ -51,8 +60,13 @@ export default function ActivitySection({
   const [newCommentImage, setNewCommentImage] = useState<File | null>(null)
   const [isSubmittingComment, setIsSubmittingComment] = useState(false)
 
+  // Share popup state
+  const [isSharePopupOpen, setIsSharePopupOpen] = useState(false)
+  const [selectedPostForShare, setSelectedPostForShare] = useState<Post | null>(null)
+
   // Comments state for displaying recent comments
   const [postComments, setPostComments] = useState<{ [postId: number]: Comment[] }>({})
+  const [userCommentCounts, setUserCommentCounts] = useState<{ [postId: number]: number }>({})
 
   const handlePostClick = (postId: number, e: React.MouseEvent) => {
     // Don't navigate if clicking on interactive elements
@@ -67,6 +81,12 @@ export default function ActivitySection({
     e.stopPropagation()
     setSelectedPostForComment(post)
     setIsCommentModalOpen(true)
+  }
+
+  const handleShareClick = (post: Post, e: React.MouseEvent) => {
+    e.stopPropagation()
+    setSelectedPostForShare(post)
+    setIsSharePopupOpen(true)
   }
 
   const canDeletePost = (post: Post) => {
@@ -171,16 +191,77 @@ export default function ActivitySection({
     }
   }
 
+  const handleManagePrivacy = async (post: Post) => {
+    setSelectedPostForPrivacy(post)
+    setShowManagePrivacy(true)
+    setOpenMenu(prev => ({ ...prev, [post.id]: false }))
+
+    // Fetch post details to get selected users for listed privacy
+    if (post.privacy === 'listed') {
+      try {
+        const postDetails = await api.getPost(post.id)
+        setCurrentSelectedUsers(postDetails.specific_user_ids || [])
+      } catch (err) {
+        console.error('Failed to fetch post details:', err)
+        setCurrentSelectedUsers([])
+      }
+    } else {
+      setCurrentSelectedUsers([])
+    }
+  }
+
+  const handleUpdatePrivacy = async (privacy: 'public' | 'followers' | 'friends' | 'listed', selectedUsers: number[]) => {
+    if (!selectedPostForPrivacy) return
+
+    try {
+      await api.updatePost(selectedPostForPrivacy.id, {
+        privacy,
+        specific_user_ids: selectedUsers
+      })
+      success('Privacy settings updated successfully!')
+      setShowManagePrivacy(false)
+      setSelectedPostForPrivacy(null)
+      // Optionally refresh posts or update local state
+      window.location.reload() // Simple refresh for now
+    } catch (err) {
+      console.error('Failed to update privacy:', err)
+      error('Failed to update privacy settings. Please try again.')
+    }
+  }
+
+  const fetchAvailableUsers = async () => {
+    if (availableUsers.length > 0) return // Already fetched
+
+    try {
+      setLoadingUsers(true)
+      const response = await api.getFollowers(user?.id || 0)
+      setAvailableUsers(response.followers || [])
+    } catch (err) {
+      console.error('Failed to fetch followers:', err)
+      error('Failed to load followers for privacy settings.')
+    } finally {
+      setLoadingUsers(false)
+    }
+  }
+
+  // Fetch users when Manage Privacy modal opens
+  useEffect(() => {
+    if (showManagePrivacy) {
+      fetchAvailableUsers()
+    }
+  }, [showManagePrivacy])
+
   // Fetch comments for commented posts
   const fetchCommentsForCommentedPosts = async () => {
     if (activitySubTab !== 'commented') return
 
     try {
       const commentsMap: { [postId: number]: Comment[] } = {}
+      const userCommentCountsMap: { [postId: number]: number } = {}
 
       for (const post of commentedPosts) {
         try {
-          const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/api/posts/${post.id}/comments?limit=5&offset=0`, {
+          const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/api/posts/${post.id}/comments?limit=50&offset=0`, {
             method: 'GET',
             headers: {
               ...(localStorage.getItem('token') ? { Authorization: `Bearer ${localStorage.getItem('token')}` } : {})
@@ -190,11 +271,15 @@ export default function ActivitySection({
 
           if (response.ok) {
             const data = await response.json()
-            // Sort comments by created_at descending to get most recent first
-            const sortedComments = (data.comments || []).sort((a: Comment, b: Comment) => 
+            // Filter to only current user's comments and sort by created_at descending to get most recent first
+            const userComments = (data.comments || []).filter((comment: Comment) => comment.user.id === user?.id)
+            const sortedUserComments = userComments.sort((a: Comment, b: Comment) => 
               new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
             )
-            commentsMap[post.id] = sortedComments
+            commentsMap[post.id] = sortedUserComments
+
+            // Count user's comments on this post
+            userCommentCountsMap[post.id] = sortedUserComments.length
           }
         } catch (error) {
           console.error(`Error fetching comments for post ${post.id}:`, error)
@@ -202,6 +287,7 @@ export default function ActivitySection({
       }
 
       setPostComments(commentsMap)
+      setUserCommentCounts(userCommentCountsMap)
     } catch (error) {
       console.error('Error fetching comments:', error)
     }
@@ -333,6 +419,13 @@ export default function ActivitySection({
                   onClick={(e) => e.stopPropagation()}
                 >
                   <button
+                    onClick={() => handleManagePrivacy(post)}
+                    className="w-full flex items-center space-x-3 px-4 py-3 text-white/70 hover:text-white hover:bg-white/10 transition-all duration-200"
+                  >
+                    <Lock className="w-4 h-4" />
+                    <span className="text-sm font-medium">Manage Privacy</span>
+                  </button>
+                  <button
                     onClick={() => handleDeletePost(post.id)}
                     className="w-full flex items-center space-x-3 px-4 py-3 text-red-400 hover:bg-red-500/10 transition-all duration-200"
                   >
@@ -355,15 +448,17 @@ export default function ActivitySection({
 
       {/* Post Image */}
       {post.image && (
-        <div className="mb-4 rounded-2xl overflow-hidden bg-gradient-to-br from-white/5 to-transparent border border-white/10 group-hover:border-emerald-400/30 transition-all duration-300">
-          <Image
-            src={post.image}
-            alt="Post image"
-            width={640}
-            height={256}
-            unoptimized={post.image.includes('/svg')}
-            className="w-full h-64 object-cover hover:scale-105 transition-transform duration-500"
-          />
+        <div className="mb-4 flex justify-center">
+          <div className="inline-block border border-white/20 rounded-2xl overflow-hidden">
+            <Image
+              src={post.image}
+              alt="Post image"
+              width={640}
+              height={256}
+              unoptimized={post.image.includes('/svg')}
+              className="max-h-64 sm:max-h-80 md:max-h-96 object-contain hover:scale-105 transition-transform duration-500 rounded-2xl"
+            />
+          </div>
         </div>
       )}
 
@@ -396,6 +491,7 @@ export default function ActivitySection({
           </button>
 
           <button
+            onClick={(e) => handleShareClick(post, e)}
             className="flex items-center justify-center space-x-2 px-4 py-2 text-white/70 hover:text-white hover:bg-gradient-to-r from-white/10 to-white/5 border border-white/10 rounded-2xl transition-all duration-300 hover:scale-105"
             title="Share"
           >
@@ -454,9 +550,12 @@ export default function ActivitySection({
                 {postComments[post.id][0].content}
               </p>
               {postComments[post.id][0].image_url && (
-                <div className="mt-2 rounded-lg overflow-hidden max-w-xs">
+                <div className="mt-2 overflow-hidden max-w-xs border border-white/20 rounded-2xl inline-block">
                   <Image
-                    src={postComments[post.id][0].image_url!}
+                    src={postComments[post.id][0].image_url!.startsWith('http') ?
+                      postComments[post.id][0].image_url! :
+                      `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}${postComments[post.id][0].image_url!}`
+                    }
                     alt="Comment image"
                     width={200}
                     height={150}
@@ -465,9 +564,9 @@ export default function ActivitySection({
                   />
                 </div>
               )}
-              {post.comments > 1 && (
+              {userCommentCounts[post.id] > 1 && (
                 <div className="mt-2 text-white/60 text-xs">
-                  + {post.comments - 1} more comment{post.comments - 1 !== 1 ? 's' : ''}
+                  + {userCommentCounts[post.id] - 1} more comment{userCommentCounts[post.id] - 1 !== 1 ? 's' : ''}
                 </div>
               )}
             </div>
@@ -826,5 +925,35 @@ export default function ActivitySection({
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Manage Privacy Modal */}
+      <ManagePrivacy
+        show={showManagePrivacy}
+        onClose={() => {
+          setShowManagePrivacy(false)
+          setSelectedPostForPrivacy(null)
+          setCurrentSelectedUsers([])
+        }}
+        postId={selectedPostForPrivacy?.id || 0}
+        currentPrivacy={selectedPostForPrivacy?.privacy as 'public' | 'followers' | 'friends' | 'listed' || 'public'}
+        currentSelectedUsers={currentSelectedUsers}
+        availableUsers={availableUsers}
+        loadingUsers={loadingUsers}
+        onUpdatePrivacy={handleUpdatePrivacy}
+      />
+
+      {/* Share Popup */}
+      {isSharePopupOpen && selectedPostForShare && (
+        <SharePopup
+          postId={selectedPostForShare.id}
+          isOpen={isSharePopupOpen}
+          onClose={() => {
+            setIsSharePopupOpen(false)
+            setSelectedPostForShare(null)
+          }}
+          onShareSuccess={() => {
+          }}
+        />
+      )}
     </div>
   )}

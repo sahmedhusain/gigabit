@@ -180,6 +180,19 @@ const GroupEventsTab: React.FC<GroupEventsTabProps> = ({ groupId, groupTitle }) 
     return new Date(event.event_time) < new Date()
   }
 
+  const formatTimeAgo = (dateString: string) => {
+    const date = new Date(dateString)
+    const now = new Date()
+    const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000)
+
+    if (diffInSeconds < 60) return 'Just now'
+    if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m ago`
+    if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h ago`
+    if (diffInSeconds < 604800) return `${Math.floor(diffInSeconds / 86400)}d ago`
+
+    return date.toLocaleDateString()
+  }
+
   return (
     <div className="flex flex-col h-full">
       {/* Header with Create Event Button */}
@@ -270,13 +283,18 @@ const GroupEventsTab: React.FC<GroupEventsTabProps> = ({ groupId, groupTitle }) 
                 return (
                   <motion.div
                     key={event.id}
-                    className="group relative bg-gradient-to-r from-white/10 to-white/5 backdrop-blur-xl rounded-xl lg:rounded-2xl p-6 border border-white/20 hover:border-white/30 transition-all duration-300 hover:shadow-lg hover:shadow-white/10"
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: index * 0.1 }}
+                    className="group relative bg-gradient-to-br from-white/10 via-white/5 to-transparent backdrop-blur-xl rounded-3xl border shadow-2xl p-6 hover:shadow-emerald-500/10 transition-all duration-500 group cursor-pointer animate-fade-in animate-slide-in-from-bottom border-white/20"
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{
+                      duration: 0.4,
+                      delay: index * 0.1,
+                      ease: "easeOut"
+                    }}
+                    style={{ animationDelay: `${index < 6 ? index * 100 : 500}ms` }}
                   >
                     {/* Subtle gradient overlay */}
-                    <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/5 via-transparent to-teal-500/5 rounded-xl lg:rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                    <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/5 via-transparent to-teal-500/5 rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
 
                     <div className="relative flex flex-col lg:flex-row lg:items-start justify-between gap-6">
                       {/* Main Content */}
@@ -306,7 +324,7 @@ const GroupEventsTab: React.FC<GroupEventsTabProps> = ({ groupId, groupTitle }) 
                             </div>
                             <p className="text-white/80 mb-4 leading-relaxed">{event.description}</p>
                             {event.canceled && event.cancel_reason && (
-                              <div className="mb-4 p-3 bg-red-500/10 border border-red-500/20 rounded-lg">
+                              <div className="mb-4 p-3 bg-red-500/10 border border-red-500/20 rounded-2xl">
                                 <p className="text-red-300 text-sm">
                                   <span className="font-medium">Cancellation reason:</span> {formatCancellationReason(event.cancel_reason)}
                                 </p>
@@ -330,7 +348,7 @@ const GroupEventsTab: React.FC<GroupEventsTabProps> = ({ groupId, groupTitle }) 
 
                               {/* Dropdown Menu */}
                               {dropdownOpen === event.id && (
-                                <div className="absolute right-0 top-full mt-1 w-48 bg-gray-800 border border-white/20 rounded-lg shadow-lg z-50">
+                                <div className="absolute right-0 top-full mt-1 w-48 bg-gradient-to-br from-slate-800/95 to-slate-900/95 backdrop-blur-xl border border-white/20 rounded-2xl shadow-2xl overflow-hidden z-50">
                                   {!event.canceled && !isEventEnded(event) && (
                                     <button
                                       onClick={(e) => {
@@ -384,7 +402,7 @@ const GroupEventsTab: React.FC<GroupEventsTabProps> = ({ groupId, groupTitle }) 
                         {/* Event Details Grid */}
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
                           {/* Date & Time */}
-                          <div className="flex items-center space-x-3 bg-white/5 rounded-lg p-3 border border-white/10">
+                          <div className="flex items-center space-x-3 bg-white/5 rounded-2xl p-3 border border-white/10">
                             <div className="w-8 h-8 bg-emerald-500/20 rounded-full flex items-center justify-center">
                               <Calendar className="w-4 h-4 text-emerald-400" />
                             </div>
@@ -396,7 +414,7 @@ const GroupEventsTab: React.FC<GroupEventsTabProps> = ({ groupId, groupTitle }) 
 
                           {/* Location */}
                           {event.location && (
-                            <div className="flex items-center space-x-3 bg-white/5 rounded-lg p-3 border border-white/10">
+                            <div className="flex items-center space-x-3 bg-white/5 rounded-2xl p-3 border border-white/10">
                               <div className="w-8 h-8 bg-blue-500/20 rounded-full flex items-center justify-center">
                                 <MapPin className="w-4 h-4 text-blue-400" />
                               </div>
@@ -407,43 +425,35 @@ const GroupEventsTab: React.FC<GroupEventsTabProps> = ({ groupId, groupTitle }) 
                             </div>
                           )}
 
-                          {/* Creator */}
-                          <div className="flex items-center space-x-3 bg-white/5 rounded-lg p-3 border border-white/10">
+                          {/* Group */}
+                          <div className="flex items-center space-x-3 bg-white/5 rounded-2xl p-3 border border-white/10">
                             <div className="w-8 h-8 bg-purple-500/20 rounded-full flex items-center justify-center">
                               <Users className="w-4 h-4 text-purple-400" />
                             </div>
                             <div>
-                              <p className="text-white/90 text-sm font-medium">Created by</p>
-                              <p className="text-white/60 text-xs">{event.creator.first_name} {event.creator.last_name}</p>
+                              <p className="text-white/90 text-sm font-medium">Group</p>
+                              <p className="text-white/60 text-xs">{groupTitle}</p>
                             </div>
                           </div>
                         </div>
 
-                        {/* Time ago */}
-                        <div className="text-xs text-white/50 border-t border-white/10 pt-3">
-                          <span>{(() => {
-                            const created = new Date(event.created_at || event.event_time);
-                            const now = new Date();
-                            const diffInSeconds = Math.floor((now.getTime() - created.getTime()) / 1000);
-                            if (diffInSeconds < 60) return 'Just now';
-                            if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m ago`;
-                            if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h ago`;
-                            if (diffInSeconds < 604800) return `${Math.floor(diffInSeconds / 86400)}d ago`;
-                            return created.toLocaleDateString();
-                          })()}</span>
+                        {/* Creator & Time */}
+                        <div className="flex items-center justify-between text-xs text-white/50 border-t border-white/10 pt-3">
+                          <span>Created by {event.creator.first_name} {event.creator.last_name}</span>
+                          <span>{formatTimeAgo(event.created_at || event.event_time)}</span>
                         </div>
                       </div>
 
                       {/* Right Side - Response Section */}
                       <div className="flex flex-col items-end space-y-4 lg:min-w-48">
                         {/* Response Counts */}
-                        <div className="flex items-center space-x-4 bg-white/5 rounded-lg p-3 border border-white/10 w-full lg:w-auto">
-                          <div className="flex items-center space-x-2">
+                        <div className="flex items-center space-x-4 bg-white/5 rounded-2xl p-3 border border-white/10 w-full">
+                          <div className="flex items-center space-x-2 flex-1">
                             <Check className="w-4 h-4 text-emerald-400" />
                             <span className="text-white/80 text-sm font-medium">{event.going_count || 0}</span>
                             <span className="text-white/60 text-xs">going</span>
                           </div>
-                          <div className="flex items-center space-x-2">     
+                          <div className="flex items-center space-x-2 flex-1">     
                             <X className="w-4 h-4 text-red-400" />
                             <span className="text-white/80 text-sm font-medium">{event.not_going_count || 0}</span>
                             <span className="text-white/60 text-xs">not going</span>
@@ -451,7 +461,7 @@ const GroupEventsTab: React.FC<GroupEventsTabProps> = ({ groupId, groupTitle }) 
                         </div>
 
                         {/* Response Buttons */}
-                        <div className="flex flex-col sm:flex-row gap-2 w-full lg:w-auto">
+                        <div className="flex flex-col sm:flex-row gap-2 w-full justify-start">
                           {event.user_response === 'going' ? (
                             <motion.button
                               onClick={(e) => {
@@ -459,7 +469,7 @@ const GroupEventsTab: React.FC<GroupEventsTabProps> = ({ groupId, groupTitle }) 
                                 handleEventResponse(event.id, 'going');
                               }}
                               disabled={event.canceled || isEventEnded(event)}
-                              className={`flex-1 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 flex items-center justify-center space-x-2 disabled:opacity-50 shadow-lg ${event.canceled || isEventEnded(event) ? 'cursor-not-allowed' : ''}`}
+                              className={`flex-1 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-2xl text-sm font-medium transition-all duration-200 flex items-center justify-center space-x-2 disabled:opacity-50 shadow-lg ${event.canceled || isEventEnded(event) ? 'cursor-not-allowed' : ''}`}
                               whileHover={event.canceled || isEventEnded(event) ? {} : { scale: 1.05 }}
                               whileTap={event.canceled || isEventEnded(event) ? {} : { scale: 0.95 }}
                             >
@@ -473,7 +483,7 @@ const GroupEventsTab: React.FC<GroupEventsTabProps> = ({ groupId, groupTitle }) 
                                 handleEventResponse(event.id, 'going');
                               }}
                               disabled={event.canceled || isEventEnded(event)}
-                              className={`flex-1 bg-white/10 hover:bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 flex items-center justify-center space-x-2 disabled:opacity-50 border border-white/20 hover:border-emerald-400/50 ${event.canceled || isEventEnded(event) ? 'cursor-not-allowed' : ''}`}
+                              className={`flex-1 bg-white/10 hover:bg-emerald-600 text-white px-4 py-2 rounded-2xl text-sm font-medium transition-all duration-200 flex items-center justify-center space-x-2 disabled:opacity-50 border border-white/20 hover:border-emerald-400/50 ${event.canceled || isEventEnded(event) ? 'cursor-not-allowed' : ''}`}
                               whileHover={event.canceled || isEventEnded(event) ? {} : { scale: 1.05 }}
                               whileTap={event.canceled || isEventEnded(event) ? {} : { scale: 0.95 }}
                             >
@@ -489,7 +499,7 @@ const GroupEventsTab: React.FC<GroupEventsTabProps> = ({ groupId, groupTitle }) 
                                 handleEventResponse(event.id, 'not_going');
                               }}
                               disabled={event.canceled || isEventEnded(event)}
-                              className={`flex-1 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 flex items-center justify-center space-x-2 disabled:opacity-50 shadow-lg ${event.canceled || isEventEnded(event) ? 'cursor-not-allowed' : ''}`}
+                              className={`flex-1 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-2xl text-sm font-medium transition-all duration-200 flex items-center justify-center space-x-2 disabled:opacity-50 shadow-lg ${event.canceled || isEventEnded(event) ? 'cursor-not-allowed' : ''}`}
                               whileHover={event.canceled || isEventEnded(event) ? {} : { scale: 1.05 }}
                               whileTap={event.canceled || isEventEnded(event) ? {} : { scale: 0.95 }}
                             >
@@ -503,7 +513,7 @@ const GroupEventsTab: React.FC<GroupEventsTabProps> = ({ groupId, groupTitle }) 
                                 handleEventResponse(event.id, 'not_going');
                               }}
                               disabled={event.canceled || isEventEnded(event)}
-                              className={`flex-1 bg-white/10 hover:bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 flex items-center justify-center space-x-2 disabled:opacity-50 border border-white/20 hover:border-red-400/50 ${event.canceled || isEventEnded(event) ? 'cursor-not-allowed' : ''}`}
+                              className={`flex-1 bg-white/10 hover:bg-red-600 text-white px-4 py-2 rounded-2xl text-sm font-medium transition-all duration-200 flex items-center justify-center space-x-2 disabled:opacity-50 border border-white/20 hover:border-red-400/50 ${event.canceled || isEventEnded(event) ? 'cursor-not-allowed' : ''}`}
                               whileHover={event.canceled || isEventEnded(event) ? {} : { scale: 1.05 }}
                               whileTap={event.canceled || isEventEnded(event) ? {} : { scale: 0.95 }}
                             >
@@ -541,7 +551,7 @@ const GroupEventsTab: React.FC<GroupEventsTabProps> = ({ groupId, groupTitle }) 
             onClick={() => setShowCancelModal(false)}
           >
             <motion.div
-              className="bg-gray-800 border border-white/20 rounded-xl p-6 w-full max-w-md"
+              className="bg-gray-800 border border-white/20 rounded-3xl p-6 w-full max-w-md"
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
@@ -566,7 +576,7 @@ const GroupEventsTab: React.FC<GroupEventsTabProps> = ({ groupId, groupTitle }) 
                     id="cancel-reason"
                     value={cancelReason}
                     onChange={(e) => setCancelReason(e.target.value)}
-                    className="w-full bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-white placeholder-white/50 focus:outline-none focus:border-orange-400/50"
+                    className="w-full bg-white/10 border border-white/20 rounded-2xl px-3 py-2 text-white placeholder-white/50 focus:outline-none focus:border-orange-400/50"
                     required
                   >
                     <option value="">Select a reason...</option>
@@ -579,7 +589,7 @@ const GroupEventsTab: React.FC<GroupEventsTabProps> = ({ groupId, groupTitle }) 
                   </select>
                 </div>
 
-                <div className="bg-orange-500/10 border border-orange-500/20 rounded-lg p-3">
+                <div className="bg-orange-500/10 border border-orange-500/20 rounded-2xl p-3">
                   <p className="text-orange-300 text-sm">
                     This will notify all attendees that the event has been cancelled.
                   </p>
@@ -634,7 +644,7 @@ const GroupEventsTab: React.FC<GroupEventsTabProps> = ({ groupId, groupTitle }) 
             onClick={() => setShowDeleteModal(false)}
           >
             <motion.div
-              className="bg-gray-800 border border-white/20 rounded-xl p-6 w-full max-w-md"
+              className="bg-gray-800 border border-white/20 rounded-3xl p-6 w-full max-w-md"
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
@@ -650,7 +660,7 @@ const GroupEventsTab: React.FC<GroupEventsTabProps> = ({ groupId, groupTitle }) 
                 </div>
               </div>
 
-              <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-3 mb-4">
+              <div className="bg-red-500/10 border border-red-500/20 rounded-2xl p-3 mb-4">
                 <p className="text-red-300 text-sm">
                   This action cannot be undone. This will permanently delete the event and remove all associated data.
                 </p>
@@ -697,7 +707,7 @@ const GroupEventsTab: React.FC<GroupEventsTabProps> = ({ groupId, groupTitle }) 
             onClick={() => setShowEditModal(false)}
           >
             <motion.div
-              className="bg-gray-800 border border-white/20 rounded-xl p-6 w-full max-w-md"
+              className="bg-gray-800 border border-white/20 rounded-3xl p-6 w-full max-w-md"
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
@@ -724,7 +734,7 @@ const GroupEventsTab: React.FC<GroupEventsTabProps> = ({ groupId, groupTitle }) 
                     value={editLocation}
                     onChange={(e) => setEditLocation(e.target.value)}
                     placeholder="Enter event location"
-                    className="w-full bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-white placeholder-white/50 focus:outline-none focus:border-blue-400/50"
+                    className="w-full bg-white/10 border border-white/20 rounded-2xl px-3 py-2 text-white placeholder-white/50 focus:outline-none focus:border-blue-400/50"
                   />
                 </div>
 
@@ -738,7 +748,7 @@ const GroupEventsTab: React.FC<GroupEventsTabProps> = ({ groupId, groupTitle }) 
                     value={editDate}
                     onChange={(e) => setEditDate(e.target.value)}
                     min={new Date().toISOString().split('T')[0]}
-                    className="w-full bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-400/50"
+                    className="w-full bg-white/10 border border-white/20 rounded-2xl px-3 py-2 text-white focus:outline-none focus:border-blue-400/50"
                     required
                   />
                 </div>
@@ -752,12 +762,12 @@ const GroupEventsTab: React.FC<GroupEventsTabProps> = ({ groupId, groupTitle }) 
                     type="time"
                     value={editTime}
                     onChange={(e) => setEditTime(e.target.value)}
-                    className="w-full bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-400/50"
+                    className="w-full bg-white/10 border border-white/20 rounded-2xl px-3 py-2 text-white focus:outline-none focus:border-blue-400/50"
                     required
                   />
                 </div>
 
-                <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3">
+                <div className="bg-blue-500/10 border border-blue-500/20 rounded-2xl p-3">
                   <p className="text-blue-300 text-sm">
                     Only location, date, and time can be edited. Title and description cannot be changed.
                   </p>

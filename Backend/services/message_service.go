@@ -170,9 +170,29 @@ func (s *MessageService) GetPrivateMessages(userID1, userID2 uint, limit, offset
 	// Base query with optional deleted_at filter (apply if user has deleted_at, regardless of current deleted flag)
 	query := `
 	SELECT m.id, m.sender_id, m.content, m.is_read, m.created_at,
-	   u.first_name, u.last_name, u.avatar, u.nickname
+	   u.first_name, u.last_name, u.avatar, u.nickname,
+	   COALESCE(s.id, 0) as share_id,
+	   COALESCE(p.id, 0) as post_id,
+	   COALESCE(p.user_id, 0) as post_user_id,
+	   COALESCE(p.content, '') as post_content,
+	   COALESCE(p.image_url, '') as post_image_url,
+	   COALESCE(p.privacy, '') as post_privacy,
+	   COALESCE(p.created_at, '') as post_created_at,
+	   COALESCE(pu.first_name, '') as post_user_first_name,
+	   COALESCE(pu.last_name, '') as post_user_last_name,
+	   COALESCE(pu.avatar, '') as post_user_avatar,
+	   COALESCE(pu.nickname, '') as post_user_nickname,
+	   COALESCE(like_stats.like_count, 0) as like_count,
+	   COALESCE(comment_stats.comment_count, 0) as comment_count,
+	   COALESCE(share_stats.share_count, 0) as share_count
 	FROM private_messages m
 	JOIN users u ON m.sender_id = u.id
+	LEFT JOIN shares s ON m.id = s.message_id
+	LEFT JOIN posts p ON s.post_id = p.id
+	LEFT JOIN users pu ON p.user_id = pu.id
+	LEFT JOIN (SELECT post_id, COUNT(*) as like_count FROM likes GROUP BY post_id) like_stats ON p.id = like_stats.post_id
+	LEFT JOIN (SELECT post_id, COUNT(*) as comment_count FROM comments GROUP BY post_id) comment_stats ON p.id = comment_stats.post_id
+	LEFT JOIN (SELECT post_id, COUNT(*) as share_count FROM shares WHERE message_id IS NOT NULL GROUP BY post_id) share_stats ON p.id = share_stats.post_id
 	WHERE m.conversation_id = ?
 	  AND (? IS NULL OR m.created_at > ?)
 	ORDER BY m.created_at DESC
@@ -197,10 +217,17 @@ func (s *MessageService) GetPrivateMessages(userID1, userID2 uint, limit, offset
 		var message models.MessageResponse
 		var sender models.UserResponse
 		var isReadInDB bool
+		var shareID, postID, postUserID uint
+		var postContent, postImageURL, postPrivacy, postCreatedAt string
+		var postUserFirstName, postUserLastName, postUserAvatar, postUserNickname string
+		var likeCount, commentCount, shareCount int64
 
 		err := rows.Scan(
 			&message.ID, &message.SenderID, &message.Content, &isReadInDB, &message.CreatedAt,
 			&sender.FirstName, &sender.LastName, &sender.Avatar, &sender.Nickname,
+			&shareID, &postID, &postUserID, &postContent, &postImageURL, &postPrivacy, &postCreatedAt,
+			&postUserFirstName, &postUserLastName, &postUserAvatar, &postUserNickname,
+			&likeCount, &commentCount, &shareCount,
 		)
 		if err != nil {
 			return nil, err
@@ -220,6 +247,51 @@ func (s *MessageService) GetPrivateMessages(userID1, userID2 uint, limit, offset
 			message.ReceiverID = userID1
 			// If current user is the receiver, use the actual is_read status from DB
 			message.IsRead = isReadInDB
+		}
+
+		// Build shared post if exists
+		if shareID > 0 && postID > 0 {
+			var postImageURLPtr *string
+			if postImageURL != "" {
+				postImageURLPtr = &postImageURL
+			}
+
+			var postUserAvatarPtr, postUserNicknamePtr *string
+			if postUserAvatar != "" {
+				postUserAvatarPtr = &postUserAvatar
+			}
+			if postUserNickname != "" {
+				postUserNicknamePtr = &postUserNickname
+			}
+
+			postUser := models.UserResponse{
+				ID:        postUserID,
+				FirstName: postUserFirstName,
+				LastName:  postUserLastName,
+				Avatar:    postUserAvatarPtr,
+				Nickname:  postUserNicknamePtr,
+			}
+
+			sharedPost := models.SharedPostResponse{
+				ID:           postID,
+				UserID:       postUserID,
+				Content:      postContent,
+				ImageURL:     postImageURLPtr,
+				Privacy:      postPrivacy,
+				User:         postUser,
+				LikeCount:    likeCount,
+				CommentCount: commentCount,
+				ShareCount:   shareCount,
+			}
+
+			// Parse created_at if valid
+			if postCreatedAt != "" {
+				if parsedTime, err := time.Parse(time.RFC3339, postCreatedAt); err == nil {
+					sharedPost.CreatedAt = parsedTime
+				}
+			}
+
+			message.SharedPost = &sharedPost
 		}
 
 		messages = append(messages, message)
@@ -244,10 +316,30 @@ func (s *MessageService) GetGroupMessages(groupID, userID uint, limit, offset in
 	query := `
 	SELECT m.id, m.sender_id, m.content, m.is_read, m.created_at,
 	   u.first_name, u.last_name, u.avatar, u.nickname,
-	   g.name
+	   g.name,
+	   COALESCE(s.id, 0) as share_id,
+	   COALESCE(p.id, 0) as post_id,
+	   COALESCE(p.user_id, 0) as post_user_id,
+	   COALESCE(p.content, '') as post_content,
+	   COALESCE(p.image_url, '') as post_image_url,
+	   COALESCE(p.privacy, '') as post_privacy,
+	   COALESCE(p.created_at, '') as post_created_at,
+	   COALESCE(pu.first_name, '') as post_user_first_name,
+	   COALESCE(pu.last_name, '') as post_user_last_name,
+	   COALESCE(pu.avatar, '') as post_user_avatar,
+	   COALESCE(pu.nickname, '') as post_user_nickname,
+	   COALESCE(like_stats.like_count, 0) as like_count,
+	   COALESCE(comment_stats.comment_count, 0) as comment_count,
+	   COALESCE(share_stats.share_count, 0) as share_count
 	FROM group_messages m
 	JOIN users u ON m.sender_id = u.id
 	JOIN groups g ON g.id = ?
+	LEFT JOIN shares s ON m.id = s.message_id
+	LEFT JOIN posts p ON s.post_id = p.id
+	LEFT JOIN users pu ON p.user_id = pu.id
+	LEFT JOIN (SELECT post_id, COUNT(*) as like_count FROM likes GROUP BY post_id) like_stats ON p.id = like_stats.post_id
+	LEFT JOIN (SELECT post_id, COUNT(*) as comment_count FROM comments GROUP BY post_id) comment_stats ON p.id = comment_stats.post_id
+	LEFT JOIN (SELECT post_id, COUNT(*) as share_count FROM shares WHERE message_id IS NOT NULL GROUP BY post_id) share_stats ON p.id = share_stats.post_id
 	WHERE m.conversation_id = ?
 	ORDER BY m.created_at DESC
 	LIMIT ? OFFSET ?
@@ -264,11 +356,18 @@ func (s *MessageService) GetGroupMessages(groupID, userID uint, limit, offset in
 		var message models.MessageResponse
 		var sender models.UserResponse
 		var groupName string
+		var shareID, postID, postUserID uint
+		var postContent, postImageURL, postPrivacy, postCreatedAt string
+		var postUserFirstName, postUserLastName, postUserAvatar, postUserNickname string
+		var likeCount, commentCount, shareCount int64
 
 		err := rows.Scan(
 			&message.ID, &message.SenderID, &message.Content, &message.IsRead, &message.CreatedAt,
 			&sender.FirstName, &sender.LastName, &sender.Avatar, &sender.Nickname,
 			&groupName,
+			&shareID, &postID, &postUserID, &postContent, &postImageURL, &postPrivacy, &postCreatedAt,
+			&postUserFirstName, &postUserLastName, &postUserAvatar, &postUserNickname,
+			&likeCount, &commentCount, &shareCount,
 		)
 		if err != nil {
 			return nil, err
@@ -285,6 +384,51 @@ func (s *MessageService) GetGroupMessages(groupID, userID uint, limit, offset in
 			Title: groupName,
 		}
 		message.Group = &group
+
+		// Build shared post if exists
+		if shareID > 0 && postID > 0 {
+			var postImageURLPtr *string
+			if postImageURL != "" {
+				postImageURLPtr = &postImageURL
+			}
+
+			var postUserAvatarPtr, postUserNicknamePtr *string
+			if postUserAvatar != "" {
+				postUserAvatarPtr = &postUserAvatar
+			}
+			if postUserNickname != "" {
+				postUserNicknamePtr = &postUserNickname
+			}
+
+			postUser := models.UserResponse{
+				ID:        postUserID,
+				FirstName: postUserFirstName,
+				LastName:  postUserLastName,
+				Avatar:    postUserAvatarPtr,
+				Nickname:  postUserNicknamePtr,
+			}
+
+			sharedPost := models.SharedPostResponse{
+				ID:           postID,
+				UserID:       postUserID,
+				Content:      postContent,
+				ImageURL:     postImageURLPtr,
+				Privacy:      postPrivacy,
+				User:         postUser,
+				LikeCount:    likeCount,
+				CommentCount: commentCount,
+				ShareCount:   shareCount,
+			}
+
+			// Parse created_at if valid
+			if postCreatedAt != "" {
+				if parsedTime, err := time.Parse(time.RFC3339, postCreatedAt); err == nil {
+					sharedPost.CreatedAt = parsedTime
+				}
+			}
+
+			message.SharedPost = &sharedPost
+		}
 
 		messages = append(messages, message)
 	}

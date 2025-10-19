@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
-import { User, Heart, MessageSquare, MoreHorizontal, Send, Image as ImageIcon, Bookmark, ZoomIn, ZoomOut, Download, X, Trash2 } from 'lucide-react'
+import { User, Heart, MessageSquare, MoreHorizontal, Send, Image as ImageIcon, Bookmark, ZoomIn, ZoomOut, Download, X, Trash2, Lock, ArrowUp, ArrowDown } from 'lucide-react'
 import ProtectedRoute from '@/components/ProtectedRoute'
 import AppLayout from '@/components/AppLayout'
 import { useAuth } from '@/context/AuthContext'
@@ -12,6 +12,8 @@ import { api, APIPost, Comment as CommentType, NetworkError } from '@/lib/api'
 import { getAvatarUrl } from '@/utils/avatarUtils'
 import Image from 'next/image'
 import { motion, AnimatePresence } from 'framer-motion'
+import ManagePrivacy from '@/components/dashboard/ManagePrivacy'
+import SharePopup from '@/components/SharePopup'
 
 interface CommentWithUser extends CommentType {
     timeAgo: string
@@ -45,6 +47,17 @@ function PostDetailPage() {
   const [openMenu, setOpenMenu] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
+  const [openCommentMenu, setOpenCommentMenu] = useState<number | null>(null)
+  const [showDeleteCommentConfirm, setShowDeleteCommentConfirm] = useState(false)
+  const [commentToDelete, setCommentToDelete] = useState<number | null>(null)
+  const [showManagePrivacy, setShowManagePrivacy] = useState(false)
+  const [selectedPostForPrivacy, setSelectedPostForPrivacy] = useState<APIPost | null>(null)
+  const [availableUsers, setAvailableUsers] = useState<any[]>([])
+  const [loadingUsers, setLoadingUsers] = useState(false)
+  const [commentSort, setCommentSort] = useState<'newest' | 'oldest'>('newest')
+  const [isSorting, setIsSorting] = useState(false)
+  const [isSharePopupOpen, setIsSharePopupOpen] = useState(false)
+  const [selectedPostForShare, setSelectedPostForShare] = useState<APIPost | null>(null)
 
     // Real-time optimistic updates for likes
     const { performUpdate: performOptimisticUpdate, isLoading: likePending } = useOptimisticUpdate(
@@ -73,8 +86,8 @@ function PostDetailPage() {
         if (!id) return
 
         try {
-            setIsLoadingPost(true)
-            const post = await api.getPost(Number(id))
+            setIsSorting(true)
+            const post = await api.getPost(Number(id), commentSort)
             setPost(post)
 
             // Convert comments to include timeAgo
@@ -102,9 +115,10 @@ function PostDetailPage() {
                 }
             }
         } finally {
+            setIsSorting(false)
             setIsLoadingPost(false)
         }
-    }, [id, error, from, subTab, searchParams, router])
+    }, [id, error, from, subTab, searchParams, router, commentSort])
 
     // Handle like post with optimistic updates
     const handleLikePost = async () => {
@@ -216,6 +230,114 @@ function PostDetailPage() {
         }
     }
 
+    // Delete comment functions
+    const canDeleteComment = (comment: CommentWithUser) => {
+        return user && (user.id === comment.user.id || (post && user.id === post.user.id))
+    }
+
+    const handleDeleteCommentClick = (commentId: number) => {
+        setCommentToDelete(commentId)
+        setShowDeleteCommentConfirm(true)
+    }
+
+    const confirmDeleteComment = async () => {
+        if (!commentToDelete) return
+
+        setIsDeleting(true)
+        try {
+            await handleDeleteComment(commentToDelete)
+        } finally {
+            setIsDeleting(false)
+            setShowDeleteCommentConfirm(false)
+            setCommentToDelete(null)
+        }
+    }
+
+    // Manage Privacy handlers
+    const handleManagePrivacy = async (post: APIPost) => {
+        setSelectedPostForPrivacy(post)
+        setShowManagePrivacy(true)
+        fetchAvailableUsers()
+        setOpenMenu(false)
+    }
+
+    const handleUpdatePrivacy = async (privacy: 'public' | 'followers' | 'friends' | 'listed', selectedUsers: number[]) => {
+        if (!selectedPostForPrivacy) return
+
+        try {
+            await api.updatePost(selectedPostForPrivacy.id, {
+                privacy,
+                specific_user_ids: selectedUsers
+            })
+
+            // Update local post state
+            setPost(prev => prev ? {
+                ...prev,
+                privacy,
+                specific_user_ids: selectedUsers
+            } : null)
+
+            success('Post privacy updated successfully!')
+            setShowManagePrivacy(false)
+            setSelectedPostForPrivacy(null)
+        } catch (err) {
+            console.error('Error updating privacy:', err)
+            if (err instanceof NetworkError) {
+                error('Failed to update privacy. Please try again.')
+            } else {
+                error('Unable to update privacy right now.')
+            }
+            throw err
+        }
+    }
+
+    const fetchAvailableUsers = async () => {
+        setLoadingUsers(true)
+        try {
+            const response = await api.getFollowers(currentUser?.id || 0)
+            setAvailableUsers(response.followers || [])
+        } catch (err) {
+            console.error('Error fetching followers:', err)
+            error('Failed to load followers for privacy settings.')
+        } finally {
+            setLoadingUsers(false)
+        }
+    }
+
+    const handleShareClick = (post: APIPost) => {
+        setSelectedPostForShare(post)
+        setIsSharePopupOpen(true)
+    }
+
+    const handleDeleteComment = async (commentId: number) => {
+        try {
+            const token = localStorage.getItem('token')
+            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/api/posts/${post?.id}/comments/${commentId}`, {
+                method: 'DELETE',
+                headers: {
+                    ...(token ? { Authorization: `Bearer ${token}` } : {})
+                },
+                credentials: 'include'
+            })
+
+            if (!response.ok) {
+                const errorData = await response.json()
+                throw new Error(errorData.error || 'Failed to delete comment')
+            }
+
+            // Remove comment from local state
+            setComments(prev => prev.filter(comment => comment.id !== commentId))
+            success('Comment deleted successfully')
+
+            // TODO: Send WebSocket message for real-time updates when supported
+        } catch (err) {
+            console.error('Failed to delete comment:', err)
+            error('Failed to delete comment. Please try again.')
+        } finally {
+            setOpenCommentMenu(null)
+        }
+    }
+
     // Handle comment submission via WebSocket
   const handleSubmitComment = async () => {
     if (!newComment.trim() && !newCommentImage) return
@@ -281,7 +403,6 @@ function PostDetailPage() {
 
   const handleUserClick = (userId: number | undefined) => {
     if (!currentUser) return
-    console.log("User clicked:", userId, "Current user:", currentUser.id)
     // Check if clicking on own profile
     if (userId === currentUser.id) {
       // Navigate to own profile route
@@ -357,32 +478,46 @@ function PostDetailPage() {
             switch (message.type) {
                 case 'comment_update':
                     if (message.post_id === Number(post.id) && message.action === 'create') {
-                        // Add new comment to the list
+                        // Add new comment to the list only if it doesn't already exist
                         if (message.data) {
-                            const newComment: CommentWithUser = {
-                                id: message.data.id,
-                                user_id: message.data.user_id,
-                                post_id: message.data.post_id,
-                                content: message.data.content,
-                                image_url: message.data.image_url,
-                                created_at: message.data.created_at,
-                                updated_at: message.data.updated_at,
-                                user: message.data.user || {
-                                    id: message.data.user_id,
-                                    first_name: message.data.user?.first_name || 'Unknown',
-                                    last_name: message.data.user?.last_name || 'User',
-                                    email: '',
-                                    date_of_birth: '',
-                                    avatar: message.data.user?.avatar,
-                                    nickname: message.data.user?.nickname,
-                                    about_me: null,
-                                    is_private: false,
-                                    created_at: '',
-                                    updated_at: ''
-                                },
-                                timeAgo: 'Just now'
-                            }
-                            setComments(prev => [...prev, newComment])
+                            setComments(prev => {
+                                // Check if comment already exists
+                                const exists = prev.some(comment => comment.id === message.data.id)
+                                if (exists) return prev
+
+                                const newComment: CommentWithUser = {
+                                    id: message.data.id,
+                                    user_id: message.data.user_id,
+                                    post_id: message.data.post_id,
+                                    content: message.data.content,
+                                    image_url: message.data.image_url,
+                                    created_at: message.data.created_at,
+                                    updated_at: message.data.updated_at,
+                                    user: message.data.user || {
+                                        id: message.data.user_id,
+                                        first_name: message.data.user?.first_name || 'Unknown',
+                                        last_name: message.data.user?.last_name || 'User',
+                                        email: '',
+                                        date_of_birth: '',
+                                        avatar: message.data.user?.avatar,
+                                        nickname: message.data.user?.nickname,
+                                        about_me: null,
+                                        is_private: false,
+                                        created_at: '',
+                                        updated_at: ''
+                                    },
+                                    timeAgo: 'Just now'
+                                }
+
+                                // Insert new comment in correct position based on current sort
+                                if (commentSort === 'newest') {
+                                    // Newest first: add to beginning
+                                    return [newComment, ...prev]
+                                } else {
+                                    // Oldest first: add to end
+                                    return [...prev, newComment]
+                                }
+                            })
                         }
                     }
                     break
@@ -405,10 +540,10 @@ function PostDetailPage() {
         return removeListener
     }, [isConnected, addMessageListener, post])
 
-    // Load post on component mount
+    // Load post on component mount and when sort changes
     useEffect(() => {
         fetchPost()
-    }, [fetchPost])
+    }, [fetchPost, commentSort])
 
   if (isLoadingPost) {
     return (
@@ -452,7 +587,7 @@ function PostDetailPage() {
   }
 
   return (
-    <AppLayout 
+    <AppLayout
       activeTab="feed"
       tempPostSubTab={id as string}
       onTempPostClose={() => {
@@ -467,7 +602,7 @@ function PostDetailPage() {
         }
       }}
     >
-      <div className="post-page-container">
+      <div className="post-page-container h-full overflow-y-auto scrollbar-hide" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
         {/* Post Card */}
         <div className="bg-gradient-to-br from-white/10 via-white/5 to-transparent backdrop-blur-xl rounded-3xl border border-white/20 shadow-2xl p-8 mb-8 hover:shadow-emerald-500/10 transition-all duration-300 group">
           {/* Post Header */}
@@ -489,7 +624,9 @@ function PostDetailPage() {
                     className="w-12 h-12 rounded-full object-cover"
                   />
                   ) : (
-                    <User className="w-6 h-6 text-white" />
+                    <span className="text-white font-bold text-lg">
+                      {post.user.first_name[0]}{post.user.last_name[0]}
+                    </span>
                   )}
                 </div>
                 </div>
@@ -547,6 +684,13 @@ function PostDetailPage() {
                       onClick={(e) => e.stopPropagation()}
                     >
                       <button
+                        onClick={() => handleManagePrivacy(post)}
+                        className="w-full flex items-center space-x-3 px-4 py-3 text-white/70 hover:text-white hover:bg-white/10 transition-all duration-200"
+                      >
+                        <Lock className="w-4 h-4" />
+                        <span className="text-sm font-medium">Manage Privacy</span>
+                      </button>
+                      <button
                         onClick={handleDeletePost}
                         className="w-full flex items-center space-x-3 px-4 py-3 text-red-400 hover:bg-red-500/10 transition-all duration-200"
                       >
@@ -569,21 +713,19 @@ function PostDetailPage() {
 
           {/* Post Image */}
           {post.image_url && (
-            <div className="mb-6 rounded-2xl overflow-hidden bg-gradient-to-br from-white/5 to-transparent border border-white/10 group-hover:border-emerald-400/30 transition-all duration-300">
-              <Image
-                src={post.image_url.startsWith('http') ?
-                  post.image_url :
-                  `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}${post.image_url}`
-                }
-                alt="Post image"
-                width={640}
-                height={256}
-                unoptimized={post.image_url.includes('/svg')}
-                className="w-full h-64 object-cover hover:scale-105 transition-transform duration-500"
-              />
-              <div className="aspect-video bg-gradient-to-br from-emerald-500/20 to-teal-500/20 flex items-center justify-center">
-                <ImageIcon className="w-16 h-16 text-white/50" />
-                <span className="ml-3 text-white/70 font-medium">Image failed to load</span>
+            <div className="mb-6 flex justify-center">
+              <div className="inline-block border border-white/20 rounded-2xl overflow-hidden">
+                <Image
+                  src={post.image_url.startsWith('http') ?
+                    post.image_url :
+                    `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}${post.image_url}`
+                  }
+                  alt="Post image"
+                  width={640}
+                  height={256}
+                  unoptimized={post.image_url.includes('/svg')}
+                  className="max-h-64 sm:max-h-80 md:max-h-96 object-contain hover:scale-105 transition-transform duration-500 rounded-2xl"
+                />
               </div>
             </div>
           )}
@@ -616,11 +758,12 @@ function PostDetailPage() {
                 <MessageSquare className="w-5 h-5" />
                 <span className="text-sm font-medium">{comments.length}</span>
               </button>              <button
+                onClick={() => handleShareClick(post)}
                 className="flex items-center justify-center space-x-2 px-5 py-3 text-white/70 hover:text-white hover:bg-gradient-to-r from-white/10 to-white/5 border border-white/10 rounded-2xl transition-all duration-300 hover:scale-105"
                 title="Share"
               >
                 <Send className="w-5 h-5" />
-                <span className="text-sm font-medium">0</span>
+                <span className="text-sm font-medium">{post.share_count}</span>
               </button>
             </div>
 
@@ -648,13 +791,64 @@ function PostDetailPage() {
             <h2 className="text-white font-semibold text-lg">
               Comments ({comments.length})
             </h2>
-            <button
-              onClick={() => setIsCommentModalOpen(true)}
-              className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg flex items-center space-x-2 transition-all duration-200 text-sm hover:scale-105"
-            >
-              <MessageSquare className="w-4 h-4" />
-              <span>Add Comment</span>
-            </button>
+            <div className="flex items-center space-x-3">
+              {/* Sort Toggle */}
+              <div className="flex items-center space-x-2 bg-white/10 rounded-xl p-1">
+                <button
+                  onClick={() => {
+                    setCommentSort('newest')
+                  }}
+                  disabled={isSorting}
+                  className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-all duration-200 ${
+                    commentSort === 'newest'
+                      ? 'bg-emerald-500 text-white shadow-lg'
+                      : 'text-white/70 hover:text-white hover:bg-white/10'
+                  } ${isSorting ? 'opacity-50 cursor-not-allowed' : ''}`}
+                >
+                  {isSorting && commentSort === 'newest' ? (
+                    <div className="flex items-center space-x-1">
+                      <div className="w-3 h-3 border border-white/30 border-t-white rounded-full animate-spin"></div>
+                      <span>Newest</span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center space-x-1">
+                      <ArrowUp className="w-3 h-3" />
+                      <span>Newest</span>
+                    </div>
+                  )}
+                </button>
+                <button
+                  onClick={() => {
+                    setCommentSort('oldest')
+                  }}
+                  disabled={isSorting}
+                  className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-all duration-200 ${
+                    commentSort === 'oldest'
+                      ? 'bg-emerald-500 text-white shadow-lg'
+                      : 'text-white/70 hover:text-white hover:bg-white/10'
+                  } ${isSorting ? 'opacity-50 cursor-not-allowed' : ''}`}
+                >
+                  {isSorting && commentSort === 'oldest' ? (
+                    <div className="flex items-center space-x-1">
+                      <div className="w-3 h-3 border border-white/30 border-t-white rounded-full animate-spin"></div>
+                      <span>Oldest</span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center space-x-1">
+                      <ArrowDown className="w-3 h-3" />
+                      <span>Oldest</span>
+                    </div>
+                  )}
+                </button>
+              </div>
+              <button
+                onClick={() => setIsCommentModalOpen(true)}
+                className="flex items-center justify-center space-x-2 px-5 py-3 text-white/70 hover:text-white hover:bg-gradient-to-r from-white/10 to-white/5 border border-white/10 rounded-2xl transition-all duration-300 hover:scale-105"
+              >
+                <MessageSquare className="w-5 h-5" />
+                <span className="text-sm font-medium">Add Comment</span>
+              </button>
+            </div>
           </div>
 
           <div className="post-comments-section">
@@ -665,75 +859,164 @@ function PostDetailPage() {
                 <p className="text-white/40 text-sm">Be the first to share your thoughts!</p>
               </div>
             ) : (
-              <div className="space-y-6">
-                {comments.map((comment) => (
-                  <div key={comment.id} className="group bg-gradient-to-r from-white/5 to-white/10 backdrop-blur-sm rounded-2xl border border-white/10 p-6 hover:border-emerald-400/30 hover:shadow-lg hover:shadow-emerald-500/10 transition-all duration-300">
-                    <div className="flex items-start space-x-4">
-                      {/* Enhanced Avatar - Circular, no status */}
-                      <div className="flex-shrink-0">
-                        <div className="w-12 h-12 bg-gradient-to-br from-emerald-400 via-teal-500 to-cyan-600 rounded-full flex items-center justify-center overflow-hidden ring-2 ring-white/20 group-hover:ring-emerald-400/50 transition-all duration-300">
-                          {getAvatarUrl(comment.user.avatar) ? (
-                            <Image
-                              src={getAvatarUrl(comment.user.avatar)!}
-                              alt={`${comment.user.first_name} ${comment.user.last_name}'s avatar`}
-                              width={48}
-                              height={48}
-                              unoptimized={comment.user.avatar.includes('/svg')}
-                              className="w-12 h-12 rounded-full object-cover"
-                            />
-                          ) : (
-                            <User className="w-6 h-6 text-white" />
+              <div className="relative">
+                {/* Sorting Loading Overlay */}
+                {isSorting && (
+                  <div className="absolute inset-0 bg-black/20 backdrop-blur-sm z-10 flex items-center justify-center rounded-2xl">
+                    <div className="flex items-center space-x-3 bg-white/10 backdrop-blur-xl rounded-xl px-4 py-2">
+                      <div className="w-4 h-4 border-2 border-emerald-400/30 border-t-emerald-400 rounded-full animate-spin"></div>
+                      <span className="text-white text-sm font-medium">Sorting comments...</span>
+                    </div>
+                  </div>
+                )}
+                <div className="overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] p-4">
+                  <div className="space-y-4">
+                    {comments.map((comment) => (
+                    <motion.div
+                      key={comment.id}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.4, ease: 'easeOut' }}
+                      className="group relative bg-gradient-to-br from-white/8 via-white/6 to-white/4 backdrop-blur-md rounded-3xl border border-white/20 p-5 shadow-lg hover:shadow-2xl hover:shadow-emerald-500/20 transition-all duration-500 hover:border-emerald-400/40 hover:-translate-y-1 hover:scale-[1.02] cursor-pointer"
+                    >
+                      {/* Subtle animated background gradient */}
+                      <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/5 via-teal-500/5 to-cyan-500/5 rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+
+                      {/* Decorative corner accent */}
+                      <div className="absolute top-0 right-0 w-16 h-16 bg-gradient-to-bl from-emerald-400/20 to-transparent rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+
+                      <div className="relative flex items-start space-x-4">
+                        {/* Enhanced Avatar with glow effect */}
+                        <div className="flex-shrink-0 relative">
+                          <div className="relative group/avatar cursor-pointer" onClick={() => handleUserClick(comment.user.id)}>
+                            <div className="w-12 h-12 bg-gradient-to-br from-emerald-400 via-teal-500 to-cyan-600 rounded-full flex items-center justify-center overflow-hidden ring-2 ring-white/30 group-hover:ring-emerald-400/60 transition-all duration-300 shadow-lg group-hover:shadow-emerald-500/30">
+                              {getAvatarUrl(comment.user.avatar) ? (
+                                <Image
+                                  src={getAvatarUrl(comment.user.avatar)!}
+                                  alt={`${comment.user.first_name} ${comment.user.last_name}'s avatar`}
+                                  width={48}
+                                  height={48}
+                                  unoptimized={comment.user.avatar.includes('/svg')}
+                                  className="w-12 h-12 rounded-full object-cover group-hover/avatar:scale-110 transition-transform duration-300"
+                                />
+                              ) : (
+                                <span className="text-white font-bold text-lg">
+                                  {comment.user.first_name[0]}{comment.user.last_name[0]}
+                                </span>
+                              )}
+                            </div>
+                            {/* Avatar glow effect */}
+                            <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/30 to-teal-500/30 rounded-full blur-md opacity-0 group-hover:opacity-100 transition-opacity duration-300 -z-10" />
+                          </div>
+                        </div>
+
+                        <div className="flex-1 min-w-0">
+                                                    {/* Enhanced Header with better typography */}
+                          <div className="flex items-center justify-between mb-3">
+                            <div className="flex items-center space-x-3">
+                              <div className="flex items-center space-x-2">
+                                <motion.h4
+                                  className="text-white font-semibold text-sm hover:text-emerald-300 transition-colors duration-300 cursor-pointer group-hover:text-emerald-200"
+                                  whileHover={{ scale: 1.02 }}
+                                  transition={{ type: 'spring', stiffness: 400, damping: 17 }}
+                                  onClick={() => handleUserClick(comment.user.id)}
+                                >
+                                  {comment.user.first_name} {comment.user.last_name}
+                                </motion.h4>
+                                <span className="text-white/70 text-xs font-medium hover:text-white/90 transition-colors duration-200">
+                                  @{comment.user.nickname || comment.user.email.split('@')[0]}
+                                </span>
+                              </div>
+                            </div>
+                            <div className="flex items-center space-x-2 text-white/60">
+                              <span className="text-xs font-medium hover:text-white/80 transition-colors duration-200">
+                                {comment.timeAgo}
+                              </span>
+                              {canDeleteComment(comment) && (
+                                <div className="relative">
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      setOpenCommentMenu(openCommentMenu === comment.id ? null : comment.id)
+                                    }}
+                                    className="p-2 text-white/70 hover:text-white hover:bg-white/10 rounded-xl transition-all duration-200 hover:scale-105"
+                                    title="More options"
+                                    aria-label="More options"
+                                  >
+                                    <MoreHorizontal className="w-4 h-4" />
+                                  </button>
+
+                                  {/* Dropdown Menu */}
+                                  <AnimatePresence>
+                                    {openCommentMenu === comment.id && (
+                                      <motion.div
+                                        initial={{ opacity: 0, scale: 0.95, y: -10 }}
+                                        animate={{ opacity: 1, scale: 1, y: 0 }}
+                                        exit={{ opacity: 0, scale: 0.95, y: -10 }}
+                                        transition={{ duration: 0.15 }}
+                                        className="absolute right-0 top-full mt-2 w-40 bg-gradient-to-br from-slate-800/95 to-slate-900/95 backdrop-blur-xl border border-white/20 rounded-xl shadow-2xl overflow-hidden z-50"
+                                        onClick={(e) => e.stopPropagation()}
+                                      >
+                                        <button
+                                          onClick={() => handleDeleteCommentClick(comment.id)}
+                                          className="w-full flex items-center space-x-3 px-3 py-2 text-red-400 hover:bg-red-500/10 transition-all duration-200"
+                                        >
+                                          <Trash2 className="w-3 h-3" />
+                                          <span className="text-xs font-medium">Delete Comment</span>
+                                        </button>
+                                      </motion.div>
+                                    )}
+                                  </AnimatePresence>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Enhanced Content with better typography */}
+                          <div className="mb-3">
+                            <p className="text-white/95 text-sm leading-relaxed whitespace-pre-wrap font-medium group-hover:text-white transition-colors duration-300">
+                              {comment.content}
+                            </p>
+                          </div>
+
+                          {/* Enhanced Image with better styling */}
+                          {comment.image_url && (
+                            <motion.div
+                              className="flex justify-start group/image"
+                              whileHover={{ scale: 1.02 }}
+                              transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+                            >
+                              <div className="relative inline-block overflow-hidden rounded-2xl border border-white/20 shadow-lg group-hover/image:shadow-emerald-500/20 transition-shadow duration-300">
+                                <img
+                                  src={comment.image_url.startsWith('http') ?
+                                    comment.image_url :
+                                    `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}${comment.image_url}`
+                                  }
+                                  alt="Comment image"
+                                  className="max-w-full max-h-72 object-contain hover:scale-105 cursor-pointer transition-transform duration-500 rounded-2xl"
+                                  onClick={() => comment.image_url && setImagePopupUrl(comment.image_url.startsWith('http') ?
+                                    comment.image_url :
+                                    `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}${comment.image_url}`
+                                  )}
+                                  onError={(e) => {
+                                    const target = e.target as HTMLImageElement;
+                                    target.style.display = 'none';
+                                  }}
+                                />
+                                {/* Image overlay effect */}
+                                <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-transparent opacity-0 group-hover/image:opacity-100 transition-opacity duration-300 rounded-2xl" />
+                              </div>
+                            </motion.div>
                           )}
                         </div>
                       </div>
 
-                      <div className="flex-1 min-w-0">
-                        {/* Enhanced Header */}
-                        <div className="flex items-center space-x-3 mb-3">
-                          <div className="flex items-center space-x-2">
-                            <h4 className="text-white font-semibold text-base hover:text-emerald-300 transition-colors duration-200 cursor-pointer">
-                              {comment.user.first_name} {comment.user.last_name}
-                            </h4>
-                            <span className="text-white/60 text-sm">
-                              @{comment.user.nickname || comment.user.email.split('@')[0]}
-                            </span>
-                          </div>
-                          <span className="text-white/40 text-sm">•</span>
-                          <span className="text-white/50 text-sm">{comment.timeAgo}</span>
-                        </div>
-
-                        {/* Enhanced Content */}
-                        <div className="mb-4">
-                          <p className="text-white/90 text-base leading-relaxed whitespace-pre-wrap">
-                            {comment.content}
-                          </p>
-                        </div>
-
-                        {/* Enhanced Image */}
-                        {comment.image_url && (
-                          <div className="flex justify-start">
-                            <img
-                              src={comment.image_url.startsWith('http') ?
-                                comment.image_url :
-                                `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}${comment.image_url}`
-                              }
-                              alt="Comment image"
-                              className="max-w-full max-h-64 object-contain hover:scale-105 cursor-pointer rounded-2xl transition-all duration-300"
-                              onClick={() => comment.image_url && setImagePopupUrl(comment.image_url.startsWith('http') ?
-                                comment.image_url :
-                                `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}${comment.image_url}`
-                              )}
-                              onError={(e) => {
-                                const target = e.target as HTMLImageElement;
-                                target.style.display = 'none';
-                              }}
-                            />
-                          </div>
-                        )}
-                      </div>
-                    </div>
+                      {/* Subtle bottom accent line */}
+                      <div className="absolute bottom-0 left-6 right-6 h-px bg-gradient-to-r from-transparent via-emerald-400/30 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                    </motion.div>
+                  ))}
                   </div>
-                ))}
+                </div>
               </div>
             )}
           </div>
@@ -960,10 +1243,7 @@ function PostDetailPage() {
                       Cancel
                     </motion.button>
                     <motion.button
-                      onClick={async () => {
-                        await handleSubmitComment()
-                        setIsCommentModalOpen(false)
-                      }}
+                      onClick={handleSubmitComment}
                       disabled={(!newComment.trim() && !newCommentImage) || isSubmittingComment || !isConnected}
                       className={`w-full sm:w-auto px-6 py-3 rounded-xl text-white font-semibold text-sm lg:text-base transition-all duration-300 shadow-lg ${
                         (!newComment.trim() && !newCommentImage) || isSubmittingComment || !isConnected
@@ -1115,6 +1395,80 @@ function PostDetailPage() {
             </motion.div>
           )}
         </AnimatePresence>
+
+        {/* Delete Comment Confirmation Modal */}
+        <AnimatePresence>
+          {showDeleteCommentConfirm && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+              onClick={() => setShowDeleteCommentConfirm(false)}
+            >
+              <motion.div
+                initial={{ scale: 0.95, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.95, opacity: 0 }}
+                className="bg-gradient-to-br from-slate-800/95 to-slate-900/95 backdrop-blur-xl border border-white/20 rounded-2xl p-6 max-w-sm w-full mx-4"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="text-center">
+                  <div className="w-12 h-12 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <MessageSquare className="w-6 h-6 text-red-400" />
+                  </div>
+                  <h3 className="text-white font-semibold text-lg mb-2">Delete Comment</h3>
+                  <p className="text-white/70 text-sm mb-6">
+                    Are you sure you want to delete this comment? This action cannot be undone.
+                  </p>
+                  <div className="flex space-x-3">
+                    <button
+                      onClick={() => setShowDeleteCommentConfirm(false)}
+                      className="flex-1 px-4 py-2 text-white/70 hover:text-white hover:bg-white/10 rounded-xl transition-all duration-200"
+                      disabled={isDeleting}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={confirmDeleteComment}
+                      className="flex-1 px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                      disabled={isDeleting}
+                    >
+                      {isDeleting ? 'Deleting...' : 'Delete'}
+                    </button>
+                  </div>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Manage Privacy Modal */}
+        <ManagePrivacy
+          show={showManagePrivacy}
+          onClose={() => {
+            setShowManagePrivacy(false)
+            setSelectedPostForPrivacy(null)
+          }}
+          postId={selectedPostForPrivacy?.id || 0}
+          currentPrivacy={selectedPostForPrivacy?.privacy as 'public' | 'followers' | 'friends' | 'listed' || 'public'}
+          currentSelectedUsers={selectedPostForPrivacy?.specific_user_ids || []}
+          availableUsers={availableUsers}
+          loadingUsers={loadingUsers}
+          onUpdatePrivacy={handleUpdatePrivacy}
+        />
+
+        {/* Share Popup */}
+        {isSharePopupOpen && selectedPostForShare && (
+          <SharePopup
+            postId={selectedPostForShare.id}
+            isOpen={isSharePopupOpen}
+            onClose={() => {
+              setIsSharePopupOpen(false)
+              setSelectedPostForShare(null)
+            }}
+          />
+        )}
       </div>
     </AppLayout>
   )

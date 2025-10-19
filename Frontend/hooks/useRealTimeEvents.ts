@@ -2,7 +2,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { api, type EventResponse } from '@/lib/api'
 import { useWebSocketSubscription } from './useWebSocketSubscription'
-import { useOptimisticUpdate } from './useOptimisticUpdate'
 import { useAuth } from '@/context/AuthContext'
 import { useToast } from '@/context/ToastContext'
 
@@ -15,14 +14,26 @@ export function useRealTimeEvents(groupId?: number) {
   const [unreadUpdates, setUnreadUpdates] = useState<Map<number, number>>(new Map())
   const lastFetchTime = useRef<number>(Date.now())
 
-  const { performUpdate: optimisticUpdate } = useOptimisticUpdate(setEvents, {
-    onError: (error, rollbackData) => {
-      console.error('Events optimistic update failed:', error)
-      if (rollbackData) {
-        setEvents(rollbackData)
-      }
+  // Custom optimistic update function that works with external state
+  const performOptimisticUpdate = useCallback(async <R>(
+    optimisticUpdateFn: (currentEvents: EventResponse[]) => EventResponse[],
+    asyncOperation: () => Promise<R>
+  ): Promise<R> => {
+    const previousEvents = events
+    try {
+      // Apply optimistic update
+      const newEvents = optimisticUpdateFn(events)
+      setEvents(newEvents)
+      
+      // Perform async operation
+      const result = await asyncOperation()
+      return result
+    } catch (error) {
+      // Rollback on error
+      setEvents(previousEvents)
+      throw error
     }
-  })
+  }, [events])
 
   // WebSocket subscription for real-time event updates
   const { isConnected } = useWebSocketSubscription({
@@ -161,7 +172,7 @@ export function useRealTimeEvents(groupId?: number) {
     }
 
     try {
-      return await optimisticUpdate(
+      return await performOptimisticUpdate(
         (currentEvents) => {
           // Create optimistic event
           const optimisticEvent: EventResponse = {
@@ -207,11 +218,11 @@ export function useRealTimeEvents(groupId?: number) {
       console.error('Failed to create event:', err)
       throw err
     }
-  }, [optimisticUpdate, user, success, fetchEvents])
+  }, [performOptimisticUpdate, user, success, fetchEvents])
 
   const respondToEvent = useCallback(async (eventId: number, option: 'going' | 'not_going') => {
     try {
-      return await optimisticUpdate(
+      return await performOptimisticUpdate(
         (currentEvents) => currentEvents.map(event => {
           if (event.id === eventId) {
             const updatedEvent = { ...event }
@@ -270,7 +281,7 @@ export function useRealTimeEvents(groupId?: number) {
       console.error('Failed to respond to event:', err)
       throw err
     }
-  }, [optimisticUpdate, success])
+  }, [performOptimisticUpdate, success])
 
   const getEvent = useCallback(async (eventId: number) => {
     try {
@@ -286,7 +297,7 @@ export function useRealTimeEvents(groupId?: number) {
     eventData: { title?: string; description?: string; event_time?: string }
   ) => {
     try {
-      return await optimisticUpdate(
+      return await performOptimisticUpdate(
         (currentEvents) => currentEvents.map(event => 
           event.id === eventId
             ? { ...event, ...eventData, updated_at: new Date().toISOString() }
@@ -302,11 +313,11 @@ export function useRealTimeEvents(groupId?: number) {
       console.error('Failed to update event:', err)
       throw err
     }
-  }, [optimisticUpdate, success])
+  }, [performOptimisticUpdate, success])
 
   const cancelEvent = useCallback(async (eventId: number, cancelReason: string) => {
     try {
-      return await optimisticUpdate(
+      return await performOptimisticUpdate(
         (currentEvents) => currentEvents.map(event => 
           event.id === eventId
             ? { ...event, canceled: true, cancel_reason: cancelReason, updated_at: new Date().toISOString() }
@@ -322,11 +333,11 @@ export function useRealTimeEvents(groupId?: number) {
       console.error('Failed to cancel event:', err)
       throw err
     }
-  }, [optimisticUpdate, success])
+  }, [performOptimisticUpdate, success])
 
   const deleteEvent = useCallback(async (eventId: number) => {
     try {
-      return await optimisticUpdate(
+      return await performOptimisticUpdate(
         (currentEvents) => currentEvents.filter(event => event.id !== eventId),
         async () => {
           // Note: Event deletion is not implemented in the API yet
@@ -339,7 +350,7 @@ export function useRealTimeEvents(groupId?: number) {
       console.error('Failed to delete event:', err)
       throw err
     }
-  }, [optimisticUpdate, success])
+  }, [performOptimisticUpdate, success])
 
   const markEventAsRead = useCallback((eventId: number) => {
     setUnreadUpdates(prev => {

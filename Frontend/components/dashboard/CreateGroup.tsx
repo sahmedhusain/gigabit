@@ -197,7 +197,7 @@ export default function CreateGroup({
 
     const groupData: CreateGroupRequest = {
       title: groupTitle.trim(),
-      description: groupDescription.trim(),
+      description: groupDescription.trim() || undefined,
       privacy,
       invite_members: inviteMemberIds.length ? inviteMemberIds : undefined,
       avatar: avatar || undefined

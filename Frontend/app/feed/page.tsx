@@ -89,7 +89,7 @@ function FeedPage() {
           image: imageUrl ? (imageUrl.startsWith('http') ? imageUrl : `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}${imageUrl}`) : undefined,
           likes: Number(post.like_count) || 0,
           comments: Number(post.comment_count) || 0,
-          shares: 0,
+          shares: Number(post.share_count) || 0,
           timeAgo: formatTimeAgo(String(post.created_at ?? '')),
           privacy: String(post.privacy ?? ''),
           isLiked: Boolean(post.is_liked),

@@ -32,7 +32,9 @@ export default function UserSearchResult({ result }: UserSearchResultProps) {
                 />
               ) : (
                 <div className="w-full h-full bg-gradient-to-r from-emerald-400 to-teal-500 rounded-full flex items-center justify-center">
-                  <User className="w-7 h-7 text-white" />
+                  <span className="text-white font-bold text-lg">
+                    {result.title?.charAt(0).toUpperCase() || '?'}{result.title?.charAt(1)?.toUpperCase() || ''}
+                  </span>
                 </div>
               )}
             </div>

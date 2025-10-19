@@ -8,10 +8,11 @@ type UnifiedChatItem struct {
 	Name              string         `json:"name"`
 	Avatar            *string        `json:"avatar,omitempty"`
 	LastMessage       *string        `json:"lastMessage,omitempty"`
-	LastMessageTime   time.Time      `json:"lastMessageTime"`
+	LastMessageTime   *time.Time     `json:"lastMessageTime,omitempty"`
 	LastMessageSender *UserResponse  `json:"lastMessageSender,omitempty"`
 	HasUnread         bool           `json:"hasUnread"`
 	UnreadCount       int            `json:"unreadCount"`
+	Unread            int            `json:"unread,omitempty"` // For frontend compatibility
 	IsOnline          bool           `json:"isOnline,omitempty"`
 	IsTyping          bool           `json:"isTyping,omitempty"`
 	TypingUsers       []string       `json:"typingUsers,omitempty"`
@@ -20,4 +21,5 @@ type UnifiedChatItem struct {
 	Group             *GroupResponse `json:"group,omitempty"`
 	ConversationID    uint           `json:"conversationId"`
 	ParticipantID     *uint          `json:"participantId,omitempty"`
+	GroupID           *uint          `json:"groupId,omitempty"` // For frontend compatibility
 }

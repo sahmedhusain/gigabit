@@ -114,6 +114,7 @@ func (s *Server) setupRoutes() {
 	conversationHandler := handlers.NewConversationHandler(s.DB.GetDB())
 	statusHandler := handlers.NewStatusHandler(s.DB.GetDB())
 	searchHandler := handlers.NewSearchHandler(s.DB.GetDB())
+	shareHandler := handlers.NewShareHandler(s.DB.GetDB(), s.Hub)
 
 	// Health check
 	s.router.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
@@ -148,6 +149,11 @@ func (s *Server) setupRoutes() {
 	// Search routes
 	s.router.HandleFunc("/api/search/suggestions", s.handleRoute(searchHandler.UnifiedSearch, true))
 	s.router.HandleFunc("/api/search", s.handleRoute(searchHandler.SearchAll, true))
+
+	// Share routes
+	s.router.HandleFunc("/api/share", s.handleRoute(shareHandler.SharePost, true))
+	s.router.HandleFunc("/api/share/recent", s.handleRoute(shareHandler.GetRecentChatsAndGroups, true))
+	s.router.HandleFunc("/api/share/search", s.handleRoute(shareHandler.SearchShareableEntities, true))
 
 	// User routes
 	s.router.HandleFunc("/api/users", s.handleRoute(userHandler.GetAllUsers, true))
@@ -409,7 +415,7 @@ func (s *Server) handlePostRoute(handler *handlers.PostHandler) http.HandlerFunc
 			authMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				handler.GetUserPosts(w, r, userID)
 			})).ServeHTTP(w, r)
-		} else if len(parts) == 2 {
+		} else if len(parts) >= 2 {
 			action := parts[1]
 			switch action {
 			case "like":
@@ -439,17 +445,33 @@ func (s *Server) handlePostRoute(handler *handlers.PostHandler) http.HandlerFunc
 					writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
 				}
 			case "comments":
-				switch r.Method {
-				case http.MethodGet:
-					authMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-						handler.GetPostComments(w, r, postID)
-					})).ServeHTTP(w, r)
-				case http.MethodPost:
-					authMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-						handler.CreateComment(w, r, postID)
-					})).ServeHTTP(w, r)
-				default:
-					writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
+				if len(parts) == 2 {
+					// /api/posts/{postID}/comments - collection operations
+					switch r.Method {
+					case http.MethodGet:
+						authMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+							handler.GetPostComments(w, r, postID)
+						})).ServeHTTP(w, r)
+					case http.MethodPost:
+						authMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+							handler.CreateComment(w, r, postID)
+						})).ServeHTTP(w, r)
+					default:
+						writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
+					}
+				} else if len(parts) == 3 {
+					// /api/posts/{postID}/comments/{commentID} - individual comment operations
+					commentID := parts[2]
+					switch r.Method {
+					case http.MethodDelete:
+						authMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+							handler.DeleteComment(w, r, postID, commentID)
+						})).ServeHTTP(w, r)
+					default:
+						writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
+					}
+				} else {
+					writeError(w, http.StatusNotFound, "Invalid comments route")
 				}
 			default:
 				writeError(w, http.StatusNotFound, "Route not found")

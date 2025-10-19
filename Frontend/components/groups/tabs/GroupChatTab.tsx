@@ -8,6 +8,9 @@ import { useRealTimeMessages, useTypingIndicator } from '@/hooks'
 import EmojiPicker from 'emoji-picker-react'
 import { MessageRounded } from '@mui/icons-material'
 
+// Import SharedPostMessage component
+import SharedPostMessage from '../../SharedPostMessage'
+
 interface EmojiData {
   emoji: string
   names: string[]
@@ -344,30 +347,56 @@ const GroupChatTab: React.FC<GroupChatTabProps> = ({
               </motion.span>
             )}
 
-            {/* Message bubble */}
-            <div
-              className={`relative px-5 py-4 rounded-2xl shadow-xl backdrop-blur-lg border transition-all duration-300 hover:shadow-2xl hover:scale-[1.02] ${isCurrentUser
-                  ? 'bg-gradient-to-br from-emerald-500 via-teal-500 to-cyan-600 text-white border-emerald-400/40 rounded-br-lg shadow-emerald-500/20'
-                  : 'bg-gradient-to-br from-white/15 to-white/10 text-white border-white/25 rounded-bl-lg hover:from-white/20 hover:to-white/15 shadow-white/10'
-                }`}
-              data-message-id={message.id}
-            >
-              <div className="text-sm leading-relaxed break-words font-medium">
-                {message.content}
-              </div>
-
-              <motion.div
-                className={`flex items-center justify-between mt-2 space-x-2 ${isCurrentUser ? 'text-emerald-100' : 'text-white/60'
+            {/* Enhanced Message bubble */}
+            {message.shared_post ? (
+              <SharedPostMessage
+                sharedPost={message.shared_post}
+                isCurrentUser={isCurrentUser}
+                messageId={message.id}
+                messageCreatedAt={createdAt}
+              />
+            ) : (
+              <div
+                className={`relative px-5 py-4 rounded-2xl shadow-xl backdrop-blur-lg border transition-all duration-300 hover:shadow-2xl hover:scale-[1.02] ${isCurrentUser
+                    ? 'bg-gradient-to-br from-emerald-500 via-teal-500 to-cyan-600 text-white border-emerald-400/40 rounded-br-lg shadow-emerald-500/20'
+                    : 'bg-gradient-to-br from-white/15 to-white/10 text-white border-white/25 rounded-bl-lg hover:from-white/20 hover:to-white/15 shadow-white/10'
                   }`}
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 0.3 }}
+                data-message-id={message.id}
               >
-                <span className="text-xs opacity-75">
-                  {formatTime(createdAt)}
-                </span>
-              </motion.div>
-            </div>
+                {/* Message content */}
+                <div className="text-sm leading-relaxed break-words font-medium">
+                  {message.content}
+                </div>
+
+                {/* Message footer */}
+                <motion.div
+                  className={`flex items-center justify-between mt-2 space-x-2 ${
+                    isCurrentUser ? 'text-emerald-100' : 'text-white/60'
+                  }`}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: 0.3 }}
+                >
+                  <span className="text-xs opacity-75">
+                    {formatTime(createdAt)}
+                  </span>
+                </motion.div>
+
+                {/* Message tail */}
+                <div className={`absolute bottom-0 ${
+                  isCurrentUser
+                    ? '-right-2 border-l-emerald-400 border-l-8 border-t-8 border-t-transparent border-b-8 border-b-transparent'
+                    : '-left-2 border-r-white/20 border-r-8 border-t-8 border-t-transparent border-b-8 border-b-transparent'
+                }`}></div>
+
+                {/* Hover effect */}
+                <motion.div
+                  className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent opacity-0 rounded-2xl"
+                  whileHover={{ opacity: 1 }}
+                  transition={{ duration: 0.2 }}
+                />
+              </div>
+            )}
           </div>
         </div>
       </div>

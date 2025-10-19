@@ -159,6 +159,7 @@ func (s *Server) setupRoutes() {
 	s.router.HandleFunc("/api/users", s.handleRoute(userHandler.GetAllUsers, true))
 	s.router.HandleFunc("/api/users/status", s.handleRoute(userHandler.UpdateStatus, true))
 	s.router.HandleFunc("/api/users/", s.handleUserRoute(followHandler, wsHandler))
+	s.router.HandleFunc("/api/users/invitable/", s.handleInvitableUsersRoute(groupHandler))
 
 	// Status routes
 	s.router.HandleFunc("/api/status/me", s.handleRoute(statusHandler.GetMyStatus, true))
@@ -357,6 +358,26 @@ func (s *Server) handleUserRoute(followHandler *handlers.FollowHandler, wsHandle
 		default:
 			writeError(w, http.StatusNotFound, "Route not found")
 		}
+	}
+}
+
+func (s *Server) handleInvitableUsersRoute(groupHandler *handlers.GroupHandler) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		path := strings.TrimPrefix(r.URL.Path, "/api/users/invitable/")
+		if path == "" {
+			writeError(w, http.StatusNotFound, "Group ID required")
+			return
+		}
+
+		if r.Method != http.MethodGet {
+			writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
+			return
+		}
+
+		authMiddleware := middleware.AuthMiddleware(s.DB.GetDB())
+		authMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			groupHandler.GetInvitableUsers(w, r, path)
+		})).ServeHTTP(w, r)
 	}
 }
 
@@ -627,7 +648,7 @@ func (s *Server) handleGroupRoute(groupHandler *handlers.GroupHandler, eventHand
 					authMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 						groupHandler.GetGroupMembers(w, r, groupID)
 					})).ServeHTTP(w, r)
-				} else if len(parts) >= 4 {
+				} else if len(parts) >= 3 {
 					// Handle /api/groups/{groupID}/members/{userID}/role or /api/groups/{groupID}/members/{userID}
 					userID := parts[2]
 					if len(parts) == 4 && parts[3] == "role" {
@@ -759,22 +780,58 @@ func (s *Server) handleGroupRoute(groupHandler *handlers.GroupHandler, eventHand
 						writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
 					}
 				}
-			case "polls":
-				// Handle group polls: /api/groups/{groupID}/polls
-				if r.Method != http.MethodGet {
+			case "privacy":
+				if r.Method != http.MethodPut {
 					writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
 					return
 				}
 				authMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-					userID, ok := middleware.GetUserID(r)
-					if !ok {
-						writeError(w, http.StatusUnauthorized, "Unauthorized")
+					groupHandler.UpdateGroupPrivacy(w, r, groupID)
+				})).ServeHTTP(w, r)
+			case "permissions":
+				if r.Method != http.MethodPut {
+					writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
+					return
+				}
+				authMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					groupHandler.UpdateGroupPermissions(w, r, groupID)
+				})).ServeHTTP(w, r)
+			case "join-requests":
+				if len(parts) >= 3 {
+					requestType := parts[2]
+					if r.Method != http.MethodGet {
+						writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
 						return
 					}
-					pollHandler.GetGroupPolls(w, r, userID)
-				})).ServeHTTP(w, r)
+					if requestType == "sent" {
+						authMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+							groupHandler.GetSentJoinRequests(w, r, groupID)
+						})).ServeHTTP(w, r)
+					} else if requestType == "received" {
+						authMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+							groupHandler.GetReceivedJoinRequests(w, r, groupID)
+						})).ServeHTTP(w, r)
+					} else {
+						writeError(w, http.StatusNotFound, "Invalid request type")
+					}
+				} else {
+					writeError(w, http.StatusNotFound, "Request type required")
+				}
+			case "messages":
+				if len(parts) >= 3 {
+					messageID := parts[2]
+					if r.Method != http.MethodDelete {
+						writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
+						return
+					}
+					authMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+						groupHandler.DeleteGroupMessage(w, r, groupID, messageID)
+					})).ServeHTTP(w, r)
+				} else {
+					writeError(w, http.StatusNotFound, "Message ID required")
+				}
 			default:
-				writeError(w, http.StatusNotFound, "Route not found")
+				writeError(w, http.StatusNotFound, "Invalid endpoint")
 			}
 		}
 	}

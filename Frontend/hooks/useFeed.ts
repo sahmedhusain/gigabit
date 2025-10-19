@@ -62,7 +62,7 @@ export function useFeed(options: { pageSize?: number; autoRefresh?: boolean } = 
       setErrorMessage(null)
       const nextOffset = reset ? 0 : offset
       const resp = await api.getFeed(pageSize, nextOffset)
-      const arr = Array.isArray(resp.data) ? resp.data : []
+      const arr = Array.isArray(resp.posts) ? resp.posts : []
       const mapped = arr.map(mapPost)
       setItems(prev => reset ? mapped : [...prev, ...mapped])
       setHasMore(mapped.length === pageSize)

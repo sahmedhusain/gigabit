@@ -2,6 +2,7 @@ package services
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"social/models"
 	"strings"
@@ -99,6 +100,21 @@ func (s *MessageService) SendGroupMessage(message *models.Message) error {
 	isMember, err := s.isUserGroupMember(*message.GroupID, message.SenderID)
 	if err != nil || !isMember {
 		return sql.ErrNoRows // Unauthorized
+	}
+
+	// Check group permissions for sending messages
+	role, err := s.getUserRoleInGroup(*message.GroupID, message.SenderID)
+	if err != nil {
+		return errors.New("user is not a member of this group")
+	}
+
+	// Check if user has permission to send messages
+	canSendMessages, err := s.canUserSendMessages(*message.GroupID, role)
+	if err != nil {
+		return err
+	}
+	if !canSendMessages {
+		return errors.New("you don't have permission to send messages in this group")
 	}
 
 	query := `
@@ -470,6 +486,36 @@ func (s *MessageService) isUserGroupMember(groupID, userID uint) (bool, error) {
 	}
 
 	return count > 0, nil
+}
+
+func (s *MessageService) getUserRoleInGroup(groupID, userID uint) (string, error) {
+	query := `
+		SELECT role FROM group_members 
+		WHERE group_id = ? AND user_id = ? AND status = 'member'
+	`
+
+	var role string
+	err := s.db.QueryRow(query, groupID, userID).Scan(&role)
+	if err == sql.ErrNoRows {
+		return "", sql.ErrNoRows
+	}
+	if err != nil {
+		return "", err
+	}
+
+	return role, nil
+}
+
+func (s *MessageService) canUserSendMessages(groupID uint, userRole string) (bool, error) {
+	// Get group permissions
+	var sendMessages string
+	err := s.db.QueryRow("SELECT send_messages FROM groups WHERE id = ?", groupID).Scan(&sendMessages)
+	if err != nil {
+		return false, err
+	}
+
+	// Check if user has permission
+	return sendMessages == "all_members" || userRole == "admin" || userRole == "creator", nil
 }
 
 func (s *MessageService) createMessageNotification(senderID, receiverID, messageID uint) error {

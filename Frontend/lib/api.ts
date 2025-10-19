@@ -264,6 +264,10 @@ export interface GroupResponse {
   title: string;
   description: string;
   privacy: 'public' | 'private';
+  create_posts: 'all_members' | 'admins_only';
+  create_polls: 'all_members' | 'admins_only';
+  create_events: 'all_members' | 'admins_only';
+  send_messages: 'all_members' | 'admins_only';
   avatar?: string;
   creator_id: number;
   member_count: number;
@@ -411,6 +415,10 @@ export interface CreateGroupRequest {
   title: string;
   description?: string;
   privacy: 'public' | 'private';
+  create_posts: 'all_members' | 'admins_only';
+  create_polls: 'all_members' | 'admins_only';
+  create_events: 'all_members' | 'admins_only';
+  send_messages: 'all_members' | 'admins_only';
   invite_members?: number[];
   avatar?: string;
 }
@@ -860,6 +868,13 @@ export class ApiClient {
     });
   }
 
+  async inviteUsersToGroup(groupId: number, userIds: number[]): Promise<{ message: string }> {
+    return this.request<{ message: string }>(`/api/groups/${groupId}/invite`, {
+      method: 'POST',
+      body: JSON.stringify({ user_ids: userIds }),
+    });
+  }
+
   async acceptGroupInvitation(groupId: number): Promise<{ message: string }> {
     return this.request<{ message: string }>(`/api/groups/${groupId}/invitation`, {
       method: 'PUT',
@@ -897,6 +912,19 @@ export class ApiClient {
     return this.request<{ message: string }>(`/api/groups/${groupId}/demote`, {
       method: 'POST',
       body: JSON.stringify({ user_id: userId }),
+    });
+  }
+
+  async kickMember(groupId: number, userId: number): Promise<{ message: string }> {
+    return this.request<{ message: string }>(`/api/groups/${groupId}/members/${userId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async updateMemberRole(groupId: number, userId: number, role: 'admin' | 'member'): Promise<{ message: string }> {
+    return this.request<{ message: string }>(`/api/groups/${groupId}/members/${userId}/role`, {
+      method: 'PUT',
+      body: JSON.stringify({ role }),
     });
   }
 
@@ -1284,6 +1312,63 @@ export class ApiClient {
     return this.request<{ message: string }>(`/api/groups/${groupId}/request/${userId}`, {
       method: 'PUT',
       body: JSON.stringify({ action }),
+    });
+  }
+
+  async updateGroupPrivacy(groupId: number, privacy: 'public' | 'private'): Promise<{ message: string }> {
+    return this.request<{ message: string }>(`/api/groups/${groupId}/privacy`, {
+      method: 'PUT',
+      body: JSON.stringify({ privacy }),
+    });
+  }
+
+  async updateGroupPermissions(groupId: number, permissions: { create_posts: 'all_members' | 'admins_only'; create_polls: 'all_members' | 'admins_only'; create_events: 'all_members' | 'admins_only'; send_messages: 'all_members' | 'admins_only' }): Promise<{ message: string }> {
+    return this.request<{ message: string }>(`/api/groups/${groupId}/permissions`, {
+      method: 'PUT',
+      body: JSON.stringify(permissions),
+    });
+  }
+
+  async getInvitableUsers(groupId: number, searchTerm?: string): Promise<{ users: User[]; count: number }> {
+    const params = new URLSearchParams();
+    if (searchTerm) {
+      params.append('search', searchTerm);
+    }
+    const queryString = params.toString();
+    const url = queryString ? `/api/users/invitable/${groupId}?${queryString}` : `/api/users/invitable/${groupId}`;
+    return this.request<{ users: User[]; count: number }>(url, {
+      method: 'GET',
+    });
+  }
+
+  async getSentJoinRequests(groupId: number): Promise<{ requests: Member[]; count: number }> {
+    return this.request<{ requests: Member[]; count: number }>(`/api/groups/${groupId}/join-requests/sent`, {
+      method: 'GET',
+    });
+  }
+
+  async getReceivedJoinRequests(groupId: number): Promise<{ requests: Member[]; count: number }> {
+    return this.request<{ requests: Member[]; count: number }>(`/api/groups/${groupId}/join-requests/received`, {
+      method: 'GET',
+    });
+  }
+
+  async deleteGroupMessage(groupId: number, messageId: number): Promise<{ message: string }> {
+    return this.request<{ message: string }>(`/api/groups/${groupId}/messages/${messageId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async updateGroup(groupId: number, data: { title?: string; description?: string; avatar?: string | null }): Promise<{ message: string }> {
+    return this.request<{ message: string }>(`/api/groups/${groupId}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteGroup(groupId: number): Promise<{ message: string }> {
+    return this.request<{ message: string }>(`/api/groups/${groupId}`, {
+      method: 'DELETE',
     });
   }
 }

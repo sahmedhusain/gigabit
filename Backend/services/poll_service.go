@@ -32,6 +32,24 @@ func (s *PollService) CreatePoll(userID uint, req *models.CreatePollRequest) (*m
 		return nil, errors.New("poll cannot have more than 10 options")
 	}
 
+	// Check group permissions if this is a group poll
+	if req.GroupID != nil {
+		// Get user's role in the group
+		role, err := s.getUserRoleInGroup(*req.GroupID, userID)
+		if err != nil {
+			return nil, errors.New("user is not a member of this group")
+		}
+
+		// Check if user has permission to create polls
+		canCreatePolls, err := s.canUserCreatePolls(*req.GroupID, role)
+		if err != nil {
+			return nil, err
+		}
+		if !canCreatePolls {
+			return nil, errors.New("you don't have permission to create polls in this group")
+		}
+	}
+
 	// Parse expires_at if provided
 	var expiresAt *time.Time
 	if req.ExpiresAt != nil && *req.ExpiresAt != "" {
@@ -611,7 +629,72 @@ func (s *PollService) getUserVotes(pollID, userID uint) ([]uint, error) {
 	return votes, nil
 }
 
+func (s *PollService) getUserRoleInGroup(groupID, userID uint) (string, error) {
+	// First check if user is the creator of the group
+	var creatorID uint
+	if err := s.db.QueryRow("SELECT creator_id FROM groups WHERE id = ?", groupID).Scan(&creatorID); err != nil {
+		return "", err
+	}
+	if creatorID == userID {
+		// Check if creator has been demoted to member
+		query := `SELECT role FROM group_members WHERE group_id = ? AND user_id = ? AND status = 'member'`
+		var role string
+		err := s.db.QueryRow(query, groupID, userID).Scan(&role)
+		if err == nil && role == "member" {
+			// Creator has been demoted, return member role
+			return "member", nil
+		}
+		// Creator still has admin privileges
+		return "creator", nil
+	}
+
+	// If not creator, get their role from group_members
+	query := `SELECT role FROM group_members WHERE group_id = ? AND user_id = ? AND status = 'member'`
+
+	var role string
+	err := s.db.QueryRow(query, groupID, userID).Scan(&role)
+	if err == sql.ErrNoRows {
+		return "", sql.ErrNoRows
+	}
+	if err != nil {
+		return "", err
+	}
+
+	return role, nil
+}
+
+func (s *PollService) canUserCreatePolls(groupID uint, userRole string) (bool, error) {
+	// Get group permissions
+	var createPolls string
+	err := s.db.QueryRow("SELECT create_polls FROM groups WHERE id = ?", groupID).Scan(&createPolls)
+	if err != nil {
+		return false, err
+	}
+
+	// Check if user has permission
+	return createPolls == "all_members" || userRole == "admin" || userRole == "creator", nil
+}
+
 func (s *PollService) isUserGroupAdmin(groupID, userID uint) (bool, error) {
+	// Check if user is creator
+	var creatorID uint
+	if err := s.db.QueryRow("SELECT creator_id FROM groups WHERE id = ?", groupID).Scan(&creatorID); err != nil {
+		return false, err
+	}
+	if creatorID == userID {
+		// Check if creator has been demoted to member
+		query := `SELECT role FROM group_members WHERE group_id = ? AND user_id = ? AND status = 'member'`
+		var role string
+		err := s.db.QueryRow(query, groupID, userID).Scan(&role)
+		if err == nil && role == "member" {
+			// Creator has been demoted, no admin privileges
+			return false, nil
+		}
+		// Creator still has admin privileges
+		return true, nil
+	}
+
+	// Check if user is admin
 	query := `
 		SELECT COUNT(*) FROM group_members 
 		WHERE group_id = ? AND user_id = ? AND role = 'admin'

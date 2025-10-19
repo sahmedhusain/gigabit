@@ -9,6 +9,12 @@ INSERT INTO group_members (group_id, user_id, role, status, invited_by, requesto
 (1, 7, 'member', 'member', 1, NULL, '2024-12-21 15:00:00', '2024-12-21 15:00:00'),
 (1, 9, 'member', 'member', 1, NULL, '2024-12-26 16:00:00', '2024-12-26 16:00:00'),
 (1, 11, 'member', 'member', 1, NULL, '2024-12-31 17:00:00', '2024-12-31 17:00:00'),
+-- Pending invitations for Tech Enthusiasts
+(1, 25, 'member', 'sent', 1, NULL, '2025-10-15 10:00:00', '2025-10-15 10:00:00'),
+(1, 26, 'member', 'sent', 1, NULL, '2025-10-16 11:00:00', '2025-10-16 11:00:00'),
+-- Join requests for Tech Enthusiasts
+(1, 27, 'member', 'requested', NULL, 27, '2025-10-17 12:00:00', '2025-10-17 12:00:00'),
+(1, 28, 'member', 'requested', NULL, 28, '2025-10-18 13:00:00', '2025-10-18 13:00:00'),
 
 -- Design & Creativity (group_id: 2) - 8 members
 (2, 2, 'admin', 'member', NULL, NULL, '2024-12-06 10:00:00', '2024-12-06 10:00:00'),

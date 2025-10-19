@@ -44,10 +44,35 @@ func (h *EventHandler) CreateEvent(w http.ResponseWriter, r *http.Request, group
 		return
 	}
 
-	// Check if user is an admin or creator of the group
+	// Get user role in the group
+	userRole, err := h.groupService.GetUserRole(uint(groupID), userID)
+	if err != nil {
+		writeError(w, http.StatusForbidden, "User is not a member of this group")
+		return
+	}
+
+	// Only members can post (not pending or invited users)
+	if userRole == "" {
+		writeError(w, http.StatusForbidden, "User is not a member of this group")
+		return
+	}
+
+	// Check group permissions for creating events
+	group, err := h.groupService.GetGroupByID(uint(groupID), userID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "Failed to get group information")
+		return
+	}
+
+	// Check if user has permission to create events
 	isAdminOrCreator, err := h.groupService.IsUserAdminOrCreator(uint(groupID), userID)
-	if err != nil || !isAdminOrCreator {
-		writeError(w, http.StatusForbidden, "Only group admins and creators can create events")
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "Failed to check user permissions")
+		return
+	}
+	canCreateEvents := group.CreateEvents == "all_members" || isAdminOrCreator
+	if !canCreateEvents {
+		writeError(w, http.StatusForbidden, "You don't have permission to create events in this group")
 		return
 	}
 

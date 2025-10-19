@@ -1054,7 +1054,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
 
     return (
       <motion.div
-        className="h-full max-h-[calc(100vh-6rem)] flex flex-col bg-gradient-to-br from-white/10 via-white/5 to-white/10 backdrop-blur-2xl rounded-3xl border border-white/30 overflow-hidden shadow-2xl ring-1 ring-white/20 mt-4"
+        className="h-full max-h-[calc(100vh-6rem)] flex flex-col rounded-3xl border border-white/30 overflow-hidden shadow-2xl ring-1 ring-white/20 mt-4"
         initial={{ opacity: 0, scale: 0.96, y: 30 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.96, y: 30 }}
@@ -1062,8 +1062,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
       >
         {/* Enhanced Group Header */}
         {!hideHeader && (
-          <div className="bg-gradient-to-r from-white/15 via-white/8 to-white/15 backdrop-blur-2xl border-b border-white/25 px-6 py-5 flex items-center justify-between flex-shrink-0 shadow-xl relative">
-            <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/5 via-teal-500/5 to-cyan-500/5 rounded-t-3xl" />
+          <div className="px-6 py-5 flex items-center justify-between flex-shrink-0 shadow-xl relative">
             <div className="flex items-center space-x-4 relative z-10 flex-1 min-w-0">
               <motion.div
                 className="w-16 h-16 rounded-full bg-gradient-to-br from-emerald-400 via-teal-500 to-cyan-600 flex items-center justify-center text-white text-2xl font-bold shadow-2xl ring-2 ring-white/30 cursor-pointer overflow-hidden"
@@ -1166,28 +1165,33 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
           </div>
         )}
 
-        {/* Tab Navigation */}
-        <div className="bg-gradient-to-r from-white/10 via-white/5 to-white/10 backdrop-blur-lg border-b border-white/20 px-6 py-3 flex space-x-1 overflow-x-auto">
-          {tabs.map((tab) => (
-            <motion.button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={`flex items-center space-x-2 px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 whitespace-nowrap ${
-                activeTab === tab
-                  ? 'bg-gradient-to-r from-emerald-500/30 to-teal-500/30 text-white border border-emerald-400/30 shadow-lg'
-                  : 'text-white/70 hover:text-white hover:bg-white/10 border border-transparent'
-              }`}
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-            >
-              {tab === 'chat' && <MessageCircle className="w-4 h-4" />}
-              {tab === 'posts' && <FileText className="w-4 h-4" />}
-              {tab === 'events' && <Calendar className="w-4 h-4" />}
-              {tab === 'polls' && <BarChart3 className="w-4 h-4" />}
-              {tab === 'settings' && <Settings className="w-4 h-4" />}
-              <span className="capitalize">{tab === 'settings' ? 'Settings' : tab}</span>
-            </motion.button>
-          ))}
+        {/* Enhanced Tab Navigation */}
+        <div className="px-6 py-3 flex justify-center items-center overflow-x-auto relative">
+          <div className="bg-gradient-to-br from-white/10 via-white/5 to-transparent backdrop-blur-xl rounded-3xl border border-white/20 shadow-2xl p-1 hover:shadow-emerald-500/10 transition-all duration-500 relative z-10">
+            <div className="flex space-x-1">
+              {tabs.map((tab) => (
+                <motion.button
+                  key={tab}
+                  onClick={() => setActiveTab(tab)}
+                  className={`flex items-center space-x-2 px-4 py-2 rounded-2xl text-sm font-medium transition-all duration-200 flex-1 justify-center ${
+                    activeTab === tab
+                      ? 'bg-emerald-500 text-white shadow-lg'
+                      : 'text-white/70 hover:text-white hover:bg-white/10'
+                  }`}
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                >
+                  {tab === 'info' && <Info className="w-4 h-4" />}
+                  {tab === 'chat' && <MessageCircle className="w-4 h-4" />}
+                  {tab === 'posts' && <FileText className="w-4 h-4" />}
+                  {tab === 'events' && <Calendar className="w-4 h-4" />}
+                  {tab === 'polls' && <BarChart3 className="w-4 h-4" />}
+                  {tab === 'settings' && <Settings className="w-4 h-4" />}
+                  <span className="capitalize">{tab === 'settings' ? 'Settings' : tab}</span>
+                </motion.button>
+              ))}
+            </div>
+          </div>
         </div>
 
         {/* Tab Content */}
@@ -1237,7 +1241,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
   // Regular chat interface for private messages
   return (
     <motion.div
-      className="h-full max-h-[calc(100vh-6rem)] flex flex-col bg-gradient-to-br from-white/10 via-white/5 to-white/10 backdrop-blur-2xl rounded-3xl border border-white/30 overflow-hidden shadow-2xl ring-1 ring-white/20 mt-4"
+      className="h-full max-h-[calc(100vh-6rem)] flex flex-col rounded-3xl border border-white/30 overflow-hidden shadow-2xl ring-1 ring-white/20 mt-4"
       initial={{ opacity: 0, scale: 0.96, y: 30 }}
       animate={{ opacity: 1, scale: 1, y: 0 }}
       exit={{ opacity: 0, scale: 0.96, y: 30 }}
@@ -1246,13 +1250,11 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
       {/* Enhanced Header */}
       {!hideHeader && (
         <motion.div
-          className="bg-gradient-to-r from-white/15 via-white/8 to-white/15 backdrop-blur-2xl border-b border-white/25 px-6 py-4 flex items-center justify-between flex-shrink-0 shadow-xl relative"
+          className="px-6 py-4 flex items-center justify-between flex-shrink-0 shadow-xl relative"
           initial={{ y: -30, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           transition={{ delay: 0.15, duration: 0.4, ease: [0.23, 1, 0.320, 1] }}
         >
-          {/* Subtle header gradient overlay */}
-          <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/5 via-teal-500/5 to-cyan-500/5 rounded-t-3xl" />
           
           <div className="flex items-center space-x-4 relative z-10">
             {/* Enhanced Avatar */}
@@ -1394,13 +1396,12 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
       {/* Enhanced Messages Area */}
       <motion.div
         ref={messagesContainerRef}
-        className="flex-1 overflow-y-scroll scrollbar-hide px-6 py-4 space-y-4 min-h-0 transition-colors duration-200"
+        className="flex-1 overflow-y-scroll scrollbar-hide px-6 py-4 space-y-4 min-h-0 transition-colors duration-200 shadow-xl"
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.3, duration: 0.5, ease: [0.23, 1, 0.320, 1] }}
         onScroll={handleScroll}
         style={{
-          background: 'linear-gradient(180deg, rgba(255,255,255,0.02) 0%, rgba(255,255,255,0.00) 100%)',
           scrollbarWidth: 'none',
           msOverflowStyle: 'none'
         }}
@@ -1523,26 +1524,13 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
 
       {/* Enhanced Input Area */}
       <motion.div
-        className="bg-gradient-to-t from-white/10 via-white/5 to-white/8 backdrop-blur-2xl border-t border-white/25 p-6 flex-shrink-0 relative"
+        className="p-4 flex-shrink-0 relative"
         initial={{ y: 30, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ delay: 0.4, duration: 0.5, ease: [0.23, 1, 0.320, 1] }}
       >
-        {/* Subtle input area gradient overlay */}
-        <div className="absolute inset-0 bg-gradient-to-t from-emerald-500/5 via-teal-500/5 to-cyan-500/5 rounded-b-3xl" />
         
-        <div className="flex items-center space-x-4 relative z-10">
-          {/* Enhanced Emoji Picker Button */}
-          <motion.button
-            onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-            className="p-3 text-white/60 hover:text-white hover:bg-gradient-to-r hover:from-yellow-500/20 hover:to-orange-500/20 rounded-2xl border border-white/20 hover:border-yellow-400/30 backdrop-blur-sm transition-all duration-300"
-            title="Add emoji"
-            whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.95 }}
-          >
-            <Smile className="w-5 h-5" />
-          </motion.button>
-
+        <div className="flex items-center justify-center space-x-4 relative z-10 min-h-[48px]">
           <div className="flex-1 relative">
             <textarea
               ref={(el) => {
@@ -1558,21 +1546,32 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
               }}
               onKeyPress={handleKeyPress}
               placeholder={`Message ${conversationType === 'group' ? `#${participantName}` : participantName}...`}
-              className="w-full bg-gradient-to-r from-white/15 to-white/10 border border-white/25 rounded-2xl px-6 py-4 text-white placeholder-white/60 focus:outline-none focus:ring-2 focus:ring-emerald-400/60 focus:border-emerald-400/50 resize-none min-h-[52px] max-h-32 text-sm overflow-y-auto backdrop-blur-sm shadow-inner transition-all duration-300 hover:bg-gradient-to-r hover:from-white/20 hover:to-white/15"
+              className="w-full bg-gradient-to-r from-white/15 to-white/10 border border-white/25 rounded-2xl px-6 py-4 text-white placeholder-white/60 focus:outline-none focus:ring-2 focus:ring-emerald-400/60 focus:border-emerald-400/50 resize-none min-h-[52px] max-h-32 text-sm overflow-y-auto scrollbar-hide transition-all duration-300 hover:bg-gradient-to-r hover:from-white/20 hover:to-white/15"
               rows={1}
             />
           </div>
 
+          {/* Enhanced Emoji Picker Button */}
+          <motion.button
+            onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+            className="p-3 text-white/60 hover:text-white hover:bg-gradient-to-r hover:from-yellow-500/20 hover:to-orange-500/20 rounded-xl border border-white/20 hover:border-yellow-400/30 backdrop-blur-sm transition-all duration-300 shadow-lg hover:shadow-yellow-500/20"
+            title="Add emoji"
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.95 }}
+          >
+            <Smile className="w-4 h-4" />
+          </motion.button>
+
           <motion.button
             onClick={handleSendMessage}
             disabled={!newMessage.trim() || !isConnected}
-            className="p-4 bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-600 rounded-2xl text-white hover:from-emerald-600 hover:via-teal-600 hover:to-cyan-700 transition-all duration-300 disabled:opacity-40 disabled:cursor-not-allowed shadow-xl hover:shadow-emerald-500/30 border border-emerald-400/30 disabled:border-white/20"
+            className="p-3 bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-600 rounded-xl text-white hover:from-emerald-600 hover:via-teal-600 hover:to-cyan-700 transition-all duration-300 disabled:opacity-40 disabled:cursor-not-allowed shadow-xl hover:shadow-emerald-500/30 border border-emerald-400/30 disabled:border-white/20"
             title="Send message"
             whileHover={{ scale: 1.08 }}
             whileTap={{ scale: 0.92 }}
             transition={{ type: 'spring', stiffness: 300, damping: 20 }}
           >
-            <Send className="w-5 h-5" />
+            <Send className="w-4 h-4" />
           </motion.button>
         </div>
 

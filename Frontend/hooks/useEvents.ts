@@ -40,7 +40,7 @@ export function useEvents(groupId?: number) {
   }, [refetch, success])
 
   const remove = useCallback(async (eventId: number) => {
-    const res = await api.deleteEvent(eventId)
+    const res = await api.cancelEvent(eventId, { cancel_reason: 'Deleted by user' })
     success('Event deleted')
     await refetch()
     return res

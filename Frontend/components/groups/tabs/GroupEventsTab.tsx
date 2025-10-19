@@ -18,6 +18,7 @@ const GroupEventsTab: React.FC<GroupEventsTabProps> = ({ groupId, groupTitle }) 
   const [isLoading, setIsLoading] = useState(true)
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [isAdminOrCreator, setIsAdminOrCreator] = useState<boolean>(false)
+  const [groupPermissions, setGroupPermissions] = useState<{ create_events: 'all_members' | 'admins_only' } | null>(null)
   const [dropdownOpen, setDropdownOpen] = useState<number | null>(null)
   const [showCancelModal, setShowCancelModal] = useState(false)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
@@ -52,9 +53,16 @@ const GroupEventsTab: React.FC<GroupEventsTabProps> = ({ groupId, groupTitle }) 
       try {
         const roleData = await api.getUserRole(groupId)
         setIsAdminOrCreator(roleData.is_admin_or_creator)
+        
+        // Fetch group data to get permissions
+        const groupData = await api.getGroup(groupId)
+        setGroupPermissions({
+          create_events: groupData.create_events
+        })
       } catch (err) {
         console.error('Failed to load user role for group:', err)
         setIsAdminOrCreator(false)
+        setGroupPermissions(null)
       }
     }
     
@@ -193,24 +201,40 @@ const GroupEventsTab: React.FC<GroupEventsTabProps> = ({ groupId, groupTitle }) 
     return date.toLocaleDateString()
   }
 
+  const canCreateEvents = () => {
+    if (!groupPermissions) return false
+    return isAdminOrCreator || groupPermissions.create_events === 'all_members'
+  }
+
   return (
     <div className="flex flex-col h-full">
       {/* Header with Create Event Button */}
-      <div className="p-6 border-b border-white/10">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between space-y-3 sm:space-y-0">
-          <h2 className="text-xl font-bold text-white">Group Events</h2>
-          {isAdminOrCreator ? (
+      <div className="bg-gradient-to-br from-white/10 via-white/5 to-transparent backdrop-blur-xl rounded-3xl border border-white/20 shadow-2xl p-6 mb-6 mt-2 hover:shadow-emerald-500/10 transition-all duration-500 mx-2">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+          <div className="flex items-center space-x-2">
+            <div className="relative">
+              <div className="w-8 h-8 bg-gradient-to-br from-emerald-400 via-teal-500 to-cyan-600 rounded-lg flex items-center justify-center shadow-sm">
+                <Calendar className="w-4 h-4 text-white drop-shadow-sm" />
+              </div>
+              <div className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-full animate-pulse"></div>
+            </div>
+            <div>
+              <h2 className="text-lg lg:text-xl font-bold text-white mb-0.5">Group Events</h2>
+              <p className="text-white/70 text-xs lg:text-sm">Create and manage events for your group members</p>
+            </div>
+          </div>
+          {canCreateEvents() ? (
             <motion.button
               onClick={() => setShowCreateModal(true)}
-              className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-emerald-500 to-teal-600 rounded-xl text-white hover:from-emerald-600 hover:to-teal-700 transition-all duration-200 shadow-lg w-full sm:w-auto justify-center"
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
+              className="flex items-center space-x-2 px-3 py-1.5 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white rounded-2xl font-medium transition-all duration-300 shadow-md hover:shadow-lg self-start sm:self-center text-sm"
+              whileHover={{ scale: 1.02, y: -0.5 }}
+              whileTap={{ scale: 0.98 }}
             >
-              <Plus className="w-4 h-4" />
-              <span className="font-medium">Create Event</span>
+              <Plus className="w-3.5 h-3.5" />
+              <span>Create Event</span>
             </motion.button>
           ) : (
-            <div className="text-white/60 text-sm bg-white/5 border border-white/10 rounded-xl px-3 py-2">
+            <div className="text-white/60 text-sm bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 self-start sm:self-center">
               Only admins and creators can create events
             </div>
           )}
@@ -237,14 +261,20 @@ const GroupEventsTab: React.FC<GroupEventsTabProps> = ({ groupId, groupTitle }) 
               <Calendar className="w-16 h-16 text-white/40 mx-auto mb-6" />
               <h3 className="text-xl font-bold text-white mb-2">No events yet</h3>
               <p className="text-white/60 mb-6">Create an event to bring the group together!</p>
-              <motion.button
-                onClick={() => setShowCreateModal(true)}
-                className="px-6 py-3 bg-gradient-to-r from-emerald-500 to-teal-600 rounded-xl text-white font-medium hover:from-emerald-600 hover:to-teal-700 transition-all duration-200"
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-              >
-                Create First Event
-              </motion.button>
+              {canCreateEvents() ? (
+                <motion.button
+                  onClick={() => setShowCreateModal(true)}
+                  className="px-6 py-3 bg-gradient-to-r from-emerald-500 to-teal-600 rounded-2xl text-white font-medium hover:from-emerald-600 hover:to-teal-700 transition-all duration-200"
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                >
+                  Create First Event
+                </motion.button>
+              ) : (
+                <div className="text-white/60 text-sm bg-white/5 border border-white/10 rounded-lg px-4 py-2">
+                  Only admins and creators can create events
+                </div>
+              )}
             </div>
           </motion.div>
         ) : (

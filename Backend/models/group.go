@@ -5,14 +5,18 @@ import (
 )
 
 type Group struct {
-	ID          uint      `json:"id"`
-	CreatorID   uint      `json:"creator_id"`
-	Title       string    `json:"title"`
-	Description string    `json:"description"`
-	Privacy     string    `json:"privacy"`
-	Avatar      *string   `json:"avatar"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
+	ID           uint      `json:"id"`
+	CreatorID    uint      `json:"creator_id"`
+	Title        string    `json:"title"`
+	Description  string    `json:"description"`
+	Privacy      string    `json:"privacy"`
+	CreatePosts  string    `json:"create_posts"`
+	CreatePolls  string    `json:"create_polls"`
+	CreateEvents string    `json:"create_events"`
+	SendMessages string    `json:"send_messages"`
+	Avatar       *string   `json:"avatar"`
+	CreatedAt    time.Time `json:"created_at"`
+	UpdatedAt    time.Time `json:"updated_at"`
 }
 
 type GroupResponse struct {
@@ -21,6 +25,10 @@ type GroupResponse struct {
 	Title        string                `json:"title"`
 	Description  string                `json:"description"`
 	Privacy      string                `json:"privacy"`
+	CreatePosts  string                `json:"create_posts"`
+	CreatePolls  string                `json:"create_polls"`
+	CreateEvents string                `json:"create_events"`
+	SendMessages string                `json:"send_messages"`
 	Avatar       *string               `json:"avatar"`
 	CreatedAt    time.Time             `json:"created_at"`
 	UpdatedAt    time.Time             `json:"updated_at"`
@@ -36,13 +44,25 @@ type CreateGroupRequest struct {
 	Title         string  `json:"title" binding:"required,min=1,max=100"`
 	Description   string  `json:"description" binding:"min=1,max=500"`
 	Privacy       string  `json:"privacy" binding:"required,oneof=public private"`
+	CreatePosts   string  `json:"create_posts" binding:"required,oneof=admins_only all_members"`
+	CreatePolls   string  `json:"create_polls" binding:"required,oneof=admins_only all_members"`
+	CreateEvents  string  `json:"create_events" binding:"required,oneof=admins_only all_members"`
+	SendMessages  string  `json:"send_messages" binding:"required,oneof=admins_only all_members"`
 	InviteMembers []uint  `json:"invite_members"`
 	Avatar        *string `json:"avatar,omitempty"`
 }
 
 type UpdateGroupRequest struct {
-	Title       string `json:"title" binding:"min=1,max=100"`
-	Description string `json:"description" binding:"max=500"`
+	Title       string  `json:"title" binding:"min=1,max=100"`
+	Description string  `json:"description" binding:"max=500"`
+	Avatar      *string `json:"avatar,omitempty"`
+}
+
+type UpdateGroupPermissionsRequest struct {
+	CreatePosts  string `json:"create_posts" binding:"required,oneof=admins_only all_members"`
+	CreatePolls  string `json:"create_polls" binding:"required,oneof=admins_only all_members"`
+	CreateEvents string `json:"create_events" binding:"required,oneof=admins_only all_members"`
+	SendMessages string `json:"send_messages" binding:"required,oneof=admins_only all_members"`
 }
 
 type GroupMember struct {

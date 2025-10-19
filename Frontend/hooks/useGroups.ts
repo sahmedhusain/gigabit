@@ -24,7 +24,7 @@ export function useGroups() {
         arr.map(async (group) => {
           try {
             const roleData = await api.getUserRole(group.id)
-            return { ...group, role: roleData.role, is_admin_or_creator: roleData.is_admin_or_creator }
+            return { ...group, role: roleData.role as 'admin' | 'member' | 'creator' | undefined, is_admin_or_creator: roleData.is_admin_or_creator }
           } catch {
             return group
           }

@@ -3,7 +3,6 @@ import Image from 'next/image'
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { X, Users, Globe, Lock, Search, Loader2, Check } from 'lucide-react'
 import { CreateGroupRequest, api, User, API_BASE_URL } from '@/lib/api'
-import { v4 as uuidv4 } from 'uuid'
 import { useConnectionStatus, useUpload } from '@/hooks'
 import { useToast } from '@/context/ToastContext'
 import { useAuth } from '@/context/AuthContext'
@@ -199,6 +198,10 @@ export default function CreateGroup({
       title: groupTitle.trim(),
       description: groupDescription.trim() || undefined,
       privacy,
+      create_posts: 'all_members',
+      create_polls: 'all_members',
+      create_events: 'all_members',
+      send_messages: 'all_members',
       invite_members: inviteMemberIds.length ? inviteMemberIds : undefined,
       avatar: avatar || undefined
     }

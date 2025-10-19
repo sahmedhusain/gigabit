@@ -34,11 +34,13 @@ export default function CreateGeneralEvent({
   const { groups, loading: groupsLoading } = useGroups()
   const { user } = useAuth()
 
-  // Only show groups where user is admin or creator
+  // Only show groups where user can create events
   const eligibleGroups = groups.filter(group => {
     if (!user) return false
-    // User is creator (no role field available on GroupResponse)
-    return group.creator_id === user.id
+    // User can create events if they are admin/creator OR if the group allows all members to create events
+    const isAdminOrCreator = group.role === 'admin' || group.role === 'creator' || group.creator_id === user.id
+    const canCreateEvents = isAdminOrCreator || group.create_events === 'all_members'
+    return canCreateEvents
   })
 
   useEffect(() => {
@@ -256,11 +258,6 @@ export default function CreateGeneralEvent({
                   >
                     <div className="w-2 h-2 bg-emerald-400 rounded-full"></div>
                     <span>Select Group *</span>
-                    {eligibleGroups.length === 0 && !groupsLoading && (
-                      <span className="ml-2 text-xs text-yellow-400/80 font-normal">
-                        (Admin/Creator only)
-                      </span>
-                    )}
                   </motion.label>
                   {groupsLoading ? (
                     <div className="w-full bg-white/10 border border-white/20 rounded-xl p-4 text-white/50 animate-pulse">
@@ -272,7 +269,7 @@ export default function CreateGeneralEvent({
                   ) : eligibleGroups.length === 0 ? (
                     <div className="bg-gradient-to-r from-yellow-500/20 to-orange-500/20 border border-yellow-400/30 rounded-xl p-4">
                       <p className="text-yellow-300 text-sm font-medium">
-                        You need to be a member of at least one group to create events.
+                        You don't have permission to create events in any of your groups.
                       </p>
                     </div>
                   ) : (
@@ -287,11 +284,11 @@ export default function CreateGeneralEvent({
                       transition={{ delay: 0.5, duration: 0.3 }}
                     >
                       <option value="" className="bg-gray-800 text-gray-200">
-                        {eligibleGroups.length === 0 ? 'No groups available (admin/creator only)' : 'Choose a group...'}
+                        {eligibleGroups.length === 0 ? 'No groups available (permission required)' : 'Choose a group...'}
                       </option>
                       {eligibleGroups.map((group) => (
                         <option key={group.id} value={group.id} className="bg-gray-800 text-gray-200">
-                          {group.title} {group.creator_id === user?.id ? '(Creator)' : '(Admin)'}
+                          {group.title} ({group.role})
                         </option>
                       ))}
                     </motion.select>
@@ -501,7 +498,7 @@ export default function CreateGeneralEvent({
                   whileHover={{ scale: (isLoading || !eventTitle.trim() || !eventDate || !eventTime || !selectedGroupId || eligibleGroups.length === 0) ? 1 : 1.05 }}
                   whileTap={{ scale: (isLoading || !eventTitle.trim() || !eventDate || !eventTime || !selectedGroupId || eligibleGroups.length === 0) ? 1 : 0.95 }}
                   transition={{ type: 'spring', stiffness: 400, damping: 17 }}
-                  title={eligibleGroups.length === 0 ? 'You must be a group admin or creator to create events' : ''}
+                  title={eligibleGroups.length === 0 ? 'You must have permission to create events in at least one group' : ''}
                 >
                   {isLoading ? (
                     <div className="flex items-center justify-center space-x-2">

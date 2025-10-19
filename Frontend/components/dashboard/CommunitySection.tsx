@@ -819,7 +819,7 @@ export default function CommunitySection({
             onClick={() => setShowCancelModal(false)}
           >
             <motion.div
-              className="bg-gray-800 border border-white/20 rounded-3xl p-6 w-full max-w-md"
+              className="bg-gradient-to-br from-slate-800/95 to-slate-900/95 backdrop-blur-xl border border-white/20 rounded-3xl p-6 w-full max-w-md"
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
@@ -912,7 +912,7 @@ export default function CommunitySection({
             onClick={() => setShowDeleteModal(false)}
           >
             <motion.div
-              className="bg-gray-800 border border-white/20 rounded-xl p-6 w-full max-w-md"
+              className="bg-gradient-to-br from-slate-800/95 to-slate-900/95 backdrop-blur-xl border border-white/20 rounded-xl p-6 w-full max-w-md"
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
@@ -975,7 +975,7 @@ export default function CommunitySection({
             onClick={() => setShowEditModal(false)}
           >
             <motion.div
-              className="bg-gray-800 border border-white/20 rounded-3xl p-6 w-full max-w-md"
+              className="bg-gradient-to-br from-slate-800/95 to-slate-900/95 backdrop-blur-xl border border-white/20 rounded-3xl p-6 w-full max-w-md"
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}

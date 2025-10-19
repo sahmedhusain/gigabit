@@ -316,14 +316,14 @@ export default function CreateGroupEvent({
                         value={eventDate}
                         onChange={(e) => setEventDate(e.target.value)}
                         min={new Date().toISOString().split('T')[0]}
-                        className="w-full bg-white/10 border border-white/20 rounded-xl p-4 pl-12 text-white focus:outline-none focus:ring-2 focus:ring-emerald-400/50 focus:border-emerald-400/50 transition-all duration-300 text-sm lg:text-base hover:bg-white/15"
+                        className="w-full bg-gradient-to-r from-white/15 via-white/10 to-white/5 backdrop-blur-sm border border-white/30 rounded-2xl p-4 pl-12 text-white focus:outline-none focus:ring-2 focus:ring-emerald-400/60 focus:border-emerald-400/60 transition-all duration-300 text-sm lg:text-base hover:bg-gradient-to-r hover:from-white/20 hover:via-white/15 hover:to-white/10 shadow-lg hover:shadow-emerald-500/10"
                         title="Select event date"
                         aria-label="Event date"
                         initial={{ opacity: 0, scale: 0.95 }}
                         animate={{ opacity: 1, scale: 1 }}
                         transition={{ delay: 0.7, duration: 0.3 }}
                       />
-                      <div className="absolute left-4 top-1/2 transform -translate-y-1/2 text-white/50">
+                      <div className="absolute left-4 top-1/2 transform -translate-y-1/2 text-white/60">
                         <Calendar className="w-5 h-5" />
                       </div>
                     </div>
@@ -348,14 +348,14 @@ export default function CreateGroupEvent({
                         type="time"
                         value={eventTime}
                         onChange={(e) => setEventTime(e.target.value)}
-                        className="w-full bg-white/10 border border-white/20 rounded-xl p-4 pl-12 text-white focus:outline-none focus:ring-2 focus:ring-teal-400/50 focus:border-teal-400/50 transition-all duration-300 text-sm lg:text-base hover:bg-white/15"
+                        className="w-full bg-gradient-to-r from-white/15 via-white/10 to-white/5 backdrop-blur-sm border border-white/30 rounded-2xl p-4 pl-12 text-white focus:outline-none focus:ring-2 focus:ring-teal-400/60 focus:border-teal-400/60 transition-all duration-300 text-sm lg:text-base hover:bg-gradient-to-r hover:from-white/20 hover:via-white/15 hover:to-white/10 shadow-lg hover:shadow-teal-500/10"
                         title="Select event time"
                         aria-label="Event time"
                         initial={{ opacity: 0, scale: 0.95 }}
                         animate={{ opacity: 1, scale: 1 }}
                         transition={{ delay: 0.8, duration: 0.3 }}
                       />
-                      <div className="absolute left-4 top-1/2 transform -translate-y-1/2 text-white/50">
+                      <div className="absolute left-4 top-1/2 transform -translate-y-1/2 text-white/60">
                         <Clock className="w-5 h-5" />
                       </div>
                     </div>

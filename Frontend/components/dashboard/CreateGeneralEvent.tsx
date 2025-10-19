@@ -280,7 +280,7 @@ export default function CreateGeneralEvent({
                       value={selectedGroupId}
                       onChange={(e) => setSelectedGroupId(e.target.value)}
                       title="Select a group for this event"
-                      className="w-full bg-white/10 border border-white/20 rounded-xl p-4 text-white focus:outline-none focus:ring-2 focus:ring-emerald-400/50 focus:border-emerald-400/50 transition-all duration-300 text-sm lg:text-base hover:bg-white/15"
+                      className="w-full bg-gradient-to-r from-white/15 via-white/10 to-white/5 backdrop-blur-sm border border-white/30 rounded-2xl p-4 text-white focus:outline-none focus:ring-2 focus:ring-emerald-400/60 focus:border-emerald-400/60 transition-all duration-300 text-sm lg:text-base hover:bg-gradient-to-r hover:from-white/20 hover:via-white/15 hover:to-white/10 shadow-lg hover:shadow-emerald-500/10"
                       disabled={eligibleGroups.length === 0}
                       initial={{ opacity: 0, scale: 0.95 }}
                       animate={{ opacity: 1, scale: 1 }}
@@ -321,7 +321,7 @@ export default function CreateGeneralEvent({
                       onChange={(e) => setEventTitle(e.target.value)}
                       onKeyPress={handleKeyPress}
                       placeholder="Enter an exciting event title..."
-                      className="w-full bg-white/10 border border-white/20 rounded-xl p-4 text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-emerald-400/50 focus:border-emerald-400/50 transition-all duration-300 text-sm lg:text-base hover:bg-white/15"
+                      className="w-full bg-gradient-to-r from-white/15 via-white/10 to-white/5 backdrop-blur-sm border border-white/30 rounded-2xl p-4 text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-emerald-400/60 focus:border-emerald-400/60 transition-all duration-300 text-sm lg:text-base hover:bg-gradient-to-r hover:from-white/20 hover:via-white/15 hover:to-white/10 shadow-lg hover:shadow-emerald-500/10"
                       maxLength={100}
                       disabled={eligibleGroups.length === 0}
                       initial={{ opacity: 0, scale: 0.95 }}
@@ -360,7 +360,7 @@ export default function CreateGeneralEvent({
                       value={eventDescription}
                       onChange={(e) => setEventDescription(e.target.value)}
                       placeholder="Tell people what this event is about, what's the agenda, what to expect..."
-                      className="w-full h-28 lg:h-32 bg-white/10 border border-white/20 rounded-xl p-4 text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-teal-400/50 focus:border-teal-400/50 resize-none text-sm lg:text-base transition-all duration-300 hover:bg-white/15"
+                      className="w-full h-28 lg:h-32 bg-gradient-to-r from-white/15 via-white/10 to-white/5 backdrop-blur-sm border border-white/30 rounded-2xl p-4 text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-teal-400/60 focus:border-teal-400/60 resize-none text-sm lg:text-base transition-all duration-300 hover:bg-gradient-to-r hover:from-white/20 hover:via-white/15 hover:to-white/10 shadow-lg hover:shadow-teal-500/10"
                       maxLength={500}
                       disabled={eligibleGroups.length === 0}
                       initial={{ opacity: 0, scale: 0.95 }}
@@ -399,7 +399,7 @@ export default function CreateGeneralEvent({
                       value={eventLocation}
                       onChange={(e) => setEventLocation(e.target.value)}
                       placeholder="Where will the event take place? Include address, virtual meeting link, or venue details..."
-                      className="w-full h-24 lg:h-28 bg-white/10 border border-white/20 rounded-xl p-4 text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-cyan-400/50 focus:border-cyan-400/50 resize-none text-sm lg:text-base transition-all duration-300 hover:bg-white/15"
+                      className="w-full h-24 lg:h-28 bg-gradient-to-r from-white/15 via-white/10 to-white/5 backdrop-blur-sm border border-white/30 rounded-2xl p-4 text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-cyan-400/60 focus:border-cyan-400/60 resize-none text-sm lg:text-base transition-all duration-300 hover:bg-gradient-to-r hover:from-white/20 hover:via-white/15 hover:to-white/10 shadow-lg hover:shadow-cyan-500/10"
                       maxLength={200}
                       disabled={eligibleGroups.length === 0}
                       initial={{ opacity: 0, scale: 0.95 }}
@@ -435,11 +435,11 @@ export default function CreateGeneralEvent({
                         value={eventDate}
                         onChange={(e) => setEventDate(e.target.value)}
                         min={minDate}
-                        className="w-full bg-white/10 border border-white/20 rounded-xl p-4 pl-12 text-white focus:outline-none focus:ring-2 focus:ring-emerald-400/50 focus:border-emerald-400/50 transition-all duration-300 text-sm lg:text-base hover:bg-white/15"
+                        className="w-full bg-gradient-to-r from-white/15 via-white/10 to-white/5 backdrop-blur-sm border border-white/30 rounded-2xl p-4 pl-12 text-white focus:outline-none focus:ring-2 focus:ring-emerald-400/60 focus:border-emerald-400/60 transition-all duration-300 text-sm lg:text-base hover:bg-gradient-to-r hover:from-white/20 hover:via-white/15 hover:to-white/10 shadow-lg hover:shadow-emerald-500/10"
                         title="Select event date"
                         disabled={eligibleGroups.length === 0}
                       />
-                      <div className="absolute left-4 top-1/2 transform -translate-y-1/2 text-white/50">
+                      <div className="absolute left-4 top-1/2 transform -translate-y-1/2 text-white/60">
                         <Calendar className="w-5 h-5" />
                       </div>
                     </div>
@@ -459,11 +459,11 @@ export default function CreateGeneralEvent({
                         type="time"
                         value={eventTime}
                         onChange={(e) => setEventTime(e.target.value)}
-                        className="w-full bg-white/10 border border-white/20 rounded-xl p-4 pl-12 text-white focus:outline-none focus:ring-2 focus:ring-teal-400/50 focus:border-teal-400/50 transition-all duration-300 text-sm lg:text-base hover:bg-white/15"
+                        className="w-full bg-gradient-to-r from-white/15 via-white/10 to-white/5 backdrop-blur-sm border border-white/30 rounded-2xl p-4 pl-12 text-white focus:outline-none focus:ring-2 focus:ring-teal-400/60 focus:border-teal-400/60 transition-all duration-300 text-sm lg:text-base hover:bg-gradient-to-r hover:from-white/20 hover:via-white/15 hover:to-white/10 shadow-lg hover:shadow-teal-500/10"
                         title="Select event time"
                         disabled={eligibleGroups.length === 0}
                       />
-                      <div className="absolute left-4 top-1/2 transform -translate-y-1/2 text-white/50">
+                      <div className="absolute left-4 top-1/2 transform -translate-y-1/2 text-white/60">
                         <Clock className="w-5 h-5" />
                       </div>
                     </div>

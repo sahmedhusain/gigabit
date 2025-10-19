@@ -1586,15 +1586,17 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
               exit={{ opacity: 0, scale: 0.8, y: 10 }}
               transition={{ duration: 0.2 }}
             >
-              <EmojiPicker
-                onEmojiClick={handleEmojiClick}
-                searchPlaceHolder="Search emojis..."
-                width={350}
-                height={400}
-                previewConfig={{
-                  showPreview: false
-                }}
-              />
+              <div className="bg-gradient-to-br from-white/15 via-white/10 to-white/5 backdrop-blur-2xl rounded-3xl border border-white/30 shadow-2xl ring-1 ring-white/20 overflow-hidden">
+                <EmojiPicker
+                  onEmojiClick={handleEmojiClick}
+                  searchPlaceHolder="Search emojis..."
+                  width={350}
+                  height={400}
+                  previewConfig={{
+                    showPreview: false
+                  }}
+                />
+              </div>
             </motion.div>
           )}
         </AnimatePresence>

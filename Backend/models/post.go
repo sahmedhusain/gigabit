@@ -15,19 +15,21 @@ type Post struct {
 }
 
 type PostResponse struct {
-	ID           uint              `json:"id"`
-	UserID       uint              `json:"user_id"`
-	Content      string            `json:"content"`
-	ImageURL     *string           `json:"image_url"`
-	Privacy      string            `json:"privacy"`
-	CreatedAt    time.Time         `json:"created_at"`
-	UpdatedAt    time.Time         `json:"updated_at"`
-	User         UserResponse      `json:"user"`
-	LikeCount    int64             `json:"like_count"`
-	CommentCount int64             `json:"comment_count"`
-	IsLiked      bool              `json:"is_liked"`
-	IsBookmarked bool              `json:"is_bookmarked"`
-	Comments     []CommentResponse `json:"comments,omitempty"`
+	ID              uint              `json:"id"`
+	UserID          uint              `json:"user_id"`
+	Content         string            `json:"content"`
+	ImageURL        *string           `json:"image_url"`
+	Privacy         string            `json:"privacy"`
+	CreatedAt       time.Time         `json:"created_at"`
+	UpdatedAt       time.Time         `json:"updated_at"`
+	User            UserResponse      `json:"user"`
+	LikeCount       int64             `json:"like_count"`
+	CommentCount    int64             `json:"comment_count"`
+	ShareCount      int64             `json:"share_count"`
+	IsLiked         bool              `json:"is_liked"`
+	IsBookmarked    bool              `json:"is_bookmarked"`
+	SpecificUserIDs []uint            `json:"specific_user_ids,omitempty"`
+	Comments        []CommentResponse `json:"comments,omitempty"`
 }
 
 type CreatePostRequest struct {

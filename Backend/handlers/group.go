@@ -41,21 +41,21 @@ func (h *GroupHandler) CreateGroup(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "Group title is required")
 		return
 	}
-	if strings.TrimSpace(req.Description) == "" {
-		writeError(w, http.StatusBadRequest, "Group description is required")
-		return
-	}
 	if req.Privacy != "public" && req.Privacy != "private" {
 		writeError(w, http.StatusBadRequest, "Invalid privacy option")
 		return
 	}
 
 	group := &models.Group{
-		CreatorID:   userID,
-		Title:       req.Title,
-		Description: req.Description,
-		Privacy:     req.Privacy,
-		Avatar:      req.Avatar,
+		CreatorID:    userID,
+		Title:        req.Title,
+		Description:  req.Description,
+		Privacy:      req.Privacy,
+		CreatePosts:  req.CreatePosts,
+		CreatePolls:  req.CreatePolls,
+		CreateEvents: req.CreateEvents,
+		SendMessages: req.SendMessages,
+		Avatar:       req.Avatar,
 	}
 
 	if err := h.groupService.CreateGroup(group, req.InviteMembers); err != nil {
@@ -534,6 +534,25 @@ func (h *GroupHandler) CreateGroupPost(w http.ResponseWriter, r *http.Request, g
 		return
 	}
 
+	// Check group permissions for creating posts
+	group, err := h.groupService.GetGroupByID(uint(groupID), userID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "Failed to get group information")
+		return
+	}
+
+	// Check if user has permission to create posts
+	isAdminOrCreator, err := h.groupService.IsUserAdminOrCreator(uint(groupID), userID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "Failed to check user permissions")
+		return
+	}
+	canCreatePosts := group.CreatePosts == "all_members" || isAdminOrCreator
+	if !canCreatePosts {
+		writeError(w, http.StatusForbidden, "You don't have permission to create posts in this group")
+		return
+	}
+
 	// Create the group post
 	groupPost := &models.GroupPost{
 		GroupID:   uint(groupID),
@@ -927,5 +946,214 @@ func (h *GroupHandler) KickMember(w http.ResponseWriter, r *http.Request, groupI
 
 	writeJSON(w, http.StatusOK, map[string]string{
 		"message": "Member removed successfully",
+	})
+}
+
+func (h *GroupHandler) UpdateGroupPrivacy(w http.ResponseWriter, r *http.Request, groupIDStr string) {
+	groupID, err := strconv.ParseUint(groupIDStr, 10, 32)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "Invalid group ID")
+		return
+	}
+
+	userID, ok := r.Context().Value("user_id").(uint)
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "User not authenticated")
+		return
+	}
+
+	var req struct {
+		Privacy string `json:"privacy"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "Invalid request body")
+		return
+	}
+
+	if req.Privacy != "public" && req.Privacy != "private" {
+		writeError(w, http.StatusBadRequest, "Privacy must be 'public' or 'private'")
+		return
+	}
+
+	if err := h.groupService.UpdateGroupPrivacy(uint(groupID), req.Privacy, userID); err != nil {
+		if err == sql.ErrNoRows {
+			writeError(w, http.StatusForbidden, "Cannot update group privacy")
+		} else {
+			writeError(w, http.StatusInternalServerError, "Failed to update group privacy")
+		}
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]interface{}{"message": "Group privacy updated successfully"})
+}
+
+func (h *GroupHandler) UpdateGroupPermissions(w http.ResponseWriter, r *http.Request, groupIDStr string) {
+	groupID, err := strconv.ParseUint(groupIDStr, 10, 32)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "Invalid group ID")
+		return
+	}
+
+	userID, ok := r.Context().Value("user_id").(uint)
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "User not authenticated")
+		return
+	}
+
+	var req models.UpdateGroupPermissionsRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "Invalid request body")
+		return
+	}
+
+	if req.CreatePosts != "all_members" && req.CreatePosts != "admins_only" {
+		writeError(w, http.StatusBadRequest, "Create posts must be 'all_members' or 'admins_only'")
+		return
+	}
+	if req.CreatePolls != "all_members" && req.CreatePolls != "admins_only" {
+		writeError(w, http.StatusBadRequest, "Create polls must be 'all_members' or 'admins_only'")
+		return
+	}
+	if req.CreateEvents != "all_members" && req.CreateEvents != "admins_only" {
+		writeError(w, http.StatusBadRequest, "Create events must be 'all_members' or 'admins_only'")
+		return
+	}
+	if req.SendMessages != "all_members" && req.SendMessages != "admins_only" {
+		writeError(w, http.StatusBadRequest, "Send messages must be 'all_members' or 'admins_only'")
+		return
+	}
+
+	if err := h.groupService.UpdateGroupPermissions(uint(groupID), &req, userID); err != nil {
+		if err == sql.ErrNoRows {
+			writeError(w, http.StatusForbidden, "Cannot update group permissions")
+		} else {
+			writeError(w, http.StatusInternalServerError, "Failed to update group permissions")
+		}
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]interface{}{"message": "Group permissions updated successfully"})
+}
+
+func (h *GroupHandler) GetSentJoinRequests(w http.ResponseWriter, r *http.Request, groupIDStr string) {
+	groupID, err := strconv.ParseUint(groupIDStr, 10, 32)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "Invalid group ID")
+		return
+	}
+
+	userID, ok := r.Context().Value("user_id").(uint)
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "User not authenticated")
+		return
+	}
+
+	requests, err := h.groupService.GetSentJoinRequests(uint(groupID), userID)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			writeError(w, http.StatusForbidden, "Cannot view sent join requests")
+		} else {
+			writeError(w, http.StatusInternalServerError, "Failed to get sent join requests")
+		}
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"requests": requests,
+		"count":    len(requests),
+	})
+}
+
+func (h *GroupHandler) GetReceivedJoinRequests(w http.ResponseWriter, r *http.Request, groupIDStr string) {
+	groupID, err := strconv.ParseUint(groupIDStr, 10, 32)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "Invalid group ID")
+		return
+	}
+
+	userID, ok := r.Context().Value("user_id").(uint)
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "User not authenticated")
+		return
+	}
+
+	requests, err := h.groupService.GetReceivedJoinRequests(uint(groupID), userID)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			writeError(w, http.StatusForbidden, "Cannot view received join requests")
+		} else {
+			writeError(w, http.StatusInternalServerError, "Failed to get received join requests")
+		}
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"requests": requests,
+		"count":    len(requests),
+	})
+}
+
+func (h *GroupHandler) DeleteGroupMessage(w http.ResponseWriter, r *http.Request, groupIDStr, messageIDStr string) {
+	groupID, err := strconv.ParseUint(groupIDStr, 10, 32)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "Invalid group ID")
+		return
+	}
+
+	messageID, err := strconv.ParseUint(messageIDStr, 10, 32)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "Invalid message ID")
+		return
+	}
+
+	userID, ok := r.Context().Value("user_id").(uint)
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "User not authenticated")
+		return
+	}
+
+	if err := h.groupService.DeleteGroupMessage(uint(groupID), uint(messageID), userID); err != nil {
+		if err == sql.ErrNoRows {
+			writeError(w, http.StatusForbidden, "Cannot delete this message")
+		} else {
+			writeError(w, http.StatusInternalServerError, "Failed to delete message")
+		}
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]interface{}{"message": "Message deleted successfully"})
+}
+
+func (h *GroupHandler) GetInvitableUsers(w http.ResponseWriter, r *http.Request, groupIDStr string) {
+	groupID, err := strconv.ParseUint(groupIDStr, 10, 32)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "Invalid group ID")
+		return
+	}
+
+	userID, ok := r.Context().Value("user_id").(uint)
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "User not authenticated")
+		return
+	}
+
+	searchTerm := r.URL.Query().Get("search")
+	if searchTerm == "" {
+		searchTerm = ""
+	}
+
+	users, err := h.groupService.GetInvitableUsers(uint(groupID), userID, searchTerm)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			writeError(w, http.StatusForbidden, "Cannot view invitable users")
+		} else {
+			writeError(w, http.StatusInternalServerError, "Failed to get invitable users")
+		}
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"users": users,
+		"count": len(users),
 	})
 }

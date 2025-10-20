@@ -1,7 +1,8 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Heart, Globe, Lock, EyeOff, MessageSquare, Sparkles, Bookmark, Send, MoreHorizontal, User, Image as ImageIcon, Trash2, ArrowUp, ArrowDown } from 'lucide-react'
 import CreatePost from './CreatePost'
+import ManagePrivacy from './ManagePrivacy'
 import { Post } from '@/lib/api'
 import { Plus } from 'lucide-react'
 import { useRealTimePosts } from '@/hooks/useRealTimePosts'
@@ -14,6 +15,7 @@ import { getAvatarUrl } from '@/utils/avatarUtils'
 import { useAuth } from '@/context/AuthContext'
 import { api } from '@/lib/api'
 import { motion, AnimatePresence } from 'framer-motion'
+import SharePopup from '../SharePopup'
 
 interface HomeFeedProps {
   posts: Post[]
@@ -35,6 +37,10 @@ interface HomeFeedProps {
   feedSubTab: string
   sortOrder: 'newest' | 'oldest'
   setSortOrder: (sort: 'newest' | 'oldest') => void
+  hasMoreResults?: boolean
+  isLoadingMore?: boolean
+  onLoadMore?: () => void
+  resultsContainerRef?: React.RefObject<HTMLDivElement | null>
 }
 
 export default function HomeFeed({
@@ -56,7 +62,11 @@ export default function HomeFeed({
   onCreatePost,
   feedSubTab,
   sortOrder,
-  setSortOrder
+  setSortOrder,
+  hasMoreResults = false,
+  isLoadingMore = false,
+  onLoadMore,
+  resultsContainerRef
 }: HomeFeedProps) {
   const router = useRouter()
   // Feed filter state
@@ -68,6 +78,10 @@ export default function HomeFeed({
   const [newComment, setNewComment] = useState('')
   const [newCommentImage, setNewCommentImage] = useState<File | null>(null)
   const [isSubmittingComment, setIsSubmittingComment] = useState(false)
+
+  // Share popup state
+  const [isSharePopupOpen, setIsSharePopupOpen] = useState(false)
+  const [selectedPostForShare, setSelectedPostForShare] = useState<Post | null>(null)
 
   // Use real-time posts hook
   const {
@@ -83,6 +97,11 @@ export default function HomeFeed({
   const [openMenu, setOpenMenu] = useState<{[key: number]: boolean}>({})
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<{[key: number]: boolean}>({})
   const [isDeleting, setIsDeleting] = useState<{[key: number]: boolean}>({})
+
+  // Privacy management state
+  const [showManagePrivacy, setShowManagePrivacy] = useState<{[key: number]: boolean}>({})
+  const [isUpdatingPrivacy, setIsUpdatingPrivacy] = useState<{[key: number]: boolean}>({})
+  const [currentSelectedUsers, setCurrentSelectedUsers] = useState<{[key: number]: number[]}>({})
 
   // Update document title with unread count
   const { setUnread, setPageTitle } = useDocumentTitle()
@@ -130,6 +149,12 @@ export default function HomeFeed({
     setIsCommentModalOpen(true)
   }
 
+  const handleShareClick = (post: Post, e: React.MouseEvent) => {
+    e.stopPropagation()
+    setSelectedPostForShare(post)
+    setIsSharePopupOpen(true)
+  }
+
   const canDeletePost = (post: Post) => {
     return user && user.id === post.user.id
   }
@@ -152,6 +177,45 @@ export default function HomeFeed({
       setIsDeleting(prev => ({ ...prev, [postId]: false }))
       setShowDeleteConfirm(prev => ({ ...prev, [postId]: false }))
       setOpenMenu(prev => ({ ...prev, [postId]: false }))
+    }
+  }
+
+  const handleManagePrivacy = async (postId: number) => {
+    try {
+      // Fetch the post details to get current selected users
+      const postDetails = await api.getPost(postId)
+      setCurrentSelectedUsers(prev => ({
+        ...prev,
+        [postId]: postDetails.specific_user_ids || []
+      }))
+    } catch (err) {
+      console.error('Failed to fetch post details:', err)
+      // Set empty array as fallback
+      setCurrentSelectedUsers(prev => ({
+        ...prev,
+        [postId]: []
+      }))
+    }
+    setShowManagePrivacy(prev => ({ ...prev, [postId]: true }))
+    setOpenMenu(prev => ({ ...prev, [postId]: false }))
+  }
+
+  const handleUpdatePrivacy = async (postId: number, privacy: 'public' | 'followers' | 'friends' | 'listed', selectedUsers: number[]) => {
+    setIsUpdatingPrivacy(prev => ({ ...prev, [postId]: true }))
+    try {
+      await api.updatePost(postId, {
+        privacy: privacy,
+        specific_user_ids: selectedUsers
+      })
+      success('Post privacy updated successfully')
+      // Refresh the page to show updated privacy
+      window.location.reload()
+    } catch (err) {
+      console.error('Failed to update privacy:', err)
+      error('Failed to update privacy. Please try again.')
+    } finally {
+      setIsUpdatingPrivacy(prev => ({ ...prev, [postId]: false }))
+      setShowManagePrivacy(prev => ({ ...prev, [postId]: false }))
     }
   }
 
@@ -221,10 +285,12 @@ export default function HomeFeed({
     switch (privacy) {
       case 'public':
         return <Globe className="w-4 h-4" />
-      case 'private':
-        return <Lock className="w-4 h-4" />
-      case 'almost_private':
+      case 'followers':
         return <EyeOff className="w-4 h-4" />
+      case 'friends':
+        return <Lock className="w-4 h-4" />
+      case 'listed':
+        return <User className="w-4 h-4" />
       default:
         return <Globe className="w-4 h-4" />
     }
@@ -336,6 +402,12 @@ export default function HomeFeed({
           </div>
         </div>
 
+        {/* Privacy Indicator */}
+        <div className="flex items-center space-x-2 text-white/60">
+          {getPrivacyIcon(post.privacy)}
+          <span className="text-xs capitalize">{post.privacy}</span>
+        </div>
+
         {canDeletePost(post) && (
           <div className="relative">
             <button
@@ -362,6 +434,13 @@ export default function HomeFeed({
                   onClick={(e) => e.stopPropagation()}
                 >
                   <button
+                    onClick={() => handleManagePrivacy(post.id)}
+                    className="w-full flex items-center space-x-3 px-4 py-3 text-blue-400 hover:bg-blue-500/10 transition-all duration-200"
+                  >
+                    <Lock className="w-4 h-4" />
+                    <span className="text-sm font-medium">Manage Privacy</span>
+                  </button>
+                  <button
                     onClick={() => handleDeletePost(post.id)}
                     className="w-full flex items-center space-x-3 px-4 py-3 text-red-400 hover:bg-red-500/10 transition-all duration-200"
                   >
@@ -384,15 +463,17 @@ export default function HomeFeed({
 
           {/* Post Image */}
           {post.image && (
-            <div className="mb-4 rounded-2xl overflow-hidden bg-gradient-to-br from-white/5 to-transparent border border-white/10 group-hover:border-emerald-400/30 transition-all duration-300">
-              <Image
-                src={post.image}
-                alt="Post image"
-                width={640}
-                height={256}
-                unoptimized={post.image.includes('/svg')}
-                className="w-full h-64 object-cover hover:scale-105 transition-transform duration-500"
-              />
+            <div className="mb-4 flex justify-center">
+              <div className="inline-block border border-white/20 rounded-2xl overflow-hidden">
+                <Image
+                  src={post.image}
+                  alt="Post image"
+                  width={640}
+                  height={256}
+                  unoptimized={post.image.includes('/svg')}
+                  className="max-h-64 sm:max-h-80 md:max-h-96 object-contain hover:scale-105 transition-transform duration-500 rounded-2xl"
+                />
+              </div>
             </div>
           )}
 
@@ -425,6 +506,7 @@ export default function HomeFeed({
               </button>
 
               <button
+                onClick={(e) => handleShareClick(post, e)}
                 className="flex items-center justify-center space-x-2 px-4 py-2 text-white/70 hover:text-white hover:bg-gradient-to-r from-white/10 to-white/5 border border-white/10 rounded-2xl transition-all duration-300 hover:scale-105"
                 title="Share"
               >
@@ -482,6 +564,24 @@ export default function HomeFeed({
     return (
       <div className="space-y-6">
         {postsToShow.map((post, index) => renderPost(post, index))}
+        {hasMoreResults && onLoadMore && (
+          <div className="flex justify-center py-6">
+            <button
+              onClick={onLoadMore}
+              disabled={isLoadingMore}
+              className="px-6 py-3 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 disabled:from-gray-500 disabled:to-gray-600 text-white rounded-2xl font-semibold transition-all duration-300 hover:scale-105 disabled:hover:scale-100 disabled:cursor-not-allowed shadow-lg hover:shadow-xl flex items-center space-x-2"
+            >
+              {isLoadingMore ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                  <span>Loading...</span>
+                </>
+              ) : (
+                <span>Load More Posts</span>
+              )}
+            </button>
+          </div>
+        )}
       </div>
     )
   }
@@ -563,7 +663,7 @@ export default function HomeFeed({
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-scroll scrollbar-hide" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+      <div ref={resultsContainerRef} className="flex-1 overflow-y-scroll scrollbar-hide" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
         {renderContent()}
       </div>
 
@@ -583,6 +683,21 @@ export default function HomeFeed({
         loadingUsers={loadingUsers}
         onCreatePost={onCreatePost}
       />
+
+      {/* Manage Privacy Modals */}
+      {posts.map((post) => (
+        <ManagePrivacy
+          key={`privacy-${post.id}`}
+          show={showManagePrivacy[post.id] || false}
+          onClose={() => setShowManagePrivacy(prev => ({ ...prev, [post.id]: false }))}
+          postId={post.id}
+          currentPrivacy={post.privacy as 'public' | 'followers' | 'friends' | 'listed'}
+          currentSelectedUsers={currentSelectedUsers[post.id] || []}
+          availableUsers={availableUsers}
+          loadingUsers={loadingUsers}
+          onUpdatePrivacy={(privacy, selectedUsers) => handleUpdatePrivacy(post.id, privacy, selectedUsers)}
+        />
+      ))}
 
       {/* Comment Modal */}
       {isCommentModalOpen && selectedPostForComment && (
@@ -788,6 +903,22 @@ export default function HomeFeed({
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Share Popup */}
+      {isSharePopupOpen && selectedPostForShare && (
+        <SharePopup
+          postId={selectedPostForShare.id}
+          isOpen={isSharePopupOpen}
+          onClose={() => {
+            setIsSharePopupOpen(false)
+            setSelectedPostForShare(null)
+          }}
+          onShareSuccess={() => {
+            // Optionally refresh posts or update share count locally
+            // For now, we'll just close the popup
+          }}
+        />
+      )}
     </div>
   )
 }

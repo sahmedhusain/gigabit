@@ -7,6 +7,10 @@ import { useWebSocket } from '@/context/WebSocketContext'
 import { useRealTimeMessages, useTypingIndicator } from '@/hooks'
 import EmojiPicker from 'emoji-picker-react'
 import { MessageRounded } from '@mui/icons-material'
+import { api } from '@/lib/api'
+
+// Import SharedPostMessage component
+import SharedPostMessage from '../../SharedPostMessage'
 
 interface EmojiData {
   emoji: string
@@ -36,6 +40,8 @@ const GroupChatTab: React.FC<GroupChatTabProps> = ({
   const [wasAtBottom, setWasAtBottom] = useState(true)
   const [isLoadingHistorical, setIsLoadingHistorical] = useState(false)
   const { user } = useAuth()
+  const [userRole, setUserRole] = useState<{ role: string; is_admin_or_creator: boolean } | null>(null)
+  const [groupPermissions, setGroupPermissions] = useState<{ send_messages: 'all_members' | 'admins_only' } | null>(null)
 
   // Real-time messaging integration
   const {
@@ -180,6 +186,30 @@ const GroupChatTab: React.FC<GroupChatTabProps> = ({
     handleMessagesChange()
   }, [messages, handleMessagesChange, effectiveConversationId])
 
+  // Load user role and group permissions
+  useEffect(() => {
+    const loadUserRoleAndPermissions = async () => {
+      if (!groupId || !user) return
+      
+      try {
+        const roleData = await api.getUserRole(groupId)
+        setUserRole(roleData)
+        
+        // Fetch group data to get permissions
+        const groupData = await api.getGroup(groupId)
+        setGroupPermissions({
+          send_messages: groupData.send_messages
+        })
+      } catch (err) {
+        console.error('Failed to load user role and permissions for group:', err)
+        setUserRole(null)
+        setGroupPermissions(null)
+      }
+    }
+    
+    loadUserRoleAndPermissions()
+  }, [groupId, user])
+
   const handleSendMessage = async () => {
     if (!newMessage.trim() || !isConnected) return
 
@@ -278,6 +308,11 @@ const GroupChatTab: React.FC<GroupChatTabProps> = ({
     }
   }
 
+  const canSendMessages = () => {
+    if (!groupPermissions) return false
+    return userRole?.is_admin_or_creator || groupPermissions.send_messages === 'all_members'
+  }
+
   const renderMessage = (message: any, index: number) => {
     const isCurrentUser = message.sender_id === user?.id
     const showAvatar = !isCurrentUser
@@ -344,30 +379,56 @@ const GroupChatTab: React.FC<GroupChatTabProps> = ({
               </motion.span>
             )}
 
-            {/* Message bubble */}
-            <div
-              className={`relative px-5 py-4 rounded-2xl shadow-xl backdrop-blur-lg border transition-all duration-300 hover:shadow-2xl hover:scale-[1.02] ${isCurrentUser
-                  ? 'bg-gradient-to-br from-emerald-500 via-teal-500 to-cyan-600 text-white border-emerald-400/40 rounded-br-lg shadow-emerald-500/20'
-                  : 'bg-gradient-to-br from-white/15 to-white/10 text-white border-white/25 rounded-bl-lg hover:from-white/20 hover:to-white/15 shadow-white/10'
-                }`}
-              data-message-id={message.id}
-            >
-              <div className="text-sm leading-relaxed break-words font-medium">
-                {message.content}
-              </div>
-
-              <motion.div
-                className={`flex items-center justify-between mt-2 space-x-2 ${isCurrentUser ? 'text-emerald-100' : 'text-white/60'
+            {/* Enhanced Message bubble */}
+            {message.shared_post ? (
+              <SharedPostMessage
+                sharedPost={message.shared_post}
+                isCurrentUser={isCurrentUser}
+                messageId={message.id}
+                messageCreatedAt={createdAt}
+              />
+            ) : (
+              <div
+                className={`relative px-5 py-4 rounded-2xl shadow-xl backdrop-blur-lg border transition-all duration-300 hover:shadow-2xl hover:scale-[1.02] ${isCurrentUser
+                    ? 'bg-gradient-to-br from-emerald-500 via-teal-500 to-cyan-600 text-white border-emerald-400/40 rounded-br-lg shadow-emerald-500/20'
+                    : 'bg-gradient-to-br from-white/15 to-white/10 text-white border-white/25 rounded-bl-lg hover:from-white/20 hover:to-white/15 shadow-white/10'
                   }`}
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 0.3 }}
+                data-message-id={message.id}
               >
-                <span className="text-xs opacity-75">
-                  {formatTime(createdAt)}
-                </span>
-              </motion.div>
-            </div>
+                {/* Message content */}
+                <div className="text-sm leading-relaxed break-words font-medium">
+                  {message.content}
+                </div>
+
+                {/* Message footer */}
+                <motion.div
+                  className={`flex items-center justify-between mt-2 space-x-2 ${
+                    isCurrentUser ? 'text-emerald-100' : 'text-white/60'
+                  }`}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: 0.3 }}
+                >
+                  <span className="text-xs opacity-75">
+                    {formatTime(createdAt)}
+                  </span>
+                </motion.div>
+
+                {/* Message tail */}
+                <div className={`absolute bottom-0 ${
+                  isCurrentUser
+                    ? '-right-2 border-l-emerald-400 border-l-8 border-t-8 border-t-transparent border-b-8 border-b-transparent'
+                    : '-left-2 border-r-white/20 border-r-8 border-t-8 border-t-transparent border-b-8 border-b-transparent'
+                }`}></div>
+
+                {/* Hover effect */}
+                <motion.div
+                  className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent opacity-0 rounded-2xl"
+                  whileHover={{ opacity: 1 }}
+                  transition={{ duration: 0.2 }}
+                />
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -379,7 +440,7 @@ const GroupChatTab: React.FC<GroupChatTabProps> = ({
       {/* Messages Area */}
       <div
         ref={messagesContainerRef}
-        className="flex-1 overflow-y-scroll scrollbar-hide px-6 py-4 space-y-4 min-h-0 transition-colors duration-200"
+        className="flex-1 overflow-y-scroll scrollbar-hide px-6 py-4 space-y-4 min-h-0 transition-colors duration-200 shadow-xl"
         onScroll={handleScroll}
         style={{
           background: 'linear-gradient(180deg, rgba(255,255,255,0.02) 0%, rgba(255,255,255,0.00) 100%)',
@@ -479,71 +540,95 @@ const GroupChatTab: React.FC<GroupChatTabProps> = ({
       </div>
 
       {/* Input Area */}
-      <div className="bg-gradient-to-t from-white/10 via-white/5 to-white/8 backdrop-blur-2xl border-t border-white/25 p-6 flex-shrink-0 relative">
-        <div className="absolute inset-0 bg-gradient-to-t from-emerald-500/5 via-teal-500/5 to-cyan-500/5" />
+      {canSendMessages() ? (
+        <div className="p-4 flex-shrink-0 relative">
+          <div className="flex items-center justify-center space-x-4 relative z-10 min-h-[48px]">
+            <div className="flex-1 relative">
+              <textarea
+                value={newMessage}
+                onChange={(e) => {
+                  setNewMessage(e.target.value)
+                  handleTyping()
+                }}
+                onKeyPress={handleKeyPress}
+                placeholder="Message the group..."
+                className="w-full bg-gradient-to-r from-white/15 to-white/10 border border-white/25 rounded-2xl px-6 py-4 text-white placeholder-white/60 focus:outline-none focus:ring-2 focus:ring-emerald-400/60 focus:border-emerald-400/50 resize-none min-h-[52px] max-h-32 text-sm overflow-y-auto scrollbar-hide transition-all duration-300 hover:bg-gradient-to-r hover:from-white/20 hover:to-white/15"
+                rows={1}
+              />
+            </div>
 
-        <div className="flex items-center space-x-4 relative z-10">
-          {/* Emoji Picker Button */}
-          <motion.button
-            onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-            className="p-3 text-white/60 hover:text-white hover:bg-gradient-to-r hover:from-yellow-500/20 hover:to-orange-500/20 rounded-2xl border border-white/20 hover:border-yellow-400/30 backdrop-blur-sm transition-all duration-300"
-            title="Add emoji"
-            whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.95 }}
-          >
-            <Smile className="w-5 h-5" />
-          </motion.button>
+            {/* Emoji Picker Button */}
+            <motion.button
+              onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+              className="p-3 text-white/60 hover:text-white hover:bg-gradient-to-r hover:from-yellow-500/20 hover:to-orange-500/20 rounded-xl border border-white/20 hover:border-yellow-400/30 backdrop-blur-sm transition-all duration-300 shadow-lg hover:shadow-yellow-500/20"
+              title="Add emoji"
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.95 }}
+            >
+              <Smile className="w-4 h-4" />
+            </motion.button>
 
-          <div className="flex-1 relative">
-            <textarea
-              value={newMessage}
-              onChange={(e) => {
-                setNewMessage(e.target.value)
-                handleTyping()
-              }}
-              onKeyPress={handleKeyPress}
-              placeholder="Message the group..."
-              className="w-full bg-gradient-to-r from-white/15 to-white/10 border border-white/25 rounded-2xl px-6 py-4 text-white placeholder-white/60 focus:outline-none focus:ring-2 focus:ring-emerald-400/60 focus:border-emerald-400/50 resize-none min-h-[52px] max-h-32 text-sm overflow-y-auto backdrop-blur-sm shadow-inner transition-all duration-300 hover:bg-gradient-to-r hover:from-white/20 hover:to-white/15"
-              rows={1}
-            />
+            <motion.button
+              onClick={handleSendMessage}
+              disabled={!newMessage.trim() || !isConnected}
+              className="p-3 bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-600 rounded-xl text-white hover:from-emerald-600 hover:via-teal-600 hover:to-cyan-700 transition-all duration-300 disabled:opacity-40 disabled:cursor-not-allowed shadow-xl hover:shadow-emerald-500/30 border border-emerald-400/30 disabled:border-white/20"
+              title="Send message"
+              whileHover={{ scale: 1.08 }}
+              whileTap={{ scale: 0.92 }}
+              transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+            >
+              <Send className="w-4 h-4" />
+            </motion.button>
           </div>
 
-          <motion.button
-            onClick={handleSendMessage}
-            disabled={!newMessage.trim() || !isConnected}
-            className="p-4 bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-600 rounded-2xl text-white hover:from-emerald-600 hover:via-teal-600 hover:to-cyan-700 transition-all duration-300 disabled:opacity-40 disabled:cursor-not-allowed shadow-xl hover:shadow-emerald-500/30 border border-emerald-400/30 disabled:border-white/20"
-            title="Send message"
-            whileHover={{ scale: 1.08 }}
-            whileTap={{ scale: 0.92 }}
-            transition={{ type: 'spring', stiffness: 300, damping: 20 }}
-          >
-            <Send className="w-5 h-5" />
-          </motion.button>
-        </div>
+          {/* Emoji Picker */}
+          <AnimatePresence>
+            {showEmojiPicker && (
+              <motion.div
+                className="absolute bottom-full left-6 mb-8 z-50"
+                initial={{ opacity: 0, scale: 0.8, y: 10 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.8, y: 10 }}
+                transition={{ duration: 0.2 }}
+              >
+                <div className="bg-gradient-to-br from-white/15 via-white/10 to-white/5 backdrop-blur-2xl rounded-3xl border border-white/30 shadow-2xl ring-1 ring-white/20 overflow-hidden">
+                  <EmojiPicker
+                    onEmojiClick={handleEmojiClick}
+                    searchPlaceHolder="Search emojis..."
+                    width={350}
+                    height={400}
+                    previewConfig={{
+                      showPreview: false
+                    }}
+                  />
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
-        {/* Emoji Picker */}
-        <AnimatePresence>
-          {showEmojiPicker && (
-            <motion.div
-              className="absolute bottom-full left-6 mb-8 z-50"
-              initial={{ opacity: 0, scale: 0.8, y: 10 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.8, y: 10 }}
-              transition={{ duration: 0.2 }}
-            >
-              <EmojiPicker
-                onEmojiClick={handleEmojiClick}
-                searchPlaceHolder="Search emojis..."
-                width={350}
-                height={400}
-                previewConfig={{
-                  showPreview: false
-                }}
-              />
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
+          <AnimatePresence>
+            {newMessage.length > 0 && (
+              <motion.div
+                className="text-xs text-white/50 mt-3 text-right"
+                initial={{ opacity: 0, y: 5 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -5 }}
+                transition={{ duration: 0.2 }}
+              >
+                Press Enter to send • Shift+Enter for new line
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      ) : (
+        <div className="p-4 flex-shrink-0 relative">
+          <div className="flex items-center justify-center relative z-10">
+            <div className="text-white/60 text-sm bg-white/5 border border-white/10 rounded-lg px-4 py-2">
+              Only admins and creators can send messages
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -431,16 +431,16 @@ export default function Sidebar({
                                     {item.label}
                                   </span>
                                   {item.isTemp && item.onClose && (
-                                    <button
+                                    <div
                                       onClick={(e) => {
                                         e.stopPropagation()
                                         item.onClose!()
                                       }}
-                                      className="ml-auto p-2 text-white/70 hover:text-white hover:bg-white/20 rounded-lg transition-all duration-200 hover:scale-105"
+                                      className="ml-auto p-2 text-white/70 hover:text-white hover:bg-white/20 rounded-lg transition-all duration-200 hover:scale-105 cursor-pointer"
                                       title="Close"
                                     >
                                       <X className="w-5 h-5" />
-                                    </button>
+                                    </div>
                                   )}
                                   {section.id === 'chats' && (() => {
                                     let count = 0

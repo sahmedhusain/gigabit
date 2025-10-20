@@ -1,11 +1,16 @@
 'use client'
-import { useState, useEffect } from 'react'
-import { Heart, MessageSquare, Bookmark, Send, Sparkles, User, Image as ImageIcon, X, MoreHorizontal, Globe, Lock, EyeOff, Plus, ArrowUp, ArrowDown } from 'lucide-react'
+import { useState, useEffect, useRef } from 'react'
+import { Heart, MessageSquare, Bookmark, Send, Sparkles, User, Image as ImageIcon, X, MoreHorizontal, Trash2, ArrowUp, ArrowDown, Globe, Lock, EyeOff } from 'lucide-react'
 import { Post, Comment } from '@/lib/api'
 import { useRouter } from 'next/navigation'
 import { useToast } from '@/context/ToastContext'
 import Image from 'next/image'
 import { getAvatarUrl } from '@/utils/avatarUtils'
+import { useAuth } from '@/context/AuthContext'
+import { api } from '@/lib/api'
+import { AnimatePresence, motion } from 'framer-motion'
+import ManagePrivacy from './ManagePrivacy'
+import SharePopup from '../SharePopup'
 
 interface ActivitySectionProps {
   activitySubTab: string
@@ -14,6 +19,10 @@ interface ActivitySectionProps {
   onPostBookmark?: (postId: number) => void
   sortOrder?: 'newest' | 'oldest'
   setSortOrder?: (sort: 'newest' | 'oldest') => void
+  hasMoreResults?: boolean
+  isLoadingMore?: boolean
+  onLoadMore?: () => void
+  resultsContainerRef?: React.RefObject<HTMLDivElement | null>
 }
 
 export default function ActivitySection({
@@ -22,10 +31,27 @@ export default function ActivitySection({
   onPostLike,
   onPostBookmark,
   sortOrder = 'newest',
-  setSortOrder
+  setSortOrder,
+  hasMoreResults = false,
+  isLoadingMore = false,
+  onLoadMore,
+  resultsContainerRef
 }: ActivitySectionProps) {
   const router = useRouter()
   const { success, error } = useToast()
+  const { user } = useAuth()
+
+  // Three-dot menu state
+  const [openMenu, setOpenMenu] = useState<{[key: number]: boolean}>({})
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState<{[key: number]: boolean}>({})
+  const [isDeleting, setIsDeleting] = useState<{[key: number]: boolean}>({})
+
+  // Manage Privacy state
+  const [showManagePrivacy, setShowManagePrivacy] = useState(false)
+  const [selectedPostForPrivacy, setSelectedPostForPrivacy] = useState<Post | null>(null)
+  const [currentSelectedUsers, setCurrentSelectedUsers] = useState<number[]>([])
+  const [availableUsers, setAvailableUsers] = useState<{ id: number; email: string; first_name: string; last_name: string; avatar?: string; nickname?: string; display_name?: string; }[]>([])
+  const [loadingUsers, setLoadingUsers] = useState(false)
 
   // Comment modal state
   const [isCommentModalOpen, setIsCommentModalOpen] = useState(false)
@@ -34,8 +60,13 @@ export default function ActivitySection({
   const [newCommentImage, setNewCommentImage] = useState<File | null>(null)
   const [isSubmittingComment, setIsSubmittingComment] = useState(false)
 
+  // Share popup state
+  const [isSharePopupOpen, setIsSharePopupOpen] = useState(false)
+  const [selectedPostForShare, setSelectedPostForShare] = useState<Post | null>(null)
+
   // Comments state for displaying recent comments
   const [postComments, setPostComments] = useState<{ [postId: number]: Comment[] }>({})
+  const [userCommentCounts, setUserCommentCounts] = useState<{ [postId: number]: number }>({})
 
   const handlePostClick = (postId: number, e: React.MouseEvent) => {
     // Don't navigate if clicking on interactive elements
@@ -50,6 +81,37 @@ export default function ActivitySection({
     e.stopPropagation()
     setSelectedPostForComment(post)
     setIsCommentModalOpen(true)
+  }
+
+  const handleShareClick = (post: Post, e: React.MouseEvent) => {
+    e.stopPropagation()
+    setSelectedPostForShare(post)
+    setIsSharePopupOpen(true)
+  }
+
+  const canDeletePost = (post: Post) => {
+    return user && user.id === post.user.id
+  }
+
+  const handleDeletePost = (postId: number) => {
+    setShowDeleteConfirm(prev => ({ ...prev, [postId]: true }))
+  }
+
+  const confirmDeletePost = async (postId: number) => {
+    setIsDeleting(prev => ({ ...prev, [postId]: true }))
+    try {
+      await api.deletePost(postId)
+      success('Post deleted successfully')
+      // Optionally refresh posts or remove from local state
+      window.location.reload() // Simple refresh for now
+    } catch (err) {
+      console.error('Failed to delete post:', err)
+      error('Failed to delete post. Please try again.')
+    } finally {
+      setIsDeleting(prev => ({ ...prev, [postId]: false }))
+      setShowDeleteConfirm(prev => ({ ...prev, [postId]: false }))
+      setOpenMenu(prev => ({ ...prev, [postId]: false }))
+    }
   }
 
   const handleSubmitComment = async () => {
@@ -114,16 +176,92 @@ export default function ActivitySection({
     }
   }
 
+  const getPrivacyIcon = (privacy: string) => {
+    switch (privacy) {
+      case 'public':
+        return <Globe className="w-4 h-4" />
+      case 'followers':
+        return <EyeOff className="w-4 h-4" />
+      case 'friends':
+        return <Lock className="w-4 h-4" />
+      case 'listed':
+        return <User className="w-4 h-4" />
+      default:
+        return <Globe className="w-4 h-4" />
+    }
+  }
+
+  const handleManagePrivacy = async (post: Post) => {
+    setSelectedPostForPrivacy(post)
+    setShowManagePrivacy(true)
+    setOpenMenu(prev => ({ ...prev, [post.id]: false }))
+
+    // Fetch post details to get selected users for listed privacy
+    if (post.privacy === 'listed') {
+      try {
+        const postDetails = await api.getPost(post.id)
+        setCurrentSelectedUsers(postDetails.specific_user_ids || [])
+      } catch (err) {
+        console.error('Failed to fetch post details:', err)
+        setCurrentSelectedUsers([])
+      }
+    } else {
+      setCurrentSelectedUsers([])
+    }
+  }
+
+  const handleUpdatePrivacy = async (privacy: 'public' | 'followers' | 'friends' | 'listed', selectedUsers: number[]) => {
+    if (!selectedPostForPrivacy) return
+
+    try {
+      await api.updatePost(selectedPostForPrivacy.id, {
+        privacy,
+        specific_user_ids: selectedUsers
+      })
+      success('Privacy settings updated successfully!')
+      setShowManagePrivacy(false)
+      setSelectedPostForPrivacy(null)
+      // Optionally refresh posts or update local state
+      window.location.reload() // Simple refresh for now
+    } catch (err) {
+      console.error('Failed to update privacy:', err)
+      error('Failed to update privacy settings. Please try again.')
+    }
+  }
+
+  const fetchAvailableUsers = async () => {
+    if (availableUsers.length > 0) return // Already fetched
+
+    try {
+      setLoadingUsers(true)
+      const response = await api.getFollowers(user?.id || 0)
+      setAvailableUsers(response.followers || [])
+    } catch (err) {
+      console.error('Failed to fetch followers:', err)
+      error('Failed to load followers for privacy settings.')
+    } finally {
+      setLoadingUsers(false)
+    }
+  }
+
+  // Fetch users when Manage Privacy modal opens
+  useEffect(() => {
+    if (showManagePrivacy) {
+      fetchAvailableUsers()
+    }
+  }, [showManagePrivacy])
+
   // Fetch comments for commented posts
   const fetchCommentsForCommentedPosts = async () => {
     if (activitySubTab !== 'commented') return
 
     try {
       const commentsMap: { [postId: number]: Comment[] } = {}
+      const userCommentCountsMap: { [postId: number]: number } = {}
 
       for (const post of commentedPosts) {
         try {
-          const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/api/posts/${post.id}/comments?limit=5&offset=0`, {
+          const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/api/posts/${post.id}/comments?limit=50&offset=0`, {
             method: 'GET',
             headers: {
               ...(localStorage.getItem('token') ? { Authorization: `Bearer ${localStorage.getItem('token')}` } : {})
@@ -133,11 +271,15 @@ export default function ActivitySection({
 
           if (response.ok) {
             const data = await response.json()
-            // Sort comments by created_at descending to get most recent first
-            const sortedComments = (data.comments || []).sort((a: Comment, b: Comment) => 
+            // Filter to only current user's comments and sort by created_at descending to get most recent first
+            const userComments = (data.comments || []).filter((comment: Comment) => comment.user.id === user?.id)
+            const sortedUserComments = userComments.sort((a: Comment, b: Comment) => 
               new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
             )
-            commentsMap[post.id] = sortedComments
+            commentsMap[post.id] = sortedUserComments
+
+            // Count user's comments on this post
+            userCommentCountsMap[post.id] = sortedUserComments.length
           }
         } catch (error) {
           console.error(`Error fetching comments for post ${post.id}:`, error)
@@ -145,6 +287,7 @@ export default function ActivitySection({
       }
 
       setPostComments(commentsMap)
+      setUserCommentCounts(userCommentCountsMap)
     } catch (error) {
       console.error('Error fetching comments:', error)
     }
@@ -244,13 +387,56 @@ export default function ActivitySection({
           </div>
         </div>
 
-        <button
-          className="p-3 text-white/70 hover:text-white hover:bg-white/10 rounded-xl transition-all duration-200 hover:scale-105"
-          title="More options"
-          aria-label="More options"
-        >
-          <MoreHorizontal className="w-5 h-5" />
-        </button>
+        {/* Privacy Indicator */}
+        <div className="flex items-center space-x-2 text-white/60">
+          {getPrivacyIcon(post.privacy)}
+          <span className="text-xs capitalize">{post.privacy}</span>
+        </div>
+
+        {canDeletePost(post) && (
+          <div className="relative">
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                setOpenMenu(prev => ({ ...prev, [post.id]: !prev[post.id] }))
+              }}
+              className="p-3 text-white/70 hover:text-white hover:bg-white/10 rounded-xl transition-all duration-200 hover:scale-105"
+              title="More options"
+              aria-label="More options"
+            >
+              <MoreHorizontal className="w-5 h-5" />
+            </button>
+
+            {/* Dropdown Menu */}
+            <AnimatePresence>
+              {openMenu[post.id] && (
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.95, y: -10 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.95, y: -10 }}
+                  transition={{ duration: 0.15 }}
+                  className="absolute right-0 top-full mt-2 w-48 bg-gradient-to-br from-slate-800/95 to-slate-900/95 backdrop-blur-xl border border-white/20 rounded-xl shadow-2xl overflow-hidden z-50"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <button
+                    onClick={() => handleManagePrivacy(post)}
+                    className="w-full flex items-center space-x-3 px-4 py-3 text-white/70 hover:text-white hover:bg-white/10 transition-all duration-200"
+                  >
+                    <Lock className="w-4 h-4" />
+                    <span className="text-sm font-medium">Manage Privacy</span>
+                  </button>
+                  <button
+                    onClick={() => handleDeletePost(post.id)}
+                    className="w-full flex items-center space-x-3 px-4 py-3 text-red-400 hover:bg-red-500/10 transition-all duration-200"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    <span className="text-sm font-medium">Delete Post</span>
+                  </button>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        )}
       </div>
 
       {/* Post Content */}
@@ -262,15 +448,17 @@ export default function ActivitySection({
 
       {/* Post Image */}
       {post.image && (
-        <div className="mb-4 rounded-2xl overflow-hidden bg-gradient-to-br from-white/5 to-transparent border border-white/10 group-hover:border-emerald-400/30 transition-all duration-300">
-          <Image
-            src={post.image}
-            alt="Post image"
-            width={640}
-            height={256}
-            unoptimized={post.image.includes('/svg')}
-            className="w-full h-64 object-cover hover:scale-105 transition-transform duration-500"
-          />
+        <div className="mb-4 flex justify-center">
+          <div className="inline-block border border-white/20 rounded-2xl overflow-hidden">
+            <Image
+              src={post.image}
+              alt="Post image"
+              width={640}
+              height={256}
+              unoptimized={post.image.includes('/svg')}
+              className="max-h-64 sm:max-h-80 md:max-h-96 object-contain hover:scale-105 transition-transform duration-500 rounded-2xl"
+            />
+          </div>
         </div>
       )}
 
@@ -303,6 +491,7 @@ export default function ActivitySection({
           </button>
 
           <button
+            onClick={(e) => handleShareClick(post, e)}
             className="flex items-center justify-center space-x-2 px-4 py-2 text-white/70 hover:text-white hover:bg-gradient-to-r from-white/10 to-white/5 border border-white/10 rounded-2xl transition-all duration-300 hover:scale-105"
             title="Share"
           >
@@ -361,9 +550,12 @@ export default function ActivitySection({
                 {postComments[post.id][0].content}
               </p>
               {postComments[post.id][0].image_url && (
-                <div className="mt-2 rounded-lg overflow-hidden max-w-xs">
+                <div className="mt-2 overflow-hidden max-w-xs border border-white/20 rounded-2xl inline-block">
                   <Image
-                    src={postComments[post.id][0].image_url!}
+                    src={postComments[post.id][0].image_url!.startsWith('http') ?
+                      postComments[post.id][0].image_url! :
+                      `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}${postComments[post.id][0].image_url!}`
+                    }
                     alt="Comment image"
                     width={200}
                     height={150}
@@ -372,9 +564,9 @@ export default function ActivitySection({
                   />
                 </div>
               )}
-              {post.comments > 1 && (
+              {userCommentCounts[post.id] > 1 && (
                 <div className="mt-2 text-white/60 text-xs">
-                  + {post.comments - 1} more comment{post.comments - 1 !== 1 ? 's' : ''}
+                  + {userCommentCounts[post.id] - 1} more comment{userCommentCounts[post.id] - 1 !== 1 ? 's' : ''}
                 </div>
               )}
             </div>
@@ -441,6 +633,24 @@ export default function ActivitySection({
     return (
       <div className="space-y-6">
         {postsToShow.map((post, index) => renderPostCard(post, activitySubTab, index))}
+        {hasMoreResults && onLoadMore && (
+          <div className="flex justify-center py-6">
+            <button
+              onClick={onLoadMore}
+              disabled={isLoadingMore}
+              className="px-6 py-3 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 disabled:from-gray-500 disabled:to-gray-600 text-white rounded-2xl font-semibold transition-all duration-300 hover:scale-105 disabled:hover:scale-100 disabled:cursor-not-allowed shadow-lg hover:shadow-xl flex items-center space-x-2"
+            >
+              {isLoadingMore ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                  <span>Loading...</span>
+                </>
+              ) : (
+                <span>Load More Posts</span>
+              )}
+            </button>
+          </div>
+        )}
       </div>
     )
   }
@@ -507,7 +717,7 @@ export default function ActivitySection({
           </div>
         </div>
       </div>
-      <div className="flex-1 overflow-y-scroll scrollbar-hide" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+      <div ref={resultsContainerRef} className="flex-1 overflow-y-scroll scrollbar-hide" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
         {renderContent()}
       </div>
 
@@ -662,6 +872,88 @@ export default function ActivitySection({
             </div>
           </div>
         </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      <AnimatePresence>
+        {Object.entries(showDeleteConfirm).some(([_, show]) => show) && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+            onClick={() => setShowDeleteConfirm({})}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-gradient-to-br from-slate-800/95 to-slate-900/95 backdrop-blur-xl border border-white/20 rounded-2xl p-6 max-w-sm w-full mx-4"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="text-center">
+                <div className="w-12 h-12 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Trash2 className="w-6 h-6 text-red-400" />
+                </div>
+                <h3 className="text-white font-semibold text-lg mb-2">Delete Post</h3>
+                <p className="text-white/70 text-sm mb-6">
+                  Are you sure you want to delete this post? This action cannot be undone.
+                </p>
+                <div className="flex space-x-3">
+                  <button
+                    onClick={() => setShowDeleteConfirm({})}
+                    className="flex-1 px-4 py-2 text-white/70 hover:text-white hover:bg-white/10 rounded-xl transition-all duration-200"
+                    disabled={Object.values(isDeleting).some(deleting => deleting)}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => {
+                      const postId = Object.keys(showDeleteConfirm).find((key) => showDeleteConfirm[parseInt(key)] !== false)
+                      if (postId) {
+                        confirmDeletePost(parseInt(postId))
+                      }
+                    }}
+                    className="flex-1 px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                    disabled={Object.values(isDeleting).some(deleting => deleting)}
+                  >
+                    {Object.values(isDeleting).some(deleting => deleting) ? 'Deleting...' : 'Delete'}
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Manage Privacy Modal */}
+      <ManagePrivacy
+        show={showManagePrivacy}
+        onClose={() => {
+          setShowManagePrivacy(false)
+          setSelectedPostForPrivacy(null)
+          setCurrentSelectedUsers([])
+        }}
+        postId={selectedPostForPrivacy?.id || 0}
+        currentPrivacy={selectedPostForPrivacy?.privacy as 'public' | 'followers' | 'friends' | 'listed' || 'public'}
+        currentSelectedUsers={currentSelectedUsers}
+        availableUsers={availableUsers}
+        loadingUsers={loadingUsers}
+        onUpdatePrivacy={handleUpdatePrivacy}
+      />
+
+      {/* Share Popup */}
+      {isSharePopupOpen && selectedPostForShare && (
+        <SharePopup
+          postId={selectedPostForShare.id}
+          isOpen={isSharePopupOpen}
+          onClose={() => {
+            setIsSharePopupOpen(false)
+            setSelectedPostForShare(null)
+          }}
+          onShareSuccess={() => {
+          }}
+        />
       )}
     </div>
   )}

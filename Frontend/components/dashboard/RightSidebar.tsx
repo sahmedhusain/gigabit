@@ -397,7 +397,7 @@ export default function RightSidebar({
                         />
                       ) : (
                         <div className="w-full h-full rounded-full bg-gradient-to-r from-emerald-400 to-teal-500 flex items-center justify-center text-white font-bold">
-                          {currentUser?.name?.[0]?.toUpperCase() || <User className="w-5 h-5" />}
+                          {currentUser?.name?.[0]?.toUpperCase() || '?'}{currentUser?.name?.[1]?.toUpperCase() || ''}
                         </div>
                       );
                     })()}
@@ -984,14 +984,20 @@ export default function RightSidebar({
                                       onClick={(e) => { e.stopPropagation(); onUserClick(followingUser); }}
                                     >
                                       <div className="relative flex-shrink-0">
-                                        <Image
-                                          src={followingUser.avatar || followingUser.profile_image || '/default-avatar.png'}
-                                          alt={followingUser.username || 'User'}
-                                          width={44}
-                                          height={44}
-                                          unoptimized={(followingUser.avatar || followingUser.profile_image || '/default-avatar.png').includes('/svg')}
-                                          className="w-11 h-11 rounded-full border-2 border-green-400/50 group-hover:border-green-400 group-hover:scale-105 transition-all duration-300"
-                                        />
+                                        {getAvatarUrl(followingUser.avatar || followingUser.profile_image) ? (
+                                          <Image
+                                            src={getAvatarUrl(followingUser.avatar || followingUser.profile_image)!}
+                                            alt={followingUser.username || 'User'}
+                                            width={44}
+                                            height={44}
+                                            unoptimized={getAvatarUrl(followingUser.avatar || followingUser.profile_image)!.includes('/svg')}
+                                            className="w-11 h-11 rounded-full border-2 border-green-400/50 group-hover:border-green-400 group-hover:scale-105 transition-all duration-300"
+                                          />
+                                        ) : (
+                                          <div className="w-11 h-11 rounded-full bg-gradient-to-r from-emerald-400 to-teal-500 flex items-center justify-center text-white font-bold border-2 border-green-400/50 group-hover:border-green-400 group-hover:scale-105 transition-all duration-300">
+                                            {followingUser.first_name?.[0] || followingUser.name?.[0] || followingUser.username?.[0] || '?'}{followingUser.last_name?.[0] || followingUser.name?.[1] || followingUser.username?.[1] || ''}
+                                          </div>
+                                        )}
                                         <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-green-500 rounded-full border-2 border-white animate-pulse"></div>
                                       </div>
                                       <div className="flex-1 min-w-0">
@@ -1043,14 +1049,20 @@ export default function RightSidebar({
                                       onClick={(e) => { e.stopPropagation(); onUserClick(followingUser); }}
                                     >
                                       <div className="relative flex-shrink-0">
-                                        <Image
-                                          src={followingUser.avatar || followingUser.profile_image || '/default-avatar.png'}
-                                          alt={followingUser.username || 'User'}
-                                          width={44}
-                                          height={44}
-                                          unoptimized={(followingUser.avatar || followingUser.profile_image || '/default-avatar.png').includes('/svg')}
-                                          className="w-11 h-11 rounded-full border-2 border-red-400/50 group-hover:border-red-400 group-hover:scale-105 transition-all duration-300"
-                                        />
+                                        {getAvatarUrl(followingUser.avatar || followingUser.profile_image) ? (
+                                          <Image
+                                            src={getAvatarUrl(followingUser.avatar || followingUser.profile_image)!}
+                                            alt={followingUser.username || 'User'}
+                                            width={44}
+                                            height={44}
+                                            unoptimized={getAvatarUrl(followingUser.avatar || followingUser.profile_image)!.includes('/svg')}
+                                            className="w-11 h-11 rounded-full border-2 border-red-400/50 group-hover:border-red-400 group-hover:scale-105 transition-all duration-300"
+                                          />
+                                        ) : (
+                                          <div className="w-11 h-11 rounded-full bg-gradient-to-r from-emerald-400 to-teal-500 flex items-center justify-center text-white font-bold border-2 border-red-400/50 group-hover:border-red-400 group-hover:scale-105 transition-all duration-300">
+                                            {followingUser.first_name?.[0] || followingUser.name?.[0] || followingUser.username?.[0] || '?'}{followingUser.last_name?.[0] || followingUser.name?.[1] || followingUser.username?.[1] || ''}
+                                          </div>
+                                        )}
                                         <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-red-500 rounded-full border-2 border-white"></div>
                                       </div>
                                       <div className="flex-1 min-w-0">
@@ -1102,14 +1114,20 @@ export default function RightSidebar({
                                       onClick={(e) => { e.stopPropagation(); onUserClick(followingUser); }}
                                     >
                                       <div className="relative flex-shrink-0">
-                                        <Image
-                                          src={followingUser.avatar || followingUser.profile_image || '/default-avatar.png'}
-                                          alt={followingUser.username || 'User'}
-                                          width={44}
-                                          height={44}
-                                          unoptimized={(followingUser.avatar || followingUser.profile_image || '/default-avatar.png').includes('/svg')}
-                                          className="w-11 h-11 rounded-full border-2 border-yellow-400/50 group-hover:border-yellow-400 group-hover:scale-105 transition-all duration-300"
-                                        />
+                                        {getAvatarUrl(followingUser.avatar || followingUser.profile_image) ? (
+                                          <Image
+                                            src={getAvatarUrl(followingUser.avatar || followingUser.profile_image)!}
+                                            alt={followingUser.username || 'User'}
+                                            width={44}
+                                            height={44}
+                                            unoptimized={getAvatarUrl(followingUser.avatar || followingUser.profile_image)!.includes('/svg')}
+                                            className="w-11 h-11 rounded-full border-2 border-yellow-400/50 group-hover:border-yellow-400 group-hover:scale-105 transition-all duration-300"
+                                          />
+                                        ) : (
+                                          <div className="w-11 h-11 rounded-full bg-gradient-to-r from-emerald-400 to-teal-500 flex items-center justify-center text-white font-bold border-2 border-yellow-400/50 group-hover:border-yellow-400 group-hover:scale-105 transition-all duration-300">
+                                            {followingUser.first_name?.[0] || followingUser.name?.[0] || followingUser.username?.[0] || '?'}{followingUser.last_name?.[0] || followingUser.name?.[1] || followingUser.username?.[1] || ''}
+                                          </div>
+                                        )}
                                         <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-yellow-500 rounded-full border-2 border-white"></div>
                                       </div>
                                       <div className="flex-1 min-w-0">
@@ -1161,14 +1179,20 @@ export default function RightSidebar({
                                       onClick={(e) => { e.stopPropagation(); onUserClick(followingUser); }}
                                     >
                                       <div className="relative flex-shrink-0">
-                                        <Image
-                                          src={followingUser.avatar || followingUser.profile_image || '/default-avatar.png'}
-                                          alt={followingUser.username || 'User'}
-                                          width={44}
-                                          height={44}
-                                          unoptimized={(followingUser.avatar || followingUser.profile_image || '/default-avatar.png').includes('/svg')}
-                                          className="w-11 h-11 rounded-full border-2 border-gray-400/50 group-hover:border-gray-400 group-hover:scale-105 transition-all duration-300"
-                                        />
+                                        {getAvatarUrl(followingUser.avatar || followingUser.profile_image) ? (
+                                          <Image
+                                            src={getAvatarUrl(followingUser.avatar || followingUser.profile_image)!}
+                                            alt={followingUser.username || 'User'}
+                                            width={44}
+                                            height={44}
+                                            unoptimized={getAvatarUrl(followingUser.avatar || followingUser.profile_image)!.includes('/svg')}
+                                            className="w-11 h-11 rounded-full border-2 border-gray-400/50 group-hover:border-gray-400 group-hover:scale-105 transition-all duration-300"
+                                          />
+                                        ) : (
+                                          <div className="w-11 h-11 rounded-full bg-gradient-to-r from-emerald-400 to-teal-500 flex items-center justify-center text-white font-bold border-2 border-gray-400/50 group-hover:border-gray-400 group-hover:scale-105 transition-all duration-300">
+                                            {followingUser.first_name?.[0] || followingUser.name?.[0] || followingUser.username?.[0] || '?'}{followingUser.last_name?.[0] || followingUser.name?.[1] || followingUser.username?.[1] || ''}
+                                          </div>
+                                        )}
                                         <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-gray-500 rounded-full border-2 border-white"></div>
                                       </div>
                                       <div className="flex-1 min-w-0">
@@ -1253,14 +1277,20 @@ export default function RightSidebar({
                           >
                             <div className="flex items-start space-x-3">
                               <div className="relative flex-shrink-0">
-                                <Image
-                                  src={request.user?.avatar || '/default-avatar.png'}
-                                  alt={request.user?.first_name + ' ' + request.user?.last_name}
-                                  width={40}
-                                  height={40}
-                                  unoptimized={(request.user?.avatar || '/default-avatar.png').includes('/svg')}
-                                  className="w-10 h-10 rounded-full border-2 border-orange-400/50 group-hover:border-orange-400 transition-colors"
-                                />
+                                {getAvatarUrl(request.user?.avatar) ? (
+                                  <Image
+                                    src={getAvatarUrl(request.user?.avatar)!}
+                                    alt={request.user?.first_name + ' ' + request.user?.last_name}
+                                    width={40}
+                                    height={40}
+                                    unoptimized={getAvatarUrl(request.user?.avatar)!.includes('/svg')}
+                                    className="w-10 h-10 rounded-full border-2 border-orange-400/50 group-hover:border-orange-400 transition-colors"
+                                  />
+                                ) : (
+                                  <div className="w-10 h-10 rounded-full bg-gradient-to-r from-emerald-400 to-teal-500 flex items-center justify-center text-white font-bold border-2 border-orange-400/50 group-hover:border-orange-400 transition-colors">
+                                    {request.user?.first_name?.[0] || request.user?.nickname?.[0] || '?'}{request.user?.last_name?.[0] || request.user?.nickname?.[1] || ''}
+                                  </div>
+                                )}
                                 <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-orange-500 rounded-full border-2 border-white flex items-center justify-center">
                                   <UserPlus className="w-2 h-2 text-white" />
                                 </div>
@@ -1336,16 +1366,24 @@ export default function RightSidebar({
                           >
                             <div className="flex items-start space-x-3">
                               <div className="relative flex-shrink-0">
-                                <Image
-                                  src={(invitation.type === 'join_request' ? invitation.request_user?.avatar : invitation.group?.creator?.avatar) || '/default-avatar.png'}
-                                  alt={invitation.type === 'join_request'
-                                    ? `${invitation.request_user?.first_name || ''} ${invitation.request_user?.last_name || ''}`
-                                    : `${invitation.group?.creator?.first_name || ''} ${invitation.group?.creator?.last_name || ''}`}
-                                  width={40}
-                                  height={40}
-                                  unoptimized={((invitation.type === 'join_request' ? invitation.request_user?.avatar : invitation.group?.creator?.avatar) || '/default-avatar.png').includes('/svg')}
-                                  className="w-10 h-10 rounded-full border-2 border-orange-400/50 group-hover:border-orange-400 transition-colors"
-                                />
+                                {getAvatarUrl((invitation.type === 'join_request' ? invitation.request_user?.avatar : invitation.group?.creator?.avatar)) ? (
+                                  <Image
+                                    src={getAvatarUrl((invitation.type === 'join_request' ? invitation.request_user?.avatar : invitation.group?.creator?.avatar))!}
+                                    alt={invitation.type === 'join_request'
+                                      ? `${invitation.request_user?.first_name || ''} ${invitation.request_user?.last_name || ''}`
+                                      : `${invitation.group?.creator?.first_name || ''} ${invitation.group?.creator?.last_name || ''}`}
+                                    width={40}
+                                    height={40}
+                                    unoptimized={getAvatarUrl((invitation.type === 'join_request' ? invitation.request_user?.avatar : invitation.group?.creator?.avatar))!.includes('/svg')}
+                                    className="w-10 h-10 rounded-full border-2 border-orange-400/50 group-hover:border-orange-400 transition-colors"
+                                  />
+                                ) : (
+                                  <div className="w-10 h-10 rounded-full bg-gradient-to-r from-emerald-400 to-teal-500 flex items-center justify-center text-white font-bold border-2 border-orange-400/50 group-hover:border-orange-400 transition-colors">
+                                    {invitation.type === 'join_request'
+                                      ? (invitation.request_user?.first_name?.[0] || invitation.request_user?.nickname?.[0] || '?') + (invitation.request_user?.last_name?.[0] || invitation.request_user?.nickname?.[1] || '')
+                                      : (invitation.group?.creator?.first_name?.[0] || invitation.group?.title?.[0] || '?') + (invitation.group?.creator?.last_name?.[0] || invitation.group?.title?.[1] || '')}
+                                  </div>
+                                )}
                                 <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-orange-500 rounded-full border-2 border-white flex items-center justify-center">
                                   <Users className="w-2 h-2 text-white" />
                                 </div>

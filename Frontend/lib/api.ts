@@ -63,6 +63,18 @@ export interface MessageItem {
   message_type: 'private' | 'group';
   image_url?: string;
   created_at: string;
+  shared_post?: {
+    id: number;
+    user_id: number;
+    content: string;
+    image_url?: string;
+    privacy: string;
+    created_at: string;
+    user: User;
+    like_count: number;
+    comment_count: number;
+    share_count: number;
+  };
   [key: string]: unknown;
 }
 
@@ -121,8 +133,10 @@ export interface APIPost {
   user: User;
   like_count: number;
   comment_count: number;
+  share_count: number;
   is_liked: boolean;
   is_bookmarked: boolean;
+  specific_user_ids?: number[];
   comments?: Comment[];
 }
 
@@ -228,6 +242,7 @@ export interface PostResponse {
   like_count: number;
   dislike_count: number;
   comment_count: number;
+  share_count: number;
   is_liked: boolean;
   is_disliked: boolean;
   is_bookmarked: boolean;
@@ -249,6 +264,10 @@ export interface GroupResponse {
   title: string;
   description: string;
   privacy: 'public' | 'private';
+  create_posts: 'all_members' | 'admins_only';
+  create_polls: 'all_members' | 'admins_only';
+  create_events: 'all_members' | 'admins_only';
+  send_messages: 'all_members' | 'admins_only';
   avatar?: string;
   creator_id: number;
   member_count: number;
@@ -386,14 +405,20 @@ export interface CreatePostRequest {
 }
 
 export interface UpdatePostRequest {
-  content: string;
+  content?: string;
   image_url?: string;
+  privacy?: 'public' | 'followers' | 'friends' | 'listed';
+  specific_user_ids?: number[];
 }
 
 export interface CreateGroupRequest {
   title: string;
-  description: string;
+  description?: string;
   privacy: 'public' | 'private';
+  create_posts: 'all_members' | 'admins_only';
+  create_polls: 'all_members' | 'admins_only';
+  create_events: 'all_members' | 'admins_only';
+  send_messages: 'all_members' | 'admins_only';
   invite_members?: number[];
   avatar?: string;
 }
@@ -646,27 +671,25 @@ export class ApiClient {
   }
 
   // Posts endpoints
-  async getFeed(limit: number = 20, offset: number = 0, filter?: string): Promise<{ data: PostResponse[] }> {
+  async getFeed(limit: number = 20, offset: number = 0, filter?: string): Promise<{ posts: PostResponse[]; limit: number; offset: number }> {
     let url = `/api/feed?limit=${limit}&offset=${offset}`;
     if (filter) {
       url += `&filter=${filter}`;
     }
-    const response = await this.request<{ count: number; limit: number; offset: number; posts: PostResponse[] }>(url, {
+    return this.request<{ limit: number; offset: number; posts: PostResponse[] }>(url, {
       method: 'GET',
     });
-    // Transform the response to match the expected format
-    return { data: response.posts };
   }
 
-  async getAllFeed(limit: number = 20, offset: number = 0): Promise<{ data: PostResponse[] }> {
+  async getAllFeed(limit: number = 20, offset: number = 0): Promise<{ posts: PostResponse[]; limit: number; offset: number }> {
     return this.getFeed(limit, offset, 'all');
   }
 
-  async getFollowingFeed(limit: number = 20, offset: number = 0): Promise<{ data: PostResponse[] }> {
+  async getFollowingFeed(limit: number = 20, offset: number = 0): Promise<{ posts: PostResponse[]; limit: number; offset: number }> {
     return this.getFeed(limit, offset, 'following');
   }
 
-  async getFriendsFeed(limit: number = 20, offset: number = 0): Promise<{ data: PostResponse[] }> {
+  async getFriendsFeed(limit: number = 20, offset: number = 0): Promise<{ posts: PostResponse[]; limit: number; offset: number }> {
     return this.getFeed(limit, offset, 'friends');
   }
 
@@ -676,8 +699,14 @@ export class ApiClient {
     });
   }
 
-  async getPost(id: number): Promise<APIPost> {
-    return this.request<APIPost>(`/api/posts/${id}`, {
+  async getPost(id: number, sort?: 'newest' | 'oldest'): Promise<APIPost> {
+    const params = new URLSearchParams();
+    if (sort) {
+      params.append('sort', sort);
+    }
+    const queryString = params.toString();
+    const url = queryString ? `/api/posts/${id}?${queryString}` : `/api/posts/${id}`;
+    return this.request<APIPost>(url, {
       method: 'GET',
     });
   }
@@ -751,6 +780,27 @@ export class ApiClient {
     });
   }
 
+  // Share endpoints
+  async sharePost(data: { post_id: number; conversation_ids: number[]; group_ids: number[]; user_ids?: number[] }): Promise<{ message: string }> {
+    return this.request<{ message: string }>('/api/share', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async getRecentChatsAndGroups(): Promise<{ chats: any[] }> {
+    return this.request<{ chats: any[] }>('/api/share/recent', {
+      method: 'GET',
+    });
+  }
+
+  async searchShareableEntities(query: string): Promise<{ chats: any[] }> {
+    const params = new URLSearchParams({ q: query });
+    return this.request<{ chats: any[] }>(`/api/share/search?${params}`, {
+      method: 'GET',
+    });
+  }
+
   // Comment endpoints
   async getPostComments(postId: number, limit: number = 20, offset: number = 0): Promise<{ comments: Comment[], count: number, post_id: number }> {
     return this.request<{ comments: Comment[], count: number, post_id: number }>(`/api/posts/${postId}/comments?limit=${limit}&offset=${offset}`, {
@@ -818,6 +868,13 @@ export class ApiClient {
     });
   }
 
+  async inviteUsersToGroup(groupId: number, userIds: number[]): Promise<{ message: string }> {
+    return this.request<{ message: string }>(`/api/groups/${groupId}/invite`, {
+      method: 'POST',
+      body: JSON.stringify({ user_ids: userIds }),
+    });
+  }
+
   async acceptGroupInvitation(groupId: number): Promise<{ message: string }> {
     return this.request<{ message: string }>(`/api/groups/${groupId}/invitation`, {
       method: 'PUT',
@@ -855,6 +912,19 @@ export class ApiClient {
     return this.request<{ message: string }>(`/api/groups/${groupId}/demote`, {
       method: 'POST',
       body: JSON.stringify({ user_id: userId }),
+    });
+  }
+
+  async kickMember(groupId: number, userId: number): Promise<{ message: string }> {
+    return this.request<{ message: string }>(`/api/groups/${groupId}/members/${userId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async updateMemberRole(groupId: number, userId: number, role: 'admin' | 'member'): Promise<{ message: string }> {
+    return this.request<{ message: string }>(`/api/groups/${groupId}/members/${userId}/role`, {
+      method: 'PUT',
+      body: JSON.stringify({ role }),
     });
   }
 
@@ -1242,6 +1312,63 @@ export class ApiClient {
     return this.request<{ message: string }>(`/api/groups/${groupId}/request/${userId}`, {
       method: 'PUT',
       body: JSON.stringify({ action }),
+    });
+  }
+
+  async updateGroupPrivacy(groupId: number, privacy: 'public' | 'private'): Promise<{ message: string }> {
+    return this.request<{ message: string }>(`/api/groups/${groupId}/privacy`, {
+      method: 'PUT',
+      body: JSON.stringify({ privacy }),
+    });
+  }
+
+  async updateGroupPermissions(groupId: number, permissions: { create_posts: 'all_members' | 'admins_only'; create_polls: 'all_members' | 'admins_only'; create_events: 'all_members' | 'admins_only'; send_messages: 'all_members' | 'admins_only' }): Promise<{ message: string }> {
+    return this.request<{ message: string }>(`/api/groups/${groupId}/permissions`, {
+      method: 'PUT',
+      body: JSON.stringify(permissions),
+    });
+  }
+
+  async getInvitableUsers(groupId: number, searchTerm?: string): Promise<{ users: User[]; count: number }> {
+    const params = new URLSearchParams();
+    if (searchTerm) {
+      params.append('search', searchTerm);
+    }
+    const queryString = params.toString();
+    const url = queryString ? `/api/users/invitable/${groupId}?${queryString}` : `/api/users/invitable/${groupId}`;
+    return this.request<{ users: User[]; count: number }>(url, {
+      method: 'GET',
+    });
+  }
+
+  async getSentJoinRequests(groupId: number): Promise<{ requests: Member[]; count: number }> {
+    return this.request<{ requests: Member[]; count: number }>(`/api/groups/${groupId}/join-requests/sent`, {
+      method: 'GET',
+    });
+  }
+
+  async getReceivedJoinRequests(groupId: number): Promise<{ requests: Member[]; count: number }> {
+    return this.request<{ requests: Member[]; count: number }>(`/api/groups/${groupId}/join-requests/received`, {
+      method: 'GET',
+    });
+  }
+
+  async deleteGroupMessage(groupId: number, messageId: number): Promise<{ message: string }> {
+    return this.request<{ message: string }>(`/api/groups/${groupId}/messages/${messageId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async updateGroup(groupId: number, data: { title?: string; description?: string; avatar?: string | null }): Promise<{ message: string }> {
+    return this.request<{ message: string }>(`/api/groups/${groupId}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteGroup(groupId: number): Promise<{ message: string }> {
+    return this.request<{ message: string }>(`/api/groups/${groupId}`, {
+      method: 'DELETE',
     });
   }
 }

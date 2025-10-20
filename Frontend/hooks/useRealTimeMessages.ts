@@ -18,6 +18,25 @@ interface Message {
     last_name: string
     avatar: string
   }
+  shared_post?: {
+    id: number
+    user_id: number
+    content: string
+    image_url?: string
+    privacy: string
+    created_at: string
+    user: {
+      id: number
+      email: string
+      first_name: string
+      last_name: string
+      avatar?: string
+      nickname?: string
+    }
+    like_count: number
+    comment_count: number
+    share_count: number
+  }
 }
 
 export function useRealTimeMessages() {
@@ -33,12 +52,24 @@ export function useRealTimeMessages() {
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
+  // Helper function to deduplicate messages by ID
+  const deduplicateMessages = (messages: Message[]): Message[] => {
+    const seen = new Set<number>()
+    return messages.filter(msg => {
+      if (seen.has(msg.id)) {
+        return false
+      }
+      seen.add(msg.id)
+      return true
+    })
+  }
+
   // WebSocket subscription for real-time message updates
   const { send, isConnected } = useWebSocketSubscription({
     messageTypes: ['private_message', 'group_message'],
     onMessage: (message) => {
       console.log('WebSocket message received:', message)
-      
+
       if (message.type === 'private_message' || message.type === 'group_message') {
         // Get conversation ID from message data
         const conversationId = (message as any).data?.conversation_id || 0
@@ -65,7 +96,8 @@ export function useRealTimeMessages() {
             first_name: (message as any).sender_name || 'Unknown',
             last_name: '',
             avatar: (message as any).sender_avatar || ''
-          }
+          },
+          shared_post: (message as any).data?.shared_post
         }
 
         console.log('Processing WebSocket message:', { message, conversationId, newMessage })
@@ -74,27 +106,27 @@ export function useRealTimeMessages() {
         setMessages(prev => {
           const conversationMessages = prev.get(conversationId) || []
           const updated = new Map(prev)
-          
-          // Check if message already exists to prevent duplicates
+
+          // More comprehensive duplicate check
           let messageExists = false
           let optimisticMessageIndex = -1
-          
-          // Look for exact ID match first (for real messages with server IDs)
+
+          // Check for exact ID match (for real messages with server IDs)
           if (newMessage.id && newMessage.id < 1000000000000) {
             messageExists = conversationMessages.some(msg => msg.id === newMessage.id)
           }
-          
-          // If no exact ID match, look for optimistic message to replace
+
+          // If no exact ID match and message is from current user, look for optimistic message to replace
           if (!messageExists && newMessage.sender_id === user?.id) {
             optimisticMessageIndex = conversationMessages.findIndex(msg => {
               // Check if this is an optimistic message (high ID) with same content/sender
-              return msg.id >= 1000000000000 && 
-                     msg.content === newMessage.content && 
+              return msg.id >= 1000000000000 &&
+                     msg.content === newMessage.content &&
                      msg.sender_id === newMessage.sender_id &&
                      Math.abs(new Date(msg.created_at).getTime() - new Date(newMessage.created_at).getTime()) < 30000 // Within 30 seconds
             })
           }
-          
+
           if (optimisticMessageIndex !== -1) {
             // Replace optimistic message with real message
             const updatedMessages = [...conversationMessages]
@@ -102,13 +134,19 @@ export function useRealTimeMessages() {
             updated.set(conversationId, updatedMessages)
             console.log(`🔄 Replaced optimistic message in conversation ${conversationId}:`, newMessage.content.substring(0, 50))
           } else if (!messageExists) {
-            // Add new message
-            updated.set(conversationId, [...conversationMessages, newMessage])
-            console.log(`✅ Added new message to conversation ${conversationId}:`, newMessage.content.substring(0, 50))
+            // Add new message - ensure no duplicates by checking again
+            const finalMessages = [...conversationMessages]
+            const duplicateIndex = finalMessages.findIndex(msg => msg.id === newMessage.id)
+            if (duplicateIndex === -1) {
+              updated.set(conversationId, [...finalMessages, newMessage])
+              console.log(`✅ Added new message to conversation ${conversationId}:`, newMessage.content.substring(0, 50))
+            } else {
+              console.log(`⛔ Duplicate message prevented (final check) for conversation ${conversationId}:`, newMessage.content.substring(0, 50))
+            }
           } else {
             console.log(`⛔ Duplicate message prevented for conversation ${conversationId}:`, newMessage.content.substring(0, 50))
           }
-          
+
           return updated
         })
 
@@ -193,24 +231,34 @@ export function useRealTimeMessages() {
             first_name: msg.sender?.first_name || 'Unknown',
             last_name: msg.sender?.last_name || 'User',
             avatar: msg.sender?.avatar || ''
-          }
+          },
+          shared_post: msg.shared_post
         }))
         .reverse() // Reverse to show oldest first, newest last
+
+      // Filter out any duplicates in the transformed messages themselves
+      const uniqueTransformedMessages = transformedMessages.filter((msg, index, self) =>
+        index === self.findIndex(m => m.id === msg.id)
+      )
 
       // Update messages map
       setMessages(prev => {
         const conversationMessages = prev.get(conversationId) || []
         const updated = new Map(prev)
-        
+
         if (append) {
+          // Create a set of existing message IDs to avoid duplicates
+          const existingIds = new Set(conversationMessages.map(msg => msg.id))
+          // Filter out messages that already exist
+          const newMessages = uniqueTransformedMessages.filter(msg => !existingIds.has(msg.id))
           // Append older messages at the beginning
-          updated.set(conversationId, [...transformedMessages, ...conversationMessages])
+          updated.set(conversationId, [...newMessages, ...conversationMessages])
         } else {
-          // Replace messages (initial load)
-          updated.set(conversationId, transformedMessages)
+          // Replace messages (initial load) - still filter duplicates just in case
+          updated.set(conversationId, uniqueTransformedMessages)
         }
-        
-        console.log(`Loaded ${transformedMessages.length} messages for conversation ${conversationId} (append: ${append})`)
+
+        console.log(`Loaded ${uniqueTransformedMessages.length} unique messages for conversation ${conversationId} (append: ${append})`)
         return updated
       })
 

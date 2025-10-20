@@ -192,7 +192,7 @@ export default function ChatItem({ item, onClick, onDelete, getUserStatus, typin
   const hasUnread = resolvedUnread > 0 || hasManualUnread;
 
   // Normalize avatar to a usable URL if it's an ID or relative token
-  const normalizedAvatar = item.avatar && !imageError ? getAvatarUrl(item.avatar) || undefined : undefined;
+  const normalizedAvatar = !imageError ? getAvatarUrl(item.avatar) : null;
 
   // Close menu when clicking outside
   useEffect(() => {
@@ -410,7 +410,7 @@ export default function ChatItem({ item, onClick, onDelete, getUserStatus, typin
                   'bg-gradient-to-r from-gray-400 to-gray-500'
               }`}>
               <motion.div
-                className="w-full h-full bg-gradient-to-br from-slate-600 to-slate-800 rounded-full flex items-center justify-center text-white font-bold text-xl shadow-lg overflow-hidden"
+                className="w-full h-full bg-gradient-to-br from-emerald-400 to-teal-600 rounded-full flex items-center justify-center text-white font-bold text-xl shadow-lg overflow-hidden"
                 whileHover={{ rotate: [0, -5, 5, 0], scale: 1.05 }}
                 transition={{ duration: 0.3 }}
               >
@@ -424,7 +424,9 @@ export default function ChatItem({ item, onClick, onDelete, getUserStatus, typin
                     onError={() => setImageError(true)}
                   />
               ) : (
-                item.name?.charAt(0).toUpperCase()
+                <span className="text-white font-bold text-xl">
+                  {item.name?.charAt(0).toUpperCase() || '?'}
+                </span>
               )}
               </motion.div>
             </div>
@@ -437,14 +439,18 @@ export default function ChatItem({ item, onClick, onDelete, getUserStatus, typin
               {normalizedAvatar ? (
                 <Image
                   src={normalizedAvatar}
-                  alt={item.name || 'Avatar'}
+                  alt={item.name || 'Group Avatar'}
                   width={56}
                   height={56}
-                  className="w-full h-full object-cover"
+                  className="w-full h-full object-cover rounded-full"
                   onError={() => setImageError(true)}
                 />
               ) : (
-                getGroupInitials(item.name || '')
+                <div className="w-full h-full bg-gradient-to-br from-emerald-400 to-teal-600 rounded-full flex items-center justify-center">
+                  <span className="text-white font-bold text-xl">
+                    {getGroupInitials(item.name || 'Group')}
+                  </span>
+                </div>
               )}
             </motion.div>
           )}
@@ -803,7 +809,7 @@ export default function ChatItem({ item, onClick, onDelete, getUserStatus, typin
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
-              className="bg-white/10 backdrop-blur-xl rounded-2xl p-6 border border-white/20 max-w-sm mx-4"
+              className="bg-gradient-to-br from-slate-800/95 to-slate-900/95 backdrop-blur-xl border border-white/20 rounded-2xl p-6 max-w-sm mx-4"
               onMouseDown={(e) => {
                 e.stopPropagation();
                 (e as any).nativeEvent?.stopImmediatePropagation?.();
@@ -813,27 +819,32 @@ export default function ChatItem({ item, onClick, onDelete, getUserStatus, typin
                 (e as any).nativeEvent?.stopImmediatePropagation?.();
               }}
             >
-              <h3 className="text-white text-lg font-semibold mb-4">Delete Conversation</h3>
-              <p className="text-white/70 mb-6">
-                Are you sure you want to delete this conversation? This action cannot be undone.
-              </p>
-              <div className="flex space-x-3">
-                <motion.button
-                  onClick={() => setShowDeleteConfirm(false)}
-                  className="flex-1 py-2 px-4 bg-white/10 hover:bg-white/20 text-white rounded-lg transition-colors"
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                >
-                  Cancel
-                </motion.button>
-                <motion.button
-                  onClick={handleDelete}
-                  className="flex-1 py-2 px-4 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-colors"
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                >
-                  Delete
-                </motion.button>
+              <div className="text-center">
+                <div className="w-12 h-12 bg-gradient-to-br from-red-500/20 to-red-600/20 rounded-full flex items-center justify-center mx-auto mb-4 border border-red-400/30">
+                  <Trash2 className="w-6 h-6 text-red-400" />
+                </div>
+                <h3 className="text-white text-lg font-semibold mb-2">Delete Conversation</h3>
+                <p className="text-white/70 text-sm mb-6">
+                  Are you sure you want to delete this conversation? This action cannot be undone.
+                </p>
+                <div className="flex space-x-3">
+                  <motion.button
+                    onClick={() => setShowDeleteConfirm(false)}
+                    className="flex-1 py-3 px-4 bg-gradient-to-r from-white/10 to-white/5 hover:from-white/15 hover:to-white/10 text-white rounded-2xl border border-white/20 hover:border-white/30 transition-all duration-300 shadow-lg hover:shadow-white/10"
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                  >
+                    Cancel
+                  </motion.button>
+                  <motion.button
+                    onClick={handleDelete}
+                    className="flex-1 py-3 px-4 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white rounded-2xl border border-red-400/30 hover:border-red-500/50 transition-all duration-300 shadow-lg hover:shadow-red-500/25"
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                  >
+                    Delete
+                  </motion.button>
+                </div>
               </div>
             </motion.div>
           </motion.div>
@@ -862,7 +873,7 @@ export default function ChatItem({ item, onClick, onDelete, getUserStatus, typin
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
-              className="bg-white/10 backdrop-blur-xl rounded-2xl p-6 border border-white/20 max-w-sm mx-4"
+              className="bg-gradient-to-br from-slate-800/95 to-slate-900/95 backdrop-blur-xl border border-white/20 rounded-2xl p-6 max-w-sm mx-4"
               onMouseDown={(e) => {
                 e.stopPropagation();
                 (e as any).nativeEvent?.stopImmediatePropagation?.();
@@ -955,7 +966,7 @@ export default function ChatItem({ item, onClick, onDelete, getUserStatus, typin
                     <div className="flex space-x-3">
                       <motion.button
                         onClick={() => setShowLeaveConfirm(false)}
-                        className="flex-1 py-2 px-4 bg-white/10 hover:bg-white/20 text-white rounded-lg transition-colors"
+                        className="flex-1 py-3 px-4 bg-gradient-to-r from-white/10 to-white/5 hover:from-white/15 hover:to-white/10 text-white rounded-2xl border border-white/20 hover:border-white/30 transition-all duration-300 shadow-lg hover:shadow-white/10"
                         whileHover={{ scale: 1.02 }}
                         whileTap={{ scale: 0.98 }}
                       >
@@ -963,7 +974,7 @@ export default function ChatItem({ item, onClick, onDelete, getUserStatus, typin
                       </motion.button>
                       <motion.button
                         onClick={handleManageAdmins}
-                        className="flex-1 py-2 px-4 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors flex items-center justify-center space-x-2"
+                        className="flex-1 py-3 px-4 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white rounded-2xl border border-blue-400/30 hover:border-blue-500/50 transition-all duration-300 shadow-lg hover:shadow-blue-500/25 flex items-center justify-center space-x-2"
                         whileHover={{ scale: 1.02 }}
                         whileTap={{ scale: 0.98 }}
                       >
@@ -973,7 +984,7 @@ export default function ChatItem({ item, onClick, onDelete, getUserStatus, typin
                     </div>
                     <motion.button
                       onClick={confirmLeaveGroup}
-                      className="w-full py-2 px-4 bg-amber-500 hover:bg-amber-600 text-white rounded-lg transition-colors"
+                      className="w-full py-3 px-4 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white rounded-2xl border border-amber-400/30 hover:border-amber-500/50 transition-all duration-300 shadow-lg hover:shadow-amber-500/25"
                       whileHover={{ scale: 1.02 }}
                       whileTap={{ scale: 0.98 }}
                     >
@@ -985,7 +996,7 @@ export default function ChatItem({ item, onClick, onDelete, getUserStatus, typin
                   <div className="flex space-x-3">
                     <motion.button
                       onClick={() => setShowLeaveConfirm(false)}
-                      className="flex-1 py-2 px-4 bg-white/10 hover:bg-white/20 text-white rounded-lg transition-colors"
+                      className="flex-1 py-3 px-4 bg-gradient-to-r from-white/10 to-white/5 hover:from-white/15 hover:to-white/10 text-white rounded-2xl border border-white/20 hover:border-white/30 transition-all duration-300 shadow-lg hover:shadow-white/10"
                       whileHover={{ scale: 1.02 }}
                       whileTap={{ scale: 0.98 }}
                     >
@@ -993,7 +1004,7 @@ export default function ChatItem({ item, onClick, onDelete, getUserStatus, typin
                     </motion.button>
                     <motion.button
                       onClick={handleManageAdmins}
-                      className="flex-1 py-2 px-4 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors flex items-center justify-center space-x-2"
+                      className="flex-1 py-3 px-4 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white rounded-2xl border border-blue-400/30 hover:border-blue-500/50 transition-all duration-300 shadow-lg hover:shadow-blue-500/25 flex items-center justify-center space-x-2"
                       whileHover={{ scale: 1.02 }}
                       whileTap={{ scale: 0.98 }}
                     >
@@ -1009,7 +1020,7 @@ export default function ChatItem({ item, onClick, onDelete, getUserStatus, typin
                     <div className="flex space-x-3">
                       <motion.button
                         onClick={() => setShowLeaveConfirm(false)}
-                        className="flex-1 py-2 px-4 bg-white/10 hover:bg-white/20 text-white rounded-lg transition-colors"
+                        className="flex-1 py-3 px-4 bg-gradient-to-r from-white/10 to-white/5 hover:from-white/15 hover:to-white/10 text-white rounded-2xl border border-white/20 hover:border-white/30 transition-all duration-300 shadow-lg hover:shadow-white/10"
                         whileHover={{ scale: 1.02 }}
                         whileTap={{ scale: 0.98 }}
                       >
@@ -1017,7 +1028,7 @@ export default function ChatItem({ item, onClick, onDelete, getUserStatus, typin
                       </motion.button>
                       <motion.button
                         onClick={handleManageAdmins}
-                        className="flex-1 py-2 px-4 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors flex items-center justify-center space-x-2"
+                        className="flex-1 py-3 px-4 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white rounded-2xl border border-blue-400/30 hover:border-blue-500/50 transition-all duration-300 shadow-lg hover:shadow-blue-500/25 flex items-center justify-center space-x-2"
                         whileHover={{ scale: 1.02 }}
                         whileTap={{ scale: 0.98 }}
                       >
@@ -1027,7 +1038,7 @@ export default function ChatItem({ item, onClick, onDelete, getUserStatus, typin
                     </div>
                     <motion.button
                       onClick={confirmLeaveGroup}
-                      className="w-full py-2 px-4 bg-amber-500 hover:bg-amber-600 text-white rounded-lg transition-colors"
+                      className="w-full py-3 px-4 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white rounded-2xl border border-amber-400/30 hover:border-amber-500/50 transition-all duration-300 shadow-lg hover:shadow-amber-500/25"
                       whileHover={{ scale: 1.02 }}
                       whileTap={{ scale: 0.98 }}
                     >
@@ -1039,7 +1050,7 @@ export default function ChatItem({ item, onClick, onDelete, getUserStatus, typin
                   <div className="flex space-x-3">
                     <motion.button
                       onClick={() => setShowLeaveConfirm(false)}
-                      className="flex-1 py-2 px-4 bg-white/10 hover:bg-white/20 text-white rounded-lg transition-colors"
+                      className="flex-1 py-3 px-4 bg-gradient-to-r from-white/10 to-white/5 hover:from-white/15 hover:to-white/10 text-white rounded-2xl border border-white/20 hover:border-white/30 transition-all duration-300 shadow-lg hover:shadow-white/10"
                       whileHover={{ scale: 1.02 }}
                       whileTap={{ scale: 0.98 }}
                     >
@@ -1047,7 +1058,7 @@ export default function ChatItem({ item, onClick, onDelete, getUserStatus, typin
                     </motion.button>
                     <motion.button
                       onClick={confirmLeaveGroup}
-                      className="flex-1 py-2 px-4 bg-amber-500 hover:bg-amber-600 text-white rounded-lg transition-colors"
+                      className="flex-1 py-3 px-4 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white rounded-2xl border border-amber-400/30 hover:border-amber-500/50 transition-all duration-300 shadow-lg hover:shadow-amber-500/25"
                       whileHover={{ scale: 1.02 }}
                       whileTap={{ scale: 0.98 }}
                     >
@@ -1060,7 +1071,7 @@ export default function ChatItem({ item, onClick, onDelete, getUserStatus, typin
                 <div className="flex space-x-3">
                   <motion.button
                     onClick={() => setShowLeaveConfirm(false)}
-                    className="flex-1 py-2 px-4 bg-white/10 hover:bg-white/20 text-white rounded-lg transition-colors"
+                    className="flex-1 py-3 px-4 bg-gradient-to-r from-white/10 to-white/5 hover:from-white/15 hover:to-white/10 text-white rounded-2xl border border-white/20 hover:border-white/30 transition-all duration-300 shadow-lg hover:shadow-white/10"
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
                   >
@@ -1068,7 +1079,7 @@ export default function ChatItem({ item, onClick, onDelete, getUserStatus, typin
                   </motion.button>
                   <motion.button
                     onClick={confirmLeaveGroup}
-                    className="flex-1 py-2 px-4 bg-amber-500 hover:bg-amber-600 text-white rounded-lg transition-colors"
+                    className="flex-1 py-3 px-4 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white rounded-2xl border border-amber-400/30 hover:border-amber-500/50 transition-all duration-300 shadow-lg hover:shadow-amber-500/25"
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
                   >

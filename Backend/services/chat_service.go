@@ -33,7 +33,10 @@ func (s *ChatService) GetUnifiedChats(userID uint) ([]models.UnifiedChatItem, er
 	sort.Slice(allChats, func(i, j int) bool {
 		// If both have messages, sort by last message time (newest first)
 		if allChats[i].LastMessage != nil && allChats[j].LastMessage != nil {
-			return allChats[i].LastMessageTime.After(allChats[j].LastMessageTime)
+			if allChats[i].LastMessageTime != nil && allChats[j].LastMessageTime != nil {
+				return allChats[i].LastMessageTime.After(*allChats[j].LastMessageTime)
+			}
+			return allChats[i].LastMessageTime != nil // i has time, comes first
 		}
 		// If only i has message, i comes first
 		if allChats[i].LastMessage != nil && allChats[j].LastMessage == nil {
@@ -44,7 +47,10 @@ func (s *ChatService) GetUnifiedChats(userID uint) ([]models.UnifiedChatItem, er
 			return false
 		}
 		// Both don't have messages (should only be groups), sort by joining date (newest first)
-		return allChats[i].LastMessageTime.After(allChats[j].LastMessageTime)
+		if allChats[i].LastMessageTime != nil && allChats[j].LastMessageTime != nil {
+			return allChats[i].LastMessageTime.After(*allChats[j].LastMessageTime)
+		}
+		return allChats[i].LastMessageTime != nil // i has time, comes first
 	})
 
 	return allChats, nil
@@ -152,7 +158,7 @@ func (s *ChatService) getPrivateChats(userID uint) ([]models.UnifiedChatItem, er
 			Name:              fmt.Sprintf("%s %s", participant.FirstName, participant.LastName),
 			Avatar:            participant.Avatar,
 			LastMessage:       lastMessage,
-			LastMessageTime:   lastMessageTime,
+			LastMessageTime:   &lastMessageTime,
 			LastMessageSender: lastMessageSender,
 			HasUnread:         unreadCount > 0,
 			UnreadCount:       unreadCount,
@@ -280,7 +286,7 @@ func (s *ChatService) getGroupChats(userID uint) ([]models.UnifiedChatItem, erro
 			Type:              "group",
 			Name:              groupName,
 			LastMessage:       lastMsg,
-			LastMessageTime:   timestamp,
+			LastMessageTime:   &timestamp,
 			LastMessageSender: lastMessageSender,
 			HasUnread:         unreadCount > 0,
 			UnreadCount:       unreadCount,

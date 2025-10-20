@@ -44,6 +44,13 @@ func (h *Hub) handleCommentCreate(message Message) {
 
 	// Extract comment data from the message
 	if commentData, ok := message.Data.(map[string]interface{}); ok {
+		// Check if this is a broadcast of an already-created comment (has ID)
+		if _, hasID := commentData["id"]; hasID {
+			// This is a broadcast from HTTP API, just relay to other clients
+			h.handleCommentUpdate(message)
+			return
+		}
+
 		postID := message.PostID
 		userID := message.From
 
@@ -552,5 +559,121 @@ func (h *Hub) handlePollUpdate(message Message) {
 func (h *Hub) handlePollVoteUpdate(message Message) {
 	if message.GroupID > 0 {
 		h.handleGroupMessage(message)
+	}
+}
+
+// handleSearch processes real-time search requests
+func (h *Hub) handleSearch(message Message) {
+	if h.db == nil {
+		log.Printf("Database not available for search")
+		return
+	}
+
+	userID := message.From
+	searchData, ok := message.Data.(map[string]interface{})
+	if !ok {
+		h.sendSearchResults(userID, []interface{}{}, "", 0)
+		return
+	}
+
+	query, ok := searchData["query"].(string)
+	if !ok || len(query) < 2 {
+		// Send empty results for invalid queries
+		h.sendSearchResults(userID, []interface{}{}, query, 0)
+		return
+	}
+
+	// Perform basic search directly here to avoid import cycles
+	suggestions := h.performBasicSearch(userID, query)
+
+	// Convert to interface{} slice for JSON serialization
+	results := make([]interface{}, len(suggestions))
+	for i, s := range suggestions {
+		results[i] = s
+	}
+
+	h.sendSearchResults(userID, results, query, len(results))
+}
+
+// performBasicSearch does a simple search without importing other packages
+func (h *Hub) performBasicSearch(userID uint, query string) []map[string]interface{} {
+	var results []map[string]interface{}
+
+	// Simple user search
+	userQuery := `
+		SELECT id, first_name, last_name, email, avatar, nickname
+		FROM users
+		WHERE id != ? AND (
+			LOWER(first_name) LIKE LOWER(?) OR
+			LOWER(last_name) LIKE LOWER(?) OR
+			LOWER(email) LIKE LOWER(?) OR
+			LOWER(nickname) LIKE LOWER(?)
+		)
+		ORDER BY first_name, last_name
+		LIMIT 3
+	`
+
+	pattern := "%" + query + "%"
+	rows, err := h.db.Query(userQuery, userID, pattern, pattern, pattern, pattern)
+	if err == nil {
+		defer rows.Close()
+		for rows.Next() {
+			var id uint
+			var firstName, lastName, email string
+			var avatar, nickname sql.NullString
+
+			if err := rows.Scan(&id, &firstName, &lastName, &email, &avatar, &nickname); err == nil {
+				displayName := firstName + " " + lastName
+				if nickname.Valid && nickname.String != "" {
+					displayName = nickname.String
+				}
+
+				avatarStr := ""
+				if avatar.Valid {
+					avatarStr = avatar.String
+				}
+
+				results = append(results, map[string]interface{}{
+					"type":     "user",
+					"id":       id,
+					"title":    displayName,
+					"subtitle": email,
+					"image":    avatarStr,
+					"url":      "/profile/" + string(rune(id)),
+				})
+			}
+		}
+	}
+
+	return results
+}
+
+// sendSearchResults sends search results back to the requesting client
+func (h *Hub) sendSearchResults(userID uint, results []interface{}, query string, count int) {
+	h.mu.RLock()
+	client, exists := h.clients[userID]
+	h.mu.RUnlock()
+
+	if !exists {
+		return
+	}
+
+	searchResultMessage := Message{
+		Type:      MessageTypeSearchResults,
+		From:      0, // System message
+		To:        userID,
+		Content:   query,
+		Timestamp: time.Now().Unix(),
+		Data: map[string]interface{}{
+			"results": results,
+			"count":   count,
+			"query":   query,
+		},
+	}
+
+	select {
+	case client.Send <- searchResultMessage:
+	default:
+		log.Printf("Failed to send search results to user %d", userID)
 	}
 }

@@ -4,6 +4,8 @@ import { ChangeEvent, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useOptimisticUpdate, useConnectionStatus, useUpload } from '@/hooks'
 import { useToast } from '@/context/ToastContext'
+import Image from 'next/image'
+import { getAvatarUrl } from '@/utils/avatarUtils'
 
 interface UserOption {
   id: number
@@ -12,6 +14,7 @@ interface UserOption {
   last_name: string
   nickname?: string
   email: string
+  avatar?: string
 }
 
 interface CreatePostProps {
@@ -373,7 +376,6 @@ export default function CreatePost({
                 {/* Selected Users */}
                 {postPrivacy === 'listed' && (
                   <motion.div
-                    className="bg-white/5 border border-white/10 rounded-xl p-4"
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                   >
@@ -381,7 +383,7 @@ export default function CreatePost({
                       <div className="w-2 h-2 bg-purple-400 rounded-full"></div>
                       <span>Select Users</span>
                     </label>
-                    <div className="space-y-2 max-h-32 lg:max-h-40 overflow-y-auto">
+                    <div className="space-y-2">
                       {loadingUsers ? (
                         <div className="text-white/60 text-sm text-center py-6">
                           <div className="flex items-center justify-center space-x-3">
@@ -416,8 +418,21 @@ export default function CreatePost({
                                 <Check className="w-3 h-3 text-white" />
                               )}
                             </div>
-                            <div className="w-8 h-8 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-full flex items-center justify-center flex-shrink-0">
-                              <User className="w-4 h-4 text-white" />
+                            <div className="w-8 h-8 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden">
+                              {getAvatarUrl(user.avatar) ? (
+                                <Image
+                                  src={getAvatarUrl(user.avatar)!}
+                                  alt={`${user.first_name} ${user.last_name}'s avatar`}
+                                  width={32}
+                                  height={32}
+                                  className="w-full h-full object-cover rounded-full"
+                                  unoptimized={getAvatarUrl(user.avatar)!.includes('/svg')}
+                                />
+                              ) : (
+                                <span className="text-white font-bold text-sm">
+                                  {user.first_name[0]}{user.last_name[0]}
+                                </span>
+                              )}
                             </div>
                             <div className="flex-1 min-w-0">
                               <p className="text-white text-sm font-medium truncate group-hover:text-white/90">

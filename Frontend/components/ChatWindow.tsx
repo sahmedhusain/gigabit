@@ -1,6 +1,6 @@
 'use client'
 import React, { useState, useRef, useEffect } from 'react'
-import { X, Send, Smile, Check, CheckCheck, Clock, ChevronDown, MessageCircle, FileText, Calendar, BarChart3, Users, Settings, Crown, User as UserIcon, Info } from 'lucide-react'
+import { X, Send, Smile, Check, CheckCheck, Clock, ChevronDown, MessageCircle, FileText, Calendar, BarChart3, Users, Settings, Crown, User as UserIcon, Info, Globe, EyeOff, Lock, Heart, MessageSquare } from 'lucide-react'
 import Image from 'next/image'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useAuth } from '@/context/AuthContext'
@@ -41,6 +41,302 @@ interface Message {
     last_name: string
     avatar: string
   }
+  shared_post?: {
+    id: number
+    user_id: number
+    content: string
+    image_url?: string
+    privacy: string
+    created_at: string
+    user: {
+      id: number
+      email: string
+      first_name: string
+      last_name: string
+      avatar?: string
+      nickname?: string
+    }
+    like_count: number
+    comment_count: number
+    share_count: number
+  }
+}
+
+interface SharedPostMessageProps {
+  sharedPost: {
+    id: number
+    user_id: number
+    content: string
+    image_url?: string
+    privacy: string
+    created_at: string
+    user: {
+      id: number
+      email: string
+      first_name: string
+      last_name: string
+      avatar?: string
+      nickname?: string
+    }
+    like_count: number
+    comment_count: number
+    share_count: number
+  }
+  isCurrentUser: boolean
+  messageId: number
+  messageCreatedAt: string
+}
+
+const SharedPostMessage: React.FC<SharedPostMessageProps> = ({ sharedPost, isCurrentUser, messageId, messageCreatedAt }) => {
+  const router = useRouter()
+
+  // Parse various timestamp formats robustly: ISO strings, milliseconds, or seconds
+  const parseDate = (value: string | number | undefined | null): Date => {
+    if (!value && value !== 0) return new Date(0)
+    const raw = typeof value === 'number' ? value : String(value).trim()
+
+    // If purely numeric string, attempt to detect units (seconds, milliseconds, microseconds)
+    if (/^\d+$/.test(String(raw))) {
+      const n = Number(raw)
+      // Try as milliseconds first
+      const asMs = new Date(n)
+      if (asMs.getFullYear() >= 2000) return asMs
+
+      // Try as seconds
+      const asSeconds = new Date(n * 1000)
+      if (asSeconds.getFullYear() >= 2000) return asSeconds
+
+      // Try as microseconds (divide by 1000)
+      const asMicros = new Date(Math.floor(n / 1000))
+      if (asMicros.getFullYear() >= 2000) return asMicros
+
+      // Fallback: prefer asSeconds if it looks reasonable, else asMs
+      if (asSeconds.getTime() !== 0) return asSeconds
+      // Log suspicious value
+      console.warn('parseDate: suspicious numeric date value', value, '->', asMs)
+      return asMs
+    }
+
+    // Fallback: let Date parse ISO-like strings
+    const d = new Date(String(raw))
+    if (isNaN(d.getTime())) {
+      // If parsing failed, log and return epoch 0
+      console.warn('parseDate: failed to parse date', value)
+      return new Date(0)
+    }
+    return d
+  }
+
+  const getPrivacyIcon = (privacy: string) => {
+    switch (privacy) {
+      case 'public':
+        return <Globe className="w-3 h-3" />
+      case 'followers':
+        return <EyeOff className="w-3 h-3" />
+      case 'friends':
+        return <Lock className="w-3 h-3" />
+      case 'listed':
+        return <UserIcon className="w-3 h-3" />
+      default:
+        return <Globe className="w-3 h-3" />
+    }
+  }
+
+  const formatTimeAgo = (dateString: string) => {
+    const date = new Date(dateString)
+    const now = new Date()
+    const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000)
+
+    if (diffInSeconds < 60) return 'Just now'
+    if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m ago`
+    if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h ago`
+    if (diffInSeconds < 604800) return `${Math.floor(diffInSeconds / 86400)}d ago`
+
+    return date.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric'
+    })
+  }
+
+  const formatMessageTime = (dateString: string) => {
+    const date = parseDate(dateString)
+    if (isNaN(date.getTime()) || date.getTime() === 0) return ''
+    return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true })
+  }
+
+  return (
+    <motion.div
+      className={`relative px-5 py-4 rounded-2xl shadow-xl backdrop-blur-lg border transition-all duration-300 hover:shadow-2xl hover:scale-[1.02] cursor-pointer ${
+        isCurrentUser
+          ? 'bg-gradient-to-br from-emerald-500 via-teal-500 to-cyan-600 text-white border-emerald-400/40 rounded-br-lg shadow-emerald-500/20'
+          : 'bg-gradient-to-br from-white/15 to-white/10 text-white border-white/25 rounded-bl-lg hover:from-white/20 hover:to-white/15 shadow-white/10'
+      }`}
+      data-message-id={messageId}
+      whileHover={{ scale: 1.02 }}
+      transition={{ duration: 0.2 }}
+      onClick={() => router.push(`/post/${sharedPost.id}`)}
+    >
+      {/* Shared Post Header */}
+      <div className="flex items-center space-x-2 mb-3">
+        <div className="w-4 h-4 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 flex items-center justify-center">
+          <Send className="w-2.5 h-2.5 text-white" />
+        </div>
+        <span className="text-xs font-medium text-white/70">
+          Shared a post
+        </span>
+        <span className="text-xs text-white/50">·</span>
+        <span className="text-xs text-white/60">
+          {formatMessageTime(messageCreatedAt)}
+        </span>
+      </div>
+
+      {/* Post Content Container */}
+      <motion.div
+        className={`rounded-xl p-4 border transition-all duration-300 ${
+          isCurrentUser
+            ? 'bg-white/10 border-white/20 hover:bg-white/15'
+            : 'bg-gradient-to-br from-emerald-500/10 to-teal-500/10 border-emerald-400/20 hover:from-emerald-500/15 hover:to-teal-500/15'
+        }`}
+        whileHover={{ y: -1 }}
+      >
+        {/* Post Header */}
+        <div className="flex items-start space-x-3 mb-3">
+          {/* Author Avatar */}
+          <motion.div
+            className="flex-shrink-0"
+            whileHover={{ scale: 1.05 }}
+            onClick={(e) => {
+              e.stopPropagation()
+              router.push(`/profile/${sharedPost.user.id}`)
+            }}
+          >
+            {sharedPost.user.avatar && getAvatarUrl(sharedPost.user.avatar) ? (
+              <div className="relative">
+                <Image
+                  src={getAvatarUrl(sharedPost.user.avatar)!}
+                  alt={`${sharedPost.user.first_name} ${sharedPost.user.last_name}`}
+                  width={36}
+                  height={36}
+                  className="w-9 h-9 rounded-full object-cover ring-2 ring-white/20"
+                />
+              </div>
+            ) : (
+              <div className="w-9 h-9 rounded-full bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center text-white text-xs font-semibold ring-2 ring-white/20">
+                {sharedPost.user.first_name[0]}{sharedPost.user.last_name[0]}
+              </div>
+            )}
+          </motion.div>
+
+          {/* Author Info */}
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center space-x-2">
+              <motion.h4
+                className="font-semibold text-white text-sm truncate hover:underline"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  router.push(`/profile/${sharedPost.user.id}`)
+                }}
+              >
+                {sharedPost.user.first_name} {sharedPost.user.last_name}
+              </motion.h4>
+              {sharedPost.user.nickname && (
+                <span className="text-xs text-white/60 truncate">
+                  @{sharedPost.user.nickname}
+                </span>
+              )}
+            </div>
+
+            <div className="flex items-center space-x-2 mt-1">
+              <span className="text-xs text-white/60">
+                {formatTimeAgo(sharedPost.created_at)}
+              </span>
+              <span className="text-xs text-white/40">·</span>
+              <div className="flex items-center space-x-1 text-white/60">
+                {getPrivacyIcon(sharedPost.privacy)}
+                <span className="text-xs capitalize">{sharedPost.privacy}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Post Content */}
+        <div className="mb-3">
+          <p className="text-white text-sm leading-relaxed whitespace-pre-wrap">
+            {sharedPost.content}
+          </p>
+        </div>
+
+        {/* Post Image */}
+        {sharedPost.image_url && (
+          <div className="mb-3">
+            <motion.div
+              className="relative rounded-lg overflow-hidden bg-gradient-to-br from-white/10 to-white/5"
+              whileHover={{ scale: 1.02 }}
+              transition={{ duration: 0.2 }}
+            >
+              <Image
+                src={sharedPost.image_url.startsWith('http')
+                  ? sharedPost.image_url
+                  : `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}${sharedPost.image_url}`
+                }
+                alt="Shared post image"
+                width={400}
+                height={250}
+                className="w-full h-auto max-h-48 object-cover"
+                unoptimized={sharedPost.image_url.includes('/svg')}
+              />
+            </motion.div>
+          </div>
+        )}
+
+        {/* Engagement Stats */}
+        <div className="flex items-center justify-between pt-3 border-t border-white/10">
+          <div className="flex items-center space-x-4">
+            {/* Comments */}
+            <motion.button
+              className="flex items-center space-x-1 text-white/70 hover:text-white transition-colors group"
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <MessageSquare className="w-4 h-4 group-hover:scale-110 transition-transform" />
+              <span className="text-xs font-medium">{sharedPost.comment_count}</span>
+            </motion.button>
+
+            {/* Likes */}
+            <motion.button
+              className={`flex items-center space-x-1 transition-colors group ${
+                sharedPost.like_count > 0 ? 'text-red-400' : 'text-white/70 hover:text-red-400'
+              }`}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <Heart className={`w-4 h-4 group-hover:scale-110 transition-transform ${
+                sharedPost.like_count > 0 ? 'fill-current' : ''
+              }`} />
+              <span className="text-xs font-medium">{sharedPost.like_count}</span>
+            </motion.button>
+          </div>
+        </div>
+      </motion.div>
+
+      {/* Message tail */}
+      <div className={`absolute bottom-0 ${
+        isCurrentUser
+          ? '-right-2 border-l-emerald-400 border-l-8 border-t-8 border-t-transparent border-b-8 border-b-transparent'
+          : '-left-2 border-r-white/20 border-r-8 border-t-8 border-t-transparent border-b-8 border-b-transparent'
+      }`}></div>
+
+      {/* Hover effect */}
+      <motion.div
+        className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent opacity-0 rounded-2xl"
+        whileHover={{ opacity: 1 }}
+        transition={{ duration: 0.2 }}
+      />
+    </motion.div>
+  )
 }
 
 interface ChatWindowProps {
@@ -687,52 +983,61 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
             )}
 
             {/* Enhanced Message bubble */}
-            <div
-              className={`relative px-5 py-4 rounded-2xl shadow-xl backdrop-blur-lg border transition-all duration-300 hover:shadow-2xl hover:scale-[1.02] ${
-                isCurrentUser
-                  ? 'bg-gradient-to-br from-emerald-500 via-teal-500 to-cyan-600 text-white border-emerald-400/40 rounded-br-lg shadow-emerald-500/20'
-                  : 'bg-gradient-to-br from-white/15 to-white/10 text-white border-white/25 rounded-bl-lg hover:from-white/20 hover:to-white/15 shadow-white/10'
-              }`}
-              data-message-id={message.id}
-            >
-              {/* Message content */}
-              <div className="text-sm leading-relaxed break-words font-medium">
-                {message.content}
-              </div>
-
-              {/* Message footer */}
-              <motion.div
-                className={`flex items-center justify-between mt-2 space-x-2 ${
-                  isCurrentUser ? 'text-emerald-100' : 'text-white/60'
-                }`}
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 0.3 }}
-              >
-                <span className="text-xs opacity-75">
-                  {formatTime(createdAt)}
-                </span>
-                {isCurrentUser && (
-                  <div className="flex items-center space-x-1">
-                    {renderMessageStatus('sent')}
-                  </div>
-                )}
-              </motion.div>
-
-              {/* Message tail */}
-              <div className={`absolute bottom-0 ${
-                isCurrentUser
-                  ? '-right-2 border-l-emerald-400 border-l-8 border-t-8 border-t-transparent border-b-8 border-b-transparent'
-                  : '-left-2 border-r-white/20 border-r-8 border-t-8 border-t-transparent border-b-8 border-b-transparent'
-              }`}></div>
-
-              {/* Hover effect */}
-              <motion.div
-                className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent opacity-0 rounded-2xl"
-                whileHover={{ opacity: 1 }}
-                transition={{ duration: 0.2 }}
+            {message.shared_post ? (
+              <SharedPostMessage
+                sharedPost={message.shared_post}
+                isCurrentUser={isCurrentUser}
+                messageId={message.id}
+                messageCreatedAt={createdAt}
               />
-            </div>
+            ) : (
+              <div
+                className={`relative px-5 py-4 rounded-2xl shadow-xl backdrop-blur-lg border transition-all duration-300 hover:shadow-2xl hover:scale-[1.02] ${
+                  isCurrentUser
+                    ? 'bg-gradient-to-br from-emerald-500 via-teal-500 to-cyan-600 text-white border-emerald-400/40 rounded-br-lg shadow-emerald-500/20'
+                    : 'bg-gradient-to-br from-white/15 to-white/10 text-white border-white/25 rounded-bl-lg hover:from-white/20 hover:to-white/15 shadow-white/10'
+                }`}
+                data-message-id={message.id}
+              >
+                {/* Message content */}
+                <div className="text-sm leading-relaxed break-words font-medium">
+                  {message.content}
+                </div>
+
+                {/* Message footer */}
+                <motion.div
+                  className={`flex items-center justify-between mt-2 space-x-2 ${
+                    isCurrentUser ? 'text-emerald-100' : 'text-white/60'
+                  }`}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: 0.3 }}
+                >
+                  <span className="text-xs opacity-75">
+                    {formatTime(createdAt)}
+                  </span>
+                  {isCurrentUser && (
+                    <div className="flex items-center space-x-1">
+                      {renderMessageStatus('sent')}
+                    </div>
+                  )}
+                </motion.div>
+
+                {/* Message tail */}
+                <div className={`absolute bottom-0 ${
+                  isCurrentUser
+                    ? '-right-2 border-l-emerald-400 border-l-8 border-t-8 border-t-transparent border-b-8 border-b-transparent'
+                    : '-left-2 border-r-white/20 border-r-8 border-t-8 border-t-transparent border-b-8 border-b-transparent'
+                }`}></div>
+
+                {/* Hover effect */}
+                <motion.div
+                  className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent opacity-0 rounded-2xl"
+                  whileHover={{ opacity: 1 }}
+                  transition={{ duration: 0.2 }}
+                />
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -749,7 +1054,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
 
     return (
       <motion.div
-        className="h-full max-h-[calc(100vh-6rem)] flex flex-col bg-gradient-to-br from-white/10 via-white/5 to-white/10 backdrop-blur-2xl rounded-3xl border border-white/30 overflow-hidden shadow-2xl ring-1 ring-white/20 mt-4"
+        className="h-full max-h-[calc(100vh-6rem)] flex flex-col rounded-3xl border border-white/30 overflow-hidden shadow-2xl ring-1 ring-white/20 mt-4"
         initial={{ opacity: 0, scale: 0.96, y: 30 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.96, y: 30 }}
@@ -757,8 +1062,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
       >
         {/* Enhanced Group Header */}
         {!hideHeader && (
-          <div className="bg-gradient-to-r from-white/15 via-white/8 to-white/15 backdrop-blur-2xl border-b border-white/25 px-6 py-5 flex items-center justify-between flex-shrink-0 shadow-xl relative">
-            <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/5 via-teal-500/5 to-cyan-500/5 rounded-t-3xl" />
+          <div className="px-6 py-5 flex items-center justify-between flex-shrink-0 shadow-xl relative">
             <div className="flex items-center space-x-4 relative z-10 flex-1 min-w-0">
               <motion.div
                 className="w-16 h-16 rounded-full bg-gradient-to-br from-emerald-400 via-teal-500 to-cyan-600 flex items-center justify-center text-white text-2xl font-bold shadow-2xl ring-2 ring-white/30 cursor-pointer overflow-hidden"
@@ -861,28 +1165,33 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
           </div>
         )}
 
-        {/* Tab Navigation */}
-        <div className="bg-gradient-to-r from-white/10 via-white/5 to-white/10 backdrop-blur-lg border-b border-white/20 px-6 py-3 flex space-x-1 overflow-x-auto">
-          {tabs.map((tab) => (
-            <motion.button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={`flex items-center space-x-2 px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 whitespace-nowrap ${
-                activeTab === tab
-                  ? 'bg-gradient-to-r from-emerald-500/30 to-teal-500/30 text-white border border-emerald-400/30 shadow-lg'
-                  : 'text-white/70 hover:text-white hover:bg-white/10 border border-transparent'
-              }`}
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-            >
-              {tab === 'chat' && <MessageCircle className="w-4 h-4" />}
-              {tab === 'posts' && <FileText className="w-4 h-4" />}
-              {tab === 'events' && <Calendar className="w-4 h-4" />}
-              {tab === 'polls' && <BarChart3 className="w-4 h-4" />}
-              {tab === 'settings' && <Settings className="w-4 h-4" />}
-              <span className="capitalize">{tab === 'settings' ? 'Settings' : tab}</span>
-            </motion.button>
-          ))}
+        {/* Enhanced Tab Navigation */}
+        <div className="px-6 py-3 flex justify-center items-center overflow-x-auto relative">
+          <div className="bg-gradient-to-br from-white/10 via-white/5 to-transparent backdrop-blur-xl rounded-3xl border border-white/20 shadow-2xl p-1 hover:shadow-emerald-500/10 transition-all duration-500 relative z-10">
+            <div className="flex space-x-1">
+              {tabs.map((tab) => (
+                <motion.button
+                  key={tab}
+                  onClick={() => setActiveTab(tab)}
+                  className={`flex items-center space-x-2 px-4 py-2 rounded-2xl text-sm font-medium transition-all duration-200 flex-1 justify-center ${
+                    activeTab === tab
+                      ? 'bg-emerald-500 text-white shadow-lg'
+                      : 'text-white/70 hover:text-white hover:bg-white/10'
+                  }`}
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                >
+                  {tab === 'info' && <Info className="w-4 h-4" />}
+                  {tab === 'chat' && <MessageCircle className="w-4 h-4" />}
+                  {tab === 'posts' && <FileText className="w-4 h-4" />}
+                  {tab === 'events' && <Calendar className="w-4 h-4" />}
+                  {tab === 'polls' && <BarChart3 className="w-4 h-4" />}
+                  {tab === 'settings' && <Settings className="w-4 h-4" />}
+                  <span className="capitalize">{tab === 'settings' ? 'Settings' : tab}</span>
+                </motion.button>
+              ))}
+            </div>
+          </div>
         </div>
 
         {/* Tab Content */}
@@ -932,7 +1241,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
   // Regular chat interface for private messages
   return (
     <motion.div
-      className="h-full max-h-[calc(100vh-6rem)] flex flex-col bg-gradient-to-br from-white/10 via-white/5 to-white/10 backdrop-blur-2xl rounded-3xl border border-white/30 overflow-hidden shadow-2xl ring-1 ring-white/20 mt-4"
+      className="h-full max-h-[calc(100vh-6rem)] flex flex-col rounded-3xl border border-white/30 overflow-hidden shadow-2xl ring-1 ring-white/20 mt-4"
       initial={{ opacity: 0, scale: 0.96, y: 30 }}
       animate={{ opacity: 1, scale: 1, y: 0 }}
       exit={{ opacity: 0, scale: 0.96, y: 30 }}
@@ -941,13 +1250,11 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
       {/* Enhanced Header */}
       {!hideHeader && (
         <motion.div
-          className="bg-gradient-to-r from-white/15 via-white/8 to-white/15 backdrop-blur-2xl border-b border-white/25 px-6 py-4 flex items-center justify-between flex-shrink-0 shadow-xl relative"
+          className="px-6 py-4 flex items-center justify-between flex-shrink-0 shadow-xl relative"
           initial={{ y: -30, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           transition={{ delay: 0.15, duration: 0.4, ease: [0.23, 1, 0.320, 1] }}
         >
-          {/* Subtle header gradient overlay */}
-          <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/5 via-teal-500/5 to-cyan-500/5 rounded-t-3xl" />
           
           <div className="flex items-center space-x-4 relative z-10">
             {/* Enhanced Avatar */}
@@ -1089,13 +1396,12 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
       {/* Enhanced Messages Area */}
       <motion.div
         ref={messagesContainerRef}
-        className="flex-1 overflow-y-scroll scrollbar-hide px-6 py-4 space-y-4 min-h-0 transition-colors duration-200"
+        className="flex-1 overflow-y-scroll scrollbar-hide px-6 py-4 space-y-4 min-h-0 transition-colors duration-200 shadow-xl"
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.3, duration: 0.5, ease: [0.23, 1, 0.320, 1] }}
         onScroll={handleScroll}
         style={{
-          background: 'linear-gradient(180deg, rgba(255,255,255,0.02) 0%, rgba(255,255,255,0.00) 100%)',
           scrollbarWidth: 'none',
           msOverflowStyle: 'none'
         }}
@@ -1218,26 +1524,13 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
 
       {/* Enhanced Input Area */}
       <motion.div
-        className="bg-gradient-to-t from-white/10 via-white/5 to-white/8 backdrop-blur-2xl border-t border-white/25 p-6 flex-shrink-0 relative"
+        className="p-4 flex-shrink-0 relative"
         initial={{ y: 30, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ delay: 0.4, duration: 0.5, ease: [0.23, 1, 0.320, 1] }}
       >
-        {/* Subtle input area gradient overlay */}
-        <div className="absolute inset-0 bg-gradient-to-t from-emerald-500/5 via-teal-500/5 to-cyan-500/5 rounded-b-3xl" />
         
-        <div className="flex items-center space-x-4 relative z-10">
-          {/* Enhanced Emoji Picker Button */}
-          <motion.button
-            onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-            className="p-3 text-white/60 hover:text-white hover:bg-gradient-to-r hover:from-yellow-500/20 hover:to-orange-500/20 rounded-2xl border border-white/20 hover:border-yellow-400/30 backdrop-blur-sm transition-all duration-300"
-            title="Add emoji"
-            whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.95 }}
-          >
-            <Smile className="w-5 h-5" />
-          </motion.button>
-
+        <div className="flex items-center justify-center space-x-4 relative z-10 min-h-[48px]">
           <div className="flex-1 relative">
             <textarea
               ref={(el) => {
@@ -1253,21 +1546,32 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
               }}
               onKeyPress={handleKeyPress}
               placeholder={`Message ${conversationType === 'group' ? `#${participantName}` : participantName}...`}
-              className="w-full bg-gradient-to-r from-white/15 to-white/10 border border-white/25 rounded-2xl px-6 py-4 text-white placeholder-white/60 focus:outline-none focus:ring-2 focus:ring-emerald-400/60 focus:border-emerald-400/50 resize-none min-h-[52px] max-h-32 text-sm overflow-y-auto backdrop-blur-sm shadow-inner transition-all duration-300 hover:bg-gradient-to-r hover:from-white/20 hover:to-white/15"
+              className="w-full bg-gradient-to-r from-white/15 to-white/10 border border-white/25 rounded-2xl px-6 py-4 text-white placeholder-white/60 focus:outline-none focus:ring-2 focus:ring-emerald-400/60 focus:border-emerald-400/50 resize-none min-h-[52px] max-h-32 text-sm overflow-y-auto scrollbar-hide transition-all duration-300 hover:bg-gradient-to-r hover:from-white/20 hover:to-white/15"
               rows={1}
             />
           </div>
 
+          {/* Enhanced Emoji Picker Button */}
+          <motion.button
+            onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+            className="p-3 text-white/60 hover:text-white hover:bg-gradient-to-r hover:from-yellow-500/20 hover:to-orange-500/20 rounded-xl border border-white/20 hover:border-yellow-400/30 backdrop-blur-sm transition-all duration-300 shadow-lg hover:shadow-yellow-500/20"
+            title="Add emoji"
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.95 }}
+          >
+            <Smile className="w-4 h-4" />
+          </motion.button>
+
           <motion.button
             onClick={handleSendMessage}
             disabled={!newMessage.trim() || !isConnected}
-            className="p-4 bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-600 rounded-2xl text-white hover:from-emerald-600 hover:via-teal-600 hover:to-cyan-700 transition-all duration-300 disabled:opacity-40 disabled:cursor-not-allowed shadow-xl hover:shadow-emerald-500/30 border border-emerald-400/30 disabled:border-white/20"
+            className="p-3 bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-600 rounded-xl text-white hover:from-emerald-600 hover:via-teal-600 hover:to-cyan-700 transition-all duration-300 disabled:opacity-40 disabled:cursor-not-allowed shadow-xl hover:shadow-emerald-500/30 border border-emerald-400/30 disabled:border-white/20"
             title="Send message"
             whileHover={{ scale: 1.08 }}
             whileTap={{ scale: 0.92 }}
             transition={{ type: 'spring', stiffness: 300, damping: 20 }}
           >
-            <Send className="w-5 h-5" />
+            <Send className="w-4 h-4" />
           </motion.button>
         </div>
 
@@ -1281,15 +1585,17 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
               exit={{ opacity: 0, scale: 0.8, y: 10 }}
               transition={{ duration: 0.2 }}
             >
-              <EmojiPicker
-                onEmojiClick={handleEmojiClick}
-                searchPlaceHolder="Search emojis..."
-                width={350}
-                height={400}
-                previewConfig={{
-                  showPreview: false
-                }}
-              />
+              <div className="bg-gradient-to-br from-white/15 via-white/10 to-white/5 backdrop-blur-2xl rounded-3xl border border-white/30 shadow-2xl ring-1 ring-white/20 overflow-hidden">
+                <EmojiPicker
+                  onEmojiClick={handleEmojiClick}
+                  searchPlaceHolder="Search emojis..."
+                  width={350}
+                  height={400}
+                  previewConfig={{
+                    showPreview: false
+                  }}
+                />
+              </div>
             </motion.div>
           )}
         </AnimatePresence>

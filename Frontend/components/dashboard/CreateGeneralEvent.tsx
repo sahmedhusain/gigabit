@@ -34,11 +34,13 @@ export default function CreateGeneralEvent({
   const { groups, loading: groupsLoading } = useGroups()
   const { user } = useAuth()
 
-  // Only show groups where user is admin or creator
+  // Only show groups where user can create events
   const eligibleGroups = groups.filter(group => {
     if (!user) return false
-    // User is creator (no role field available on GroupResponse)
-    return group.creator_id === user.id
+    // User can create events if they are admin/creator OR if the group allows all members to create events
+    const isAdminOrCreator = group.role === 'admin' || group.role === 'creator' || group.creator_id === user.id
+    const canCreateEvents = isAdminOrCreator || group.create_events === 'all_members'
+    return canCreateEvents
   })
 
   useEffect(() => {
@@ -256,11 +258,6 @@ export default function CreateGeneralEvent({
                   >
                     <div className="w-2 h-2 bg-emerald-400 rounded-full"></div>
                     <span>Select Group *</span>
-                    {eligibleGroups.length === 0 && !groupsLoading && (
-                      <span className="ml-2 text-xs text-yellow-400/80 font-normal">
-                        (Admin/Creator only)
-                      </span>
-                    )}
                   </motion.label>
                   {groupsLoading ? (
                     <div className="w-full bg-white/10 border border-white/20 rounded-xl p-4 text-white/50 animate-pulse">
@@ -272,7 +269,7 @@ export default function CreateGeneralEvent({
                   ) : eligibleGroups.length === 0 ? (
                     <div className="bg-gradient-to-r from-yellow-500/20 to-orange-500/20 border border-yellow-400/30 rounded-xl p-4">
                       <p className="text-yellow-300 text-sm font-medium">
-                        You need to be a member of at least one group to create events.
+                        You don't have permission to create events in any of your groups.
                       </p>
                     </div>
                   ) : (
@@ -280,18 +277,18 @@ export default function CreateGeneralEvent({
                       value={selectedGroupId}
                       onChange={(e) => setSelectedGroupId(e.target.value)}
                       title="Select a group for this event"
-                      className="w-full bg-white/10 border border-white/20 rounded-xl p-4 text-white focus:outline-none focus:ring-2 focus:ring-emerald-400/50 focus:border-emerald-400/50 transition-all duration-300 text-sm lg:text-base hover:bg-white/15"
+                      className="w-full bg-gradient-to-r from-white/15 via-white/10 to-white/5 backdrop-blur-sm border border-white/30 rounded-2xl p-4 text-white focus:outline-none focus:ring-2 focus:ring-emerald-400/60 focus:border-emerald-400/60 transition-all duration-300 text-sm lg:text-base hover:bg-gradient-to-r hover:from-white/20 hover:via-white/15 hover:to-white/10 shadow-lg hover:shadow-emerald-500/10"
                       disabled={eligibleGroups.length === 0}
                       initial={{ opacity: 0, scale: 0.95 }}
                       animate={{ opacity: 1, scale: 1 }}
                       transition={{ delay: 0.5, duration: 0.3 }}
                     >
                       <option value="" className="bg-gray-800 text-gray-200">
-                        {eligibleGroups.length === 0 ? 'No groups available (admin/creator only)' : 'Choose a group...'}
+                        {eligibleGroups.length === 0 ? 'No groups available (permission required)' : 'Choose a group...'}
                       </option>
                       {eligibleGroups.map((group) => (
                         <option key={group.id} value={group.id} className="bg-gray-800 text-gray-200">
-                          {group.title} {group.creator_id === user?.id ? '(Creator)' : '(Admin)'}
+                          {group.title} ({group.role})
                         </option>
                       ))}
                     </motion.select>
@@ -321,7 +318,7 @@ export default function CreateGeneralEvent({
                       onChange={(e) => setEventTitle(e.target.value)}
                       onKeyPress={handleKeyPress}
                       placeholder="Enter an exciting event title..."
-                      className="w-full bg-white/10 border border-white/20 rounded-xl p-4 text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-emerald-400/50 focus:border-emerald-400/50 transition-all duration-300 text-sm lg:text-base hover:bg-white/15"
+                      className="w-full bg-gradient-to-r from-white/15 via-white/10 to-white/5 backdrop-blur-sm border border-white/30 rounded-2xl p-4 text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-emerald-400/60 focus:border-emerald-400/60 transition-all duration-300 text-sm lg:text-base hover:bg-gradient-to-r hover:from-white/20 hover:via-white/15 hover:to-white/10 shadow-lg hover:shadow-emerald-500/10"
                       maxLength={100}
                       disabled={eligibleGroups.length === 0}
                       initial={{ opacity: 0, scale: 0.95 }}
@@ -360,7 +357,7 @@ export default function CreateGeneralEvent({
                       value={eventDescription}
                       onChange={(e) => setEventDescription(e.target.value)}
                       placeholder="Tell people what this event is about, what's the agenda, what to expect..."
-                      className="w-full h-28 lg:h-32 bg-white/10 border border-white/20 rounded-xl p-4 text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-teal-400/50 focus:border-teal-400/50 resize-none text-sm lg:text-base transition-all duration-300 hover:bg-white/15"
+                      className="w-full h-28 lg:h-32 bg-gradient-to-r from-white/15 via-white/10 to-white/5 backdrop-blur-sm border border-white/30 rounded-2xl p-4 text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-teal-400/60 focus:border-teal-400/60 resize-none text-sm lg:text-base transition-all duration-300 hover:bg-gradient-to-r hover:from-white/20 hover:via-white/15 hover:to-white/10 shadow-lg hover:shadow-teal-500/10"
                       maxLength={500}
                       disabled={eligibleGroups.length === 0}
                       initial={{ opacity: 0, scale: 0.95 }}
@@ -399,7 +396,7 @@ export default function CreateGeneralEvent({
                       value={eventLocation}
                       onChange={(e) => setEventLocation(e.target.value)}
                       placeholder="Where will the event take place? Include address, virtual meeting link, or venue details..."
-                      className="w-full h-24 lg:h-28 bg-white/10 border border-white/20 rounded-xl p-4 text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-cyan-400/50 focus:border-cyan-400/50 resize-none text-sm lg:text-base transition-all duration-300 hover:bg-white/15"
+                      className="w-full h-24 lg:h-28 bg-gradient-to-r from-white/15 via-white/10 to-white/5 backdrop-blur-sm border border-white/30 rounded-2xl p-4 text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-cyan-400/60 focus:border-cyan-400/60 resize-none text-sm lg:text-base transition-all duration-300 hover:bg-gradient-to-r hover:from-white/20 hover:via-white/15 hover:to-white/10 shadow-lg hover:shadow-cyan-500/10"
                       maxLength={200}
                       disabled={eligibleGroups.length === 0}
                       initial={{ opacity: 0, scale: 0.95 }}
@@ -435,11 +432,11 @@ export default function CreateGeneralEvent({
                         value={eventDate}
                         onChange={(e) => setEventDate(e.target.value)}
                         min={minDate}
-                        className="w-full bg-white/10 border border-white/20 rounded-xl p-4 pl-12 text-white focus:outline-none focus:ring-2 focus:ring-emerald-400/50 focus:border-emerald-400/50 transition-all duration-300 text-sm lg:text-base hover:bg-white/15"
+                        className="w-full bg-gradient-to-r from-white/15 via-white/10 to-white/5 backdrop-blur-sm border border-white/30 rounded-2xl p-4 pl-12 text-white focus:outline-none focus:ring-2 focus:ring-emerald-400/60 focus:border-emerald-400/60 transition-all duration-300 text-sm lg:text-base hover:bg-gradient-to-r hover:from-white/20 hover:via-white/15 hover:to-white/10 shadow-lg hover:shadow-emerald-500/10"
                         title="Select event date"
                         disabled={eligibleGroups.length === 0}
                       />
-                      <div className="absolute left-4 top-1/2 transform -translate-y-1/2 text-white/50">
+                      <div className="absolute left-4 top-1/2 transform -translate-y-1/2 text-white/60">
                         <Calendar className="w-5 h-5" />
                       </div>
                     </div>
@@ -459,11 +456,11 @@ export default function CreateGeneralEvent({
                         type="time"
                         value={eventTime}
                         onChange={(e) => setEventTime(e.target.value)}
-                        className="w-full bg-white/10 border border-white/20 rounded-xl p-4 pl-12 text-white focus:outline-none focus:ring-2 focus:ring-teal-400/50 focus:border-teal-400/50 transition-all duration-300 text-sm lg:text-base hover:bg-white/15"
+                        className="w-full bg-gradient-to-r from-white/15 via-white/10 to-white/5 backdrop-blur-sm border border-white/30 rounded-2xl p-4 pl-12 text-white focus:outline-none focus:ring-2 focus:ring-teal-400/60 focus:border-teal-400/60 transition-all duration-300 text-sm lg:text-base hover:bg-gradient-to-r hover:from-white/20 hover:via-white/15 hover:to-white/10 shadow-lg hover:shadow-teal-500/10"
                         title="Select event time"
                         disabled={eligibleGroups.length === 0}
                       />
-                      <div className="absolute left-4 top-1/2 transform -translate-y-1/2 text-white/50">
+                      <div className="absolute left-4 top-1/2 transform -translate-y-1/2 text-white/60">
                         <Clock className="w-5 h-5" />
                       </div>
                     </div>
@@ -501,7 +498,7 @@ export default function CreateGeneralEvent({
                   whileHover={{ scale: (isLoading || !eventTitle.trim() || !eventDate || !eventTime || !selectedGroupId || eligibleGroups.length === 0) ? 1 : 1.05 }}
                   whileTap={{ scale: (isLoading || !eventTitle.trim() || !eventDate || !eventTime || !selectedGroupId || eligibleGroups.length === 0) ? 1 : 0.95 }}
                   transition={{ type: 'spring', stiffness: 400, damping: 17 }}
-                  title={eligibleGroups.length === 0 ? 'You must be a group admin or creator to create events' : ''}
+                  title={eligibleGroups.length === 0 ? 'You must have permission to create events in at least one group' : ''}
                 >
                   {isLoading ? (
                     <div className="flex items-center justify-center space-x-2">

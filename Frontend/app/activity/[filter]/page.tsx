@@ -1,5 +1,5 @@
 "use client"
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter, useParams, useSearchParams } from 'next/navigation'
 import ProtectedRoute from '@/components/ProtectedRoute'
 import { useAuth } from '@/context/AuthContext'
@@ -49,6 +49,20 @@ function ActivityFilterPage() {
   const [posts, setPosts] = useState<Post[]>([])
   const [, setIsLoadingPosts] = useState(true)
 
+  // Pagination state for each activity type
+  const [paginationState, setPaginationState] = useState<{
+    liked: { currentPage: number; hasMoreResults: boolean; isLoadingMore: boolean };
+    commented: { currentPage: number; hasMoreResults: boolean; isLoadingMore: boolean };
+    saved: { currentPage: number; hasMoreResults: boolean; isLoadingMore: boolean };
+  }>({
+    liked: { currentPage: 0, hasMoreResults: true, isLoadingMore: false },
+    commented: { currentPage: 0, hasMoreResults: true, isLoadingMore: false },
+    saved: { currentPage: 0, hasMoreResults: true, isLoadingMore: false }
+  })
+
+  // Scroll position preservation
+  const resultsContainerRef = useRef<HTMLDivElement>(null)
+
   // Update URL when filter changes
   useEffect(() => {
     if (activitySubTab !== filter) {
@@ -69,28 +83,36 @@ function ActivityFilterPage() {
   }, [sortOrder, activitySubTab, searchParams, router])
 
   // Fetch data when component loads
-  const fetchActivityPosts = useCallback(async () => {
+  const fetchActivityPosts = useCallback(async (page: number = 0, append: boolean = false) => {
     try {
-      setIsLoadingPosts(true)
-      console.log('Fetching activity posts...')
-      let response: { posts?: PostResponse[]; bookmarks?: Bookmark[] } | undefined
+      if (append) {
+        setPaginationState(prev => ({
+          ...prev,
+          [activitySubTab as keyof typeof prev]: { ...prev[activitySubTab as keyof typeof prev], isLoadingMore: true }
+        }))
+      } else {
+        setIsLoadingPosts(true)
+      }
+
+      console.log('Fetching activity posts...', { activitySubTab, page, append })
+      let response: { posts?: PostResponse[]; bookmarks?: Bookmark[]; count?: number } | undefined
 
       let postsArr: Array<PostResponse | APIPost> = []
 
       switch (activitySubTab) {
         case 'liked':
           // Fetch posts liked by the user
-          response = await api.getUserLikedPosts()
+          response = await api.getUserLikedPosts(20, page * 20)
           postsArr = Array.isArray(response?.posts) ? response.posts : []
           break
         case 'commented':
           // Fetch posts commented on by the user
-          response = await api.getUserCommentedPosts()
+          response = await api.getUserCommentedPosts(20, page * 20)
           postsArr = Array.isArray(response?.posts) ? response.posts : []
           break
         case 'saved':
           // Fetch saved/bookmarked posts
-          response = await api.getUserBookmarks()
+          response = await api.getUserBookmarks(20, page * 20)
           // Bookmarks response has a different structure - extract posts from bookmarks
           const bookmarksArr = Array.isArray(response?.bookmarks) ? response.bookmarks : []
           postsArr = bookmarksArr
@@ -98,12 +120,18 @@ function ActivityFilterPage() {
             .filter((p): p is APIPost => Boolean(p))
           break
         default:
-          response = await api.getUserLikedPosts()
+          response = await api.getUserLikedPosts(20, page * 20)
           postsArr = Array.isArray(response?.posts) ? response.posts : []
       }
 
       if (!postsArr.length) {
-        setPosts([])
+        if (!append) {
+          setPosts([])
+        }
+        setPaginationState(prev => ({
+          ...prev,
+          [activitySubTab as keyof typeof prev]: { ...prev[activitySubTab as keyof typeof prev], hasMoreResults: false }
+        }))
         return
       }
 
@@ -127,7 +155,7 @@ function ActivityFilterPage() {
             ) : undefined,
           likes: post.like_count,
           comments: post.comment_count,
-          shares: 0,
+          shares: post.share_count,
           timeAgo: formatTimeAgo(post.created_at),
           privacy: post.privacy,
           isLiked: post.is_liked,
@@ -136,7 +164,35 @@ function ActivityFilterPage() {
         }
       })
 
-      setPosts(mappedPosts)
+      if (append) {
+        setPosts(prevPosts => [...prevPosts, ...mappedPosts])
+        setPaginationState(prev => ({
+          ...prev,
+          [activitySubTab as keyof typeof prev]: {
+            ...prev[activitySubTab as keyof typeof prev],
+            currentPage: page,
+            isLoadingMore: false
+          }
+        }))
+      } else {
+        setPosts(mappedPosts)
+        setPaginationState(prev => ({
+          ...prev,
+          [activitySubTab as keyof typeof prev]: {
+            currentPage: 0,
+            hasMoreResults: true,
+            isLoadingMore: false
+          }
+        }))
+      }
+
+      // Check if we got fewer posts than requested, indicating no more results
+      if (mappedPosts.length < 20) {
+        setPaginationState(prev => ({
+          ...prev,
+          [activitySubTab as keyof typeof prev]: { ...prev[activitySubTab as keyof typeof prev], hasMoreResults: false }
+        }))
+      }
         } catch (err) {
       console.error('Error fetching posts:', err)
       if (err instanceof NetworkError) {
@@ -148,13 +204,34 @@ function ActivityFilterPage() {
       }
     } finally {
       setIsLoadingPosts(false)
+      setPaginationState(prev => ({
+        ...prev,
+        [activitySubTab as keyof typeof prev]: { ...prev[activitySubTab as keyof typeof prev], isLoadingMore: false }
+      }))
     }
       }, [activitySubTab, error])
 
   // Fetch activity posts on mount and when filter changes
   useEffect(() => {
-    fetchActivityPosts()
+    fetchActivityPosts(0, false) // Reset to first page
   }, [fetchActivityPosts])
+
+  const handleLoadMore = useCallback(() => {
+    const currentState = paginationState[activitySubTab as keyof typeof paginationState]
+    if (!currentState.isLoadingMore && currentState.hasMoreResults && resultsContainerRef.current) {
+      // Save current scroll position
+      const scrollTop = resultsContainerRef.current.scrollTop
+
+      fetchActivityPosts(currentState.currentPage + 1, true).then(() => {
+        // Restore scroll position after new posts are loaded
+        requestAnimationFrame(() => {
+          if (resultsContainerRef.current) {
+            resultsContainerRef.current.scrollTop = scrollTop
+          }
+        })
+      })
+    }
+  }, [activitySubTab, paginationState, fetchActivityPosts])
 
       // WebSocket real-time notifications
       useEffect(() => {
@@ -279,6 +356,10 @@ function ActivityFilterPage() {
         activitySubTab={activitySubTab}
         sortOrder={sortOrder}
         setSortOrder={setSortOrder}
+        hasMoreResults={paginationState[activitySubTab as keyof typeof paginationState].hasMoreResults}
+        isLoadingMore={paginationState[activitySubTab as keyof typeof paginationState].isLoadingMore}
+        onLoadMore={handleLoadMore}
+        resultsContainerRef={resultsContainerRef}
       />
     </AppLayout>
   )

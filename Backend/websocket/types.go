@@ -28,6 +28,8 @@ const (
 	MessageTypeGroupUpdate         = "group_update"
 	MessageTypeEventUpdate         = "event_update"
 	MessageTypeLayoutSync          = "layout_sync"
+	MessageTypeSearch              = "search"
+	MessageTypeSearchResults       = "search_results"
 	MessageTypeError               = "error"
 	MessageTypePing                = "ping"
 	MessageTypePong                = "pong"

@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { Calendar, Users, Plus, Edit, Trash2, X, Check, WifiOff } from 'lucide-react';
 import { api, Event, EventResponse, CreateEventRequest, UpdateEventRequest, GroupResponse } from '@/lib/api';
 import { useToast } from '@/context/ToastContext';
@@ -523,12 +524,14 @@ const EventDetailsModal: React.FC<EventDetailsModalProps> = ({
 };
 
 export const EventsSection: React.FC<EventsSectionProps> = ({ events, onEventsUpdate, isLoading = false }) => {
+  const searchParams = useSearchParams()
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<EventResponse | null>(null);
   const [groups, setGroups] = useState<GroupResponse[]>([]);
   const [groupRoles, setGroupRoles] = useState<{ [groupId: number]: { role: string; is_admin_or_creator: boolean } }>({});
+  const [highlightedEventId, setHighlightedEventId] = useState<number | null>(null);
   const { user } = useAuth();
   const { success, error } = useToast();
   
@@ -537,6 +540,36 @@ export const EventsSection: React.FC<EventsSectionProps> = ({ events, onEventsUp
   
   // Connection status monitoring
   const { isConnected } = useConnectionStatus()
+
+  // Handle event highlighting from URL params
+  useEffect(() => {
+    const eventId = searchParams.get('eventId')
+    if (eventId && events.length > 0) {
+      const targetEventId = parseInt(eventId)
+      const targetEvent = events.find(event => event.id === targetEventId)
+      
+      if (targetEvent) {
+        setHighlightedEventId(targetEventId)
+        
+        // Scroll to the event after a short delay to ensure the DOM is ready
+        setTimeout(() => {
+          const eventElement = document.getElementById(`event-${targetEventId}`)
+          if (eventElement) {
+            eventElement.scrollIntoView({ 
+              behavior: 'smooth', 
+              block: 'center',
+              inline: 'nearest'
+            })
+          }
+        }, 100)
+        
+        // Remove highlight after 3 seconds
+        setTimeout(() => {
+          setHighlightedEventId(null)
+        }, 3000)
+      }
+    }
+  }, [searchParams, events])
 
   const loadUserGroups = useCallback(async () => {
     if (!user) return;
@@ -647,14 +680,18 @@ export const EventsSection: React.FC<EventsSectionProps> = ({ events, onEventsUp
                 const eventDate = new Date(event.event_time);
                 const isExpired = eventDate < new Date();
                 const isToday = eventDate.toDateString() === new Date().toDateString();
+                const isHighlighted = highlightedEventId === event.id;
                 
                 return (
                   <div 
-                    key={event.id} 
-                    className={`bg-white/5 rounded-xl lg:rounded-2xl p-4 lg:p-6 hover:bg-white/10 transition-all duration-200 cursor-pointer border-l-4 ${
-                      isExpired ? 'border-gray-500 opacity-75' : 
-                      isToday ? 'border-yellow-500' : 
-                      'border-emerald-500'
+                    key={event.id}
+                    id={`event-${event.id}`}
+                    className={`bg-white/5 rounded-xl lg:rounded-2xl p-4 lg:p-6 hover:bg-white/10 transition-all duration-500 cursor-pointer border-l-4 ${
+                      isHighlighted 
+                        ? 'border-yellow-400 bg-yellow-500/10 shadow-lg shadow-yellow-500/20 ring-2 ring-yellow-400/30' 
+                        : isExpired ? 'border-gray-500 opacity-75' : 
+                        isToday ? 'border-yellow-500' : 
+                        'border-emerald-500'
                     }`}
                     onClick={() => handleEventClick(event)}
                   >

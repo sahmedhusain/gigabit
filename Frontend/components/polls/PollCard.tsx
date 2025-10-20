@@ -115,18 +115,20 @@ export default function PollCard({ poll, onVote, onUnvote, onDelete, onExpire, c
 
   return (
     <motion.div
-      className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-sm border border-white/20 rounded-2xl p-6 hover:from-white/15 hover:to-white/10 transition-all duration-300 shadow-lg"
+      className="group relative bg-gradient-to-br from-white/10 via-white/5 to-transparent backdrop-blur-xl rounded-3xl border shadow-2xl p-6 hover:shadow-emerald-500/10 transition-all duration-500 border-white/20"
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4 }}
     >
+      {/* Subtle gradient overlay */}
+      <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/5 via-transparent to-teal-500/5 rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
       {/* Poll Header */}
-      <div className="mb-5">
+      <div className="relative mb-5">
         <div className="flex items-start justify-between mb-3">
           <h3 className="text-lg lg:text-xl font-bold text-white flex-1">{poll.title}</h3>
           <div className="flex items-center space-x-2 ml-3">
             {isExpired && (
-              <span className="px-3 py-1 bg-red-500/20 border border-red-400/30 rounded-full text-red-300 text-xs font-semibold">
+              <span className="px-3 py-1 bg-gradient-to-r from-red-500/20 to-red-600/20 border border-red-400/30 rounded-full text-red-300 text-xs font-semibold shadow-lg shadow-red-500/10">
                 Expired
               </span>
             )}
@@ -181,18 +183,18 @@ export default function PollCard({ poll, onVote, onUnvote, onDelete, onExpire, c
           {poll.expires_at && !isExpired && (
             <>
               <span>•</span>
-              <div className="flex items-center space-x-1 text-cyan-300">
+              <div className="flex items-center space-x-1 text-cyan-300 bg-cyan-500/10 rounded-full px-2 py-1 border border-cyan-400/20">
                 <Clock className="w-3 h-3" />
-                <span>Expires {formatDate(poll.expires_at)}</span>
+                <span className="text-xs font-medium">Expires {formatDate(poll.expires_at)}</span>
               </div>
             </>
           )}
           {poll.allow_multiple_choices && (
             <>
               <span>•</span>
-              <div className="flex items-center space-x-1 text-emerald-300">
+              <div className="flex items-center space-x-1 text-emerald-300 bg-emerald-500/10 rounded-full px-2 py-1 border border-emerald-400/20">
                 <CheckCircle className="w-3 h-3" />
-                <span>Multiple choice</span>
+                <span className="text-xs font-medium">Multiple choice</span>
               </div>
             </>
           )}
@@ -210,7 +212,7 @@ export default function PollCard({ poll, onVote, onUnvote, onDelete, onExpire, c
             return (
               <motion.div
                 key={option.id}
-                className={`relative p-4 rounded-xl border transition-all duration-300 cursor-pointer overflow-hidden ${
+                className={`relative p-4 rounded-2xl border transition-all duration-300 cursor-pointer overflow-hidden ${
                   canVote
                     ? 'hover:border-emerald-400/50 hover:shadow-lg hover:shadow-emerald-500/10'
                     : ''
@@ -228,8 +230,8 @@ export default function PollCard({ poll, onVote, onUnvote, onDelete, onExpire, c
               >
                 {/* Vote percentage background */}
                 <motion.div
-                  className={`absolute inset-y-0 left-0 rounded-xl transition-all duration-500 ${
-                    isSelected || isUserVote ? 'bg-emerald-500/30' : 'bg-white/10'
+                  className={`absolute inset-y-0 left-0 rounded-2xl transition-all duration-500 ${
+                    isSelected || isUserVote ? 'bg-gradient-to-r from-emerald-500/40 to-teal-500/40' : 'bg-gradient-to-r from-white/15 to-white/10'
                   }`}
                   initial={{ width: 0 }}
                   animate={{ width: `${Math.min(percentage, 100)}%` }}
@@ -240,16 +242,16 @@ export default function PollCard({ poll, onVote, onUnvote, onDelete, onExpire, c
                   <div className="flex items-center space-x-3 flex-1">
                     {/* Checkbox/Radio indicator - only show if poll is not expired */}
                     {!isExpired && (
-                      <div className={`w-5 h-5 rounded-${poll.allow_multiple_choices ? 'lg' : 'full'} border-2 flex-shrink-0 transition-all duration-300 flex items-center justify-center ${
+                      <div className={`w-5 h-5 rounded-${poll.allow_multiple_choices ? 'lg' : 'full'} border-2 flex-shrink-0 transition-all duration-300 flex items-center justify-center shadow-lg ${
                         isSelected || isUserVote
-                          ? 'border-emerald-300 bg-emerald-400 shadow-lg shadow-emerald-400/30'
-                          : 'border-white/40'
+                          ? 'border-emerald-300 bg-gradient-to-br from-emerald-400 to-teal-500 shadow-emerald-400/30'
+                          : 'border-white/40 hover:border-white/60'
                       }`}>
                         {(isSelected || isUserVote) && (
                           <motion.div
                             initial={{ scale: 0 }}
                             animate={{ scale: 1 }}
-                            className="w-2 h-2 bg-white rounded-full"
+                            className="w-2 h-2 bg-white rounded-full shadow-sm"
                           />
                         )}
                       </div>
@@ -290,8 +292,8 @@ export default function PollCard({ poll, onVote, onUnvote, onDelete, onExpire, c
       </div>
 
       {/* Poll Stats */}
-      <div className="flex items-center justify-between text-sm pt-4 border-t border-white/10">
-        <div className="flex items-center space-x-2 text-white/70">
+      <div className="relative flex items-center justify-between text-sm pt-4 border-t border-white/10">
+        <div className="flex items-center space-x-2 text-white/70 bg-white/5 rounded-2xl px-3 py-2 border border-white/10">
           <Users className="w-4 h-4" />
           <span className="font-medium">
             {poll.total_votes} {poll.total_votes === 1 ? 'vote' : 'votes'}
@@ -299,7 +301,7 @@ export default function PollCard({ poll, onVote, onUnvote, onDelete, onExpire, c
         </div>
         {poll.user_voted && (
           <motion.div
-            className="flex items-center space-x-1 text-emerald-300 font-semibold"
+            className="flex items-center space-x-1 text-emerald-300 font-semibold bg-emerald-500/10 rounded-2xl px-3 py-2 border border-emerald-400/20"
             initial={{ opacity: 0, x: 10 }}
             animate={{ opacity: 1, x: 0 }}
           >
@@ -312,9 +314,9 @@ export default function PollCard({ poll, onVote, onUnvote, onDelete, onExpire, c
       {/* Voting indicator */}
       {isVoting && (
         <motion.div
-          className="mt-3 flex items-center justify-center space-x-2 text-emerald-300 text-sm"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
+          className="relative mt-3 flex items-center justify-center space-x-2 text-emerald-300 text-sm bg-emerald-500/10 rounded-2xl px-4 py-2 border border-emerald-400/20"
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
         >
           <div className="w-4 h-4 border-2 border-emerald-300/30 border-t-emerald-300 rounded-full animate-spin"></div>
           <span>Updating vote...</span>
@@ -331,7 +333,7 @@ export default function PollCard({ poll, onVote, onUnvote, onDelete, onExpire, c
             exit={{ opacity: 0 }}
           >
             <motion.div
-              className="bg-gradient-to-br from-gray-900 to-gray-800 border border-white/20 rounded-2xl p-6 max-w-md w-full"
+              className="bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 border border-white/20 rounded-3xl p-6 max-w-md w-full shadow-2xl"
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
@@ -351,14 +353,14 @@ export default function PollCard({ poll, onVote, onUnvote, onDelete, onExpire, c
               <div className="flex space-x-3">
                 <button
                   onClick={() => setShowDeleteConfirm(false)}
-                  className="flex-1 px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded-lg transition-all duration-200"
+                  className="flex-1 px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded-2xl transition-all duration-200 border border-white/20"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleDelete}
                   disabled={isDeleting}
-                  className="flex-1 px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
+                  className="flex-1 px-4 py-2 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white rounded-2xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2 shadow-lg"
                 >
                   {isDeleting && (
                     <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
@@ -381,7 +383,7 @@ export default function PollCard({ poll, onVote, onUnvote, onDelete, onExpire, c
             exit={{ opacity: 0 }}
           >
             <motion.div
-              className="bg-gradient-to-br from-gray-900 to-gray-800 border border-white/20 rounded-2xl p-6 max-w-md w-full"
+              className="bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 border border-white/20 rounded-3xl p-6 max-w-md w-full shadow-2xl"
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
@@ -401,14 +403,14 @@ export default function PollCard({ poll, onVote, onUnvote, onDelete, onExpire, c
               <div className="flex space-x-3">
                 <button
                   onClick={() => setShowExpireConfirm(false)}
-                  className="flex-1 px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded-lg transition-all duration-200"
+                  className="flex-1 px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded-2xl transition-all duration-200 border border-white/20"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleExpire}
                   disabled={isExpiring}
-                  className="flex-1 px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
+                  className="flex-1 px-4 py-2 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white rounded-2xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2 shadow-lg"
                 >
                   {isExpiring && (
                     <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>

@@ -2,7 +2,7 @@
 
 import { Menu, X, Bell, Search, Users, Calendar, Hash, Filter, FileText, User, ChevronDown, Compass, MessageCircle } from 'lucide-react'
 import { useState, useEffect, useRef } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, usePathname, useSearchParams } from 'next/navigation'
 import { api, getToken } from '@/lib/api'
 
 interface TopBarProps {
@@ -40,6 +40,9 @@ export default function TopBar({
   onDiscoverClick,
 }: TopBarProps) {
   const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+  
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedFilter, setSelectedFilter] = useState('all')
   const [showFilterDropdown, setShowFilterDropdown] = useState(false)
@@ -49,11 +52,11 @@ export default function TopBar({
   const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(-1)
   const [recentSearches, setRecentSearches] = useState<string[]>([])
   const [searchHistory, setSearchHistory] = useState<SearchHistoryItem[]>([])
-  const [popularSearches, setPopularSearches] = useState<string[]>([])
   const [showRecentSearches, setShowRecentSearches] = useState(false)
   const [showSearchHistory, setShowSearchHistory] = useState(false)
   const [pendingJoin, setPendingJoin] = useState<Record<number, boolean>>({})
   const [joinedGroups, setJoinedGroups] = useState<Record<number, boolean>>({})
+  const [hasUserFocused, setHasUserFocused] = useState(false)
   const searchRef = useRef<HTMLDivElement>(null)
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null)
 
@@ -67,6 +70,43 @@ export default function TopBar({
     { id: 'tags', label: 'Tags', icon: Hash },
     { id: 'message', label: 'Messages', icon: MessageCircle }
   ]
+
+  // Sync search state with URL when on search page
+  useEffect(() => {
+    if (pathname && pathname.startsWith('/search/')) {
+      const pathParts = pathname.split('/')
+      const urlFilter = pathParts[2] // e.g., 'groups' from '/search/groups'
+      const urlQuery = searchParams.get('q') || ''
+      
+      // Map URL filter to our filter IDs
+      const filterMapping: Record<string, string> = {
+        'all': 'all',
+        'users': 'users',
+        'groups': 'groups',
+        'events': 'events',
+        'posts': 'posts',
+        'messages': 'message',
+        'chats': 'chat',
+        'tags': 'tags'
+      }
+      
+      const mappedFilter = filterMapping[urlFilter] || 'all'
+      
+      if (mappedFilter !== selectedFilter) {
+        setSelectedFilter(mappedFilter)
+      }
+      
+      // Only sync the query if the user hasn't actively focused on the input
+      // or if the URL query is different from what's currently displayed
+      if (!hasUserFocused && urlQuery !== searchQuery) {
+        setSearchQuery(urlQuery)
+      }
+    } else {
+      // Reset when not on search page
+      // Don't reset hasUserFocused here as it prevents suggestions from showing on other pages
+      // setHasUserFocused(false)
+    }
+  }, [pathname, searchParams, hasUserFocused])
 
   // Load recent searches, search history, and popular searches from localStorage
   useEffect(() => {
@@ -86,15 +126,6 @@ export default function TopBar({
         setSearchHistory(history.sort((a: SearchHistoryItem, b: SearchHistoryItem) => b.timestamp - a.timestamp))
       } catch (e) {
         console.error('Failed to parse search history:', e)
-      }
-    }
-
-    const storedPopular = localStorage.getItem('popularSearches')
-    if (storedPopular) {
-      try {
-        setPopularSearches(JSON.parse(storedPopular))
-      } catch (e) {
-        console.error('Failed to parse popular searches:', e)
       }
     }
   }, [])
@@ -144,7 +175,8 @@ export default function TopBar({
         setIsSearching(false)
         return
       }
-      const response = await fetch(`http://localhost:8080/api/search/suggestions?q=${encodeURIComponent(query)}`, {
+      const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'
+      const response = await fetch(`${API_BASE_URL}/api/search/suggestions?q=${encodeURIComponent(query)}`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -161,9 +193,8 @@ export default function TopBar({
           results = results.filter((s: SearchSuggestion) => s.type === targetType)
         }
         setSuggestions(results)
-        setShowSuggestions(true)
+        setShowSuggestions(hasUserFocused)
         addToSearchHistory(query, results.length)
-        updatePopularSearches(query)
       }
     } catch (error) {
       console.error('Search error:', error)
@@ -189,13 +220,6 @@ export default function TopBar({
     localStorage.setItem('searchHistory', JSON.stringify(updated))
   }
 
-  const updatePopularSearches = (query: string) => {
-    const currentCount = popularSearches.find(p => p === query) ? 1 : 0
-    const updated = [query, ...popularSearches.filter(s => s !== query)].slice(0, 10)
-    setPopularSearches(updated)
-    localStorage.setItem('popularSearches', JSON.stringify(updated))
-  }
-
   const handleSuggestionClick = (suggestion: SearchSuggestion) => {
     addToRecentSearches(searchQuery)
     setSearchQuery('')
@@ -203,35 +227,37 @@ export default function TopBar({
     setShowSuggestions(false)
     setSelectedSuggestionIndex(-1)
 
-    // Unified navigation for chats and messages
+    // Unified navigation for chats and messages - same as ChatsSection
     if (suggestion.type === 'chat') {
       // Directly open conversation by id
-      router.push(`/chats/all?chat=${encodeURIComponent(String(suggestion.id))}`)
+      const conversationId = Number(suggestion.id)
+      router.push(`/chats/all?chat=${conversationId}`)
       return
     }
 
     if (suggestion.type === 'message') {
-      try {
-        const parsed = new URL(suggestion.url, 'http://localhost')
-        const chatId = parsed.searchParams.get('chat') || String(suggestion.metadata?.conversationId || '')
-        const messageId = parsed.searchParams.get('message') || String(suggestion.id)
-        if (chatId) {
-          router.push(`/chats/all?chat=${encodeURIComponent(chatId)}&message=${encodeURIComponent(messageId)}`)
-          return
-        }
-      } catch (e) {
-        console.warn('Failed to parse message suggestion URL, falling back to /chats/all')
-        router.push('/chats/all')
-        return
-      }
+      // Get conversation ID and message ID from metadata (same as ChatsSection)
+      const meta = suggestion.metadata as Record<string, unknown> | undefined
+      const conversationId = meta?.conversationId ? Number(meta.conversationId) : Number(suggestion.id)
+      const messageId = Number(suggestion.id)
+      
+      router.push(`/chats/all?chat=${conversationId}&message=${messageId}`)
+      return
     }
 
     if (suggestion.type === 'group') {
-      const gmeta = suggestion.metadata as Partial<{ joinable: boolean; isMember: boolean }> | undefined
+      const gmeta = suggestion.metadata as Partial<{ joinable: boolean; isMember: boolean; conversationId?: number }> | undefined
       const joinable = !!gmeta?.joinable
       const isMember = !!gmeta?.isMember
+      
       if (joinable && !isMember) {
         // Row has a Join button; prevent navigation on title click
+        return
+      }
+      
+      // For member groups, navigate to chat (backend already provides the correct URL)
+      if (isMember && gmeta?.conversationId) {
+        router.push(`/chats/all?chat=${gmeta.conversationId}`)
         return
       }
     }
@@ -244,6 +270,24 @@ export default function TopBar({
     setSearchQuery(query)
     setShowRecentSearches(false)
     setSelectedSuggestionIndex(-1)
+    
+    // Check if we're already on a search page with the same query
+    const isOnSearchPage = pathname && pathname.startsWith('/search/')
+    const currentUrlQuery = searchParams.get('q') || ''
+    const currentUrlFilter = pathname.split('/')[2] || 'all'
+    
+    if (isOnSearchPage && currentUrlQuery === query && currentUrlFilter === selectedFilter) {
+      // Already on the correct search page, just close the UI
+      return
+    }
+    
+    // Navigate to search page with the selected filter
+    router.push(`/search/${selectedFilter}?q=${encodeURIComponent(query)}`)
+    
+    // Only clear searchQuery if we're not on a search page
+    if (!isOnSearchPage) {
+      setSearchQuery('')
+    }
   }
 
   const clearRecentSearches = () => {
@@ -252,6 +296,56 @@ export default function TopBar({
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      
+      // If there are suggestions and one is selected, use that
+      if (showSuggestions && selectedSuggestionIndex >= 0 && suggestions[selectedSuggestionIndex]) {
+        handleSuggestionClick(suggestions[selectedSuggestionIndex])
+        return
+      }
+      
+      // If there are recent searches showing and one is selected, use that
+      if (showRecentSearches && selectedSuggestionIndex >= 0 && recentSearches[selectedSuggestionIndex]) {
+        handleRecentSearchClick(recentSearches[selectedSuggestionIndex])
+        return
+      }
+      
+      // Otherwise, redirect to search page with the current query
+      if (searchQuery.trim().length >= 2) {
+        const trimmedQuery = searchQuery.trim()
+        addToRecentSearches(trimmedQuery)
+        
+        // Check if we're already on a search page with the same query
+        const isOnSearchPage = pathname && pathname.startsWith('/search/')
+        const currentUrlQuery = searchParams.get('q') || ''
+        const currentUrlFilter = pathname.split('/')[2] || 'all'
+        
+        if (isOnSearchPage && currentUrlQuery === trimmedQuery && currentUrlFilter === selectedFilter) {
+          // Already on the correct search page, just close the UI
+          setSuggestions([])
+          setShowSuggestions(false)
+          setShowRecentSearches(false)
+          setSelectedSuggestionIndex(-1)
+          return
+        }
+        
+        // Navigate to the search page
+        router.push(`/search/${selectedFilter}?q=${encodeURIComponent(trimmedQuery)}`)
+        
+        // Only clear searchQuery if we're not on a search page (to allow URL sync to work)
+        if (!isOnSearchPage) {
+          setSearchQuery('')
+        }
+        
+        setSuggestions([])
+        setShowSuggestions(false)
+        setShowRecentSearches(false)
+        setSelectedSuggestionIndex(-1)
+      }
+      return
+    }
+
     if (!showSuggestions && !showRecentSearches) return
 
     const items = showSuggestions ? suggestions : recentSearches
@@ -269,16 +363,6 @@ export default function TopBar({
         setSelectedSuggestionIndex(prev =>
           prev > 0 ? prev - 1 : maxIndex
         )
-        break
-      case 'Enter':
-        e.preventDefault()
-        if (selectedSuggestionIndex >= 0) {
-          if (showSuggestions && suggestions[selectedSuggestionIndex]) {
-            handleSuggestionClick(suggestions[selectedSuggestionIndex])
-          } else if (showRecentSearches && recentSearches[selectedSuggestionIndex]) {
-            handleRecentSearchClick(recentSearches[selectedSuggestionIndex])
-          }
-        }
         break
       case 'Escape':
         setShowSuggestions(false)
@@ -323,6 +407,21 @@ export default function TopBar({
     }
   }
 
+  // Generate dynamic placeholder text
+  const getSearchPlaceholder = () => {
+    const currentFilter = searchFilters.find(f => f.id === selectedFilter)
+    const filterLabel = currentFilter?.label.toLowerCase() || 'everything'
+    
+    // If we're on a search page with a query, show that in the placeholder
+    if (pathname && pathname.startsWith('/search/') && searchParams.get('q')) {
+      const query = searchParams.get('q')
+      return `"${query}" in ${filterLabel}`
+    }
+    
+    // Otherwise show the standard search placeholder
+    return `Search ${selectedFilter === 'all' ? 'everything' : filterLabel}...`
+  }
+
   const toggleFilterDropdown = () => {
     setShowFilterDropdown(!showFilterDropdown)
     setShowSuggestions(false)
@@ -349,11 +448,12 @@ export default function TopBar({
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-white/60" />
                 <input
                   type="text"
-                  placeholder="Search..."
+                  placeholder={getSearchPlaceholder()}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   onKeyDown={handleKeyDown}
                   onFocus={() => {
+                    setHasUserFocused(true)
                     if (searchQuery.length < 2 && recentSearches.length > 0) {
                       setShowRecentSearches(true)
                       setShowSuggestions(false)
@@ -395,165 +495,270 @@ export default function TopBar({
 
             {/* Search Suggestions Dropdown */}
             {showSuggestions && suggestions.length > 0 && (
-              <div className="absolute left-0 right-0 top-full mt-2 w-full bg-white/10 backdrop-blur-xl rounded-2xl shadow-2xl border border-white/20 overflow-hidden z-50 max-h-96 overflow-y-auto">
-                <div className="p-2">
-                  <div className="text-xs font-semibold text-white/80 mb-2 px-2">Search Results</div>
-                  {suggestions.map((suggestion, index) => {
-                    const IconComponent = getIconForType(suggestion.type)
-                    const iconColor = getColorForType(suggestion.type)
-                    const isSelected = selectedSuggestionIndex === index
-                    return (
-                      <div
-                        key={`${suggestion.type}-${suggestion.id}-${index}`}
-                        className={`w-full flex items-start space-x-3 px-3 py-3 rounded-xl transition-all duration-200 group ${
-                          isSelected
-                            ? 'bg-white/20 text-white'
-                            : 'text-white/80 hover:bg-white/10 hover:text-white'
-                        }`}
-                      >
-                        {suggestion.image ? (
-                          <img 
-                            src={suggestion.image} 
-                            alt={suggestion.title}
-                            className="w-10 h-10 rounded-full object-cover flex-shrink-0"
-                          />
-                        ) : (
-                          <div className={`w-10 h-10 rounded-full bg-white/10 flex items-center justify-center flex-shrink-0 ${iconColor}`}>
-                            <IconComponent className="w-5 h-5" />
-                          </div>
-                        )}
-                        <div className="flex-1 text-left min-w-0">
-                          <div className="flex items-center space-x-2">
-                            <button
-                              onClick={() => handleSuggestionClick(suggestion)}
-                              className="text-left flex-1"
-                            >
-                              <span className="text-sm font-medium text-white group-hover:text-white truncate">
-                                {suggestion.title}
-                              </span>
-                              <span className={`text-xs ${iconColor} capitalize px-2 py-0.5 rounded-full bg-white/10 ml-2`}>
-                                {suggestion.type}
-                              </span>
-                              {suggestion.subtitle && (
-                                <span className="text-xs text-white/60 block mt-1 truncate">
-                                  {suggestion.subtitle}
+              <div className="absolute left-0 right-0 top-full mt-2 search-suggestions-container bg-white/5 backdrop-blur-2xl rounded-2xl shadow-2xl border border-white/10 overflow-hidden z-50 max-h-[32rem] search-results-scrollbar overflow-y-auto">
+                <div className="p-3">
+                  {/* Header */}
+                  <div className="flex items-center justify-between mb-3 px-2">
+                    <div className="flex items-center space-x-2">
+                      <div className="w-2 h-2 bg-emerald-400 rounded-full"></div>
+                      <span className="text-xs font-semibold text-white/90 uppercase tracking-wide">Search Results</span>
+                    </div>
+                    <span className="text-xs text-white/50">{suggestions.length} found</span>
+                  </div>
+
+                  {/* Suggestions */}
+                  <div className="space-y-1">
+                    {suggestions.map((suggestion, index) => {
+                      const IconComponent = getIconForType(suggestion.type)
+                      const iconColor = getColorForType(suggestion.type)
+                      const isSelected = selectedSuggestionIndex === index
+                      return (
+                        <div
+                          key={`${suggestion.type}-${suggestion.id}-${index}`}
+                          className={`search-suggestion-item w-full flex items-start space-x-3 px-3 py-3 rounded-xl transition-all duration-200 group ${
+                            isSelected
+                              ? 'bg-emerald-500/20 text-white border border-emerald-400/30 shadow-lg transform scale-[1.02]'
+                              : 'text-white/80 hover:bg-white/10 hover:text-white border border-transparent'
+                          }`}
+                        >
+                          {suggestion.image ? (
+                            <div className="relative">
+                              <img 
+                                src={suggestion.image} 
+                                alt={suggestion.title}
+                                className="search-suggestion-avatar w-11 h-11 rounded-full object-cover flex-shrink-0 border border-white/10"
+                              />
+                              <div className={`absolute -bottom-1 -right-1 w-5 h-5 rounded-lg bg-gradient-to-br from-gray-800 to-gray-900 border border-white/20 flex items-center justify-center ${getColorForType(suggestion.type)}`}>
+                                <IconComponent className="w-3 h-3" />
+                              </div>
+                            </div>
+                          ) : (
+                            <div className={`w-11 h-11 rounded-full bg-gradient-to-br from-white/10 to-white/5 border border-white/10 flex items-center justify-center flex-shrink-0 ${getColorForType(suggestion.type)} group-hover:scale-110 transition-transform duration-200`}>
+                              {suggestion.type === 'group' ? (
+                                <span className="text-white font-bold text-sm">
+                                  {suggestion.title.substring(0, 2).toUpperCase()}
+                                </span>
+                              ) : suggestion.type === 'user' ? (
+                                <span className="text-white font-bold text-sm">
+                                  {suggestion.title?.charAt(0).toUpperCase() || '?'}{suggestion.title?.charAt(1)?.toUpperCase() || ''}
+                                </span>
+                              ) : (
+                                <IconComponent className="w-5 h-5" />
+                              )}
+                            </div>
+                          )}
+                          <div className="search-suggestion-content flex-1 text-left min-w-0">
+                            <div className="flex items-center justify-between">
+                              <button
+                                onClick={() => handleSuggestionClick(suggestion)}
+                                className="text-left flex-1 min-w-0"
+                              >
+                                <div className="flex items-center space-x-2 mb-1">
+                                  <span className="search-suggestion-title text-sm font-semibold truncate block">
+                                    {suggestion.title}
+                                  </span>
+                                  <span className={`search-suggestion-type text-xs px-2 py-0.5 rounded-lg font-medium uppercase tracking-wide border ${
+                                    suggestion.type === 'user' ? 'bg-blue-500/20 text-blue-300 border-blue-500/30' :
+                                    suggestion.type === 'group' ? 'bg-green-500/20 text-green-300 border-green-500/30' :
+                                    suggestion.type === 'event' ? 'bg-purple-500/20 text-purple-300 border-purple-500/30' :
+                                    suggestion.type === 'post' ? 'bg-orange-500/20 text-orange-300 border-orange-500/30' :
+                                    suggestion.type === 'message' ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/30' :
+                                    'bg-gray-500/20 text-gray-300 border-gray-500/30'
+                                  }`}>
+                                    {suggestion.type}
+                                  </span>
+                                </div>
+                                {suggestion.subtitle && (
+                                  <span className="search-suggestion-subtitle text-xs text-white/60 block truncate leading-relaxed">
+                                    {suggestion.subtitle}
+                                  </span>
+                                )}
+                              </button>
+                              {suggestion.type === 'group' && !!(suggestion.metadata as Partial<{ joinable: boolean; isMember: boolean; memberStatus?: string }>)?.joinable && !(suggestion.metadata as Partial<{ joinable: boolean; isMember: boolean; memberStatus?: string }>)?.isMember && (
+                                <button
+                                  onClick={async (e) => {
+                                    e.stopPropagation()
+                                    const groupId = Number(suggestion.id)
+                                    try {
+                                      setPendingJoin(prev => ({ ...prev, [groupId]: true }))
+                                      await api.joinGroup(groupId)
+                                      setJoinedGroups(prev => ({ ...prev, [groupId]: true }))
+                                    } catch (err) {
+                                      console.error('Join group failed', err)
+                                    } finally {
+                                      setPendingJoin(prev => ({ ...prev, [groupId]: false }))
+                                    }
+                                  }}
+                                  className="ml-3 px-3 py-1.5 text-xs rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white font-medium whitespace-nowrap transition-all duration-200 border border-emerald-400/30 hover:border-emerald-300/50 shadow-sm"
+                                  disabled={pendingJoin[Number(suggestion.id)]}
+                                >
+                                  {pendingJoin[Number(suggestion.id)] ? 'Requesting...' : (joinedGroups[Number(suggestion.id)] ? 'Requested' : 'Join')}
+                                </button>
+                              )}
+                              {suggestion.type === 'group' && (suggestion.metadata as Partial<{ memberStatus?: string }>)?.memberStatus === 'requested' && (
+                                <span className="ml-3 px-2 py-1 bg-yellow-500/20 text-yellow-300 text-xs rounded-full border border-yellow-500/30">
+                                  Join Requested
                                 </span>
                               )}
-                            </button>
-                            {suggestion.type === 'group' && !!(suggestion.metadata as Partial<{ joinable: boolean; isMember: boolean }>)?.joinable && !(suggestion.metadata as Partial<{ joinable: boolean; isMember: boolean }>)?.isMember && (
-                              <button
-                                onClick={async (e) => {
-                                  e.stopPropagation()
-                                  const groupId = Number(suggestion.id)
-                                  try {
-                                    setPendingJoin(prev => ({ ...prev, [groupId]: true }))
-                                    await api.joinGroup(groupId)
-                                    setJoinedGroups(prev => ({ ...prev, [groupId]: true }))
-                                  } catch (err) {
-                                    console.error('Join group failed', err)
-                                  } finally {
-                                    setPendingJoin(prev => ({ ...prev, [groupId]: false }))
-                                  }
-                                }}
-                                className="ml-3 px-3 py-1 text-xs rounded-full bg-emerald-500 hover:bg-emerald-600 text-white whitespace-nowrap"
-                                disabled={pendingJoin[Number(suggestion.id)]}
-                              >
-                                {pendingJoin[Number(suggestion.id)] ? 'Requesting...' : (joinedGroups[Number(suggestion.id)] ? 'Requested' : 'Request to join')}
-                              </button>
-                            )}
+                              {suggestion.type === 'group' && (suggestion.metadata as Partial<{ memberStatus?: string }>)?.memberStatus === 'sent' && (
+                                <span className="ml-3 px-2 py-1 bg-yellow-500/20 text-yellow-300 text-xs rounded-full border border-yellow-500/30">
+                                  Join Requested
+                                </span>
+                              )}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    )
-                  })}
+                      )
+                    })}
+                  </div>
+                  
+                  {/* View All Results button */}
+                  {suggestions.length > 0 && (
+                    <>
+                      <div className="search-divider my-3 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent"></div>
+                      <button
+                        onClick={() => {
+                          addToRecentSearches(searchQuery)
+                          
+                          // Check if we're already on a search page with the same query
+                          const isOnSearchPage = pathname && pathname.startsWith('/search/')
+                          const currentUrlQuery = searchParams.get('q') || ''
+                          const currentUrlFilter = pathname.split('/')[2] || 'all'
+                          
+                          if (!(isOnSearchPage && currentUrlQuery === searchQuery && currentUrlFilter === selectedFilter)) {
+                            router.push(`/search/${selectedFilter}?q=${encodeURIComponent(searchQuery)}`)
+                          }
+                          
+                          // Only clear searchQuery if we're not on a search page
+                          if (!isOnSearchPage) {
+                            setSearchQuery('')
+                          }
+                          
+                          setSuggestions([])
+                          setShowSuggestions(false)
+                          setSelectedSuggestionIndex(-1)
+                        }}
+                        className="w-full flex items-center justify-center space-x-3 px-4 py-3 rounded-xl transition-all duration-200 text-emerald-300 hover:bg-emerald-500/10 hover:text-emerald-200 border border-emerald-500/20 hover:border-emerald-400/40 bg-emerald-500/5 hover:shadow-lg group"
+                      >
+                        <Search className="w-4 h-4 group-hover:scale-110 transition-transform duration-200" />
+                        <span className="text-sm font-medium">View all results for "{searchQuery}"</span>
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
             )}
 
             {showSuggestions && searchQuery.length >= 2 && suggestions.length === 0 && !isSearching && (
-              <div className="absolute left-0 right-0 top-full mt-2 w-full bg-white/10 backdrop-blur-xl rounded-2xl shadow-2xl border border-white/20 overflow-hidden z-50">
-                <div className="p-4 text-center text-white/60 text-sm">
-                  No results found for "{searchQuery}"
+              <div className="absolute left-0 right-0 top-full mt-2 w-full bg-white/5 backdrop-blur-2xl rounded-2xl shadow-2xl border border-white/10 overflow-hidden z-50">
+                <div className="p-6 text-center">
+                  <div className="w-16 h-16 bg-white/10 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                    <Search className="w-8 h-8 text-white/40" />
+                  </div>
+                  <h4 className="text-white/90 font-medium mb-2">No results found</h4>
+                  <p className="text-white/60 text-sm mb-4">We couldn't find anything matching "{searchQuery}"</p>
+                  <button
+                    onClick={() => {
+                      addToRecentSearches(searchQuery)
+                      
+                      // Check if we're already on a search page with the same query
+                      const isOnSearchPage = pathname && pathname.startsWith('/search/')
+                      const currentUrlQuery = searchParams.get('q') || ''
+                      const currentUrlFilter = pathname.split('/')[2] || 'all'
+                      
+                      if (!(isOnSearchPage && currentUrlQuery === searchQuery && currentUrlFilter === selectedFilter)) {
+                        router.push(`/search/${selectedFilter}?q=${encodeURIComponent(searchQuery)}`)
+                      }
+                      
+                      // Only clear searchQuery if we're not on a search page
+                      if (!isOnSearchPage) {
+                        setSearchQuery('')
+                      }
+                      
+                      setSuggestions([])
+                      setShowSuggestions(false)
+                      setSelectedSuggestionIndex(-1)
+                    }}
+                    className="px-4 py-2 bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/30 rounded-lg text-emerald-300 hover:text-emerald-200 text-sm font-medium transition-all duration-200"
+                  >
+                    Search anyway
+                  </button>
                 </div>
               </div>
             )}
             
             {/* Recent Searches Dropdown */}
             {showRecentSearches && recentSearches.length > 0 && !showSuggestions && (
-              <div className="absolute left-0 right-0 top-full mt-2 w-full bg-white/10 backdrop-blur-xl rounded-2xl shadow-2xl border border-white/20 overflow-hidden z-50 max-h-80 overflow-y-auto">
-                <div className="p-2">
-                  <div className="flex items-center justify-between mb-2 px-2">
-                    <span className="text-xs font-semibold text-white/80">Recent Searches</span>
+              <div className="absolute left-0 right-0 top-full mt-2 w-full bg-white/5 backdrop-blur-2xl rounded-2xl shadow-2xl border border-white/10 overflow-hidden z-50 max-h-[32rem] overflow-y-auto">
+                <div className="p-3">
+                  <div className="flex items-center justify-between mb-3 px-2">
+                    <div className="flex items-center space-x-2">
+                      <div className="w-2 h-2 bg-cyan-400 rounded-full"></div>
+                      <span className="text-xs font-semibold text-white/90 uppercase tracking-wide">Recent Searches</span>
+                    </div>
                     <button
                       onClick={clearRecentSearches}
-                      className="text-xs text-white/60 hover:text-white/80 transition-colors"
+                      className="text-xs text-white/60 hover:text-white/80 transition-colors px-2 py-1 rounded-lg hover:bg-white/10"
                     >
-                      Clear
+                      Clear all
                     </button>
                   </div>
-                  {recentSearches.map((query, index) => (
-                    <button
-                      key={`recent-${query}-${index}`}
-                      onClick={() => handleRecentSearchClick(query)}
-                      className={`w-full flex items-center space-x-3 px-3 py-2 rounded-xl transition-all duration-200 text-left ${
-                        selectedSuggestionIndex === index
-                          ? 'bg-white/20 text-white'
-                          : 'text-white/80 hover:bg-white/10 hover:text-white'
-                      }`}
-                    >
-                      <Search className="w-4 h-4 flex-shrink-0" />
-                      <span className="text-sm truncate">{query}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Popular Searches Dropdown */}
-            {showRecentSearches && recentSearches.length === 0 && popularSearches.length > 0 && !showSuggestions && (
-              <div className="absolute left-0 right-0 top-full mt-2 w-full bg-white/10 backdrop-blur-xl rounded-2xl shadow-2xl border border-white/20 overflow-hidden z-50 max-h-80 overflow-y-auto">
-                <div className="p-2">
-                  <div className="text-xs font-semibold text-white/80 mb-2 px-2">Popular Searches</div>
-                  {popularSearches.slice(0, 5).map((query, index) => (
-                    <button
-                      key={`popular-${query}-${index}`}
-                      onClick={() => handleRecentSearchClick(query)}
-                      className={`w-full flex items-center space-x-3 px-3 py-2 rounded-xl transition-all duration-200 text-left ${
-                        selectedSuggestionIndex === index
-                          ? 'bg-white/20 text-white'
-                          : 'text-white/80 hover:bg-white/10 hover:text-white'
-                      }`}
-                    >
-                      <div className="w-4 h-4 rounded-full bg-gradient-to-r from-orange-400 to-pink-400 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
-                        {index + 1}
-                      </div>
-                      <span className="text-sm truncate">{query}</span>
-                    </button>
-                  ))}
+                  <div className="space-y-1">
+                    {recentSearches.map((query, index) => (
+                      <button
+                        key={`recent-${query}-${index}`}
+                        onClick={() => handleRecentSearchClick(query)}
+                        className={`w-full flex items-center space-x-3 px-3 py-3 rounded-xl transition-all duration-200 text-left border group ${
+                          selectedSuggestionIndex === index
+                            ? 'bg-cyan-500/20 text-white border-cyan-400/30 shadow-lg transform scale-[1.02]'
+                            : 'text-white/80 hover:bg-white/10 hover:text-white border-transparent'
+                        }`}
+                      >
+                        <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-cyan-500/20 to-cyan-600/20 border border-cyan-500/20 flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform duration-200">
+                          <Search className="w-4 h-4 text-cyan-400" />
+                        </div>
+                        <span className="text-sm font-medium truncate">{query}</span>
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
             )}
 
             {/* Filter Dropdown (Full width, glass/blur) */}
             {showFilterDropdown && (
-              <div className="absolute left-0 right-0 top-full mt-2 w-full bg-white/10 backdrop-blur-xl rounded-2xl shadow-2xl border border-white/20 overflow-hidden z-50">
-                <div className="p-2">
-                  <div className="text-xs font-semibold text-white/80 mb-2 px-2">Search Filters</div>
+              <div className="absolute left-0 right-0 top-full mt-2 w-full bg-white/20 backdrop-blur-2xl rounded-2xl shadow-2xl border border-white/30 overflow-hidden z-50">
+                <div className="p-3">
+                  <div className="text-xs font-semibold text-white uppercase tracking-wide mb-3 px-2">Search Filters</div>
                   {searchFilters.map((filter) => {
                     const IconComponent = filter.icon
                     const isSelected = selectedFilter === filter.id
                     return (
                       <button
                         key={filter.id}
-                        onClick={() => handleFilterSelect(filter.id)}
-                        className={`w-full flex items-center space-x-3 px-3 py-2 rounded-xl transition-all duration-200 ${
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault()
+                          e.stopPropagation()
+                          handleFilterSelect(filter.id)
+                        }}
+                        className={`w-full flex items-center space-x-3 px-3 py-3 rounded-xl transition-all duration-200 cursor-pointer ${
                           isSelected
-                            ? 'bg-white/20 text-white'
-                            : 'text-white/80 hover:bg-white/10 hover:text-white'
+                            ? 'bg-emerald-500/30 text-emerald-200 border-r-4 border-emerald-400'
+                            : 'text-white/90 hover:bg-white/20 hover:text-white cursor-pointer'
                         }`}
                       >
-                        <IconComponent className="w-4 h-4" />
-                        <span className="text-sm">{filter.label}</span>
+                        <div className={`w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center transition-all duration-200 ${
+                          isSelected ? 'bg-emerald-500/40' : 'hover:bg-white/30'
+                        }`}>
+                          <IconComponent className="w-4 h-4" />
+                        </div>
+                        <span className="text-sm font-medium">{filter.label}</span>
+                        {isSelected && (
+                          <div className="w-5 h-5 bg-emerald-500 rounded-full flex items-center justify-center ml-auto">
+                            <span className="text-white text-xs font-bold">✓</span>
+                          </div>
+                        )}
                       </button>
                     )
                   })}

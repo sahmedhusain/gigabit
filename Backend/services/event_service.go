@@ -2,6 +2,7 @@ package services
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"log"
 	"social/models"
@@ -23,6 +24,21 @@ func NewEventService(db *sql.DB, hub *websocket.Hub) *EventService {
 }
 
 func (s *EventService) CreateEvent(event *models.Event) error {
+	// Check group permissions for creating events
+	role, err := s.getUserRoleInGroup(event.GroupID, event.CreatorID)
+	if err != nil {
+		return errors.New("user is not a member of this group")
+	}
+
+	// Check if user has permission to create events
+	canCreateEvents, err := s.canUserCreateEvents(event.GroupID, role)
+	if err != nil {
+		return err
+	}
+	if !canCreateEvents {
+		return errors.New("you don't have permission to create events in this group")
+	}
+
 	query := `
 INSERT INTO events (group_id, creator_id, title, description, event_date, location, created_at, updated_at)
 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
@@ -648,4 +664,34 @@ func (s *EventService) getEventGroupID(eventID uint) (uint, error) {
 	var groupID uint
 	err := s.db.QueryRow(query, eventID).Scan(&groupID)
 	return groupID, err
+}
+
+func (s *EventService) getUserRoleInGroup(groupID, userID uint) (string, error) {
+	query := `
+		SELECT role FROM group_members 
+		WHERE group_id = ? AND user_id = ? AND status = 'member'
+	`
+
+	var role string
+	err := s.db.QueryRow(query, groupID, userID).Scan(&role)
+	if err == sql.ErrNoRows {
+		return "", sql.ErrNoRows
+	}
+	if err != nil {
+		return "", err
+	}
+
+	return role, nil
+}
+
+func (s *EventService) canUserCreateEvents(groupID uint, userRole string) (bool, error) {
+	// Get group permissions
+	var createEvents string
+	err := s.db.QueryRow("SELECT create_events FROM groups WHERE id = ?", groupID).Scan(&createEvents)
+	if err != nil {
+		return false, err
+	}
+
+	// Check if user has permission
+	return createEvents == "all_members" || userRole == "admin" || userRole == "creator", nil
 }

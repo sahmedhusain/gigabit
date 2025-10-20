@@ -152,14 +152,19 @@ export function useRealTimeGroups() {
           const optimisticGroup: GroupResponse = {
             id: Date.now(), // Temporary ID
             title: payload.title,
-            description: payload.description,
+            description: payload.description || '',
+            privacy: payload.privacy,
+            create_posts: payload.create_posts,
+            create_polls: payload.create_polls,
+            create_events: payload.create_events,
+            send_messages: payload.send_messages,
             creator_id: user?.id || 0,
             member_count: 1,
             is_member: true,
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString()
           }
-          return [optimisticGroup, ...currentGroups]
+          return [optimisticGroup, ...(currentGroups || [])]
         },
         async () => {
           const res = await api.createGroup(payload)
@@ -177,7 +182,7 @@ export function useRealTimeGroups() {
   const joinGroup = useCallback(async (groupId: number) => {
     try {
       return await optimisticUpdate(
-        (currentGroups) => currentGroups.map(group => 
+        (currentGroups) => (currentGroups || []).map(group => 
           group.id === groupId
             ? { 
                 ...group, 
@@ -201,7 +206,7 @@ export function useRealTimeGroups() {
   const leaveGroup = useCallback(async (groupId: number) => {
     try {
       return await optimisticUpdate(
-        (currentGroups) => currentGroups.map(group => 
+        (currentGroups) => (currentGroups || []).map(group => 
           group.id === groupId
             ? { 
                 ...group, 

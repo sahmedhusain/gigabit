@@ -214,7 +214,10 @@ export default function ProfileSection({
                   <User className="w-12 h-12 lg:w-16 lg:h-16 text-white hidden" />
                 </>
               ) : (
-                <User className="w-12 h-12 lg:w-16 lg:h-16 text-white" />
+                <span className="text-white font-bold text-2xl lg:text-3xl">
+                  {currentUser?.firstName?.[0] || currentUser?.first_name?.[0] || currentUser?.name?.[0] || '?'}
+                  {currentUser?.lastName?.[0] || currentUser?.last_name?.[0] || currentUser?.name?.[1] || ''}
+                </span>
               )}
             </div>
 
@@ -468,7 +471,9 @@ export default function ProfileSection({
                             className="w-full h-full object-cover"
                           />
                         ) : (
-                          <User className="w-5 h-5 text-white" />
+                          <span className="text-white font-bold text-sm">
+                            {user.first_name[0]}{user.last_name[0]}
+                          </span>
                         )}
                       </div>
                       <div className="flex-1 min-w-0">

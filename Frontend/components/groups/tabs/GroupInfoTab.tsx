@@ -227,52 +227,55 @@ const GroupInfoTab: React.FC<GroupInfoTabProps> = ({ groupId, onLeaveGroup, onMa
   }
 
   return (
-    <div className="h-full overflow-y-scroll scrollbar-hide p-6" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
-      <div className="max-w-4xl mx-auto space-y-8">
+    <div className="flex flex-col h-full">
+      {/* Content */}
+      <div className="flex-1 overflow-y-scroll scrollbar-hide p-6 space-y-6" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
         {/* Group Header */}
         <motion.div
-          className="relative text-center"
+          className="relative"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6 }}
         >
-          {/* Leave Group Button - Top Right */}
+          {/* Leave Group Button - Inline with Avatar */}
           {groupInfo.is_member && (
             <motion.div
-              className="absolute top-0 right-0"
+              className="absolute top-0 right-0 z-10"
               initial={{ opacity: 0, scale: 0.8 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ duration: 0.5, delay: 0.3 }}
             >
               <motion.button
                 onClick={handleLeaveGroup}
-                className="px-4 py-2 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-400/40 hover:border-amber-400/60 text-amber-400 hover:text-amber-300 rounded-xl transition-all duration-200 flex items-center space-x-2 font-medium text-sm"
+                className="px-4 py-2 bg-gradient-to-r from-amber-500/20 to-orange-500/20 hover:from-red-500/25 hover:to-orange-500/25 border border-amber-400/30 hover:border-red-400/50 text-amber-400 hover:text-red-300 rounded-xl transition-all duration-300 flex items-center space-x-2 font-medium text-sm backdrop-blur-sm shadow-lg hover:shadow-red-500/25 group"
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
               >
-                <LogOut className="w-4 h-4" />
-                <span>Leave Group</span>
+                <LogOut className="w-4 h-4 group-hover:rotate-12 transition-transform duration-300" />
+                <span>Leave</span>
               </motion.button>
             </motion.div>
           )}
 
-          <div className="w-32 h-32 mx-auto mb-6 rounded-full bg-gradient-to-br from-emerald-400 via-teal-500 to-cyan-600 flex items-center justify-center text-white text-4xl font-bold shadow-2xl ring-4 ring-white/20 overflow-hidden">
-            {groupInfo.avatar && getAvatarUrl(groupInfo.avatar) ? (
-              <img
-                src={getAvatarUrl(groupInfo.avatar)!}
-                alt={groupInfo.title}
-                className="w-full h-full object-cover rounded-full"
-              />
-            ) : (
-              getGroupInitials(groupInfo.title)
-            )}
+          <div className="flex flex-col items-center text-center">
+            <div className="w-32 h-32 mx-auto mb-6 rounded-full bg-gradient-to-br from-emerald-400 via-teal-500 to-cyan-600 flex items-center justify-center text-white text-4xl font-bold shadow-2xl ring-4 ring-white/20 overflow-hidden">
+              {groupInfo.avatar && getAvatarUrl(groupInfo.avatar) ? (
+                <img
+                  src={getAvatarUrl(groupInfo.avatar)!}
+                  alt={groupInfo.title}
+                  className="w-full h-full object-cover rounded-full"
+                />
+              ) : (
+                getGroupInitials(groupInfo.title)
+              )}
+            </div>
+            <h1 className="text-4xl font-bold bg-gradient-to-r from-white to-white/80 bg-clip-text text-transparent mb-4">
+              {groupInfo.title}
+            </h1>
+            <p className="text-white/70 text-lg leading-relaxed max-w-2xl mx-auto">
+              {groupInfo.description}
+            </p>
           </div>
-          <h1 className="text-4xl font-bold bg-gradient-to-r from-white to-white/80 bg-clip-text text-transparent mb-4">
-            {groupInfo.title}
-          </h1>
-          <p className="text-white/70 text-lg leading-relaxed max-w-2xl mx-auto">
-            {groupInfo.description}
-          </p>
         </motion.div>
 
         {/* Group Stats */}
@@ -282,31 +285,31 @@ const GroupInfoTab: React.FC<GroupInfoTabProps> = ({ groupId, onLeaveGroup, onMa
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.2 }}
         >
-          <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-2xl p-6 text-center">
-            <Users className="w-8 h-8 text-emerald-400 mx-auto mb-3" />
+          <div className="bg-gradient-to-br from-white/10 via-white/5 to-transparent backdrop-blur-xl rounded-3xl border border-white/20 shadow-2xl p-6 text-center hover:shadow-emerald-500/10 transition-all duration-500 group">
+            <Users className="w-8 h-8 text-emerald-400 mx-auto mb-3 group-hover:scale-110 transition-transform duration-300" />
             <div className="text-2xl font-bold text-white mb-1">{groupInfo.member_count}</div>
             <div className="text-white/60 text-sm">Members</div>
           </div>
 
-          <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-2xl p-6 text-center">
-            <div className="w-8 h-8 mx-auto mb-3 relative flex items-center justify-center">
-              <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
+          <div className="bg-gradient-to-br from-white/10 via-white/5 to-transparent backdrop-blur-xl rounded-3xl border border-white/20 shadow-2xl p-6 text-center hover:shadow-emerald-500/10 transition-all duration-500 group">
+            <div className="w-8 h-8 mx-auto mb-3 relative flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
+              <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse shadow-green-500/50 shadow-lg"></div>
             </div>
             <div className="text-2xl font-bold text-white mb-1">{getOnlineGroupMembersCount()}</div>
             <div className="text-white/60 text-sm">Online</div>
           </div>
           
-          <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-2xl p-6 text-center">
-            <Calendar className="w-8 h-8 text-teal-400 mx-auto mb-3" />
+          <div className="bg-gradient-to-br from-white/10 via-white/5 to-transparent backdrop-blur-xl rounded-3xl border border-white/20 shadow-2xl p-6 text-center hover:shadow-emerald-500/10 transition-all duration-500 group">
+            <Calendar className="w-8 h-8 text-teal-400 mx-auto mb-3 group-hover:scale-110 transition-transform duration-300" />
             <div className="text-lg font-semibold text-white mb-1">{formatDate(groupInfo.created_at)}</div>
             <div className="text-white/60 text-sm">Created</div>
           </div>
 
-          <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-2xl p-6 text-center">
+          <div className="bg-gradient-to-br from-white/10 via-white/5 to-transparent backdrop-blur-xl rounded-3xl border border-white/20 shadow-2xl p-6 text-center hover:shadow-emerald-500/10 transition-all duration-500 group">
             {groupInfo.privacy === 'public' ? (
-              <Globe className="w-8 h-8 text-cyan-400 mx-auto mb-3" />
+              <Globe className="w-8 h-8 text-cyan-400 mx-auto mb-3 group-hover:scale-110 transition-transform duration-300" />
             ) : (
-              <Lock className="w-8 h-8 text-orange-400 mx-auto mb-3" />
+              <Lock className="w-8 h-8 text-orange-400 mx-auto mb-3 group-hover:scale-110 transition-transform duration-300" />
             )}
             <div className="text-lg font-semibold text-white mb-1 capitalize">{groupInfo.privacy}</div>
             <div className="text-white/60 text-sm">Group</div>
@@ -316,17 +319,17 @@ const GroupInfoTab: React.FC<GroupInfoTabProps> = ({ groupId, onLeaveGroup, onMa
         {/* Group Creator */}
         {groupInfo.creator && (
           <motion.div
-            className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-2xl p-6"
+            className="bg-gradient-to-br from-white/10 via-white/5 to-transparent backdrop-blur-xl rounded-3xl border border-white/20 shadow-2xl p-6 hover:shadow-emerald-500/10 transition-all duration-500 group"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.4 }}
           >
             <h3 className="text-xl font-bold text-white mb-4 flex items-center">
-              <Crown className="w-5 h-5 text-yellow-400 mr-2" />
+              <Crown className="w-5 h-5 text-yellow-400 mr-2 group-hover:scale-110 transition-transform duration-300" />
               Group Creator
             </h3>
             <div 
-              className="flex items-center space-x-4 cursor-pointer hover:bg-white/5 rounded-xl p-4 -m-4 transition-all duration-200"
+              className="flex items-center space-x-4 cursor-pointer hover:bg-white/5 rounded-xl p-4 -m-4 transition-all duration-200 group"
               onClick={() => groupInfo.creator && handleMemberClick(groupInfo.creator.id)}
             >
               <div className="relative">
@@ -334,10 +337,10 @@ const GroupInfoTab: React.FC<GroupInfoTabProps> = ({ groupId, onLeaveGroup, onMa
                   <img
                     src={groupInfo.creator.avatar}
                     alt={`${groupInfo.creator.first_name} ${groupInfo.creator.last_name}`}
-                    className="w-16 h-16 rounded-full object-cover shadow-lg"
+                    className="w-16 h-16 rounded-full object-cover shadow-lg ring-2 ring-white/20 group-hover:ring-emerald-400/50 transition-all duration-300"
                   />
                 ) : (
-                  <div className="w-16 h-16 rounded-full bg-gradient-to-br from-yellow-400 to-orange-500 flex items-center justify-center text-white font-bold text-xl shadow-lg">
+                  <div className="w-16 h-16 rounded-full bg-gradient-to-br from-yellow-400 to-orange-500 flex items-center justify-center text-white font-bold text-xl shadow-lg ring-2 ring-white/20 group-hover:ring-emerald-400/50 transition-all duration-300">
                     {groupInfo.creator.first_name[0]}{groupInfo.creator.last_name[0]}
                   </div>
                 )}
@@ -354,7 +357,7 @@ const GroupInfoTab: React.FC<GroupInfoTabProps> = ({ groupId, onLeaveGroup, onMa
                 )}
               </div>
               <div>
-                <h4 className="text-lg font-semibold text-white">
+                <h4 className="text-lg font-semibold text-white group-hover:text-emerald-200 transition-colors duration-300">
                   {groupInfo.creator.first_name} {groupInfo.creator.last_name}
                 </h4>
                 <div className="flex items-center space-x-2 mt-1">
@@ -371,16 +374,16 @@ const GroupInfoTab: React.FC<GroupInfoTabProps> = ({ groupId, onLeaveGroup, onMa
         {/* All Members */}
         {members.length > 0 && (
           <motion.div
-            className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-2xl p-6"
+            className="bg-gradient-to-br from-white/10 via-white/5 to-transparent backdrop-blur-xl rounded-3xl border border-white/20 shadow-2xl p-6 hover:shadow-emerald-500/10 transition-all duration-500 group"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.6 }}
           >
             <h3 className="text-xl font-bold text-white mb-6 flex items-center">
-              <Users className="w-5 h-5 text-emerald-400 mr-2" />
+              <Users className="w-5 h-5 text-emerald-400 mr-2 group-hover:scale-110 transition-transform duration-300" />
               All Members
-              <div className="ml-3 px-3 py-1 bg-white/10 rounded-full">
-                <span className="text-white/70 text-sm font-medium">{members.length}</span>
+              <div className="ml-3 px-3 py-1 bg-gradient-to-r from-emerald-500/20 to-teal-500/20 rounded-full border border-emerald-400/30">
+                <span className="text-emerald-300 text-sm font-medium">{members.length}</span>
               </div>
             </h3>
             
@@ -395,7 +398,7 @@ const GroupInfoTab: React.FC<GroupInfoTabProps> = ({ groupId, onLeaveGroup, onMa
                 return (
                   <motion.div
                     key={member.id}
-                    className="flex items-center space-x-4 p-4 bg-white/5 rounded-xl hover:bg-white/10 transition-all duration-200 cursor-pointer"
+                    className="flex items-center space-x-4 p-4 bg-gradient-to-r from-white/5 to-white/10 rounded-xl hover:from-white/10 hover:to-white/15 transition-all duration-200 cursor-pointer group"
                     initial={{ opacity: 0, x: -20 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: index * 0.05 }}
@@ -407,10 +410,10 @@ const GroupInfoTab: React.FC<GroupInfoTabProps> = ({ groupId, onLeaveGroup, onMa
                         <img
                           src={member.user.avatar}
                           alt={`${member.user.first_name} ${member.user.last_name}`}
-                          className="w-12 h-12 rounded-full object-cover shadow-lg"
+                          className="w-12 h-12 rounded-full object-cover shadow-lg ring-2 ring-white/20 group-hover:ring-emerald-400/50 transition-all duration-300"
                         />
                       ) : (
-                        <div className="w-12 h-12 rounded-full bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center text-white font-semibold shadow-lg">
+                        <div className="w-12 h-12 rounded-full bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center text-white font-semibold shadow-lg ring-2 ring-white/20 group-hover:ring-emerald-400/50 transition-all duration-300">
                           {member.user.first_name[0]}{member.user.last_name[0]}
                         </div>
                       )}
@@ -430,7 +433,7 @@ const GroupInfoTab: React.FC<GroupInfoTabProps> = ({ groupId, onLeaveGroup, onMa
                     {/* Member Info */}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center space-x-3">
-                        <h4 className="font-semibold text-white truncate">
+                        <h4 className="font-semibold text-white truncate group-hover:text-emerald-200 transition-colors duration-300">
                           {member.user.first_name} {member.user.last_name}
                           {member.user.id === user?.id && (
                             <span className="text-white/60 text-sm font-normal ml-1">(You)</span>
@@ -473,235 +476,201 @@ const GroupInfoTab: React.FC<GroupInfoTabProps> = ({ groupId, onLeaveGroup, onMa
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
-            onMouseDown={(e) => {
-              e.stopPropagation();
-              (e as any).nativeEvent?.stopImmediatePropagation?.();
-            }}
-            onClick={(e) => {
-              e.stopPropagation();
-              setShowLeaveConfirm(false);
-              (e as any).nativeEvent?.stopImmediatePropagation?.();
-            }}
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+            onClick={() => setShowLeaveConfirm(false)}
           >
             <motion.div
-              initial={{ scale: 0.9, opacity: 0 }}
+              initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              className="bg-white/10 backdrop-blur-xl rounded-2xl p-6 border border-white/20 max-w-sm mx-4"
-              onMouseDown={(e) => {
-                e.stopPropagation();
-                (e as any).nativeEvent?.stopImmediatePropagation?.();
-              }}
-              onClick={(e) => {
-                e.stopPropagation();
-                (e as any).nativeEvent?.stopImmediatePropagation?.();
-              }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-gradient-to-br from-slate-800/95 to-slate-900/95 backdrop-blur-xl border border-white/20 rounded-2xl p-6 max-w-sm w-full mx-4"
+              onClick={(e) => e.stopPropagation()}
             >
-              <h3 className="text-white text-lg font-semibold mb-4 flex items-center">
-                {userRole === 'creator' ? <Crown className="w-4 h-4 text-yellow-400 mr-2" /> :
-                 userRole === 'admin' ? <Shield className="w-4 h-4 text-blue-400 mr-2" /> : null}
-                Leave Group
-              </h3>
-              
-              {/* Different messages based on user role */}
-              {userRole === 'creator' && (
-                <div className="mb-6">
-                  {hasExistingAdmins ? (
-                    <p className="text-white/70 mb-3">
-                      As the group creator, leaving will transfer ownership to the next admin.
-                    </p>
-                  ) : (
-                    <p className="text-white/70 mb-3">
-                      As the group creator, since there are no admins, ownership will be transferred to the first added member (like WhatsApp).
-                    </p>
-                  )}
-                  
-                  {nextAdmin && nextAdmin !== 'No eligible members' ? (
-                    <div className="bg-yellow-500/10 border border-yellow-400/30 rounded-lg p-3 mb-4">
-                      <p className="text-yellow-200 text-sm font-medium flex items-center">
-                        <Crown className="w-4 h-4 mr-2" />
-                        {hasExistingAdmins ? 'Next Admin Owner:' : 'Next Owner (First Member):'} {nextAdmin}
-                      </p>
-                    </div>
-                  ) : nextAdmin === 'No eligible members' ? (
-                    <div className="bg-red-500/10 border border-red-400/30 rounded-lg p-3 mb-4">
-                      <p className="text-red-200 text-sm font-medium">
-                        No eligible members to transfer ownership to.
-                      </p>
-                    </div>
-                  ) : null}
-                  
-                  {!hasExistingAdmins && nextAdmin && nextAdmin !== 'No eligible members' ? (
-                    <p className="text-white/60 text-sm">
-                      You can select an admin before leaving, or proceed to transfer ownership to the first member.
-                    </p>
-                  ) : hasExistingAdmins ? (
-                    <p className="text-white/60 text-sm">
-                      You can manage admins before leaving, or proceed to leave the group.
-                    </p>
-                  ) : (
-                    <p className="text-white/60 text-sm">
-                      Add some admins first, or the group will be transferred to the first member.
-                    </p>
-                  )}
+              <div className="text-center">
+                <div className="w-12 h-12 bg-amber-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <LogOut className="w-6 h-6 text-amber-400" />
                 </div>
-              )}
-              
-              {userRole === 'admin' && (
-                <div className="mb-6">
-                  <p className="text-white/70 mb-3">
-                    Are you sure you want to leave "{groupInfo?.title}"? As an admin, you will lose your administrative privileges.
+                <h3 className="text-white font-semibold text-lg mb-2 flex items-center justify-center">
+                  {userRole === 'creator' ? <Crown className="w-4 h-4 text-yellow-400 mr-2" /> :
+                   userRole === 'admin' ? <Shield className="w-4 h-4 text-blue-400 mr-2" /> : null}
+                  Leave Group
+                </h3>
+                
+                {/* Different messages based on user role */}
+                {userRole === 'creator' && (
+                  <div className="mb-6">
+                    {hasExistingAdmins ? (
+                      <p className="text-white/70 text-sm mb-3">
+                        As the group creator, leaving will transfer ownership to the next admin.
+                      </p>
+                    ) : (
+                      <p className="text-white/70 text-sm mb-3">
+                        As the group creator, since there are no admins, ownership will be transferred to the first added member (like WhatsApp).
+                      </p>
+                    )}
+                    
+                    {nextAdmin && nextAdmin !== 'No eligible members' ? (
+                      <div className="bg-yellow-500/10 border border-yellow-400/30 rounded-lg p-3 mb-4">
+                        <p className="text-yellow-200 text-sm font-medium flex items-center">
+                          <Crown className="w-4 h-4 mr-2" />
+                          {hasExistingAdmins ? 'Next Admin Owner:' : 'Next Owner (First Member):'} {nextAdmin}
+                        </p>
+                      </div>
+                    ) : nextAdmin === 'No eligible members' ? (
+                      <div className="bg-red-500/10 border border-red-400/30 rounded-lg p-3 mb-4">
+                        <p className="text-red-200 text-sm font-medium">
+                          No eligible members to transfer ownership to.
+                        </p>
+                      </div>
+                    ) : null}
+                    
+                    {!hasExistingAdmins && nextAdmin && nextAdmin !== 'No eligible members' ? (
+                      <p className="text-white/60 text-xs">
+                        You can select an admin before leaving, or proceed to transfer ownership to the first member.
+                      </p>
+                    ) : hasExistingAdmins ? (
+                      <p className="text-white/60 text-xs">
+                        You can manage admins before leaving, or proceed to leave the group.
+                      </p>
+                    ) : (
+                      <p className="text-white/60 text-xs">
+                        Add some admins first, or the group will be transferred to the first member.
+                      </p>
+                    )}
+                  </div>
+                )}
+                
+                {userRole === 'admin' && (
+                  <div className="mb-6">
+                    <p className="text-white/70 text-sm mb-3">
+                      Are you sure you want to leave "{groupInfo?.title}"? As an admin, you will lose your administrative privileges.
+                    </p>
+                    {hasOtherAdmins ? (
+                      <p className="text-white/60 text-xs">
+                        Since there are other admins in the group, you can leave normally. You will need to be re-invited to rejoin.
+                      </p>
+                    ) : (
+                      <div className="bg-yellow-500/10 border border-yellow-400/30 rounded-lg p-3">
+                        <p className="text-yellow-200 text-sm font-medium flex items-center">
+                          <Shield className="w-4 h-4 mr-2" />
+                          You are the only admin. Consider promoting someone before leaving.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
+                
+                {userRole === 'member' && (
+                  <p className="text-white/70 text-sm mb-6">
+                    Are you sure you want to leave "{groupInfo?.title}"? You will no longer receive messages from this group and will need to be re-invited to rejoin.
                   </p>
-                  {hasOtherAdmins ? (
-                    <p className="text-white/60 text-sm">
-                      Since there are other admins in the group, you can leave normally. You will need to be re-invited to rejoin.
-                    </p>
-                  ) : (
-                    <div className="bg-yellow-500/10 border border-yellow-400/30 rounded-lg p-3">
-                      <p className="text-yellow-200 text-sm font-medium flex items-center">
-                        <Shield className="w-4 h-4 mr-2" />
-                        You are the only admin. Consider promoting someone before leaving.
-                      </p>
-                    </div>
-                  )}
-                </div>
-              )}
-              
-              {userRole === 'member' && (
-                <p className="text-white/70 mb-6">
-                  Are you sure you want to leave "{groupInfo?.title}"? You will no longer receive messages from this group and will need to be re-invited to rejoin.
-                </p>
-              )}
+                )}
 
-              {/* Buttons based on user role and conditions */}
-              {userRole === 'creator' ? (
-                nextAdmin && nextAdmin !== 'No eligible members' ? (
-                  <div className="space-y-3">
+                {/* Buttons based on user role and conditions */}
+                {userRole === 'creator' ? (
+                  nextAdmin && nextAdmin !== 'No eligible members' ? (
+                    <div className="space-y-3">
+                      <div className="flex space-x-3">
+                        <button
+                          onClick={() => setShowLeaveConfirm(false)}
+                          className="flex-1 px-4 py-2 text-white/70 hover:text-white hover:bg-white/10 rounded-xl transition-all duration-200"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          onClick={handleManageAdmins}
+                          className="flex-1 px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-xl transition-all duration-200 flex items-center justify-center space-x-2"
+                        >
+                          <Settings className="w-4 h-4" />
+                          <span>{hasExistingAdmins ? 'Manage Admins' : 'Add Admin'}</span>
+                        </button>
+                      </div>
+                      <button
+                        onClick={confirmLeaveGroup}
+                        className="w-full px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-xl transition-all duration-200"
+                      >
+                        {hasExistingAdmins ? 'Leave Group' : 'Leave & Transfer to First Member'}
+                      </button>
+                    </div>
+                  ) : (
+                    /* No eligible members case */
                     <div className="flex space-x-3">
-                      <motion.button
+                      <button
                         onClick={() => setShowLeaveConfirm(false)}
-                        className="flex-1 py-2 px-4 bg-white/10 hover:bg-white/20 text-white rounded-lg transition-colors"
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
+                        className="flex-1 px-4 py-2 text-white/70 hover:text-white hover:bg-white/10 rounded-xl transition-all duration-200"
                       >
                         Cancel
-                      </motion.button>
-                      <motion.button
+                      </button>
+                      <button
                         onClick={handleManageAdmins}
-                        className="flex-1 py-2 px-4 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors flex items-center justify-center space-x-2"
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
+                        className="flex-1 px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-xl transition-all duration-200 flex items-center justify-center space-x-2"
                       >
                         <Settings className="w-4 h-4" />
-                        <span>{hasExistingAdmins ? 'Manage Admins' : 'Add Admin'}</span>
-                      </motion.button>
+                        <span>Add Members</span>
+                      </button>
                     </div>
-                    <motion.button
-                      onClick={confirmLeaveGroup}
-                      className="w-full py-2 px-4 bg-amber-500 hover:bg-amber-600 text-white rounded-lg transition-colors"
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
-                    >
-                      {hasExistingAdmins ? 'Leave Group' : 'Leave & Transfer to First Member'}
-                    </motion.button>
-                  </div>
-                ) : (
-                  /* No eligible members case */
-                  <div className="flex space-x-3">
-                    <motion.button
-                      onClick={() => setShowLeaveConfirm(false)}
-                      className="flex-1 py-2 px-4 bg-white/10 hover:bg-white/20 text-white rounded-lg transition-colors"
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
-                    >
-                      Cancel
-                    </motion.button>
-                    <motion.button
-                      onClick={handleManageAdmins}
-                      className="flex-1 py-2 px-4 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors flex items-center justify-center space-x-2"
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
-                    >
-                      <Settings className="w-4 h-4" />
-                      <span>Add Members</span>
-                    </motion.button>
-                  </div>
-                )
-              ) : userRole === 'admin' ? (
-                /* Admin buttons - show manage admins only if they're the only admin */
-                !hasOtherAdmins ? (
-                  <div className="space-y-3">
+                  )
+                ) : userRole === 'admin' ? (
+                  /* Admin buttons - show manage admins only if they're the only admin */
+                  !hasOtherAdmins ? (
+                    <div className="space-y-3">
+                      <div className="flex space-x-3">
+                        <button
+                          onClick={() => setShowLeaveConfirm(false)}
+                          className="flex-1 px-4 py-2 text-white/70 hover:text-white hover:bg-white/10 rounded-xl transition-all duration-200"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          onClick={handleManageAdmins}
+                          className="flex-1 px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-xl transition-all duration-200 flex items-center justify-center space-x-2"
+                        >
+                          <Settings className="w-4 h-4" />
+                          <span>Add Admin</span>
+                        </button>
+                      </div>
+                      <button
+                        onClick={confirmLeaveGroup}
+                        className="w-full px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-xl transition-all duration-200"
+                      >
+                        Leave Anyway
+                      </button>
+                    </div>
+                  ) : (
+                    /* Normal admin leave when other admins exist */
                     <div className="flex space-x-3">
-                      <motion.button
+                      <button
                         onClick={() => setShowLeaveConfirm(false)}
-                        className="flex-1 py-2 px-4 bg-white/10 hover:bg-white/20 text-white rounded-lg transition-colors"
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
+                        className="flex-1 px-4 py-2 text-white/70 hover:text-white hover:bg-white/10 rounded-xl transition-all duration-200"
                       >
                         Cancel
-                      </motion.button>
-                      <motion.button
-                        onClick={handleManageAdmins}
-                        className="flex-1 py-2 px-4 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors flex items-center justify-center space-x-2"
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
+                      </button>
+                      <button
+                        onClick={confirmLeaveGroup}
+                        className="flex-1 px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-xl transition-all duration-200"
                       >
-                        <Settings className="w-4 h-4" />
-                        <span>Add Admin</span>
-                      </motion.button>
+                        Leave Group
+                      </button>
                     </div>
-                    <motion.button
-                      onClick={confirmLeaveGroup}
-                      className="w-full py-2 px-4 bg-amber-500 hover:bg-amber-600 text-white rounded-lg transition-colors"
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
-                    >
-                      Leave Anyway
-                    </motion.button>
-                  </div>
+                  )
                 ) : (
-                  /* Normal admin leave when other admins exist */
+                  /* Member buttons - simple leave */
                   <div className="flex space-x-3">
-                    <motion.button
+                    <button
                       onClick={() => setShowLeaveConfirm(false)}
-                      className="flex-1 py-2 px-4 bg-white/10 hover:bg-white/20 text-white rounded-lg transition-colors"
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
+                      className="flex-1 px-4 py-2 text-white/70 hover:text-white hover:bg-white/10 rounded-xl transition-all duration-200"
                     >
                       Cancel
-                    </motion.button>
-                    <motion.button
+                    </button>
+                    <button
                       onClick={confirmLeaveGroup}
-                      className="flex-1 py-2 px-4 bg-amber-500 hover:bg-amber-600 text-white rounded-lg transition-colors"
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
+                      className="flex-1 px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-xl transition-all duration-200"
                     >
                       Leave Group
-                    </motion.button>
+                    </button>
                   </div>
-                )
-              ) : (
-                /* Member buttons - simple leave */
-                <div className="flex space-x-3">
-                  <motion.button
-                    onClick={() => setShowLeaveConfirm(false)}
-                    className="flex-1 py-2 px-4 bg-white/10 hover:bg-white/20 text-white rounded-lg transition-colors"
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                  >
-                    Cancel
-                  </motion.button>
-                  <motion.button
-                    onClick={confirmLeaveGroup}
-                    className="flex-1 py-2 px-4 bg-amber-500 hover:bg-amber-600 text-white rounded-lg transition-colors"
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                  >
-                    Leave Group
-                  </motion.button>
-                </div>
-              )}
+                )}
+              </div>
             </motion.div>
           </motion.div>
         )}

@@ -17,6 +17,7 @@ const GroupPollsTab: React.FC<GroupPollsTabProps> = ({ groupId }) => {
   const [isLoading, setIsLoading] = useState(false)
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [userRole, setUserRole] = useState<{ role: string; is_admin_or_creator: boolean } | null>(null)
+  const [groupPermissions, setGroupPermissions] = useState<{ create_polls: 'all_members' | 'admins_only' } | null>(null)
   const { user } = useAuth()
   const { addMessageListener } = useWebSocket()
 
@@ -59,6 +60,12 @@ const GroupPollsTab: React.FC<GroupPollsTabProps> = ({ groupId }) => {
     try {
       const roleData = await api.getUserRole(groupId)
       setUserRole(roleData)
+      
+      // Fetch group data to get permissions
+      const groupData = await api.getGroup(groupId)
+      setGroupPermissions({
+        create_polls: groupData.create_polls
+      })
     } catch (error) {
       console.error('Failed to fetch user role:', error)
     }
@@ -142,20 +149,42 @@ const GroupPollsTab: React.FC<GroupPollsTabProps> = ({ groupId }) => {
     return false
   }
 
+  const canCreatePolls = () => {
+    if (!groupPermissions) return false
+    return userRole?.is_admin_or_creator || groupPermissions.create_polls === 'all_members'
+  }
+
   return (
     <div className="flex flex-col h-full">
-      <div className="p-6 border-b border-white/10">
-        <div className="flex items-center justify-between">
-          <h2 className="text-xl font-bold text-white">Group Polls</h2>
-          <motion.button
-            onClick={() => setShowCreateModal(true)}
-            className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-emerald-500 to-teal-600 rounded-xl text-white hover:from-emerald-600 hover:to-teal-700 transition-all duration-200 shadow-lg"
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-          >
-            <Plus className="w-4 h-4" />
-            <span className="font-medium">Create Poll</span>
-          </motion.button>
+      <div className="bg-gradient-to-br from-white/10 via-white/5 to-transparent backdrop-blur-xl rounded-3xl border border-white/20 shadow-2xl p-6 mb-6 mt-2 hover:shadow-emerald-500/10 transition-all duration-500 mx-2">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+          <div className="flex items-center space-x-2">
+            <div className="relative">
+              <div className="w-8 h-8 bg-gradient-to-br from-emerald-400 via-teal-500 to-cyan-600 rounded-lg flex items-center justify-center shadow-sm">
+                <BarChart3 className="w-4 h-4 text-white drop-shadow-sm" />
+              </div>
+              <div className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-full animate-pulse"></div>
+            </div>
+            <div>
+              <h2 className="text-lg lg:text-xl font-bold text-white mb-0.5">Group Polls</h2>
+              <p className="text-white/70 text-xs lg:text-sm">Create polls and gather opinions from group members</p>
+            </div>
+          </div>
+          {canCreatePolls() ? (
+            <motion.button
+              onClick={() => setShowCreateModal(true)}
+              className="flex items-center space-x-2 px-3 py-1.5 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white rounded-2xl font-medium transition-all duration-300 shadow-md hover:shadow-lg self-start sm:self-center text-sm"
+              whileHover={{ scale: 1.02, y: -0.5 }}
+              whileTap={{ scale: 0.98 }}
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>Create Poll</span>
+            </motion.button>
+          ) : (
+            <div className="text-white/60 text-sm bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 self-start sm:self-center">
+              Only admins and creators can create polls
+            </div>
+          )}
         </div>
       </div>
 
@@ -176,14 +205,20 @@ const GroupPollsTab: React.FC<GroupPollsTabProps> = ({ groupId }) => {
               <p className="text-white/60 text-base leading-relaxed mb-6">
                 Create the first poll to start gathering opinions from group members.
               </p>
-              <motion.button
-                onClick={() => setShowCreateModal(true)}
-                className="px-6 py-3 bg-gradient-to-r from-emerald-500 to-teal-600 rounded-xl text-white font-medium hover:from-emerald-600 hover:to-teal-700 transition-all duration-200"
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-              >
-                Create First Poll
-              </motion.button>
+              {canCreatePolls() ? (
+                <motion.button
+                  onClick={() => setShowCreateModal(true)}
+                  className="px-6 py-3 bg-gradient-to-r from-emerald-500 to-teal-600 rounded-xl text-white font-medium hover:from-emerald-600 hover:to-teal-700 transition-all duration-200"
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                >
+                  Create First Poll
+                </motion.button>
+              ) : (
+                <div className="text-white/60 text-sm bg-white/5 border border-white/10 rounded-lg px-4 py-2">
+                  Only admins and creators can create polls
+                </div>
+              )}
             </div>
           </div>
         ) : (

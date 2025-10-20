@@ -11,6 +11,26 @@ export interface SearchOptions<T> {
   filterFn?: (items: T[], query: string) => T[]
 }
 
+export interface SearchResult {
+  type: 'user' | 'group' | 'event' | 'post' | 'message' | 'chat' | 'tag'
+  id: string | number
+  title: string
+  subtitle?: string
+  image?: string
+  description?: string
+  url: string
+  metadata?: any
+}
+
+export interface SearchResponse {
+  results: SearchResult[]
+  count: number
+  query: string
+  filter?: string
+  page?: number
+  limit?: number
+}
+
 export function useSearch<T>(
   searchFunction: (query: string) => Promise<T[]>,
   options: SearchOptions<T> = {}
@@ -168,5 +188,148 @@ export function useSearch<T>(
     clearSearch,
     retrySearch,
     performSearch: () => performSearch(query.trim())
+  }
+}
+
+// Enhanced search hook for the new search functionality
+export function useSearchResults() {
+  const [results, setResults] = useState<SearchResult[]>([])
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [totalCount, setTotalCount] = useState(0)
+  const [currentQuery, setCurrentQuery] = useState('')
+  const [currentFilter, setCurrentFilter] = useState('all')
+
+  const abortController = useRef<AbortController | null>(null)
+
+  const searchAll = useCallback(async (query: string, filter: string = 'all', page: number = 1, limit: number = 20, append: boolean = false) => {
+    if (query.length < 2) {
+      if (!append) {
+        setResults([])
+        setTotalCount(0)
+      }
+      return
+    }
+
+    try {
+      setLoading(true)
+      setError(null)
+      setCurrentQuery(query)
+      setCurrentFilter(filter)
+
+      // Cancel previous request
+      if (abortController.current) {
+        abortController.current.abort()
+      }
+
+      abortController.current = new AbortController()
+
+      const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'
+      const response = await fetch(
+        `${API_BASE_URL}/api/search?${new URLSearchParams({
+          q: query,
+          filter,
+          page: page.toString(),
+          limit: limit.toString()
+        })}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+            'Content-Type': 'application/json',
+          },
+          signal: abortController.current.signal
+        }
+      )
+
+      if (!response.ok) {
+        throw new Error(`Search failed: ${response.statusText}`)
+      }
+
+      const data: SearchResponse = await response.json()
+      const newResults = data.results || []
+      
+      if (append) {
+        setResults(prev => [...prev, ...newResults])
+      } else {
+        setResults(newResults)
+      }
+      
+      setTotalCount(data.count || 0)
+    } catch (err: any) {
+      if (err.name === 'AbortError') {
+        return
+      }
+      
+      const errorMessage = err.message || 'Search failed'
+      setError(errorMessage)
+      if (!append) {
+        setResults([])
+        setTotalCount(0)
+      }
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  const searchSuggestions = useCallback(async (query: string): Promise<SearchResult[]> => {
+    if (query.length < 2) {
+      return []
+    }
+
+    try {
+      const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'
+      const response = await fetch(
+        `${API_BASE_URL}/api/search/suggestions?${new URLSearchParams({ q: query })}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+            'Content-Type': 'application/json',
+          }
+        }
+      )
+
+      if (!response.ok) {
+        throw new Error(`Suggestions failed: ${response.statusText}`)
+      }
+
+      const data = await response.json()
+      return data.suggestions || []
+    } catch (err) {
+      console.error('Search suggestions failed:', err)
+      return []
+    }
+  }, [])
+
+  const clearResults = useCallback(() => {
+    setResults([])
+    setTotalCount(0)
+    setError(null)
+    setCurrentQuery('')
+    setCurrentFilter('all')
+    
+    if (abortController.current) {
+      abortController.current.abort()
+    }
+  }, [])
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (abortController.current) {
+        abortController.current.abort()
+      }
+    }
+  }, [])
+
+  return {
+    results,
+    loading,
+    error,
+    totalCount,
+    currentQuery,
+    currentFilter,
+    searchAll,
+    searchSuggestions,
+    clearResults
   }
 }

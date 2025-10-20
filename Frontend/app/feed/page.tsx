@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import ProtectedRoute from '@/components/ProtectedRoute'
 import AppLayout from '@/components/AppLayout'
@@ -7,9 +7,9 @@ import HomeFeed from '@/components/dashboard/HomeFeed'
 import CreatePost from '@/components/dashboard/CreatePost'
 import { useAuth } from '@/context/AuthContext'
 import { useToast } from '@/context/ToastContext'
-import { api, NetworkError, AuthenticationError } from '@/lib/api'
+import { api, NetworkError, AuthenticationError, ValidationError, PostResponse } from '@/lib/api'
 import { getToken } from '@/lib/api'
-import { ApiClient, CreatePostRequest, ValidationError, Post } from '@/lib/api'
+import { ApiClient, CreatePostRequest, Post } from '@/lib/api'
 
 function FeedPage() {
   const router = useRouter()
@@ -34,6 +34,12 @@ function FeedPage() {
 
   // Data State
   const [posts, setPosts] = useState<Post[]>([])
+  const [currentPage, setCurrentPage] = useState(0)
+  const [hasMoreResults, setHasMoreResults] = useState(true)
+  const [isLoadingMore, setIsLoadingMore] = useState(false)
+
+  // Scroll position preservation
+  const resultsContainerRef = useRef<HTMLDivElement>(null)
 
   // Update URL when filter or sort changes
   useEffect(() => {
@@ -44,46 +50,63 @@ function FeedPage() {
     router.replace(newUrl)
   }, [feedSubTab, sortOrder, router])
 
-  const fetchFeedPosts = useCallback(async () => {
+  const fetchFeedPosts = useCallback(async (page: number = 0, append: boolean = false) => {
     try {
-      // setIsLoadingPosts(true)
-      console.log('Fetching feed posts...')
-      const response = await api.getFeed(20, 0)
-      console.log('Feed API response:', response)
-      const respRec = response as Record<string, unknown>
-      const postsArr = Array.isArray(respRec['data'] as unknown) ? respRec['data'] as unknown[] : [];
+      if (append) {
+        setIsLoadingMore(true)
+      }
+      console.log('Fetching feed posts with params...', { page, append, filter: feedSubTab })
+      let response: { posts: PostResponse[]; limit: number; offset: number }
+      if (feedSubTab === 'following') {
+        response = await api.getFollowingFeed(20, page * 20)
+      } else if (feedSubTab === 'friends') {
+        response = await api.getFriendsFeed(20, page * 20)
+      } else {
+        response = await api.getFeed(20, page * 20)
+      }
 
-      if (!postsArr.length) {
-        setPosts([])
+      if (!response.posts || response.posts.length === 0) {
+        if (!append) {
+          setPosts([])
+        }
+        setHasMoreResults(false)
         return
       }
 
-      const mappedPosts = postsArr.map((post: unknown) => {
-        const p = post as Record<string, unknown>
-        const userObj = p['user'] as Record<string, unknown> | undefined
-        const imageUrl = typeof p['image_url'] === 'string' ? String(p['image_url']) : undefined
+      const mappedPosts = response.posts.map((post: any) => {
+        const userObj = post.user
+        const imageUrl = typeof post.image_url === 'string' ? String(post.image_url) : undefined
 
         return {
-          id: Number(p['id']) || 0,
+          id: Number(post.id) || 0,
           user: {
-            id: userObj ? Number(userObj['id'] ?? 0) : 0,
-            name: userObj ? `${String(userObj['first_name'] ?? '')} ${String(userObj['last_name'] ?? '')}` : 'Unknown',
-            username: userObj ? String(userObj['nickname'] ?? userObj['email'] ?? '').split('@')[0] : 'unknown',
-            avatar: userObj ? String(userObj['avatar'] ?? '') : ''
+            id: userObj ? Number(userObj.id ?? 0) : 0,
+            name: userObj ? `${String(userObj.first_name ?? '')} ${String(userObj.last_name ?? '')}` : 'Unknown',
+            username: userObj ? String(userObj.nickname ?? userObj.email ?? '').split('@')[0] : 'unknown',
+            avatar: userObj ? String(userObj.avatar ?? '') : ''
           },
-          content: typeof p['content'] === 'string' ? String(p['content']) : '',
+          content: typeof post.content === 'string' ? String(post.content) : '',
           image: imageUrl ? (imageUrl.startsWith('http') ? imageUrl : `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}${imageUrl}`) : undefined,
-          likes: Number(p['like_count']) || 0,
-          comments: Number(p['comment_count']) || 0,
-          shares: 0,
-          timeAgo: formatTimeAgo(String(p['created_at'] ?? '')),
-          privacy: String(p['privacy'] ?? ''),
-          isLiked: Boolean(p['is_liked']),
-          created_at: String(p['created_at'] ?? '')
+          likes: Number(post.like_count) || 0,
+          comments: Number(post.comment_count) || 0,
+          shares: Number(post.share_count) || 0,
+          timeAgo: formatTimeAgo(String(post.created_at ?? '')),
+          privacy: String(post.privacy ?? ''),
+          isLiked: Boolean(post.is_liked),
+          created_at: String(post.created_at ?? '')
         }
       })
 
-      setPosts(mappedPosts)
+      if (append) {
+        setPosts(prevPosts => [...prevPosts, ...mappedPosts])
+        setCurrentPage(page)
+      } else {
+        setPosts(mappedPosts)
+        setCurrentPage(0)
+      }
+
+      // If fewer posts than page size, no more results
+      setHasMoreResults(mappedPosts.length === 20)
     } catch (err) {
       console.error('Error fetching posts:', err)
       if (err instanceof NetworkError) {
@@ -94,17 +117,33 @@ function FeedPage() {
         error('Unable to load posts right now.')
       }
     } finally {
-      // setIsLoadingPosts(false)
+      setIsLoadingMore(false)
     }
   }, [error])
 
-  // Fetch data when component loads
+  // Fetch data when component loads or filter changes
   useEffect(() => {
     if (user) {
-      fetchFeedPosts()
+      fetchFeedPosts(0, false) // Reset to first page
       fetchUsers()
     }
-  }, [user, fetchFeedPosts])
+  }, [user, feedSubTab, sortOrder, fetchFeedPosts])
+
+  const handleLoadMore = useCallback(() => {
+    if (!isLoadingMore && hasMoreResults && resultsContainerRef.current) {
+      // Save current scroll position
+      const scrollTop = resultsContainerRef.current.scrollTop
+
+      fetchFeedPosts(currentPage + 1, true).then(() => {
+        // Restore scroll position after new posts are loaded
+        requestAnimationFrame(() => {
+          if (resultsContainerRef.current) {
+            resultsContainerRef.current.scrollTop = scrollTop
+          }
+        })
+      })
+    }
+  }, [currentPage, hasMoreResults, isLoadingMore, fetchFeedPosts])
 
   const fetchUsers = async () => {
     try {
@@ -292,6 +331,10 @@ function FeedPage() {
         feedSubTab={feedSubTab}
         sortOrder={sortOrder}
         setSortOrder={setSortOrder}
+        hasMoreResults={hasMoreResults}
+        isLoadingMore={isLoadingMore}
+        onLoadMore={handleLoadMore}
+        resultsContainerRef={resultsContainerRef}
       />
     </AppLayout>
   )

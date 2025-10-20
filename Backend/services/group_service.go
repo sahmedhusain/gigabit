@@ -33,12 +33,12 @@ func (s *GroupService) CreateGroup(group *models.Group, invitees []uint) error {
 	}()
 
 	groupQuery := `
-INSERT INTO groups (creator_id, name, description, privacy, avatar, created_at, updated_at)
-VALUES (?, ?, ?, ?, ?, ?, ?)
+INSERT INTO groups (creator_id, name, description, privacy, create_posts, create_polls, create_events, send_messages, avatar, created_at, updated_at)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 `
 
 	now := time.Now()
-	result, execErr := tx.Exec(groupQuery, group.CreatorID, group.Title, group.Description, group.Privacy, group.Avatar, now, now)
+	result, execErr := tx.Exec(groupQuery, group.CreatorID, group.Title, group.Description, group.Privacy, group.CreatePosts, group.CreatePolls, group.CreateEvents, group.SendMessages, group.Avatar, now, now)
 	if execErr != nil {
 		err = execErr
 		return err
@@ -93,7 +93,7 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 
 func (s *GroupService) GetGroupByID(groupID, currentUserID uint) (*models.GroupResponse, error) {
 	query := `
-SELECT g.id, g.creator_id, g.name as title, g.description, g.privacy, g.avatar, g.created_at, g.updated_at,
+SELECT g.id, g.creator_id, g.name as title, g.description, g.privacy, g.create_posts, g.create_polls, g.create_events, g.send_messages, g.avatar, g.created_at, g.updated_at,
 	u.first_name, u.last_name, u.avatar, u.nickname,
 	COUNT(DISTINCT gm.id) as member_count
 FROM groups g
@@ -108,7 +108,7 @@ GROUP BY g.id, u.id
 
 	err := s.db.QueryRow(query, groupID).Scan(
 		&group.ID, &group.CreatorID, &group.Title, &group.Description,
-		&group.Privacy, &group.Avatar,
+		&group.Privacy, &group.CreatePosts, &group.CreatePolls, &group.CreateEvents, &group.SendMessages, &group.Avatar,
 		&group.CreatedAt, &group.UpdatedAt,
 		&creator.FirstName, &creator.LastName, &creator.Avatar, &creator.Nickname,
 		&group.MemberCount,
@@ -148,7 +148,7 @@ GROUP BY g.id, u.id
 
 func (s *GroupService) GetAllGroups(currentUserID uint, limit, offset int) ([]models.GroupResponse, error) {
 	query := `
-SELECT g.id, g.creator_id, g.name as title, g.description, g.privacy, g.avatar, g.created_at, g.updated_at,
+SELECT g.id, g.creator_id, g.name as title, g.description, g.privacy, g.create_posts, g.create_polls, g.create_events, g.send_messages, g.avatar, g.created_at, g.updated_at,
 	u.first_name, u.last_name, u.avatar, u.nickname,
 	COUNT(DISTINCT gm.id) as member_count
 FROM groups g
@@ -172,7 +172,7 @@ LIMIT ? OFFSET ?
 		var creator models.UserResponse
 
 		err := rows.Scan(
-			&group.ID, &group.CreatorID, &group.Title, &group.Description, &group.Privacy,
+			&group.ID, &group.CreatorID, &group.Title, &group.Description, &group.Privacy, &group.CreatePosts, &group.CreatePolls, &group.CreateEvents, &group.SendMessages,
 			&group.Avatar,
 			&group.CreatedAt, &group.UpdatedAt,
 			&creator.FirstName, &creator.LastName, &creator.Avatar, &creator.Nickname,
@@ -207,7 +207,7 @@ LIMIT ? OFFSET ?
 
 func (s *GroupService) GetUserGroups(userID uint, limit, offset int) ([]models.GroupResponse, error) {
 	query := `
-SELECT g.id, g.creator_id, g.name as title, g.description, g.privacy, g.avatar, g.created_at, g.updated_at,
+SELECT g.id, g.creator_id, g.name as title, g.description, g.privacy, g.create_posts, g.create_polls, g.create_events, g.send_messages, g.avatar, g.created_at, g.updated_at,
 	u.first_name, u.last_name, u.avatar, u.nickname,
 	COUNT(DISTINCT gm2.id) as member_count
 FROM groups g
@@ -231,7 +231,7 @@ LIMIT ? OFFSET ?
 		var creator models.UserResponse
 
 		err := rows.Scan(
-			&group.ID, &group.CreatorID, &group.Title, &group.Description, &group.Privacy,
+			&group.ID, &group.CreatorID, &group.Title, &group.Description, &group.Privacy, &group.CreatePosts, &group.CreatePolls, &group.CreateEvents, &group.SendMessages,
 			&group.Avatar,
 			&group.CreatedAt, &group.UpdatedAt,
 			&creator.FirstName, &creator.LastName, &creator.Avatar, &creator.Nickname,
@@ -268,12 +268,12 @@ func (s *GroupService) UpdateGroup(groupID, userID uint, updateReq *models.Updat
 	}
 
 	query := `
-UPDATE groups SET name = ?, description = ?, updated_at = ?
+UPDATE groups SET name = ?, description = ?, avatar = ?, updated_at = ?
 WHERE id = ? AND creator_id = ?
 `
 
 	now := time.Now()
-	_, err = s.db.Exec(query, updateReq.Title, updateReq.Description, now, groupID, userID)
+	_, err = s.db.Exec(query, updateReq.Title, updateReq.Description, updateReq.Avatar, now, groupID, userID)
 	return err
 }
 
@@ -292,6 +292,7 @@ func (s *GroupService) DeleteGroup(groupID, userID uint) error {
 	// Delete related data first
 	s.db.Exec("DELETE FROM group_members WHERE group_id = ?", groupID)
 	s.db.Exec("DELETE FROM group_posts WHERE group_id = ?", groupID)
+	s.db.Exec("DELETE FROM group_messages WHERE group_id = ?", groupID)
 	s.db.Exec("DELETE FROM events WHERE group_id = ?", groupID)
 
 	// Delete the group
@@ -659,6 +660,16 @@ func (s *GroupService) IsUserMember(groupID, userID uint) (bool, error) {
 }
 
 func (s *GroupService) GetUserRole(groupID, userID uint) (string, error) {
+	// First check if user is the creator of the group
+	var creatorID uint
+	if err := s.db.QueryRow("SELECT creator_id FROM groups WHERE id = ?", groupID).Scan(&creatorID); err != nil {
+		return "", err
+	}
+	if creatorID == userID {
+		return "creator", nil
+	}
+
+	// If not creator, get their role from group_members
 	query := `SELECT role FROM group_members WHERE group_id = ? AND user_id = ? AND status = 'member'`
 
 	var role string
@@ -674,6 +685,25 @@ func (s *GroupService) GetUserRole(groupID, userID uint) (string, error) {
 }
 
 func (s *GroupService) IsUserAdminOrCreator(groupID, userID uint) (bool, error) {
+	// Check if user is creator
+	var creatorID uint
+	if err := s.db.QueryRow("SELECT creator_id FROM groups WHERE id = ?", groupID).Scan(&creatorID); err != nil {
+		return false, err
+	}
+	if creatorID == userID {
+		// Check if creator has been demoted to member
+		query := `SELECT role FROM group_members WHERE group_id = ? AND user_id = ? AND status = 'member'`
+		var role string
+		err := s.db.QueryRow(query, groupID, userID).Scan(&role)
+		if err == nil && role == "member" {
+			// Creator has been demoted, no admin privileges
+			return false, nil
+		}
+		// Creator still has admin privileges
+		return true, nil
+	}
+
+	// Check if user is admin
 	role, err := s.GetUserRole(groupID, userID)
 	if err != nil {
 		return false, err
@@ -1147,4 +1177,181 @@ func (s *GroupService) GetNextAdmin(groupID, currentUserID uint) (map[string]int
 		"has_admins":   hasAdmins,
 		"first_member": nextAdmin, // For frontend compatibility
 	}, nil
+}
+
+func (s *GroupService) UpdateGroupPrivacy(groupID uint, privacy string, userID uint) error {
+	// Check if user is the creator
+	var creatorID uint
+	err := s.db.QueryRow("SELECT creator_id FROM groups WHERE id = ?", groupID).Scan(&creatorID)
+	if err != nil {
+		return err
+	}
+
+	if creatorID != userID {
+		return sql.ErrNoRows // Unauthorized
+	}
+
+	query := `
+UPDATE groups SET privacy = ?, updated_at = ?
+WHERE id = ? AND creator_id = ?
+`
+
+	now := time.Now()
+	_, err = s.db.Exec(query, privacy, now, groupID, userID)
+	return err
+}
+
+func (s *GroupService) UpdateGroupPermissions(groupID uint, permissions *models.UpdateGroupPermissionsRequest, userID uint) error {
+	// Check if user is admin or creator
+	isAdmin, err := s.IsUserAdminOrCreator(groupID, userID)
+	if err != nil || !isAdmin {
+		return sql.ErrNoRows
+	}
+
+	query := `
+UPDATE groups SET create_posts = ?, create_polls = ?, create_events = ?, send_messages = ?, updated_at = ?
+WHERE id = ?
+`
+
+	now := time.Now()
+	_, err = s.db.Exec(query, permissions.CreatePosts, permissions.CreatePolls, permissions.CreateEvents, permissions.SendMessages, now, groupID)
+	return err
+}
+
+func (s *GroupService) GetInvitableUsers(groupID uint, currentUserID uint, searchTerm string) ([]models.User, error) {
+	// Check if current user is admin or creator
+	isAdmin, err := s.IsUserAdminOrCreator(groupID, currentUserID)
+	if err != nil || !isAdmin {
+		return nil, sql.ErrNoRows
+	}
+
+	query := `
+SELECT u.id, u.first_name, u.last_name, u.nickname, u.avatar, u.status
+FROM users u
+WHERE u.id != ?
+AND u.id NOT IN (
+    SELECT gm.user_id FROM group_members gm WHERE gm.group_id = ? AND gm.status IN ('member', 'sent', 'requested')
+)
+`
+
+	args := []interface{}{currentUserID, groupID}
+
+	// Add search filter if provided
+	if searchTerm != "" {
+		query += ` AND (u.first_name LIKE ? OR u.last_name LIKE ? OR u.nickname LIKE ?)`
+		searchPattern := "%" + searchTerm + "%"
+		args = append(args, searchPattern, searchPattern, searchPattern)
+	}
+
+	// Filter out private profiles that current user doesn't follow
+	query += `
+AND (u.status != 'private' OR u.id IN (
+    SELECT f.following_id FROM follows f WHERE f.follower_id = ?
+))
+`
+
+	args = append(args, currentUserID)
+
+	query += ` ORDER BY u.first_name, u.last_name LIMIT 50`
+
+	rows, err := s.db.Query(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var users []models.User
+	for rows.Next() {
+		var user models.User
+		err := rows.Scan(&user.ID, &user.FirstName, &user.LastName, &user.Nickname, &user.Avatar, &user.Status)
+		if err != nil {
+			return nil, err
+		}
+		users = append(users, user)
+	}
+
+	return users, nil
+}
+
+func (s *GroupService) GetSentJoinRequests(groupID uint, userID uint) ([]models.GroupMemberResponse, error) {
+	// Only admins can view sent requests
+	isAdmin, err := s.IsUserAdminOrCreator(groupID, userID)
+	if err != nil || !isAdmin {
+		return nil, sql.ErrNoRows
+	}
+
+	query := `
+SELECT gm.id, gm.group_id, gm.user_id, gm.status, gm.role, gm.invited_by, gm.requestor_id, gm.created_at,
+       u.first_name, u.last_name, u.avatar, u.nickname
+FROM group_members gm
+JOIN users u ON gm.user_id = u.id
+WHERE gm.group_id = ? AND gm.status = 'sent' AND gm.invited_by IS NOT NULL
+ORDER BY gm.created_at DESC
+`
+
+	rows, err := s.db.Query(query, groupID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var requests []models.GroupMemberResponse
+	for rows.Next() {
+		var request models.GroupMemberResponse
+		var user models.UserResponse
+		var invitedBy, requestorID sql.NullInt64
+		var createdAt time.Time
+
+		err := rows.Scan(
+			&request.ID, &request.GroupID, &user.ID, &request.Status, &request.Role, &invitedBy, &requestorID, &createdAt,
+			&user.FirstName, &user.LastName, &user.Avatar, &user.Nickname,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		request.User = user
+		request.JoinedAt = createdAt
+		if invitedBy.Valid {
+			val := uint(invitedBy.Int64)
+			request.InvitedBy = &val
+		}
+		if requestorID.Valid {
+			val := uint(requestorID.Int64)
+			request.Requestor = &val
+		}
+		requests = append(requests, request)
+	}
+
+	return requests, nil
+}
+
+func (s *GroupService) GetReceivedJoinRequests(groupID uint, userID uint) ([]models.GroupMemberResponse, error) {
+	// This is the same as GetPendingRequests
+	return s.GetPendingRequests(groupID, userID)
+}
+
+func (s *GroupService) DeleteGroupMessage(messageID uint, userID uint, groupID uint) error {
+	// Check if user is admin or creator of the group
+	isAdmin, err := s.IsUserAdminOrCreator(groupID, userID)
+	if err != nil || !isAdmin {
+		return sql.ErrNoRows
+	}
+
+	// Delete the message
+	result, err := s.db.Exec("DELETE FROM group_messages WHERE id = ? AND group_id = ?", messageID, groupID)
+	if err != nil {
+		return err
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+
+	if rowsAffected == 0 {
+		return sql.ErrNoRows
+	}
+
+	return nil
 }

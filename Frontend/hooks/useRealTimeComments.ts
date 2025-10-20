@@ -90,7 +90,7 @@ export function useRealTimeComments(postId: number) {
             updated_at: new Date().toISOString(),
             user: user
           }
-          return [...currentComments, optimisticComment]
+          return [...(currentComments || []), optimisticComment]
         },
         async () => {
           const response = await api.createComment(postId, commentData)

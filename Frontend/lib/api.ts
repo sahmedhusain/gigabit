@@ -772,6 +772,38 @@ export class ApiClient {
     });
   }
 
+  async getUnreadNotificationCount(): Promise<{ unread_count: number }> {
+    return this.request<{ unread_count: number }>('/api/notifications/unread', {
+      method: 'GET',
+    });
+  }
+
+  async markNotificationAsRead(notificationIds: number[]): Promise<{ message: string; count: number }> {
+    return this.request<{ message: string; count: number }>('/api/notifications/read', {
+      method: 'PUT',
+      body: JSON.stringify({ notification_ids: notificationIds, mark_all: false }),
+    });
+  }
+
+  async markAllNotificationsAsRead(): Promise<{ message: string }> {
+    return this.request<{ message: string }>('/api/notifications/read', {
+      method: 'PUT',
+      body: JSON.stringify({ mark_all: true }),
+    });
+  }
+
+  async deleteNotification(notificationId: number): Promise<{ message: string }> {
+    return this.request<{ message: string }>(`/api/notifications/${notificationId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async deleteAllReadNotifications(): Promise<{ message: string }> {
+    return this.request<{ message: string }>('/api/notifications/read', {
+      method: 'DELETE',
+    });
+  }
+
   // Groups endpoints
   async getUserGroups(userId: number): Promise<{ groups: GroupResponse[], count: number, limit: number, offset: number }> {
     return this.request<{ groups: GroupResponse[], count: number, limit: number, offset: number }>(`/api/groups/user/${userId}`, {

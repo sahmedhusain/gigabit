@@ -9,28 +9,79 @@ export function useNotifications() {
   const [items, setItems] = useState<NotificationResponse[]>([])
   const [unread, setUnread] = useState<number>(0)
   const [loading, setLoading] = useState(false)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [hasMore, setHasMore] = useState(true)
   const [err, setErr] = useState<string | null>(null)
+  const [offset, setOffset] = useState(0)
+  const limit = 20
 
-  const fetchNotifications = useCallback(async () => {
+  const fetchNotifications = useCallback(async (reset = true) => {
     try {
-      setLoading(true)
-      const res = await api.getNotifications(20, 0)
+      if (reset) {
+        setLoading(true)
+        setOffset(0)
+      } else {
+        setLoadingMore(true)
+      }
+      
+      const currentOffset = reset ? 0 : offset
+      const res = await api.getNotifications(limit, currentOffset)
       const data = Array.isArray(res.data) ? res.data : []
-      setItems(data)
-      setUnread(data.filter(n => !n.is_read).length)
+      
+      if (reset) {
+        setItems(data)
+      } else {
+        setItems(prev => [...prev, ...data])
+      }
+      
+      // Update hasMore based on whether we got a full page
+      setHasMore(data.length === limit)
+      
+      // Update offset for next fetch
+      if (!reset) {
+        setOffset(prev => prev + limit)
+      }
+      
+      // Fetch unread count from backend instead of calculating locally
+      try {
+        const unreadRes = await api.getUnreadNotificationCount()
+        setUnread(unreadRes.unread_count)
+      } catch (unreadErr) {
+        // Fallback to local calculation if API call fails
+        setUnread(data.filter(n => !n.is_read).length)
+      }
     } catch (e: any) {
       const msg = e?.message || 'Failed to load notifications'
       setErr(msg)
       error('Failed to load notifications.')
     } finally {
       setLoading(false)
+      setLoadingMore(false)
     }
-  }, [error])
+  }, [error, offset, limit])
 
-  const markAllAsReadLocal = useCallback(() => {
-    setItems(prev => prev.map(n => ({ ...n, is_read: true })))
-    setUnread(0)
-  }, [])
+  const loadMore = useCallback(() => {
+    if (!loadingMore && hasMore) {
+      fetchNotifications(false)
+    }
+  }, [fetchNotifications, loadingMore, hasMore])
+
+  const markAllAsReadLocal = useCallback(async () => {
+    try {
+      // Optimistically update local state
+      setItems(prev => prev.map(n => ({ ...n, is_read: true })))
+      setUnread(0)
+      
+      // Call API to mark all as read on server
+      await api.markAllNotificationsAsRead()
+      success('All notifications marked as read')
+    } catch (e: any) {
+      console.error('Failed to mark all as read:', e)
+      error('Failed to mark all notifications as read')
+      // Revert optimistic update
+      fetchNotifications()
+    }
+  }, [fetchNotifications, success, error])
 
   const markAsRead = useCallback(async (notificationId: number) => {
     try {
@@ -40,14 +91,15 @@ export function useNotifications() {
       ))
       setUnread(prev => Math.max(0, prev - 1))
       
-      // TODO: Call API to mark as read on server
-      // await api.markNotificationAsRead(notificationId)
+      // Call API to mark as read on server
+      await api.markNotificationAsRead([notificationId])
     } catch (e: any) {
       console.error('Failed to mark notification as read:', e)
+      error('Failed to mark notification as read')
       // Revert optimistic update
       fetchNotifications()
     }
-  }, [fetchNotifications])
+  }, [fetchNotifications, error])
 
   const deleteNotification = useCallback(async (notificationId: number) => {
     try {
@@ -59,8 +111,8 @@ export function useNotifications() {
         setUnread(prev => Math.max(0, prev - 1))
       }
       
-      // TODO: Call API to delete notification on server
-      // await api.deleteNotification(notificationId)
+      // Call API to delete notification on server
+      await api.deleteNotification(notificationId)
       
       success('Notification deleted')
     } catch (e: any) {
@@ -76,60 +128,41 @@ export function useNotifications() {
     messageTypes: ['notification'],
     onMessage: (msg) => {
       if (msg.type === 'notification' && msg.data) {
-        const newNotification: NotificationResponse = {
-          id: Date.now(),
-          type: msg.data.type || 'general',
-          message: msg.data.message || 'You have a new notification',
-          actor: msg.data.actor || { 
-            id: 0, 
-            email: '', 
-            first_name: 'Someone', 
-            last_name: '', 
-            avatar: '', 
-            nickname: '', 
-            about_me: '', 
-            date_of_birth: '', 
-            is_private: false, 
-            created_at: '', 
-            updated_at: '' 
-          },
-          is_read: false,
-          created_at: new Date().toISOString()
+        // msg.data should be a complete NotificationResponse from the backend
+        const notification = msg.data as NotificationResponse
+        
+        // Only add if it has a valid ID (from backend)
+        if (notification.id && notification.id > 0) {
+          setItems(prev => {
+            // Check if notification already exists to avoid duplicates
+            const exists = prev.some(n => n.id === notification.id)
+            if (exists) return prev
+            
+            return [notification, ...prev]
+          })
+          setUnread(u => u + 1)
         }
-        
-        setItems(prev => [newNotification, ...prev])
-        setUnread(u => u + 1)
-        
-        // Show toast notification based on type
-        const notificationTypes = {
-          'like': '👍 Someone liked your post',
-          'comment': '💬 New comment on your post', 
-          'follow': '👤 Someone started following you',
-          'group_invite': '👥 Group invitation received',
-          'event_invite': '📅 Event invitation received',
-          'message': '📨 New message received'
-        }
-        
-        const displayMessage = notificationTypes[msg.data.type as keyof typeof notificationTypes] || msg.data.message
-        success(displayMessage)
       }
     }
   })
 
   useEffect(() => {
-    fetchNotifications()
-  }, [fetchNotifications])
+    fetchNotifications(true)
+  }, [])
 
   return useMemo(() => ({
     items,
     unread,
     loading,
+    loadingMore,
+    hasMore,
     error: err,
     isConnected,
-    refetch: fetchNotifications,
+    refetch: () => fetchNotifications(true),
+    loadMore,
     markAllAsReadLocal,
     markAsRead,
     deleteNotification,
     notify: success,
-  }), [items, unread, loading, err, isConnected, fetchNotifications, markAllAsReadLocal, markAsRead, deleteNotification, success])
+  }), [items, unread, loading, loadingMore, hasMore, err, isConnected, fetchNotifications, loadMore, markAllAsReadLocal, markAsRead, deleteNotification, success])
 }

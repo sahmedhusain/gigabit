@@ -14,14 +14,16 @@ import (
 )
 
 type GroupHandler struct {
-	groupService *services.GroupService
-	hub          *websocket.Hub
+	groupService        *services.GroupService
+	notificationService *services.NotificationService
+	hub                 *websocket.Hub
 }
 
 func NewGroupHandler(db *sql.DB, hub *websocket.Hub) *GroupHandler {
 	return &GroupHandler{
-		groupService: services.NewGroupService(db),
-		hub:          hub,
+		groupService:        services.NewGroupService(db),
+		notificationService: services.NewNotificationService(db, hub),
+		hub:                 hub,
 	}
 }
 
@@ -262,6 +264,11 @@ func (h *GroupHandler) InviteUsers(w http.ResponseWriter, r *http.Request, group
 		return
 	}
 
+	// Send notifications to invited users
+	for _, invitedUserID := range req.UserIDs {
+		go h.notificationService.NotifyGroupInvite(userID, invitedUserID, uint(groupID))
+	}
+
 	writeJSON(w, http.StatusOK, map[string]interface{}{"message": "Invitations sent successfully"})
 }
 
@@ -285,6 +292,12 @@ func (h *GroupHandler) RequestToJoin(w http.ResponseWriter, r *http.Request, gro
 			writeError(w, http.StatusInternalServerError, "Failed to request group membership")
 		}
 		return
+	}
+
+	// Get group creator to send notification
+	group, err := h.groupService.GetGroupByID(uint(groupID), userID)
+	if err == nil && group != nil {
+		go h.notificationService.NotifyJoinRequest(userID, group.CreatorID, uint(groupID))
 	}
 
 	writeJSON(w, http.StatusCreated, map[string]interface{}{"message": "Join request sent successfully"})
@@ -562,6 +575,9 @@ func (h *GroupHandler) CreateGroupPost(w http.ResponseWriter, r *http.Request, g
 		})
 		return
 	}
+
+	// Send notification to all group members
+	go h.notificationService.NotifyGroupPostCreated(userID, uint(groupID), groupPost.ID)
 
 	// Send real-time update to all group members via WebSocket
 	if h.hub != nil {

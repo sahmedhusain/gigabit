@@ -414,9 +414,11 @@ export default function DiscoverPage() {
   const fetchPendingRequests = async (groupId: number) => {
     try {
       const response = await api.getPendingJoinRequests(groupId)
+      const safeRequests = Array.isArray((response as any)?.requests) ? (response as any).requests : []
       setPendingRequests(prev => ({
         ...prev,
-        [groupId]: response.requests
+        // Always store an array to avoid re-fetch loops when value is falsy/undefined
+        [groupId]: safeRequests
       }))
     } catch (err) {
       console.error('Failed to fetch pending requests:', err)

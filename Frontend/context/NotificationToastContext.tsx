@@ -18,6 +18,8 @@ export const NotificationToastProvider: React.FC<{ children: React.ReactNode }> 
   const [notifications, setNotifications] = useState<ToastNotification[]>([])
   const { addMessageListener, isConnected } = useWebSocket()
   const { user } = useAuth()
+  // Track if user is on a chat route to suppress chat toasts
+  const [isOnChatRoute, setIsOnChatRoute] = useState(false)
   const notificationIdCounter = React.useRef(1)
 
   const addNotification = useCallback((notification: Omit<ToastNotification, 'id' | 'timestamp'>) => {
@@ -43,6 +45,25 @@ export const NotificationToastProvider: React.FC<{ children: React.ReactNode }> 
     setNotifications([])
   }, [])
 
+  // Track route changes to determine if user is inside chats
+  useEffect(() => {
+    const update = () => {
+      try {
+        const path = window.location.pathname
+        setIsOnChatRoute(path.startsWith('/chats'))
+      } catch {}
+    }
+    update()
+    window.addEventListener('popstate', update)
+    window.addEventListener('pushState', update as any)
+    window.addEventListener('replaceState', update as any)
+    return () => {
+      window.removeEventListener('popstate', update)
+      window.removeEventListener('pushState', update as any)
+      window.removeEventListener('replaceState', update as any)
+    }
+  }, [])
+
   // Listen to WebSocket messages for real-time notifications
   useEffect(() => {
     if (!isConnected || !user) return
@@ -53,7 +74,7 @@ export const NotificationToastProvider: React.FC<{ children: React.ReactNode }> 
 
       switch (message.type) {
         case 'notification':
-          // Handle structured notification messages
+          // Handle structured notification messages (support both persisted and transient)
           if (message.data) {
             const { type, message: msg, actor, entity_id, entity_type } = message.data
             
@@ -116,7 +137,7 @@ export const NotificationToastProvider: React.FC<{ children: React.ReactNode }> 
 
         case 'private_message':
           // Handle direct private messages
-          if (message.data && message.from !== user.id) {
+          if (!isOnChatRoute && message.data && message.from !== user.id) {
             const sender = message.data.sender
             addNotification({
               type: 'message',
@@ -131,7 +152,7 @@ export const NotificationToastProvider: React.FC<{ children: React.ReactNode }> 
 
         case 'group_message':
           // Handle group messages
-          if (message.data && message.from !== user.id) {
+          if (!isOnChatRoute && message.data && message.from !== user.id) {
             const sender = message.data.sender
             addNotification({
               type: 'group',
@@ -172,16 +193,7 @@ export const NotificationToastProvider: React.FC<{ children: React.ReactNode }> 
           break
 
         case 'follow_update':
-          // Handle follow requests and accepts
-          if (message.data && message.from !== user.id) {
-            const isRequest = message.action === 'request'
-            addNotification({
-              type: 'follow',
-              title: isRequest ? 'Follow Request' : 'New Follower',
-              message: isRequest ? 'Someone wants to follow you' : 'Someone started following you',
-              link: `/profile/${message.from}`,
-            })
-          }
+          // Suppress toasts for sender; structured notifications will arrive via 'notification'
           break
 
         case 'group_update':

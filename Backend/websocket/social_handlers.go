@@ -280,7 +280,10 @@ func (h *Hub) handleFollow(message Message) {
 		Timestamp: time.Now().Unix(),
 	})
 
-	// Send notification to target user
+	// Send notification to target user (show follower's name, not receiver's)
+	var followerFirstName, followerLastName string
+	h.db.QueryRow("SELECT first_name, last_name FROM users WHERE id = ?", followerID).Scan(&followerFirstName, &followerLastName)
+
 	h.SendToUser(targetUserID, Message{
 		Type:   MessageTypeNotification,
 		From:   followerID,
@@ -288,7 +291,7 @@ func (h *Hub) handleFollow(message Message) {
 		Action: "new_follower",
 		Data: map[string]interface{}{
 			"type":    "follow",
-			"message": firstName + " " + lastName + " started following you",
+			"message": followerFirstName + " " + followerLastName + " started following you",
 		},
 		Timestamp: time.Now().Unix(),
 	})

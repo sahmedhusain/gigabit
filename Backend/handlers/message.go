@@ -15,16 +15,18 @@ import (
 )
 
 type MessageHandler struct {
-	messageService *services.MessageService
-	chatService    *services.ChatService
-	hub            *websocket.Hub
+	messageService      *services.MessageService
+	chatService         *services.ChatService
+	notificationService *services.NotificationService
+	hub                 *websocket.Hub
 }
 
 func NewMessageHandler(db *sql.DB, hub *websocket.Hub) *MessageHandler {
 	return &MessageHandler{
-		messageService: services.NewMessageService(db),
-		chatService:    services.NewChatService(db),
-		hub:            hub,
+		messageService:      services.NewMessageService(db),
+		chatService:         services.NewChatService(db),
+		notificationService: services.NewNotificationService(db, hub),
+		hub:                 hub,
 	}
 }
 
@@ -115,10 +117,16 @@ func (h *MessageHandler) SendMessage(w http.ResponseWriter, r *http.Request) {
 	if req.MessageType == "private" {
 		wsMessage.To = req.ReceiverID
 		h.hub.BroadcastMessage(wsMessage)
+
+		// Send notification for private message
+		go h.notificationService.NotifyNewMessage(userID, req.ReceiverID, message.ID)
 	} else if req.MessageType == "group" {
 		wsMessage.Type = websocket.MessageTypeGroupMessage
 		wsMessage.GroupID = req.GroupID
 		h.hub.BroadcastMessage(wsMessage)
+
+		// Note: Not sending individual notifications for group messages to avoid spam
+		// Group members will see the message in real-time via WebSocket or when they check the group
 	}
 
 	writeJSON(w, http.StatusCreated, map[string]interface{}{

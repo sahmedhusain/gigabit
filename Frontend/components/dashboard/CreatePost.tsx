@@ -207,7 +207,7 @@ export default function CreatePost({
                       onChange={(e) => setNewPostContent(e.target.value)}
                       placeholder="Share your thoughts, ideas, or updates..."
                       className="w-full h-32 lg:h-36 bg-white/10 border border-white/20 rounded-xl p-4 text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-emerald-400/50 focus:border-emerald-400/50 resize-none text-sm lg:text-base transition-all duration-300 hover:bg-white/15"
-                      maxLength={5000}
+                      maxLength={1500}
                       initial={{ opacity: 0, scale: 0.95 }}
                       animate={{ opacity: 1, scale: 1 }}
                       transition={{ delay: 0.5, duration: 0.3 }}

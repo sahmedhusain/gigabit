@@ -133,7 +133,7 @@ func (h *UserHandler) GetAllUsers(w http.ResponseWriter, r *http.Request) {
 
 	// Get all users except the current user
 	query := `
-		SELECT id, email, first_name, last_name, avatar, nickname
+		SELECT id, email, first_name, last_name, avatar, nickname, is_private
 		FROM users 
 		WHERE id != ? 
 		ORDER BY first_name, last_name
@@ -156,9 +156,10 @@ func (h *UserHandler) GetAllUsers(w http.ResponseWriter, r *http.Request) {
 			LastName  string  `json:"last_name"`
 			Avatar    *string `json:"avatar"`
 			Nickname  *string `json:"nickname"`
+			IsPrivate bool    `json:"is_private"`
 		}
 
-		err := rows.Scan(&user.ID, &user.Email, &user.FirstName, &user.LastName, &user.Avatar, &user.Nickname)
+		err := rows.Scan(&user.ID, &user.Email, &user.FirstName, &user.LastName, &user.Avatar, &user.Nickname, &user.IsPrivate)
 		if err != nil {
 			continue
 		}
@@ -176,6 +177,7 @@ func (h *UserHandler) GetAllUsers(w http.ResponseWriter, r *http.Request) {
 			"avatar":       user.Avatar,
 			"nickname":     user.Nickname,
 			"display_name": displayName,
+			"is_private":   user.IsPrivate,
 		})
 	}
 

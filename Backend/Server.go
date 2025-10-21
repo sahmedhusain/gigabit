@@ -184,6 +184,8 @@ func (s *Server) setupRoutes() {
 	s.router.HandleFunc("/api/groups/", s.handleGroupRoute(groupHandler, eventHandler, pollHandler))
 	s.router.HandleFunc("/api/groups/invitations", s.handleRoute(groupHandler.GetUserInvitations, true))
 	s.router.HandleFunc("/api/follow/requests", s.handleRoute(followHandler.GetFollowRequests, true))
+	s.router.HandleFunc("/api/follow/requests/outgoing", s.handleRoute(followHandler.GetOutgoingFollowRequests, true))
+	s.router.HandleFunc("/api/groups/join-requests/outgoing", s.handleRoute(groupHandler.GetOutgoingGroupJoinRequests, true))
 
 	// Event routes
 	s.router.HandleFunc("/api/events", s.handleUserEventsRoute(eventHandler))

@@ -727,6 +727,25 @@ func (h *GroupHandler) GetUserInvitations(w http.ResponseWriter, r *http.Request
 	})
 }
 
+func (h *GroupHandler) GetOutgoingGroupJoinRequests(w http.ResponseWriter, r *http.Request) {
+	userID, ok := r.Context().Value("user_id").(uint)
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "User not authenticated")
+		return
+	}
+
+	requests, err := h.groupService.GetOutgoingGroupJoinRequests(userID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "Failed to get outgoing group join requests")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"requests": requests,
+		"count":    len(requests),
+	})
+}
+
 func (h *GroupHandler) PromoteToAdmin(w http.ResponseWriter, r *http.Request, groupIDStr string) {
 	groupID, err := strconv.ParseUint(groupIDStr, 10, 32)
 	if err != nil {

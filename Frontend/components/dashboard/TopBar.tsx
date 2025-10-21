@@ -497,19 +497,22 @@ export default function TopBar({
 
             {/* Search Suggestions Dropdown */}
             {showSuggestions && suggestions.length > 0 && (
-              <div className="absolute left-0 right-0 top-full mt-2 search-suggestions-container bg-white/5 backdrop-blur-2xl rounded-2xl shadow-2xl border border-white/10 overflow-hidden z-50 max-h-[32rem] search-results-scrollbar overflow-y-auto">
-                <div className="p-3">
+              <div className="absolute left-1/2 top-full mt-3 w-[480px] max-w-[90vw] -translate-x-1/2 search-suggestions-container bg-gradient-to-br from-white/10 via-white/5 to-transparent backdrop-blur-xl rounded-3xl shadow-lg border border-white/20 overflow-hidden z-50 max-h-[36rem] overflow-y-auto scrollbar-hide hover:shadow-emerald-500/10 transition-all duration-300">
+                <div className="p-5">
                   {/* Header */}
-                  <div className="flex items-center justify-between mb-3 px-2">
-                    <div className="flex items-center space-x-2">
-                      <div className="w-2 h-2 bg-emerald-400 rounded-full"></div>
-                      <span className="text-xs font-semibold text-white/90 uppercase tracking-wide">Search Results</span>
+                  <div className="flex items-center justify-between mb-5 px-2">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-3 h-3 bg-gradient-to-br from-emerald-400 to-teal-500 rounded-full animate-pulse"></div>
+                      <span className="text-sm font-bold text-white uppercase tracking-wide">Search Results</span>
                     </div>
-                    <span className="text-xs text-white/50">{suggestions.length} found</span>
+                    <div className="flex items-center space-x-2 bg-emerald-500/10 border border-emerald-500/20 rounded-xl px-3 py-1">
+                      <div className="w-2 h-2 bg-emerald-400 rounded-full"></div>
+                      <span className="text-emerald-200 text-xs font-semibold">{suggestions.length} found</span>
+                    </div>
                   </div>
 
                   {/* Suggestions */}
-                  <div className="space-y-1">
+                  <div className="space-y-3">
                     {suggestions.map((suggestion, index) => {
                       const IconComponent = getIconForType(suggestion.type)
                       const iconColor = getColorForType(suggestion.type)
@@ -517,10 +520,10 @@ export default function TopBar({
                       return (
                         <div
                           key={`${suggestion.type}-${suggestion.id}-${index}`}
-                          className={`search-suggestion-item w-full flex items-start space-x-3 px-3 py-3 rounded-xl transition-all duration-200 group ${
+                          className={`search-suggestion-item w-full flex items-start space-x-3 px-4 py-3 rounded-2xl transition-all duration-300 group hover:scale-[1.01] ${
                             isSelected
-                              ? 'bg-emerald-500/20 text-white border border-emerald-400/30 shadow-lg transform scale-[1.02]'
-                              : 'text-white/80 hover:bg-white/10 hover:text-white border border-transparent'
+                              ? 'bg-gradient-to-r from-emerald-500/20 to-teal-500/20 text-white border border-emerald-400/30 shadow-lg backdrop-blur-sm'
+                              : 'text-white/90 hover:bg-white/10 hover:text-white border border-transparent hover:border-white/10'
                           }`}
                         >
                           {suggestion.image ? (
@@ -528,14 +531,14 @@ export default function TopBar({
                               <img 
                                 src={suggestion.image} 
                                 alt={suggestion.title}
-                                className="search-suggestion-avatar w-11 h-11 rounded-full object-cover flex-shrink-0 border border-white/10"
+                                className="search-suggestion-avatar w-10 h-10 rounded-xl object-cover flex-shrink-0 border-2 border-white/20 shadow-md group-hover:shadow-emerald-500/25 transition-all duration-300"
                               />
-                              <div className={`absolute -bottom-1 -right-1 w-5 h-5 rounded-lg bg-gradient-to-br from-gray-800 to-gray-900 border border-white/20 flex items-center justify-center ${getColorForType(suggestion.type)}`}>
+                              <div className={`absolute -bottom-1 -right-1 w-5 h-5 rounded-lg bg-gradient-to-br from-gray-800 to-gray-900 border-2 border-white/30 flex items-center justify-center shadow-lg ${getColorForType(suggestion.type)}`}>
                                 <IconComponent className="w-3 h-3" />
                               </div>
                             </div>
                           ) : (
-                            <div className={`w-11 h-11 rounded-full bg-gradient-to-br from-white/10 to-white/5 border border-white/10 flex items-center justify-center flex-shrink-0 ${getColorForType(suggestion.type)} ${suggestion.type === 'group' && !(suggestion.metadata as Partial<{ isMember: boolean }>)?.isMember ? '' : 'group-hover:scale-110 transition-transform duration-200'}`}>
+                            <div className={`w-10 h-10 rounded-xl bg-gradient-to-br from-white/15 to-white/5 border-2 border-white/20 flex items-center justify-center flex-shrink-0 shadow-md group-hover:shadow-lg transition-all duration-300 ${getColorForType(suggestion.type)} group-hover:scale-110`}>
                               {suggestion.type === 'group' ? (
                                 <span className="text-white font-bold text-sm">
                                   {suggestion.title.substring(0, 2).toUpperCase()}
@@ -545,7 +548,7 @@ export default function TopBar({
                                   {suggestion.title?.charAt(0).toUpperCase() || '?'}{suggestion.title?.charAt(1)?.toUpperCase() || ''}
                                 </span>
                               ) : (
-                                <IconComponent className="w-5 h-5" />
+                                <IconComponent className="w-4 h-4" />
                               )}
                             </div>
                           )}
@@ -553,14 +556,14 @@ export default function TopBar({
                             <div className="flex items-center justify-between">
                               <button
                                 onClick={() => handleSuggestionClick(suggestion)}
-                                className={`text-left flex-1 min-w-0 ${suggestion.type === 'group' && !(suggestion.metadata as Partial<{ isMember: boolean }>)?.isMember ? '' : 'cursor-pointer hover:text-white/90 transition-colors duration-200'}`}
+                                className={`text-left flex-1 min-w-0 ${suggestion.type === 'group' && !(suggestion.metadata as Partial<{ isMember: boolean }>)?.isMember ? '' : 'cursor-pointer hover:text-white transition-colors duration-300'}`}
                                 disabled={suggestion.type === 'group' && !(suggestion.metadata as Partial<{ isMember: boolean }>)?.isMember}
                               >
-                                <div className="flex items-center space-x-2 mb-1">
-                                  <span className={`search-suggestion-title text-sm font-semibold truncate block ${suggestion.type === 'group' && !(suggestion.metadata as Partial<{ isMember: boolean }>)?.isMember ? '' : 'hover:text-white/90 transition-colors duration-200'}`}>
+                                <div className="flex items-center space-x-2 mb-1.5">
+                                  <span className={`search-suggestion-title text-sm font-semibold truncate block ${suggestion.type === 'group' && !(suggestion.metadata as Partial<{ isMember: boolean }>)?.isMember ? '' : 'hover:text-emerald-300 transition-colors duration-300'}`}>
                                     {suggestion.title}
                                   </span>
-                                  <span className={`search-suggestion-type text-xs px-2 py-0.5 rounded-lg font-medium uppercase tracking-wide border ${
+                                  <span className={`search-suggestion-type text-xs px-3 py-1.5 rounded-xl font-semibold uppercase tracking-wide border shadow-sm ${
                                     suggestion.type === 'user' ? 'bg-blue-500/20 text-blue-300 border-blue-500/30' :
                                     suggestion.type === 'group' ? 'bg-green-500/20 text-green-300 border-green-500/30' :
                                     suggestion.type === 'event' ? 'bg-purple-500/20 text-purple-300 border-purple-500/30' :
@@ -572,7 +575,7 @@ export default function TopBar({
                                   </span>
                                 </div>
                                 {suggestion.subtitle && (
-                                  <span className={`search-suggestion-subtitle text-xs block truncate leading-relaxed ${suggestion.type === 'group' && !(suggestion.metadata as Partial<{ isMember: boolean }>)?.isMember ? 'text-white/60' : 'text-white/60 hover:text-white/70 transition-colors duration-200'}`}>
+                                  <span className={`search-suggestion-subtitle text-xs block truncate leading-relaxed ${suggestion.type === 'group' && !(suggestion.metadata as Partial<{ isMember: boolean }>)?.isMember ? 'text-white/60' : 'text-white/70 hover:text-white/90 transition-colors duration-300'}`}>
                                     {suggestion.subtitle}
                                   </span>
                                 )}
@@ -592,21 +595,21 @@ export default function TopBar({
                                       setPendingJoin(prev => ({ ...prev, [groupId]: false }))
                                     }
                                   }}
-                                  className="ml-3 px-3 py-1.5 text-xs rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white font-medium whitespace-nowrap transition-all duration-200 border border-emerald-400/30 hover:border-emerald-300/50 shadow-sm"
+                                  className="ml-4 px-4 py-2 text-sm rounded-xl bg-gradient-to-r from-emerald-500/20 to-teal-500/20 hover:from-emerald-500/30 hover:to-teal-500/30 border border-emerald-400/30 hover:border-emerald-300/50 text-emerald-300 hover:text-emerald-200 font-semibold whitespace-nowrap transition-all duration-300 hover:scale-105 shadow-lg hover:shadow-emerald-500/25"
                                   disabled={pendingJoin[Number(suggestion.id)]}
                                 >
                                   {pendingJoin[Number(suggestion.id)] ? 'Requesting...' : (joinedGroups[Number(suggestion.id)] ? 'Requested' : 'Join')}
                                 </button>
                               )}
                               {suggestion.type === 'group' && (suggestion.metadata as Partial<{ memberStatus?: string }>)?.memberStatus === 'requested' && (
-                                <span className="ml-3 px-2 py-1 bg-yellow-500/20 text-yellow-300 text-xs rounded-full border border-yellow-500/30">
+                                <div className="ml-4 px-3 py-2 bg-gradient-to-r from-yellow-500/20 to-orange-500/20 text-yellow-300 text-sm rounded-xl border border-yellow-500/30 font-medium shadow-sm">
                                   Join Requested
-                                </span>
+                                </div>
                               )}
                               {suggestion.type === 'group' && (suggestion.metadata as Partial<{ memberStatus?: string }>)?.memberStatus === 'sent' && (
-                                <span className="ml-3 px-2 py-1 bg-yellow-500/20 text-yellow-300 text-xs rounded-full border border-yellow-500/30">
+                                <div className="ml-4 px-3 py-2 bg-gradient-to-r from-yellow-500/20 to-orange-500/20 text-yellow-300 text-sm rounded-xl border border-yellow-500/30 font-medium shadow-sm">
                                   Join Requested
-                                </span>
+                                </div>
                               )}
                             </div>
                           </div>
@@ -618,7 +621,7 @@ export default function TopBar({
                   {/* View All Results button */}
                   {suggestions.length > 0 && (
                     <>
-                      <div className="search-divider my-3 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent"></div>
+                      <div className="search-divider my-4 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent"></div>
                       <button
                         onClick={() => {
                           addToRecentSearches(searchQuery)
@@ -641,10 +644,10 @@ export default function TopBar({
                           setShowSuggestions(false)
                           setSelectedSuggestionIndex(-1)
                         }}
-                        className="w-full flex items-center justify-center space-x-3 px-4 py-3 rounded-xl transition-all duration-200 text-emerald-300 hover:bg-emerald-500/10 hover:text-emerald-200 border border-emerald-500/20 hover:border-emerald-400/40 bg-emerald-500/5 hover:shadow-lg group"
+                        className="w-full flex items-center justify-center space-x-3 px-4 py-3 rounded-xl transition-all duration-300 text-emerald-300 hover:bg-gradient-to-r hover:from-emerald-500/10 hover:to-teal-500/10 hover:text-emerald-200 border border-emerald-500/20 hover:border-emerald-400/40 bg-emerald-500/5 hover:shadow-lg hover:shadow-emerald-500/25 group hover:scale-[1.01]"
                       >
-                        <Search className="w-4 h-4 group-hover:scale-110 transition-transform duration-200" />
-                        <span className="text-sm font-medium">View all results for "{searchQuery}"</span>
+                        <Search className="w-4 h-4 group-hover:scale-110 transition-transform duration-300" />
+                        <span className="text-sm font-semibold">View all results for "{searchQuery}"</span>
                       </button>
                     </>
                   )}
@@ -653,13 +656,13 @@ export default function TopBar({
             )}
 
             {showSuggestions && searchQuery.length >= 2 && suggestions.length === 0 && !isSearching && (
-              <div className="absolute left-0 right-0 top-full mt-2 w-full bg-white/5 backdrop-blur-2xl rounded-2xl shadow-2xl border border-white/10 overflow-hidden z-50">
+              <div className="absolute left-1/2 top-full mt-3 w-[480px] max-w-[90vw] -translate-x-1/2 bg-gradient-to-br from-white/10 via-white/5 to-transparent backdrop-blur-xl rounded-3xl shadow-lg border border-white/20 overflow-hidden z-50 hover:shadow-emerald-500/10 transition-all duration-300">
                 <div className="p-6 text-center">
-                  <div className="w-16 h-16 bg-white/10 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                  <div className="w-16 h-16 bg-gradient-to-br from-white/10 to-white/5 rounded-2xl border border-white/20 flex items-center justify-center mx-auto mb-4 shadow-lg">
                     <Search className="w-8 h-8 text-white/40" />
                   </div>
-                  <h4 className="text-white/90 font-medium mb-2">No results found</h4>
-                  <p className="text-white/60 text-sm mb-4">We couldn't find anything matching "{searchQuery}"</p>
+                  <h4 className="text-white/90 font-bold text-base mb-2">No results found</h4>
+                  <p className="text-white/70 text-sm mb-4 max-w-sm mx-auto">We couldn't find anything matching "{searchQuery}" in the selected filter.</p>
                   <button
                     onClick={() => {
                       addToRecentSearches(searchQuery)
@@ -682,7 +685,7 @@ export default function TopBar({
                       setShowSuggestions(false)
                       setSelectedSuggestionIndex(-1)
                     }}
-                    className="px-4 py-2 bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/30 rounded-lg text-emerald-300 hover:text-emerald-200 text-sm font-medium transition-all duration-200"
+                    className="px-4 py-2 bg-gradient-to-r from-emerald-500/20 to-teal-500/20 hover:from-emerald-500/30 hover:to-teal-500/30 border border-emerald-500/30 hover:border-emerald-400/50 rounded-lg text-emerald-300 hover:text-emerald-200 text-sm font-semibold transition-all duration-300 hover:scale-105 shadow-lg hover:shadow-emerald-500/25"
                   >
                     Search anyway
                   </button>
@@ -692,35 +695,35 @@ export default function TopBar({
             
             {/* Recent Searches Dropdown */}
             {showRecentSearches && recentSearches.length > 0 && !showSuggestions && (
-              <div className="absolute left-0 right-0 top-full mt-2 w-full bg-white/5 backdrop-blur-2xl rounded-2xl shadow-2xl border border-white/10 overflow-hidden z-50 max-h-[32rem] overflow-y-auto">
-                <div className="p-3">
-                  <div className="flex items-center justify-between mb-3 px-2">
-                    <div className="flex items-center space-x-2">
-                      <div className="w-2 h-2 bg-cyan-400 rounded-full"></div>
-                      <span className="text-xs font-semibold text-white/90 uppercase tracking-wide">Recent Searches</span>
+              <div className="absolute left-1/2 top-full mt-3 w-[480px] max-w-[90vw] -translate-x-1/2 bg-gradient-to-br from-white/10 via-white/5 to-transparent backdrop-blur-xl rounded-3xl shadow-lg border border-white/20 overflow-hidden z-50 max-h-[36rem] overflow-y-auto scrollbar-hide hover:shadow-emerald-500/10 transition-all duration-300">
+                <div className="p-5">
+                  <div className="flex items-center justify-between mb-5 px-2">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-3 h-3 bg-gradient-to-br from-cyan-400 to-teal-500 rounded-full animate-pulse"></div>
+                      <span className="text-sm font-bold text-white uppercase tracking-wide">Recent Searches</span>
                     </div>
                     <button
                       onClick={clearRecentSearches}
-                      className="text-xs text-white/60 hover:text-white/80 transition-colors px-2 py-1 rounded-lg hover:bg-white/10"
+                      className="text-sm text-white/70 hover:text-white/90 transition-colors px-3 py-1.5 rounded-xl hover:bg-white/10 border border-white/10 hover:border-white/20 font-medium"
                     >
                       Clear all
                     </button>
                   </div>
-                  <div className="space-y-1">
+                  <div className="space-y-3">
                     {recentSearches.map((query, index) => (
                       <button
                         key={`recent-${query}-${index}`}
                         onClick={() => handleRecentSearchClick(query)}
-                        className={`w-full flex items-center space-x-3 px-3 py-3 rounded-xl transition-all duration-200 text-left border group ${
+                        className={`w-full flex items-center space-x-3 px-4 py-3 rounded-2xl transition-all duration-300 text-left border group hover:scale-[1.01] ${
                           selectedSuggestionIndex === index
-                            ? 'bg-cyan-500/20 text-white border-cyan-400/30 shadow-lg transform scale-[1.02]'
-                            : 'text-white/80 hover:bg-white/10 hover:text-white border-transparent'
+                            ? 'bg-gradient-to-r from-cyan-500/20 to-teal-500/20 text-white border-cyan-400/30 shadow-lg backdrop-blur-sm'
+                            : 'text-white/90 hover:bg-white/10 hover:text-white border-transparent hover:border-white/10'
                         }`}
                       >
-                        <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-cyan-500/20 to-cyan-600/20 border border-cyan-500/20 flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform duration-200">
+                        <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-cyan-500/20 to-cyan-600/20 border-2 border-cyan-500/20 flex items-center justify-center flex-shrink-0 shadow-md group-hover:shadow-lg transition-all duration-300 group-hover:scale-110">
                           <Search className="w-4 h-4 text-cyan-400" />
                         </div>
-                        <span className="text-sm font-medium truncate">{query}</span>
+                        <span className="text-sm font-semibold truncate">{query}</span>
                       </button>
                     ))}
                   </div>
@@ -730,9 +733,12 @@ export default function TopBar({
 
             {/* Filter Dropdown (Full width, glass/blur) */}
             {showFilterDropdown && (
-              <div className="absolute left-0 right-0 top-full mt-2 w-full bg-white/20 backdrop-blur-2xl rounded-2xl shadow-2xl border border-white/30 overflow-hidden z-50">
-                <div className="p-3">
-                  <div className="text-xs font-semibold text-white uppercase tracking-wide mb-3 px-2">Search Filters</div>
+              <div className="absolute left-1/2 top-full mt-3 w-[480px] max-w-[90vw] -translate-x-1/2 bg-gradient-to-br from-white/10 via-white/5 to-transparent backdrop-blur-xl rounded-3xl shadow-lg border border-white/20 overflow-hidden z-50 hover:shadow-emerald-500/10 transition-all duration-300">
+                <div className="p-5">
+                  <div className="flex items-center space-x-3 mb-5 px-2">
+                    <div className="w-3 h-3 bg-gradient-to-br from-emerald-400 to-teal-500 rounded-full animate-pulse"></div>
+                    <span className="text-sm font-bold text-white uppercase tracking-wide">Search Filters</span>
+                  </div>
                   {searchFilters.map((filter) => {
                     const IconComponent = filter.icon
                     const isSelected = selectedFilter === filter.id
@@ -745,20 +751,20 @@ export default function TopBar({
                           e.stopPropagation()
                           handleFilterSelect(filter.id)
                         }}
-                        className={`w-full flex items-center space-x-3 px-3 py-3 rounded-xl transition-all duration-200 cursor-pointer ${
+                        className={`w-full flex items-center space-x-3 px-4 py-3 rounded-2xl transition-all duration-300 cursor-pointer mb-2 hover:scale-[1.01] ${
                           isSelected
-                            ? 'bg-emerald-500/30 text-emerald-200 border-r-4 border-emerald-400'
-                            : 'text-white/90 hover:bg-white/20 hover:text-white cursor-pointer'
+                            ? 'bg-gradient-to-r from-emerald-500/20 to-teal-500/20 text-white border border-emerald-400/30 shadow-lg backdrop-blur-sm'
+                            : 'text-white/90 hover:bg-white/10 hover:text-white border border-transparent hover:border-white/10'
                         }`}
                       >
-                        <div className={`w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center transition-all duration-200 ${
-                          isSelected ? 'bg-emerald-500/40' : 'hover:bg-white/30'
+                        <div className={`w-10 h-10 rounded-2xl bg-gradient-to-br from-white/15 to-white/5 border-2 border-white/20 flex items-center justify-center transition-all duration-300 shadow-md ${
+                          isSelected ? 'bg-emerald-500/40 shadow-lg' : 'hover:bg-white/30 group-hover:scale-110'
                         }`}>
                           <IconComponent className="w-4 h-4" />
                         </div>
-                        <span className="text-sm font-medium">{filter.label}</span>
+                        <span className="text-sm font-semibold">{filter.label}</span>
                         {isSelected && (
-                          <div className="w-5 h-5 bg-emerald-500 rounded-full flex items-center justify-center ml-auto">
+                          <div className="w-5 h-5 bg-gradient-to-br from-emerald-500 to-teal-500 rounded-lg flex items-center justify-center ml-auto shadow-lg border border-emerald-400/30">
                             <span className="text-white text-xs font-bold">✓</span>
                           </div>
                         )}

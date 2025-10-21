@@ -284,7 +284,7 @@ body {
   display: flex;
   flex-direction: column;
   gap: 16px;
-  overflow: hidden; /* Prevent scrolling */
+  overflow: hidden; /* Prevent scrolling on parent container */
   box-sizing: border-box;
 }
 
@@ -345,8 +345,8 @@ body {
   height: 100%;
   max-height: 100%;
   gap: 16px;
-  /* Allow scrolling if content exceeds viewport */
-  overflow-y: auto;
+  /* Parent should not scroll; internal sections handle scrolling */
+  overflow-y: hidden;
   box-sizing: border-box;
 }
 
@@ -727,6 +727,33 @@ body {
     opacity: 1;
   }
 }
+
+/* Force-hide scrollbars for right sidebar sections to ensure consistency */
+.fixed-right-sidebar .space-y-4,
+.fixed-right-sidebar .section-content,
+.fixed-right-sidebar .following-content,
+.fixed-right-sidebar .invitation-content,
+.fixed-right-sidebar .invitation-content > .flex-1,
+.fixed-right-sidebar .following-content > .flex-1 {
+  /* Firefox */
+  scrollbar-width: none !important;
+  /* IE 10+ */
+  -ms-overflow-style: none !important;
+  /* Ensure transparent color fallback */
+  scrollbar-color: transparent transparent !important;
+}
+
+.fixed-right-sidebar .space-y-4::-webkit-scrollbar,
+.fixed-right-sidebar .section-content::-webkit-scrollbar,
+.fixed-right-sidebar .following-content::-webkit-scrollbar,
+.fixed-right-sidebar .invitation-content::-webkit-scrollbar,
+.fixed-right-sidebar .invitation-content > .flex-1::-webkit-scrollbar,
+.fixed-right-sidebar .following-content > .flex-1::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
 
 .animate-slide-up {
   animation: slide-up 0.3s ease-out;

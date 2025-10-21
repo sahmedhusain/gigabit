@@ -1204,8 +1204,20 @@ export class ApiClient {
     });
   }
 
+  async getOutgoingFollowRequests(): Promise<{ requests: FollowRequestItem[]; count: number }> {
+    return this.request<{ requests: FollowRequestItem[]; count: number }>(`/api/follow/requests/outgoing`, {
+      method: 'GET',
+    });
+  }
+
   async getGroupInvitations(): Promise<{ invitations: GroupInvitationItem[]; count: number }> {
     return this.request<{ invitations: GroupInvitationItem[]; count: number }>(`/api/groups/invitations`, {
+      method: 'GET',
+    });
+  }
+
+  async getOutgoingGroupJoinRequests(): Promise<{ requests: GroupInvitationItem[]; count: number }> {
+    return this.request<{ requests: GroupInvitationItem[]; count: number }>(`/api/groups/join-requests/outgoing`, {
       method: 'GET',
     });
   }

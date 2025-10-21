@@ -70,6 +70,7 @@ interface GroupInvitation {
   group?: {
     id: number
     title?: string
+    avatar?: string
     creator?: {
       id: number
       first_name?: string
@@ -368,8 +369,8 @@ export default function RightSidebar({
   }
 
   return (
-    <div className="fixed-right-sidebar">
-      <div className="space-y-4">
+    <div className="fixed-right-sidebar scrollbar-hide">
+      <div className="space-y-4 scrollbar-hide">
         {/* User Profile Dropdown Container */}
         <div className="rounded-2xl">
           <div className="p-4">
@@ -768,7 +769,7 @@ export default function RightSidebar({
                         </div>
 
                         {/* Events List */}
-                        <div className="max-h-60 overflow-y-scroll scrollbar-hide p-4 space-y-3" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+                        <div className="max-h-60 overflow-y-auto scrollbar-hide p-4 space-y-3">
                           {(() => {
                             const eventsForDate = getEventsForDate(slideUpDate);
                             return eventsForDate.map((event) => {
@@ -880,7 +881,7 @@ export default function RightSidebar({
 
             {expandedSection === 'following' && (
               <div className="section-content following-content flex-1 flex flex-col min-h-0">
-                <div className="flex-1 overflow-y-scroll scrollbar-hide" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+                <div className="flex-1 overflow-y-auto scrollbar-hide">
                   <div className="space-y-2">
                     {(() => {
                       // Use followingUsers if available, otherwise fall back to onlineUsers
@@ -1260,7 +1261,7 @@ export default function RightSidebar({
             {/* Expanded State */}
             {expandedSection === 'invitations' && (
               <div className={`section-content invitation-content flex-1 flex flex-col min-h-0 ${expandedSection === 'invitations' ? 'invitations-content-expanded' : ''}`}>
-                <div className="flex-1 overflow-y-scroll scrollbar-hide" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+                <div className="flex-1 overflow-y-auto scrollbar-hide">
                   <div className="space-y-3">
                     {loadingInvitations ? (
                       <div className="flex items-center justify-center py-8">
@@ -1407,22 +1408,18 @@ export default function RightSidebar({
                                   <div className="relative z-10">
                                     <div className="flex items-start space-x-3 mb-3">
                                       <div className="relative flex-shrink-0">
-                                        {getAvatarUrl((invitation.type === 'join_request' ? invitation.request_user?.avatar : invitation.group?.creator?.avatar)) ? (
+                                        {getAvatarUrl(invitation.group?.avatar) ? (
                                           <Image
-                                            src={getAvatarUrl((invitation.type === 'join_request' ? invitation.request_user?.avatar : invitation.group?.creator?.avatar))!}
-                                            alt={invitation.type === 'join_request'
-                                              ? `${invitation.request_user?.first_name || ''} ${invitation.request_user?.last_name || ''}`
-                                              : `${invitation.group?.creator?.first_name || ''} ${invitation.group?.creator?.last_name || ''}`}
+                                            src={getAvatarUrl(invitation.group?.avatar)!}
+                                            alt={invitation.group?.title || 'Group'}
                                             width={40}
                                             height={40}
-                                            unoptimized={getAvatarUrl((invitation.type === 'join_request' ? invitation.request_user?.avatar : invitation.group?.creator?.avatar))!.includes('/svg')}
+                                            unoptimized={getAvatarUrl(invitation.group?.avatar)!.includes('/svg')}
                                             className="w-10 h-10 rounded-full border-2 border-orange-400/50 group-hover:border-orange-400 group-hover:scale-105 transition-all duration-300 shadow-lg"
                                           />
                                         ) : (
                                           <div className="w-10 h-10 rounded-full bg-gradient-to-r from-orange-400 to-red-500 flex items-center justify-center text-white font-bold border-2 border-orange-400/50 group-hover:border-orange-400 group-hover:scale-105 transition-all duration-300 shadow-lg">
-                                            {invitation.type === 'join_request'
-                                              ? (invitation.request_user?.first_name?.[0] || invitation.request_user?.nickname?.[0] || '?') + (invitation.request_user?.last_name?.[0] || invitation.request_user?.nickname?.[1] || '')
-                                              : (invitation.group?.creator?.first_name?.[0] || invitation.group?.title?.[0] || '?') + (invitation.group?.creator?.last_name?.[0] || invitation.group?.title?.[1] || '')}
+                                            {invitation.group?.title?.substring(0, 2).toUpperCase() || '??'}
                                           </div>
                                         )}
                                         <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-gradient-to-r from-orange-500 to-red-500 rounded-full border-2 border-white flex items-center justify-center shadow-md">

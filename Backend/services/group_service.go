@@ -1326,6 +1326,51 @@ ORDER BY gm.created_at DESC
 	return requests, nil
 }
 
+func (s *GroupService) GetOutgoingGroupJoinRequests(userID uint) ([]models.GroupInvitationResponse, error) {
+	query := `
+SELECT gm.id, gm.group_id, gm.created_at,
+       g.name as group_name, g.description as group_description, g.privacy,
+       g.creator_id,
+       cu.first_name, cu.last_name, cu.avatar, cu.nickname
+FROM group_members gm
+JOIN groups g ON gm.group_id = g.id
+JOIN users cu ON g.creator_id = cu.id
+WHERE gm.user_id = ? AND gm.status = 'requested' AND gm.requestor_id IS NOT NULL
+ORDER BY gm.created_at DESC
+`
+
+	rows, err := s.db.Query(query, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var requests []models.GroupInvitationResponse
+	for rows.Next() {
+		var request models.GroupInvitationResponse
+		var group models.GroupResponse
+		var creator models.UserResponse
+
+		err := rows.Scan(
+			&request.ID, &group.ID, &request.CreatedAt,
+			&group.Title, &group.Description, &group.Privacy,
+			&group.CreatorID,
+			&creator.FirstName, &creator.LastName, &creator.Avatar, &creator.Nickname,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		creator.ID = group.CreatorID
+		group.Creator = creator
+		request.Group = group
+		request.Type = "join_request"
+		requests = append(requests, request)
+	}
+
+	return requests, nil
+}
+
 func (s *GroupService) GetReceivedJoinRequests(groupID uint, userID uint) ([]models.GroupMemberResponse, error) {
 	// This is the same as GetPendingRequests
 	return s.GetPendingRequests(groupID, userID)

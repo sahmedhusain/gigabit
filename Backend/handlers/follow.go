@@ -524,6 +524,25 @@ func (h *FollowHandler) GetFollowRequests(w http.ResponseWriter, r *http.Request
 	})
 }
 
+func (h *FollowHandler) GetOutgoingFollowRequests(w http.ResponseWriter, r *http.Request) {
+	currentUserID, ok := r.Context().Value("user_id").(uint)
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "User not authenticated")
+		return
+	}
+
+	requests, err := h.followService.GetOutgoingFollowRequests(currentUserID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "Failed to get outgoing follow requests")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"requests": requests,
+		"count":    len(requests),
+	})
+}
+
 // getFollowerCounts returns follower counts for multiple users
 func (h *FollowHandler) getFollowerCounts(userIDs ...uint) map[string]interface{} {
 	counts := make(map[string]interface{})

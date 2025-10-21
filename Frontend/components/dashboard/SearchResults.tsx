@@ -2,6 +2,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { ChevronDown, Users, Hash, Calendar, MessageCircle, FileText, User, Filter } from 'lucide-react'
 import { useSearchResults } from '@/hooks/useSearch'
+import { api } from '@/lib/api'
 import UserSearchResult from '@/components/search/UserSearchResult'
 import GroupSearchResult from '@/components/search/GroupSearchResult'
 import EventSearchResult from '@/components/search/EventSearchResult'
@@ -25,11 +26,15 @@ const filterOptions = [
 ]
 
 export default function SearchResults({ filter, query, onSearch, onClose }: SearchResultsProps) {
+    // Get current user
+    const { user } = require('@/context/AuthContext').useAuth();
+
   const [activeFilter, setActiveFilter] = useState(filter)
   const [showFilterDropdown, setShowFilterDropdown] = useState(false)
   const [currentPage, setCurrentPage] = useState(1)
   const [hasMoreResults, setHasMoreResults] = useState(false)
   const [isLoadingMore, setIsLoadingMore] = useState(false)
+  const [userGroups, setUserGroups] = useState<number[]>([])
   
   const searchRef = useRef<HTMLDivElement>(null)
   const resultsContainerRef = useRef<HTMLDivElement>(null)
@@ -41,6 +46,30 @@ export default function SearchResults({ filter, query, onSearch, onClose }: Sear
     searchAll,
     totalCount 
   } = useSearchResults()
+
+  // Fetch user groups for filtering events
+  useEffect(() => {
+    if (user) {
+      api.getUserGroups(user.id).then(data => {
+        setUserGroups(data.groups.map((g: any) => g.id))
+      }).catch(err => {
+        console.error('Failed to fetch user groups:', err)
+      })
+    }
+  }, [user])
+
+  // Filter out events for groups where user is not a member
+  const filteredResults = results.filter((result: any) => {
+    if (result.type === 'event') {
+      // Check if event has a group and user is member
+      const groupId = result.metadata?.group_id || result.metadata?.group?.id || result.metadata?.event?.group_id || result.group_id
+      const numGroupId = groupId ? Number(groupId) : null
+      if (numGroupId && !userGroups.includes(numGroupId)) {
+        return false
+      }
+    }
+    return true
+  })
 
   useEffect(() => {
     setActiveFilter(filter)
@@ -114,20 +143,20 @@ export default function SearchResults({ filter, query, onSearch, onClose }: Sear
   }
 
   const renderSearchResult = (result: any) => {
-    switch (result.type) {
-      case 'user':
-        return <UserSearchResult key={`user-${result.id}`} result={result} />
-      case 'group':
-        return <GroupSearchResult key={`group-${result.id}`} result={result} />
-      case 'event':
-        return <EventSearchResult key={`event-${result.id}`} result={result} />
-      case 'post':
-        return <PostSearchResult key={`post-${result.id}`} result={result} />
-      case 'message':
-        return <MessageSearchResult key={`message-${result.id}`} result={result} />
-      default:
-        return null
-    }
+      switch (result.type) {
+        case 'user':
+          return <UserSearchResult key={`user-${result.id}`} result={result} />
+        case 'group':
+          return <GroupSearchResult key={`group-${result.id}`} result={result} />
+        case 'event':
+          return <EventSearchResult key={`event-${result.id}`} result={result} />
+        case 'post':
+          return <PostSearchResult key={`post-${result.id}`} result={result} />
+        case 'message':
+          return <MessageSearchResult key={`message-${result.id}`} result={result} />
+        default:
+          return null;
+      }
   }
 
   const getActiveFilterOption = () => {
@@ -227,7 +256,7 @@ export default function SearchResults({ filter, query, onSearch, onClose }: Sear
                 {/* Results Count and Stats with Enhanced Styling */}
                 {!loading && !error && (
                   <div className="flex items-center space-x-6">
-                    {results.length > 0 && (
+                    {filteredResults.length > 0 && (
                       <div className="flex items-center space-x-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl px-4 py-2">
                         <div className="h-2 w-2 bg-emerald-400 rounded-full animate-pulse"></div>
                         <span className="text-emerald-200 text-sm font-semibold">
@@ -290,7 +319,7 @@ export default function SearchResults({ filter, query, onSearch, onClose }: Sear
             </div>
           )}
 
-          {!loading && !error && query && query.length >= 2 && results.length === 0 && (
+          {!loading && !error && query && query.length >= 2 && filteredResults.length === 0 && (
             <div className="text-center py-20">
               <div className="w-24 h-24 bg-gradient-to-br from-white/10 to-white/5 rounded-2xl border border-white/20 flex items-center justify-center mx-auto mb-6 shadow-lg">
                 <ActiveIcon className="w-12 h-12 text-white/40" />
@@ -307,11 +336,11 @@ export default function SearchResults({ filter, query, onSearch, onClose }: Sear
             </div>
           )}
 
-          {!loading && !error && results.length > 0 && (
+          {!loading && !error && filteredResults.length > 0 && (
             <div className="space-y-6 px-4">
               {/* Results Grid with Enhanced Spacing */}
               <div className="grid gap-6">
-                {results.map((result, index) => (
+                {filteredResults.map((result, index) => (
                   <div
                     key={`${result.type}-${result.id}-${index}`}
                     className={`animate-fade-in animate-slide-in-from-bottom ${

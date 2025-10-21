@@ -13,7 +13,7 @@ export default function EventSearchResult({ result }: EventSearchResultProps) {
   const handleClick = () => {
     // Navigate to events page and highlight the specific event
     const eventId = result.id
-    router.push(`/events/all?eventId=${eventId}`)
+    router.push(`/events/all?event=${eventId}`)
   }
 
   const formatEventTime = (eventTime: string) => {

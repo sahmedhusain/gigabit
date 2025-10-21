@@ -232,16 +232,17 @@ func (s *SearchService) searchGroups(userID uint, pattern string, limit int) []S
 
 func (s *SearchService) searchEvents(userID uint, pattern string, limit int) []SearchSuggestion {
 	query := `
-		SELECT e.id, e.title, e.description, e.event_date, e.location, g.name as group_name,
+		SELECT e.id, e.title, e.description, e.event_date, e.location, g.name as group_name, g.id as group_id,
 			   (SELECT COUNT(*) FROM event_responses WHERE event_id = e.id AND response = 'going') as going_count
 		FROM events e
 		JOIN groups g ON e.group_id = g.id
+		JOIN group_members gm ON gm.group_id = g.id AND gm.user_id = ? AND gm.status = 'member'
 		WHERE LOWER(e.title) LIKE ? OR LOWER(e.description) LIKE ? OR LOWER(e.location) LIKE ?
 		ORDER BY e.event_date ASC
 		LIMIT ?
 	`
 
-	rows, err := s.db.Query(query, pattern, pattern, pattern, limit)
+	rows, err := s.db.Query(query, userID, pattern, pattern, pattern, limit)
 	if err != nil {
 		return []SearchSuggestion{}
 	}
@@ -251,9 +252,10 @@ func (s *SearchService) searchEvents(userID uint, pattern string, limit int) []S
 	for rows.Next() {
 		var id uint
 		var title, description, eventDate, location, groupName string
+		var groupID uint
 		var goingCount int
 
-		err := rows.Scan(&id, &title, &description, &eventDate, &location, &groupName, &goingCount)
+		err := rows.Scan(&id, &title, &description, &eventDate, &location, &groupName, &groupID, &goingCount)
 		if err != nil {
 			continue
 		}
@@ -271,6 +273,7 @@ func (s *SearchService) searchEvents(userID uint, pattern string, limit int) []S
 				"eventDate":  eventDate,
 				"location":   location,
 				"groupName":  groupName,
+				"group_id":   groupID,
 				"goingCount": goingCount,
 			},
 		})

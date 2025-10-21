@@ -344,16 +344,17 @@ func (h *SearchHandler) searchGroups(userID uint, pattern string, limit int, off
 
 func (h *SearchHandler) searchEvents(userID uint, pattern string, limit int, offset int) []SearchSuggestion {
 	query := `
-		SELECT e.id, e.title, e.description, e.event_date, e.location, g.name as group_name,
+		SELECT e.id, e.title, e.description, e.event_date, e.location, g.name as group_name, g.id as group_id,
 			   (SELECT COUNT(*) FROM event_responses WHERE event_id = e.id AND response = 'going') as going_count
 		FROM events e
 		JOIN groups g ON e.group_id = g.id
+		JOIN group_members gm ON gm.group_id = g.id AND gm.user_id = ? AND gm.status = 'member'
 		WHERE LOWER(e.title) LIKE ? OR LOWER(e.description) LIKE ? OR LOWER(e.location) LIKE ?
 		ORDER BY e.event_date ASC
 		LIMIT ? OFFSET ?
 	`
 
-	rows, err := h.db.Query(query, pattern, pattern, pattern, limit, offset)
+	rows, err := h.db.Query(query, userID, pattern, pattern, pattern, limit, offset)
 	if err != nil {
 		return []SearchSuggestion{}
 	}
@@ -363,9 +364,10 @@ func (h *SearchHandler) searchEvents(userID uint, pattern string, limit int, off
 	for rows.Next() {
 		var id uint
 		var title, description, eventDate, location, groupName string
+		var groupID uint
 		var goingCount int
 
-		err := rows.Scan(&id, &title, &description, &eventDate, &location, &groupName, &goingCount)
+		err := rows.Scan(&id, &title, &description, &eventDate, &location, &groupName, &groupID, &goingCount)
 		if err != nil {
 			continue
 		}
@@ -383,6 +385,7 @@ func (h *SearchHandler) searchEvents(userID uint, pattern string, limit int, off
 				"eventDate":  eventDate,
 				"location":   location,
 				"groupName":  groupName,
+				"group_id":   groupID,
 				"goingCount": goingCount,
 			},
 		})
@@ -727,11 +730,12 @@ func (h *SearchHandler) countEvents(userID uint, pattern string) int {
 SELECT COUNT(*)
 FROM events e
 JOIN groups g ON e.group_id = g.id
+JOIN group_members gm ON gm.group_id = g.id AND gm.user_id = ? AND gm.status = 'member'
 WHERE LOWER(e.title) LIKE ? OR LOWER(e.description) LIKE ? OR LOWER(e.location) LIKE ?
 `
 
 	var count int
-	err := h.db.QueryRow(query, pattern, pattern, pattern).Scan(&count)
+	err := h.db.QueryRow(query, userID, pattern, pattern, pattern).Scan(&count)
 	if err != nil {
 		return 0
 	}

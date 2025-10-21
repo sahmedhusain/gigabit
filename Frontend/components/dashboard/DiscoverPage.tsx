@@ -8,7 +8,6 @@ import {
   MessageCircle, 
   Users, 
   Sparkles, 
-  TrendingUp, 
   Globe, 
   UserCheck, 
   UserPlus,
@@ -16,7 +15,6 @@ import {
   Calendar,
   Eye,
   Grid3X3,
-  Hash,
   Plus,
   ArrowUp,
   ArrowDown,
@@ -56,17 +54,10 @@ interface GroupWithJoinStatus extends GroupResponse {
   trending_score?: number
 }
 
-interface TrendingTag {
-  tag: string
-  count: number
-  growth: number
-  trend: 'up' | 'down' | 'stable'
-}
-
 type UserFilter = 'all' | 'not_following' | 'online' | 'new_members'
 type GroupFilter = 'all' | 'available' | 'joined' | 'active'
 type SortBy = 'newest' | 'members' | 'active' | 'name_asc' | 'name_desc'
-type DiscoverTab = 'users' | 'groups' | 'trending'
+type DiscoverTab = 'users' | 'groups'
 
 export default function DiscoverPage() {
   const { user: currentUser } = useAuth()
@@ -87,9 +78,6 @@ export default function DiscoverPage() {
   const [filteredGroups, setFilteredGroups] = useState<GroupWithJoinStatus[]>([])
   const [groupFilter, setGroupFilter] = useState<GroupFilter>('all')
   const [pendingRequests, setPendingRequests] = useState<{ [groupId: number]: Array<{ user: UserType; requested_at: string }> }>({})
-  
-  // Trending tags state
-  const [trendingTags, setTrendingTags] = useState<TrendingTag[]>([])
   
   // General state
   const [isLoading, setIsLoading] = useState(true)
@@ -172,24 +160,6 @@ export default function DiscoverPage() {
     }
   }, [currentUser])
 
-  const fetchTrendingTags = useCallback(async () => {
-    // Mock trending tags data - replace with real API call when available
-    const mockTags: TrendingTag[] = [
-      { tag: 'technology', count: 1250, growth: 15.3, trend: 'up' },
-      { tag: 'photography', count: 892, growth: 8.7, trend: 'up' },
-      { tag: 'travel', count: 756, growth: -2.1, trend: 'down' },
-      { tag: 'coding', count: 634, growth: 22.4, trend: 'up' },
-      { tag: 'food', count: 543, growth: 0.8, trend: 'stable' },
-      { tag: 'music', count: 432, growth: 12.1, trend: 'up' },
-      { tag: 'fitness', count: 321, growth: 5.6, trend: 'up' },
-      { tag: 'art', count: 298, growth: -1.2, trend: 'down' },
-      { tag: 'gaming', count: 267, growth: 18.9, trend: 'up' },
-      { tag: 'nature', count: 234, growth: 3.4, trend: 'stable' }
-    ]
-    
-    setTrendingTags(mockTags)
-  }, [])
-
   const fetchData = useCallback(async () => {
     if (!currentUser) return
 
@@ -198,8 +168,7 @@ export default function DiscoverPage() {
       
       await Promise.all([
         fetchUsers(),
-        fetchGroups(),
-        fetchTrendingTags()
+        fetchGroups()
       ])
     } catch (err: unknown) {
       console.error('Failed to fetch discover data:', err)
@@ -207,7 +176,7 @@ export default function DiscoverPage() {
     } finally {
       setIsLoading(false)
     }
-  }, [currentUser, error, fetchUsers, fetchGroups, fetchTrendingTags])
+  }, [currentUser, error, fetchUsers, fetchGroups])
 
   useEffect(() => {
     fetchData()
@@ -458,7 +427,7 @@ export default function DiscoverPage() {
       return status === 'none' || status === 'rejected'
     }).length },
     { id: 'joined', label: 'Already Joined', icon: <Check className="w-4 h-4" />, count: groups.filter(g => normalizeGroupStatus(g) === 'member').length },
-    { id: 'active', label: 'Most Active', icon: <TrendingUp className="w-4 h-4" />, count: groups.filter(g => g.recent_activity).length }
+    { id: 'active', label: 'Most Active', icon: <Sparkles className="w-4 h-4" />, count: groups.filter(g => g.recent_activity).length }
   ]
 
   const sortOptions: { id: SortBy; label: string }[] = [
@@ -491,8 +460,7 @@ export default function DiscoverPage() {
             <div className="flex space-x-1 bg-white/10 rounded-xl p-1 mt-6">
               {[
                 { id: 'users', label: 'Users', icon: <Users className="w-4 h-4" /> },
-                { id: 'groups', label: 'Groups', icon: <Globe className="w-4 h-4" /> },
-                { id: 'trending', label: 'Trending', icon: <Hash className="w-4 h-4" /> }
+                { id: 'groups', label: 'Groups', icon: <Globe className="w-4 h-4" /> }
               ].map((tab) => (
                 <div key={tab.id} className="flex items-center space-x-2 px-4 py-3 rounded-lg flex-1 justify-center bg-white/5 animate-pulse">
                   {tab.icon}
@@ -1007,53 +975,7 @@ export default function DiscoverPage() {
     )
   }
 
-  // Trending Tab Component
-  function TrendingTab() {
-    return (
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {trendingTags.map((tag, index) => (
-          <div key={tag.tag} className="bg-white/5 backdrop-blur-xl rounded-xl border border-white/10 p-6 hover:bg-white/10 transition-all duration-300 group">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center space-x-2">
-                <div className={`p-2 rounded-lg ${
-                  index < 3 ? 'bg-gradient-to-r from-yellow-500/20 to-orange-500/20 border border-yellow-400/20' : 'bg-white/10'
-                }`}>
-                  <Hash className={`w-5 h-5 ${index < 3 ? 'text-yellow-400' : 'text-white/60'}`} />
-                </div>
-                <span className={`text-xs font-medium px-2 py-1 rounded-full ${
-                  index < 3 ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-400/20' : 'bg-white/10 text-white/60'
-                }`}>
-                  #{index + 1}
-                </span>
-              </div>
-              <div className="flex items-center space-x-1">
-                <TrendingUp className={`w-4 h-4 ${index < 3 ? 'text-yellow-400' : 'text-white/60'}`} />
-                <span className={`text-xs font-medium ${index < 3 ? 'text-yellow-400' : 'text-white/60'}`}>
-                  Trending
-                </span>
-              </div>
-            </div>
-            
-            <div className="space-y-3">
-              <h3 className="text-lg font-bold text-white group-hover:text-emerald-200 transition-colors">
-                #{tag.tag}
-              </h3>
-              <p className="text-white/70 text-sm">
-                {tag.count.toLocaleString()} posts
-              </p>
-            </div>
-            
-            <button 
-              className="w-full py-2 px-4 bg-gradient-to-r from-emerald-500/20 to-teal-500/20 hover:from-emerald-500/30 hover:to-teal-500/30 text-white border border-emerald-400/20 rounded-lg transition-all duration-200 text-sm font-medium"
-              onClick={() => warning('Tag exploration coming soon!')}
-            >
-              Explore Tag
-            </button>
-          </div>
-        ))}
-      </div>
-    )
-  }
+
 
   return (
     <div className="flex-1 min-w-0 max-h-screen overflow-hidden">
@@ -1067,7 +989,7 @@ export default function DiscoverPage() {
                 Discover
               </h1>
               <p className="text-white/70 mt-2">
-                Find new people, groups, and trending topics
+                Find new people and groups
               </p>
             </div>
           </div>
@@ -1076,8 +998,7 @@ export default function DiscoverPage() {
           <div className="flex space-x-1 bg-white/10 rounded-xl p-1 mb-6">
             {[
               { id: 'users', label: 'Users', icon: <Users className="w-4 h-4" />, count: users.filter(u => !u.followStatus.isFollowing).length },
-              { id: 'groups', label: 'Groups', icon: <Globe className="w-4 h-4" />, count: groups.length },
-              { id: 'trending', label: 'Trending', icon: <Hash className="w-4 h-4" />, count: trendingTags.length }
+              { id: 'groups', label: 'Groups', icon: <Globe className="w-4 h-4" />, count: groups.length }
             ].map((tab) => (
               <button
                 key={tab.id}
@@ -1137,8 +1058,7 @@ export default function DiscoverPage() {
             </div>
 
             {/* Sort and View Controls */}
-            {activeTab !== 'trending' && (
-              <div className="flex items-center space-x-3">
+            <div className="flex items-center space-x-3">
                 <select
                   value={sortBy}
                   onChange={(e) => setSortBy(e.target.value as SortBy)}
@@ -1180,7 +1100,6 @@ export default function DiscoverPage() {
                   </button>
                 </div>
               </div>
-            )}
           </div>
 
           {/* Offline Warning */}
@@ -1198,7 +1117,6 @@ export default function DiscoverPage() {
         <div className="flex-1 overflow-y-auto p-6 min-h-0">
           {activeTab === 'users' && <UsersTab />}
           {activeTab === 'groups' && <GroupsTab />}
-          {activeTab === 'trending' && <TrendingTab />}
         </div>
       </div>
     </div>

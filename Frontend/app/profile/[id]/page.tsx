@@ -13,6 +13,7 @@ function ProfilePage() {
   const router = useRouter()
   const { user: currentUser } = useAuth()
   const { error } = useToast()
+  const userId = params.id as string
 
   const [profileUser, setProfileUser] = useState<User | null>(null)
   const [userPosts, setUserPosts] = useState<Post[]>([])
@@ -21,7 +22,71 @@ function ProfilePage() {
   const [isLoading, setIsLoading] = useState(true)
   const [isOwnProfile, setIsOwnProfile] = useState(false)
   const [isFollowing, setIsFollowing] = useState<boolean>(false)
-  const userId = params.id as string 
+  const [showPrivacyOverlay, setShowPrivacyOverlay] = useState<boolean>(false)
+  const handleLikePost = async (postId: number) => {
+    const post = userPosts.find((p) => p.id === postId)
+    const wasLiked = post?.isLiked || false
+
+    try {
+      if (wasLiked) {
+        await api.unlikePost(postId)
+      } else {
+        await api.likePost(postId)
+      }
+
+      setUserPosts(userPosts.map((p) =>
+        p.id === postId
+          ? { ...p, isLiked: !wasLiked, likes: p.likes + (wasLiked ? -1 : 1) }
+          : p
+      ))
+    } catch (err) {
+      console.error('Error toggling like:', err)
+      setUserPosts(userPosts.map((p) =>
+        p.id === postId
+          ? { ...p, isLiked: wasLiked, likes: p.likes }
+          : p
+      ))
+      error('Unable to update like right now.')
+    }
+  }
+
+  const handleBookmarkPost = async (postId: number) => {
+    const post = userPosts.find((p) => p.id === postId)
+    const wasBookmarked = post?.isBookmarked || false
+
+    try {
+      if (wasBookmarked) {
+        await api.unbookmarkPost(postId)
+      } else {
+        await api.toggleBookmark(postId)
+      }
+
+      setUserPosts(userPosts.map((p) =>
+        p.id === postId
+          ? { ...p, isBookmarked: !wasBookmarked }
+          : p
+      ))
+    } catch (err) {
+      console.error('Error toggling bookmark:', err)
+      setUserPosts(userPosts.map((p) =>
+        p.id === postId
+          ? { ...p, isBookmarked: wasBookmarked }
+          : p
+      ))
+      error('Unable to update bookmark right now.')
+    }
+  }
+
+  const handlePostPrivacyUpdate = async (postId: number, privacy: string) => {
+    setUserPosts(prevPosts => {
+      const updatedPosts = prevPosts.map((p) =>
+        p.id === postId
+          ? { ...p, privacy: privacy }
+          : p
+      )
+      return updatedPosts
+    })
+  } 
 
 
   const fetchUserProfile = useCallback(async (userIdNum: number) => {
@@ -40,6 +105,25 @@ function ProfilePage() {
         }
         if (profileDataRec['following_count'] !== undefined) {
           // followingCount not used, skip setting
+        }
+
+        // Get follow status between current user and profile user
+        if (currentUser && currentUser.id !== userIdNum) {
+          try {
+            const followStatusData = await api.getFollowStatus(userIdNum)
+            setIsFollowing(followStatusData.is_following)
+            // Determine if privacy overlay should be shown
+            setShowPrivacyOverlay(profileData.is_private && !followStatusData.is_following)
+          } catch (followError) {
+            console.warn('Failed to get follow status:', followError)
+            // If we can't get follow status, assume not following for privacy overlay
+            setIsFollowing(false)
+            setShowPrivacyOverlay(profileData.is_private)
+          }
+        } else {
+          // Own profile or no current user
+          setIsFollowing(false)
+          setShowPrivacyOverlay(false)
         }
 
         // get more data
@@ -77,15 +161,8 @@ function ProfilePage() {
           setFollowing([])
         }
 
-        // Check if current user is following this profile user
-        if (followersResponse.status === 'fulfilled') {
-          const followersVal = followersResponse.value as Record<string, unknown>
-          const isCurrentUserFollowing = Array.isArray(followersVal['followers'] as unknown) ? (followersVal['followers'] as unknown[]).some((follower: unknown) => {
-            const f = follower as Record<string, unknown>
-            return Number(f['id']) === currentUser?.id
-          }) : false
-          setIsFollowing(isCurrentUserFollowing || false)
-        }
+        // Remove the incorrect follow status logic - let FollowHandler handle it
+        setIsFollowing(false) // Reset to false, FollowHandler will set correct status
       } catch (profileError: unknown) {
         console.error('Profile fetch failed:', profileError)
 
@@ -111,6 +188,7 @@ function ProfilePage() {
               setProfileUser(basicUser)
 
               setIsFollowing(false)
+              setShowPrivacyOverlay(true) // Always show overlay for private profiles when we can't access full data
 
               // Don't try to fetch posts for private profiles
               setUserPosts([])
@@ -210,8 +288,10 @@ function ProfilePage() {
         following={following}
         posts={userPosts}
         isOwnProfile={isOwnProfile}
-        showPrivacyOverlay={profileUser.is_private && !isOwnProfile}
-        isFollowing={isFollowing}
+        showPrivacyOverlay={showPrivacyOverlay}
+        onPostLike={handleLikePost}
+        onPostBookmark={handleBookmarkPost}
+        onPostPrivacyUpdate={handlePostPrivacyUpdate}
       />
     </AppLayout>
   )

@@ -24,6 +24,7 @@ const (
 	MessageTypeUnfollow            = "unfollow"
 	MessageTypeFollowRequest       = "follow_request"
 	MessageTypeCancelFollowRequest = "cancel_follow_request"
+	MessageTypeFollowStatus        = "follow_status"
 	MessageTypeFollowerCountUpdate = "follower_count_update"
 	MessageTypeGroupUpdate         = "group_update"
 	MessageTypeEventUpdate         = "event_update"

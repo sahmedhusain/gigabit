@@ -74,24 +74,33 @@ export default function PostSearchResult({ result }: PostSearchResultProps) {
               </p>
             </div>
 
+            {/* Post Image Preview */}
+            {result.metadata?.postImage && (
+              <div className="mt-3 flex justify-start">
+                <div className="relative inline-block overflow-hidden rounded-xl border border-white/20 shadow-lg group-hover:shadow-emerald-500/20 transition-shadow duration-300">
+                  <img
+                    src={result.metadata.postImage.startsWith('http') ?
+                      result.metadata.postImage :
+                      `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}${result.metadata.postImage}`
+                    }
+                    alt="Post image"
+                    className="max-w-full max-h-32 object-cover hover:scale-105 transition-transform duration-300 rounded-xl"
+                    onError={(e) => {
+                      const target = e.target as HTMLImageElement;
+                      target.style.display = 'none';
+                    }}
+                  />
+                </div>
+              </div>
+            )}
+
             {/* Enhanced Metadata */}
             <div className="flex items-center space-x-4 mt-4">
               <div className="flex items-center space-x-2 bg-orange-500/10 border border-orange-500/20 rounded-xl px-3 py-1">
                 <div className="w-2 h-2 bg-orange-400 rounded-full"></div>
                 <span className="text-orange-300 text-xs font-medium">Post</span>
               </div>
-              {result.metadata?.likeCount && (
-                <div className="flex items-center space-x-2 bg-red-500/10 border border-red-500/20 rounded-xl px-3 py-1">
-                  <Heart className="w-3 h-3 text-red-400" />
-                  <span className="text-red-300 text-xs font-medium">{result.metadata.likeCount} likes</span>
-                </div>
-              )}
-              {result.metadata?.commentCount && (
-                <div className="flex items-center space-x-2 bg-cyan-500/10 border border-cyan-500/20 rounded-xl px-3 py-1">
-                  <MessageCircle className="w-3 h-3 text-cyan-400" />
-                  <span className="text-cyan-300 text-xs font-medium">{result.metadata.commentCount} comments</span>
-                </div>
-              )}
+              {/* Likes and comments intentionally hidden in search results */}
             </div>
           </div>
         </div>

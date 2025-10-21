@@ -209,11 +209,131 @@ func (h *Hub) handleLike(message Message) {
 	}
 }
 
+// handleFollowStatus processes follow status queries
+func (h *Hub) handleFollowStatus(message Message) {
+	if h.db == nil {
+		log.Printf("Database not available")
+		h.sendErrorMessage(message.From, "Database not available")
+		return
+	}
+
+	targetUserID := message.To
+	followerID := message.From
+
+	if targetUserID == 0 {
+		log.Printf("Invalid target user ID in follow status message")
+		h.sendErrorMessage(followerID, "Invalid target user")
+		return
+	}
+
+	// Check if target user exists
+	var isPrivate bool
+	var firstName, lastName string
+	err := h.db.QueryRow("SELECT is_private, first_name, last_name FROM users WHERE id = ?", targetUserID).Scan(&isPrivate, &firstName, &lastName)
+	if err != nil {
+		log.Printf("User %d not found: %v", targetUserID, err)
+		h.sendErrorMessage(followerID, "User not found")
+		return
+	}
+
+	// Query the follow relationship
+	var status string
+	var followID int
+	err = h.db.QueryRow("SELECT id, status FROM follows WHERE follower_id = ? AND following_id = ?", followerID, targetUserID).Scan(&followID, &status)
+	if err != nil && err != sql.ErrNoRows {
+		log.Printf("Error querying follow relationship: %v", err)
+		h.sendErrorMessage(followerID, "Failed to check follow status")
+		return
+	}
+
+	// Determine the follow status
+	var followStatus string
+	if err == sql.ErrNoRows {
+		followStatus = "not_following"
+	} else {
+		// Map database status to API status
+		switch status {
+		case "accepted":
+			followStatus = "following"
+		case "pending":
+			followStatus = "pending"
+		default:
+			followStatus = "not_following"
+		}
+	}
+
+	// Check if the target user follows the current user back
+	var isFollowedBy bool
+	err = h.db.QueryRow("SELECT 1 FROM follows WHERE follower_id = ? AND following_id = ? AND status = 'accepted'", targetUserID, followerID).Scan(new(int))
+	if err == nil {
+		isFollowedBy = true
+	} else if err != sql.ErrNoRows {
+		log.Printf("Error checking reverse follow relationship: %v", err)
+	}
+
+	// Send response to the requesting user
+	h.SendToUser(followerID, Message{
+		Type:   MessageTypeFollowUpdate,
+		From:   0, // System message
+		To:     followerID,
+		Action: "status",
+		Data: map[string]interface{}{
+			"user_id":        targetUserID,
+			"user_name":      firstName + " " + lastName,
+			"status":         followStatus,
+			"is_followed_by": isFollowedBy,
+		},
+		Timestamp: time.Now().Unix(),
+	})
+
+	log.Printf("Follow status query from user %d to user %d: status=%s, is_followed_by=%v", followerID, targetUserID, followStatus, isFollowedBy)
+}
+
 // handleFollowUpdate broadcasts follow updates
 func (h *Hub) handleFollowUpdate(message Message) {
 	// Send to the user being followed
 	if message.To > 0 {
 		h.handlePrivateMessage(message)
+	}
+
+	// Also broadcast to followers of both users for real-time updates
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+
+	// Get all users who might need updates (followers of both users)
+	affectedUsers := make(map[uint]bool)
+
+	// Add followers of the target user (they see follower count changes)
+	for userID, client := range h.clients {
+		client.mu.RLock()
+		isFollowingTarget := client.Following[message.To]
+		client.mu.RUnlock()
+
+		if isFollowingTarget {
+			affectedUsers[userID] = true
+		}
+	}
+
+	// Add followers of the current user (they see following count changes)
+	for userID, client := range h.clients {
+		client.mu.RLock()
+		isFollowingCurrent := client.Following[message.From]
+		client.mu.RUnlock()
+
+		if isFollowingCurrent {
+			affectedUsers[userID] = true
+		}
+	}
+
+	// Send updates to affected users
+	for userID := range affectedUsers {
+		if userID != message.From { // Don't send to the user who performed the action
+			select {
+			case h.clients[userID].Send <- message:
+			default:
+				log.Printf("Failed to send follow update to user %d", userID)
+			}
+		}
 	}
 }
 

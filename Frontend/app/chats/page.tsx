@@ -98,58 +98,12 @@ function ChatsPage() {
     if (openChatWindow?.highlightMessageId || highlightMessageParam) {
       params.set('message', (openChatWindow?.highlightMessageId || highlightMessageParam)!.toString())
     }
-    router.replace(`/chats/all?${params}`)
-  }, [chatSubTab, openChatWindow, router])
-
-  // Open chat from various URL parameters
-  useEffect(() => {
-    // Direct conversation open via ?chat=
-    if (chatId) {
-      const id = parseInt(chatId)
-      if (!isNaN(id)) {
-        // If chats already loaded, try to find details; otherwise open with minimal info
-        const chat = chats.find(c => c.id === id)
-        setOpenChatWindow({
-          conversationId: id,
-          type: chat?.isGroup ? 'group' : 'private',
-          name: chat?.name || 'Chat',
-          participantId: chat?.participantId,
-          groupId: chat?.isGroup ? chat.groupId : undefined,
-          highlightMessageId: highlightMessageParam ? parseInt(highlightMessageParam) : undefined
-        })
-        return
-      }
-    }
-
-    // Legacy support
-    if (groupParam) {
-      const groupId = parseInt(groupParam)
-      if (!isNaN(groupId)) {
-        setOpenChatWindow({
-          conversationId: groupId,
-          type: 'group',
-          name: `Group #${groupId}`,
-          groupId,
-          highlightMessageId: highlightMessageParam ? parseInt(highlightMessageParam) : undefined
-        })
-        return
-      }
-    }
-
+    // Preserve user parameter if it exists
     if (userParam) {
-      const participantId = parseInt(userParam)
-      if (!isNaN(participantId)) {
-        const existing = chats.find(c => !c.isGroup && c.participantId === participantId)
-        setOpenChatWindow({
-          conversationId: existing?.id || 0,
-          type: 'private',
-          name: existing?.name || 'Direct Message',
-          participantId,
-          highlightMessageId: highlightMessageParam ? parseInt(highlightMessageParam) : undefined
-        })
-      }
+      params.set('user', userParam)
     }
-  }, [chatId, chats, groupParam, userParam, highlightMessageParam])
+    router.replace(`/chats/all?${params}`)
+  }, [chatSubTab, openChatWindow, router, userParam, highlightMessageParam])
 
   const formatTimeAgo = (dateString: string) => {
     const date = new Date(dateString)

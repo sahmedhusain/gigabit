@@ -8,7 +8,8 @@ import { User } from '@/lib/api'
 export interface FollowStatus {
   isFollowing: boolean
   isPending: boolean
-  status: 'not_following' | 'pending' | 'following'
+  isFollowedBy: boolean  // Whether the target user is following the current user
+  status: 'not_following' | 'pending' | 'following' | 'follow_back'
 }
 
 interface FollowHandlerProps {
@@ -17,6 +18,9 @@ interface FollowHandlerProps {
   onStatusChange: (newStatus: FollowStatus) => void
   disabled?: boolean
   size?: 'sm' | 'md' | 'lg'
+  confirmUnfollow?: boolean
+  onUnfollowConfirm?: (userId: number, userName: string) => void
+  fullWidth?: boolean
 }
 
 export default function FollowHandler({
@@ -24,7 +28,10 @@ export default function FollowHandler({
   currentFollowStatus,
   onStatusChange,
   disabled = false,
-  size = 'md'
+  size = 'md',
+  confirmUnfollow = false,
+  onUnfollowConfirm,
+  fullWidth = false
 }: FollowHandlerProps) {
   const { sendMessage, addMessageListener, isConnected } = useWebSocket()
   const { success, error, warning } = useToast()
@@ -46,33 +53,45 @@ export default function FollowHandler({
         const newFollowingStatus: FollowStatus = {
           isFollowing: true,
           isPending: false,
-          status: 'following'
+          isFollowedBy: data.is_followed_by || false,
+          status: data.is_followed_by ? 'follow_back' : 'following'
         }
         setLocalStatus(newFollowingStatus)
         onStatusChange(newFollowingStatus)
-        success(data.message || `Now following ${data.user_name}`)
+        // Only show success message if this wasn't a status check
+        if (message.action !== 'status') {
+          success(data.message || `Now following ${data.user_name}`)
+        }
         break
 
       case 'pending':
         const newPendingStatus: FollowStatus = {
           isFollowing: false,
           isPending: true,
+          isFollowedBy: data.is_followed_by || false,
           status: 'pending'
         }
         setLocalStatus(newPendingStatus)
         onStatusChange(newPendingStatus)
-        success(data.message || `Follow request sent to ${data.user_name}`)
+        // Only show success message if this wasn't a status check
+        if (message.action !== 'status') {
+          success(data.message || `Follow request sent to ${data.user_name}`)
+        }
         break
 
       case 'not_following':
         const newNotFollowingStatus: FollowStatus = {
           isFollowing: false,
           isPending: false,
-          status: 'not_following'
+          isFollowedBy: data.is_followed_by || false,
+          status: data.is_followed_by ? 'follow_back' : 'not_following'
         }
         setLocalStatus(newNotFollowingStatus)
         onStatusChange(newNotFollowingStatus)
-        success(data.message || `Unfollowed ${data.user_name}`)
+        // Only show success message if this wasn't a status check
+        if (message.action !== 'status') {
+          success(data.message || `Unfollowed ${data.user_name}`)
+        }
         break
 
       default:
@@ -106,6 +125,13 @@ export default function FollowHandler({
     setIsLoading(true)
 
     try {
+      // Check if this is an unfollow action that requires confirmation
+      if (confirmUnfollow && localStatus.isFollowing && onUnfollowConfirm) {
+        setIsLoading(false) // Reset loading state since we're not proceeding with the action
+        onUnfollowConfirm(targetUser.id, `${targetUser.first_name} ${targetUser.last_name}`)
+        return
+      }
+
       let messageType: WebSocketMessage['type']
       let action: string
 
@@ -162,7 +188,9 @@ export default function FollowHandler({
     targetUser,
     sendMessage,
     warning,
-    error
+    error,
+    confirmUnfollow,
+    onUnfollowConfirm
   ])
 
   const getButtonContent = () => {
@@ -188,7 +216,16 @@ export default function FollowHandler({
       return (
         <div className="flex items-center">
           <X className="w-3 h-3 mr-1" />
-          <span>Cancel Request</span>
+          <span>Requested</span>
+        </div>
+      )
+    }
+
+    if (localStatus.status === 'follow_back') {
+      return (
+        <div className="flex items-center">
+          <UserPlus className="w-3 h-3 mr-1" />
+          <span>Follow Back</span>
         </div>
       )
     }
@@ -202,33 +239,33 @@ export default function FollowHandler({
   }
 
   const getButtonStyle = () => {
-    const baseStyle = "transition-all duration-200 font-medium rounded-lg border "
+    const baseStyle = `${fullWidth ? 'w-full ' : ''}flex items-center justify-center transition-all duration-200 font-semibold rounded-xl `
     
     let sizeStyle = ""
     switch (size) {
       case 'sm':
-        sizeStyle = "px-2 py-1 text-xs "
+        sizeStyle = "px-4 py-2.5 text-xs "
         break
       case 'lg':
-        sizeStyle = "px-4 py-2 text-base "
+        sizeStyle = "px-6 py-3 text-base "
         break
       default:
-        sizeStyle = "px-3 py-1.5 text-sm "
+        sizeStyle = "px-6 py-3 text-sm "
     }
 
     if (isLoading || disabled || !isConnected) {
-      return baseStyle + sizeStyle + "bg-gray-500/20 text-gray-400 border-gray-400/30 cursor-not-allowed"
+      return baseStyle + sizeStyle + "bg-white/20 text-gray-400 border-gray-400/30 cursor-not-allowed"
     }
 
     if (localStatus.isFollowing) {
-      return baseStyle + sizeStyle + "bg-red-500/20 text-red-400 border-red-400/30 hover:bg-red-500/30 hover:text-red-300"
+      return baseStyle + sizeStyle + "bg-gradient-to-r from-red-500 to-pink-600 hover:from-red-600 hover:to-pink-700 text-white shadow-lg shadow-red-500/25"
     }
 
     if (localStatus.isPending) {
-      return baseStyle + sizeStyle + "bg-yellow-500/20 text-yellow-400 border-yellow-400/30 hover:bg-yellow-500/30 hover:text-yellow-300"
+      return baseStyle + sizeStyle + "bg-gradient-to-r from-yellow-500 to-orange-600 hover:from-yellow-600 hover:to-orange-700 text-white shadow-lg shadow-yellow-500/25"
     }
 
-    return baseStyle + sizeStyle + "bg-emerald-500/20 text-emerald-400 border-emerald-400/30 hover:bg-emerald-500/30 hover:text-emerald-300"
+    return baseStyle + sizeStyle + "bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white shadow-lg shadow-emerald-500/25"
   }
 
   const getButtonTitle = () => {
@@ -250,6 +287,10 @@ export default function FollowHandler({
 
     if (localStatus.isPending) {
       return 'Cancel follow request'
+    }
+
+    if (localStatus.status === 'follow_back') {
+      return 'Follow back'
     }
 
     if (targetUser.is_private) {
@@ -288,13 +329,15 @@ export function useFollowStatus(initialStatus: FollowStatus) {
 // Helper function to determine follow status from API data
 export function getFollowStatusFromAPI(
   isFollowing: boolean,
-  followStatus?: string
+  followStatus?: string,
+  isFollowedBy: boolean = false
 ): FollowStatus {
   if (isFollowing) {
     return {
       isFollowing: true,
       isPending: false,
-      status: 'following'
+      isFollowedBy: isFollowedBy,
+      status: isFollowedBy ? 'follow_back' : 'following'
     }
   }
 
@@ -302,6 +345,7 @@ export function getFollowStatusFromAPI(
     return {
       isFollowing: false,
       isPending: true,
+      isFollowedBy: isFollowedBy,
       status: 'pending'
     }
   }
@@ -309,7 +353,8 @@ export function getFollowStatusFromAPI(
   return {
     isFollowing: false,
     isPending: false,
-    status: 'not_following'
+    isFollowedBy: isFollowedBy,
+    status: isFollowedBy ? 'follow_back' : 'not_following'
   }
 }
 

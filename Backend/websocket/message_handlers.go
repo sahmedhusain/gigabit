@@ -41,6 +41,8 @@ func (h *Hub) handleMessage(message Message) {
 		h.handleFollowRequest(message)
 	case MessageTypeCancelFollowRequest:
 		h.handleCancelFollowRequest(message)
+	case MessageTypeFollowStatus:
+		h.handleFollowStatus(message)
 	case MessageTypeGroupUpdate:
 		h.handleGroupUpdate(message)
 	case MessageTypeEventUpdate:

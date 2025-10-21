@@ -331,6 +331,14 @@ func (s *Server) handleUserRoute(followHandler *handlers.FollowHandler, wsHandle
 					writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
 				}
 			})).ServeHTTP(w, r)
+		case "follow-status":
+			if r.Method != http.MethodGet {
+				writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
+				return
+			}
+			authMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				followHandler.GetFollowStatus(w, r)
+			})).ServeHTTP(w, r)
 		case "followers":
 			if r.Method != http.MethodGet {
 				writeError(w, http.StatusMethodNotAllowed, "Method not allowed")

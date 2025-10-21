@@ -55,6 +55,7 @@ interface Message {
       last_name: string
       avatar?: string
       nickname?: string
+      is_private?: boolean
     }
     like_count: number
     comment_count: number
@@ -77,6 +78,7 @@ interface SharedPostMessageProps {
       last_name: string
       avatar?: string
       nickname?: string
+      is_private?: boolean
     }
     like_count: number
     comment_count: number
@@ -89,6 +91,32 @@ interface SharedPostMessageProps {
 
 const SharedPostMessage: React.FC<SharedPostMessageProps> = ({ sharedPost, isCurrentUser, messageId, messageCreatedAt }) => {
   const router = useRouter()
+  const { user } = useAuth()
+
+  // Check if current user can view this shared post
+  const canViewPost = () => {
+    if (!user) return false
+    
+    // If the post is public, anyone can view
+    if (sharedPost.privacy === 'public') return true
+    
+    // If the post is from the current user, they can always view
+    if (sharedPost.user.id === user.id) return true
+    
+    // For private users, only followers can view
+    if (sharedPost.user.is_private) {
+      // This would need to be checked via API, but for now we'll assume
+      // the backend has already filtered this. In a real implementation,
+      // we'd need to check the follow relationship here.
+      return false // For private users in group chats, don't show to non-followers
+    }
+    
+    // For other privacy levels (followers, friends, listed), allow viewing
+    // In a full implementation, we'd check the specific relationships
+    return true
+  }
+
+  const canView = canViewPost()
 
   // Parse various timestamp formats robustly: ISO strings, milliseconds, or seconds
   const parseDate = (value: string | number | undefined | null): Date => {
@@ -175,7 +203,7 @@ const SharedPostMessage: React.FC<SharedPostMessageProps> = ({ sharedPost, isCur
       data-message-id={messageId}
       whileHover={{ scale: 1.02 }}
       transition={{ duration: 0.2 }}
-      onClick={() => router.push(`/post/${sharedPost.id}`)}
+      onClick={() => canView && router.push(`/post/${sharedPost.id}`)}
     >
       {/* Shared Post Header */}
       <div className="flex items-center space-x-2 mb-3">
@@ -200,126 +228,139 @@ const SharedPostMessage: React.FC<SharedPostMessageProps> = ({ sharedPost, isCur
         }`}
         whileHover={{ y: -1 }}
       >
-        {/* Post Header */}
-        <div className="flex items-start space-x-3 mb-3">
-          {/* Author Avatar */}
-          <motion.div
-            className="flex-shrink-0"
-            whileHover={{ scale: 1.05 }}
-            onClick={(e) => {
-              e.stopPropagation()
-              router.push(`/profile/${sharedPost.user.id}`)
-            }}
-          >
-            {sharedPost.user.avatar && getAvatarUrl(sharedPost.user.avatar) ? (
-              <div className="relative">
-                <Image
-                  src={getAvatarUrl(sharedPost.user.avatar)!}
-                  alt={`${sharedPost.user.first_name} ${sharedPost.user.last_name}`}
-                  width={36}
-                  height={36}
-                  className="w-9 h-9 rounded-full object-cover ring-2 ring-white/20"
-                />
-              </div>
-            ) : (
-              <div className="w-9 h-9 rounded-full bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center text-white text-xs font-semibold ring-2 ring-white/20">
-                {sharedPost.user.first_name[0]}{sharedPost.user.last_name[0]}
-              </div>
-            )}
-          </motion.div>
-
-          {/* Author Info */}
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center space-x-2">
-              <motion.h4
-                className="font-semibold text-white text-sm truncate hover:underline"
+        {canView ? (
+          <>
+            {/* Post Header */}
+            <div className="flex items-start space-x-3 mb-3">
+              {/* Author Avatar */}
+              <motion.div
+                className="flex-shrink-0"
+                whileHover={{ scale: 1.05 }}
                 onClick={(e) => {
                   e.stopPropagation()
                   router.push(`/profile/${sharedPost.user.id}`)
                 }}
               >
-                {sharedPost.user.first_name} {sharedPost.user.last_name}
-              </motion.h4>
-              {sharedPost.user.nickname && (
-                <span className="text-xs text-white/60 truncate">
-                  @{sharedPost.user.nickname}
-                </span>
-              )}
-            </div>
+                {sharedPost.user.avatar && getAvatarUrl(sharedPost.user.avatar) ? (
+                  <div className="relative">
+                    <Image
+                      src={getAvatarUrl(sharedPost.user.avatar)!}
+                      alt={`${sharedPost.user.first_name} ${sharedPost.user.last_name}`}
+                      width={36}
+                      height={36}
+                      className="w-9 h-9 rounded-full object-cover ring-2 ring-white/20"
+                    />
+                  </div>
+                ) : (
+                  <div className="w-9 h-9 rounded-full bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center text-white text-xs font-semibold ring-2 ring-white/20">
+                    {sharedPost.user.first_name[0]}{sharedPost.user.last_name[0]}
+                  </div>
+                )}
+              </motion.div>
 
-            <div className="flex items-center space-x-2 mt-1">
-              <span className="text-xs text-white/60">
-                {formatTimeAgo(sharedPost.created_at)}
-              </span>
-              <span className="text-xs text-white/40">·</span>
-              <div className="flex items-center space-x-1 text-white/60">
-                {getPrivacyIcon(sharedPost.privacy)}
-                <span className="text-xs capitalize">{sharedPost.privacy}</span>
+              {/* Author Info */}
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center space-x-2">
+                  <motion.h4
+                    className="font-semibold text-white text-sm truncate hover:underline"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      router.push(`/profile/${sharedPost.user.id}`)
+                    }}
+                  >
+                    {sharedPost.user.first_name} {sharedPost.user.last_name}
+                  </motion.h4>
+                  {sharedPost.user.nickname && (
+                    <span className="text-xs text-white/60 truncate">
+                      @{sharedPost.user.nickname}
+                    </span>
+                  )}
+                </div>
+
+                <div className="flex items-center space-x-2 mt-1">
+                  <span className="text-xs text-white/60">
+                    {formatTimeAgo(sharedPost.created_at)}
+                  </span>
+                  <span className="text-xs text-white/40">·</span>
+                  <div className="flex items-center space-x-1 text-white/60">
+                    {getPrivacyIcon(sharedPost.privacy)}
+                    <span className="text-xs capitalize">{sharedPost.privacy}</span>
+                  </div>
+                </div>
               </div>
             </div>
-          </div>
-        </div>
 
-        {/* Post Content */}
-        <div className="mb-3">
-          <p className="text-white text-sm leading-relaxed whitespace-pre-wrap">
-            {sharedPost.content}
-          </p>
-        </div>
+            {/* Post Content */}
+            <div className="mb-3">
+              <p className="text-white text-sm leading-relaxed whitespace-pre-wrap">
+                {sharedPost.content}
+              </p>
+            </div>
 
-        {/* Post Image */}
-        {sharedPost.image_url && (
-          <div className="mb-3">
-            <motion.div
-              className="relative rounded-lg overflow-hidden bg-gradient-to-br from-white/10 to-white/5"
-              whileHover={{ scale: 1.02 }}
-              transition={{ duration: 0.2 }}
-            >
-              <Image
-                src={sharedPost.image_url.startsWith('http')
-                  ? sharedPost.image_url
-                  : `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}${sharedPost.image_url}`
-                }
-                alt="Shared post image"
-                width={400}
-                height={250}
-                className="w-full h-auto max-h-48 object-cover"
-                unoptimized={sharedPost.image_url.includes('/svg')}
-              />
-            </motion.div>
+            {/* Post Image */}
+            {sharedPost.image_url && (
+              <div className="mb-3">
+                <motion.div
+                  className="relative rounded-lg overflow-hidden bg-gradient-to-br from-white/10 to-white/5"
+                  whileHover={{ scale: 1.02 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  <Image
+                    src={sharedPost.image_url.startsWith('http')
+                      ? sharedPost.image_url
+                      : `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}${sharedPost.image_url}`
+                    }
+                    alt="Shared post image"
+                    width={400}
+                    height={250}
+                    className="w-full h-auto max-h-48 object-cover"
+                    unoptimized={sharedPost.image_url.includes('/svg')}
+                  />
+                </motion.div>
+              </div>
+            )}
+
+            {/* Engagement Stats */}
+            <div className="flex items-center justify-between pt-3 border-t border-white/10">
+              <div className="flex items-center space-x-4">
+                {/* Comments */}
+                <motion.button
+                  className="flex items-center space-x-1 text-white/70 hover:text-white transition-colors group"
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <MessageSquare className="w-4 h-4 group-hover:scale-110 transition-transform" />
+                  <span className="text-xs font-medium">{sharedPost.comment_count}</span>
+                </motion.button>
+
+                {/* Likes */}
+                <motion.button
+                  className={`flex items-center space-x-1 transition-colors group ${
+                    sharedPost.like_count > 0 ? 'text-red-400' : 'text-white/70 hover:text-red-400'
+                  }`}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <Heart className={`w-4 h-4 group-hover:scale-110 transition-transform ${
+                    sharedPost.like_count > 0 ? 'fill-current' : ''
+                  }`} />
+                  <span className="text-xs font-medium">{sharedPost.like_count}</span>
+                </motion.button>
+              </div>
+            </div>
+          </>
+        ) : (
+          /* Unavailable Post Message */
+          <div className="flex items-center justify-center py-8">
+            <div className="text-center">
+              <Lock className="w-8 h-8 text-white/40 mx-auto mb-2" />
+              <p className="text-white/60 text-sm">This post is unavailable</p>
+              <p className="text-white/40 text-xs mt-1">You don't have permission to view this content</p>
+            </div>
           </div>
         )}
-
-        {/* Engagement Stats */}
-        <div className="flex items-center justify-between pt-3 border-t border-white/10">
-          <div className="flex items-center space-x-4">
-            {/* Comments */}
-            <motion.button
-              className="flex items-center space-x-1 text-white/70 hover:text-white transition-colors group"
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <MessageSquare className="w-4 h-4 group-hover:scale-110 transition-transform" />
-              <span className="text-xs font-medium">{sharedPost.comment_count}</span>
-            </motion.button>
-
-            {/* Likes */}
-            <motion.button
-              className={`flex items-center space-x-1 transition-colors group ${
-                sharedPost.like_count > 0 ? 'text-red-400' : 'text-white/70 hover:text-red-400'
-              }`}
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <Heart className={`w-4 h-4 group-hover:scale-110 transition-transform ${
-                sharedPost.like_count > 0 ? 'fill-current' : ''
-              }`} />
-              <span className="text-xs font-medium">{sharedPost.like_count}</span>
-            </motion.button>
-          </div>
-        </div>
       </motion.div>
 
       {/* Message tail */}
@@ -1304,7 +1345,9 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
                   }
                 }}
               >
-                {participantName}
+                {conversationType === 'private' && participantData 
+                  ? `${participantData.first_name} ${participantData.last_name}`.trim()
+                  : participantName}
               </motion.h1>
               
               {/* Enhanced Status */}
@@ -1501,7 +1544,9 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
                         No messages yet
                       </h3>
                       <p className="text-white/60 text-base mb-6 leading-relaxed">
-                        Start the conversation with {conversationType === 'group' ? `#${participantName}` : participantName}!
+                        Start the conversation with {conversationType === 'private' && participantData 
+                          ? `${participantData.first_name} ${participantData.last_name}`.trim()
+                          : conversationType === 'group' ? `#${participantName}` : participantName}!
                       </p>
                       <div className="inline-flex items-center space-x-2 px-4 py-2 bg-white/10 backdrop-blur-sm rounded-full border border-white/20">
                         <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
@@ -1545,7 +1590,9 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
                 handleTyping()
               }}
               onKeyPress={handleKeyPress}
-              placeholder={`Message ${conversationType === 'group' ? `#${participantName}` : participantName}...`}
+              placeholder={`Message ${conversationType === 'private' && participantData 
+                ? `${participantData.first_name} ${participantData.last_name}`.trim()
+                : conversationType === 'group' ? `#${participantName}` : participantName}...`}
               className="w-full bg-gradient-to-r from-white/15 to-white/10 border border-white/25 rounded-2xl px-6 py-4 text-white placeholder-white/60 focus:outline-none focus:ring-2 focus:ring-emerald-400/60 focus:border-emerald-400/50 resize-none min-h-[52px] max-h-32 text-sm overflow-y-auto scrollbar-hide transition-all duration-300 hover:bg-gradient-to-r hover:from-white/20 hover:to-white/15"
               rows={1}
             />

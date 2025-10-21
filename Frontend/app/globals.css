@@ -366,7 +366,7 @@ body {
 
 /* Add specific constraints for following section when expanded */
 .sidebar-section:has(.following-content).expandable {
-  max-height: calc(55vh - 80px); /* Even more reduced height for optimal viewport management */
+  max-height: calc(50vh - 80px); /* Reduced height to prevent sidebar scrollbar */
   flex: 0 0 auto;
 }
 
@@ -390,6 +390,26 @@ body {
   padding-top: 0;
 }
 
+/* Make invitations section header completely fixed and non-scrollable */
+.invitations-header-sticky {
+  position: sticky;
+  top: 16px; /* Position from top of section */
+  z-index: 15;
+  background: inherit;
+  -webkit-backdrop-filter: inherit;
+  backdrop-filter: inherit;
+  border-radius: inherit;
+  padding-bottom: 16px;
+  margin-bottom: 0; /* Remove bottom margin to prevent gap */
+  pointer-events: auto;
+}
+
+/* Adjust invitations section content to account for sticky header */
+.invitations-content-expanded {
+  margin-top: 0;
+  padding-top: 0;
+}
+
 /* Add class to invitation content for targeting */
 .invitation-content {
   /* Specific styling for invitation content */
@@ -402,7 +422,7 @@ body {
 .following-content {
   /* Specific styling for following content */
   position: relative;
-  max-height: calc(55vh - 80px); /* Match section constraint */
+  max-height: calc(50vh - 80px); /* Match section constraint */
   overflow-y: auto; /* Allow internal scrolling */
 }
 

@@ -1,6 +1,6 @@
 'use client'
 import { useState, useEffect } from 'react'
-import { useRouter, useParams } from 'next/navigation'
+import { useRouter, useParams, useSearchParams } from 'next/navigation'
 import ProtectedRoute from '@/components/ProtectedRoute'
 import ChatWindow from '@/components/ChatWindow'
 import { useAuth } from '@/context/AuthContext'
@@ -27,12 +27,18 @@ import CreateDirectMessage from '@/components/dashboard/CreateDirectMessage'
 function ChatsFilterPage() {
   const router = useRouter()
   const params = useParams()
+  const searchParams = useSearchParams()
   const filter = params.filter as string
   const { user } = useAuth()
   const { isConnected, onlineUsers } = useWebSocket()
   const { success, error } = useToast()
   const { items: _liveNotifications, unread: _liveUnreadCount } = useNotifications()
   const { conversations: _liveConversations } = useConversations()
+
+  // Get URL parameters
+  const chatId = searchParams.get('chat')
+  const userParam = searchParams.get('user')
+  const highlightMessageParam = searchParams.get('message')
 
   const [chatSubTab, setChatSubTab] = useState(filter === 'groups' ? 'group' : filter || 'all')
   const [showCreateGroup, setShowCreateGroup] = useState(false)
@@ -128,6 +134,42 @@ function ChatsFilterPage() {
       )
     }
   }, [onlineUsers, chats.length])
+
+  // Open chat from URL parameters
+  useEffect(() => {
+    // Direct conversation open via ?chat=
+    if (chatId) {
+      const id = parseInt(chatId)
+      if (!isNaN(id)) {
+        // If chats already loaded, try to find details; otherwise open with minimal info
+        const chat = chats.find(c => c.id === id)
+        setOpenChatWindow({
+          conversationId: id,
+          type: chat?.isGroup ? 'group' : 'private',
+          name: chat?.name || 'Chat',
+          participantId: chat?.participantId,
+          groupId: chat?.isGroup ? chat.groupId : undefined,
+          highlightMessageId: highlightMessageParam ? parseInt(highlightMessageParam) : undefined
+        })
+        return
+      }
+    }
+
+    // Open direct message via ?user=
+    if (userParam) {
+      const participantId = parseInt(userParam)
+      if (!isNaN(participantId)) {
+        const existing = chats.find(c => !c.isGroup && c.participantId === participantId)
+        setOpenChatWindow({
+          conversationId: existing?.id || 0,
+          type: 'private',
+          name: existing?.name || 'Direct Message',
+          participantId,
+          highlightMessageId: highlightMessageParam ? parseInt(highlightMessageParam) : undefined
+        })
+      }
+    }
+  }, [chatId, chats, userParam, highlightMessageParam])
 
   const fetchConversations = async () => {
     try {

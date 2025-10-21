@@ -65,9 +65,7 @@ export default function TopBar({
     { id: 'users', label: 'Users', icon: User },
     { id: 'events', label: 'Events', icon: Calendar },
     { id: 'groups', label: 'Groups', icon: Users },
-    { id: 'chat', label: 'Chats', icon: MessageCircle },
     { id: 'posts', label: 'Posts', icon: FileText },
-    { id: 'tags', label: 'Tags', icon: Hash },
     { id: 'message', label: 'Messages', icon: MessageCircle }
   ]
 
@@ -86,7 +84,6 @@ export default function TopBar({
         'events': 'events',
         'posts': 'posts',
         'messages': 'message',
-        'chats': 'chat',
         'tags': 'tags'
       }
       
@@ -252,6 +249,11 @@ export default function TopBar({
       
       if (joinable && !isMember) {
         // Row has a Join button; prevent navigation on title click
+        return
+      }
+      
+      if (!isMember) {
+        // Prevent navigation for non-member groups
         return
       }
       
@@ -533,7 +535,7 @@ export default function TopBar({
                               </div>
                             </div>
                           ) : (
-                            <div className={`w-11 h-11 rounded-full bg-gradient-to-br from-white/10 to-white/5 border border-white/10 flex items-center justify-center flex-shrink-0 ${getColorForType(suggestion.type)} group-hover:scale-110 transition-transform duration-200`}>
+                            <div className={`w-11 h-11 rounded-full bg-gradient-to-br from-white/10 to-white/5 border border-white/10 flex items-center justify-center flex-shrink-0 ${getColorForType(suggestion.type)} ${suggestion.type === 'group' && !(suggestion.metadata as Partial<{ isMember: boolean }>)?.isMember ? '' : 'group-hover:scale-110 transition-transform duration-200'}`}>
                               {suggestion.type === 'group' ? (
                                 <span className="text-white font-bold text-sm">
                                   {suggestion.title.substring(0, 2).toUpperCase()}
@@ -551,10 +553,11 @@ export default function TopBar({
                             <div className="flex items-center justify-between">
                               <button
                                 onClick={() => handleSuggestionClick(suggestion)}
-                                className="text-left flex-1 min-w-0"
+                                className={`text-left flex-1 min-w-0 ${suggestion.type === 'group' && !(suggestion.metadata as Partial<{ isMember: boolean }>)?.isMember ? '' : 'cursor-pointer hover:text-white/90 transition-colors duration-200'}`}
+                                disabled={suggestion.type === 'group' && !(suggestion.metadata as Partial<{ isMember: boolean }>)?.isMember}
                               >
                                 <div className="flex items-center space-x-2 mb-1">
-                                  <span className="search-suggestion-title text-sm font-semibold truncate block">
+                                  <span className={`search-suggestion-title text-sm font-semibold truncate block ${suggestion.type === 'group' && !(suggestion.metadata as Partial<{ isMember: boolean }>)?.isMember ? '' : 'hover:text-white/90 transition-colors duration-200'}`}>
                                     {suggestion.title}
                                   </span>
                                   <span className={`search-suggestion-type text-xs px-2 py-0.5 rounded-lg font-medium uppercase tracking-wide border ${
@@ -569,7 +572,7 @@ export default function TopBar({
                                   </span>
                                 </div>
                                 {suggestion.subtitle && (
-                                  <span className="search-suggestion-subtitle text-xs text-white/60 block truncate leading-relaxed">
+                                  <span className={`search-suggestion-subtitle text-xs block truncate leading-relaxed ${suggestion.type === 'group' && !(suggestion.metadata as Partial<{ isMember: boolean }>)?.isMember ? 'text-white/60' : 'text-white/60 hover:text-white/70 transition-colors duration-200'}`}>
                                     {suggestion.subtitle}
                                   </span>
                                 )}

@@ -232,12 +232,12 @@ func (s *SearchService) searchGroups(userID uint, pattern string, limit int) []S
 
 func (s *SearchService) searchEvents(userID uint, pattern string, limit int) []SearchSuggestion {
 	query := `
-		SELECT e.id, e.title, e.description, e.event_time, e.location, g.name as group_name,
+		SELECT e.id, e.title, e.description, e.event_date, e.location, g.name as group_name,
 			   (SELECT COUNT(*) FROM event_responses WHERE event_id = e.id AND response = 'going') as going_count
 		FROM events e
 		JOIN groups g ON e.group_id = g.id
 		WHERE LOWER(e.title) LIKE ? OR LOWER(e.description) LIKE ? OR LOWER(e.location) LIKE ?
-		ORDER BY e.event_time ASC
+		ORDER BY e.event_date ASC
 		LIMIT ?
 	`
 
@@ -250,10 +250,10 @@ func (s *SearchService) searchEvents(userID uint, pattern string, limit int) []S
 	var results []SearchSuggestion
 	for rows.Next() {
 		var id uint
-		var title, description, eventTime, location, groupName string
+		var title, description, eventDate, location, groupName string
 		var goingCount int
 
-		err := rows.Scan(&id, &title, &description, &eventTime, &location, &groupName, &goingCount)
+		err := rows.Scan(&id, &title, &description, &eventDate, &location, &groupName, &goingCount)
 		if err != nil {
 			continue
 		}
@@ -268,7 +268,7 @@ func (s *SearchService) searchEvents(userID uint, pattern string, limit int) []S
 			Description: description,
 			URL:         fmt.Sprintf("/events/all#event-%d", id),
 			Metadata: map[string]interface{}{
-				"eventTime":  eventTime,
+				"eventDate":  eventDate,
 				"location":   location,
 				"groupName":  groupName,
 				"goingCount": goingCount,
@@ -281,16 +281,36 @@ func (s *SearchService) searchEvents(userID uint, pattern string, limit int) []S
 
 func (s *SearchService) searchPosts(userID uint, pattern string, limit int) []SearchSuggestion {
 	query := `
-SELECT p.id, p.content, p.created_at, u.first_name, u.last_name, u.avatar,
-   (SELECT COUNT(*) FROM likes WHERE post_id = p.id AND is_like = 1) as like_count
+SELECT p.id, p.content, p.image_url, p.created_at, u.first_name, u.last_name, u.avatar,
+	(SELECT COUNT(*) FROM likes WHERE post_id = p.id AND reaction_type = 'like') as like_count,
+   (SELECT COUNT(*) FROM comments WHERE post_id = p.id) as comment_count
 FROM posts p
 JOIN users u ON p.user_id = u.id
 WHERE LOWER(p.content) LIKE ?
+  AND (
+    p.user_id = ?
+    OR p.privacy = 'public'
+	OR (p.privacy = 'followers' AND EXISTS (
+		SELECT 1 FROM follows f 
+		WHERE f.follower_id = ? AND f.following_id = p.user_id AND f.status = 'accepted'
+	))
+	OR (p.privacy = 'friends' AND EXISTS (
+		SELECT 1 FROM follows f1 
+		WHERE f1.follower_id = ? AND f1.following_id = p.user_id AND f1.status = 'accepted'
+	) AND EXISTS (
+		SELECT 1 FROM follows f2 
+		WHERE f2.follower_id = p.user_id AND f2.following_id = ? AND f2.status = 'accepted'
+	))
+    OR (p.privacy = 'listed' AND EXISTS (
+        SELECT 1 FROM post_privacy pp 
+        WHERE pp.post_id = p.id AND pp.user_id = ?
+    ))
+  )
 ORDER BY p.created_at DESC
 LIMIT ?
 `
 
-	rows, err := s.db.Query(query, pattern, limit)
+	rows, err := s.db.Query(query, pattern, userID, userID, userID, userID, userID, limit)
 	if err != nil {
 		return []SearchSuggestion{}
 	}
@@ -299,10 +319,10 @@ LIMIT ?
 	var results []SearchSuggestion
 	for rows.Next() {
 		var id uint
-		var content, createdAt, firstName, lastName, avatar string
-		var likeCount int
+		var content, imageUrl, createdAt, firstName, lastName, avatar string
+		var likeCount, commentCount int
 
-		err := rows.Scan(&id, &content, &createdAt, &firstName, &lastName, &avatar, &likeCount)
+		err := rows.Scan(&id, &content, &imageUrl, &createdAt, &firstName, &lastName, &avatar, &likeCount, &commentCount)
 		if err != nil {
 			continue
 		}
@@ -320,12 +340,14 @@ LIMIT ?
 			ID:       id,
 			Title:    displayContent,
 			Subtitle: "by " + authorName,
-			Image:    avatar,
+			Image:    avatar, // User avatar for search results
 			URL:      fmt.Sprintf("/post/%d", id),
 			Metadata: map[string]interface{}{
-				"authorName": authorName,
-				"createdAt":  createdAt,
-				"likeCount":  likeCount,
+				"authorName":   authorName,
+				"createdAt":    createdAt,
+				"likeCount":    likeCount,
+				"commentCount": commentCount,
+				"postImage":    imageUrl, // Post image if exists
 			},
 		})
 	}

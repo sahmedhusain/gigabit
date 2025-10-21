@@ -621,7 +621,17 @@ export class ApiClient {
   }
 
   private delay(ms: number): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, ms));
+    return new Promise(resolve => setTimeout(resolve, ms))
+  }
+
+  private formatTimeAgo(date: Date): string {
+    const now = new Date()
+    const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000)
+    if (diffInSeconds < 60) return 'Just now'
+    if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m ago`
+    if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h ago`
+    if (diffInSeconds < 604800) return `${Math.floor(diffInSeconds / 86400)}d ago`
+    return date.toLocaleDateString()
   }
 
   // Health check with timeout
@@ -1181,7 +1191,7 @@ export class ApiClient {
     });
   }
 
-  async respondToFollowRequest(userId: number, action: 'accept' | 'decline'): Promise<{ message: string; status: string }> {
+  async respondToFollowRequest(userId: number, action: 'accept' | 'decline' | 'remove'): Promise<{ message: string; status: string }> {
     return this.request<{ message: string; status: string }>(`/api/users/${userId}/follow`, {
       method: 'PUT',
       body: JSON.stringify({ action }),
@@ -1213,9 +1223,37 @@ export class ApiClient {
   }
 
   async getUserPosts(userId: number, limit: number = 20, offset: number = 0): Promise<{ posts: Post[], count: number, limit: number, offset: number }> {
-    return this.request<{ posts: Post[], count: number, limit: number, offset: number }>(`/api/posts/user/${userId}?limit=${limit}&offset=${offset}`, {
+    const response = await this.request<{ posts: PostResponse[], count: number, limit: number, offset: number }>(`/api/posts/user/${userId}?limit=${limit}&offset=${offset}`, {
       method: 'GET',
     });
+
+    // Transform PostResponse[] to Post[]
+    const transformedPosts: Post[] = response.posts.map(postResponse => ({
+      id: postResponse.id,
+      user: {
+        id: postResponse.user.id,
+        name: `${postResponse.user.first_name} ${postResponse.user.last_name}`,
+        username: postResponse.user.nickname || postResponse.user.email.split('@')[0],
+        avatar: postResponse.user.avatar,
+      },
+      content: postResponse.content,
+      image: postResponse.image_url,
+      likes: postResponse.like_count,
+      comments: postResponse.comment_count,
+      shares: postResponse.share_count,
+      timeAgo: this.formatTimeAgo(new Date(postResponse.created_at)),
+      privacy: postResponse.privacy,
+      isLiked: Boolean(postResponse.is_liked),
+      isBookmarked: Boolean(postResponse.is_bookmarked),
+      created_at: postResponse.created_at,
+    }));
+
+    return {
+      posts: transformedPosts,
+      count: response.count,
+      limit: response.limit,
+      offset: response.offset,
+    };
   }
 
   async getUserLikedPosts(limit: number = 20, offset: number = 0): Promise<{ posts: PostResponse[], count: number, limit: number, offset: number }> {
@@ -1369,6 +1407,12 @@ export class ApiClient {
   async deleteGroup(groupId: number): Promise<{ message: string }> {
     return this.request<{ message: string }>(`/api/groups/${groupId}`, {
       method: 'DELETE',
+    });
+  }
+
+  async getFollowStatus(userId: number): Promise<{ is_following: boolean; is_pending: boolean; is_followed_by: boolean; status: string }> {
+    return this.request<{ is_following: boolean; is_pending: boolean; is_followed_by: boolean; status: string }>(`/api/users/${userId}/follow-status`, {
+      method: 'GET',
     });
   }
 }

@@ -21,8 +21,7 @@ const filterOptions = [
   { key: 'groups', label: 'Groups', icon: Users },
   { key: 'events', label: 'Events', icon: Calendar },
   { key: 'posts', label: 'Posts', icon: FileText },
-  { key: 'messages', label: 'Messages', icon: MessageCircle },
-  { key: 'tags', label: 'Tags', icon: Hash, disabled: true }
+  { key: 'messages', label: 'Messages', icon: MessageCircle }
 ]
 
 export default function SearchResults({ filter, query, onSearch, onClose }: SearchResultsProps) {
@@ -186,7 +185,6 @@ export default function SearchResults({ filter, query, onSearch, onClose }: Sear
                       {filterOptions.map((option) => {
                         const OptionIcon = option.icon
                         const isActive = activeFilter === option.key
-                        const isDisabled = option.disabled
                         
                         return (
                           <button
@@ -195,16 +193,11 @@ export default function SearchResults({ filter, query, onSearch, onClose }: Sear
                             onClick={(e) => {
                               e.preventDefault()
                               e.stopPropagation()
-                              if (!isDisabled) {
-                                handleFilterChange(option.key)
-                              }
+                              handleFilterChange(option.key)
                             }}
-                            disabled={isDisabled}
                             className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all duration-300 cursor-pointer mb-1 ${
                               isActive
                                 ? 'bg-emerald-500/30 text-emerald-200 border-r-4 border-emerald-400 shadow-lg'
-                                : isDisabled
-                                ? 'text-white/30 cursor-not-allowed'
                                 : 'text-white/90 hover:bg-white/20 hover:text-white cursor-pointer hover:scale-[1.02]'
                             }`}
                           >
@@ -214,10 +207,7 @@ export default function SearchResults({ filter, query, onSearch, onClose }: Sear
                               <OptionIcon className="w-4 h-4" />
                             </div>
                             <span className="text-sm font-medium">{option.label}</span>
-                            {isDisabled && (
-                              <span className="text-xs text-white/50 ml-auto">(Soon)</span>
-                            )}
-                            {isActive && !isDisabled && (
+                            {isActive && (
                               <div className="w-5 h-5 bg-emerald-500 rounded-full flex items-center justify-center ml-auto shadow-md">
                                 <span className="text-white text-xs font-bold">✓</span>
                               </div>

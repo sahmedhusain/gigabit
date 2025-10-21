@@ -18,7 +18,8 @@ import {
   UserPlus,
   Mail,
   Check,
-  X
+  X,
+  Lock
 } from 'lucide-react'
 import { useWebSocket } from '@/context/WebSocketContext'
 import { api, Event } from '@/lib/api'
@@ -416,7 +417,7 @@ export default function RightSidebar({
                     </span>
                     {currentUser?.isPrivate && (
                       <div title="Private account">
-                        <Shield className="w-3 h-3 text-yellow-400" />
+                        <Lock className="w-3 h-3 text-amber-400" />
                       </div>
                     )}
                   </div>
@@ -426,10 +427,10 @@ export default function RightSidebar({
                       <span className="font-medium text-white">{currentUser?.posts || 0}</span> Posts
                     </span>
                     <span className="text-xs text-white/60">
-                      <span className="font-medium text-white">{currentUser?.following || 0}</span> following
+                      <span className="font-medium text-white">{currentUser?.following || 0}</span> Following
                     </span>
                     <span className="text-xs text-white/60">
-                      <span className="font-medium text-white">{currentUser?.followers || 0}</span> followers
+                      <span className="font-medium text-white">{currentUser?.followers || 0}</span> Followers
                     </span>
                   </div>
                 </div>
@@ -1232,7 +1233,7 @@ export default function RightSidebar({
           }`}>
           <div className="p-4">
             <div
-              className={`flex items-center justify-between cursor-pointer ${expandedSection === 'invitations' ? 'mb-4' : 'mb-2 h-12'}`}
+              className={`flex items-center justify-between cursor-pointer ${expandedSection === 'invitations' ? 'mb-4 invitations-header-sticky' : 'mb-2 h-12'}`}
               onClick={() => toggleSection('invitations')}
             >
               <h3 className="text-white font-bold text-base flex items-center">
@@ -1258,7 +1259,7 @@ export default function RightSidebar({
 
             {/* Expanded State */}
             {expandedSection === 'invitations' && (
-              <div className="section-content invitation-content flex-1 flex flex-col min-h-0">
+              <div className={`section-content invitation-content flex-1 flex flex-col min-h-0 ${expandedSection === 'invitations' ? 'invitations-content-expanded' : ''}`}>
                 <div className="flex-1 overflow-y-scroll scrollbar-hide" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
                   <div className="space-y-3">
                     {loadingInvitations ? (
@@ -1268,233 +1269,296 @@ export default function RightSidebar({
                     ) : (followRequests.length + groupInvitations.length) > 0 ? (
                       <>
                         {/* Follow Requests */}
-                        {followRequests.map((request) => (
-                          console.log("Request:", request),
-                          console.log("Requester:", request.user?.avatar),
-                          <div
-                            key={`follow-${request.request_id}`}
-                            className="bg-white/5 rounded-xl p-3 border border-white/10 hover:bg-white/10 transition-all duration-300 group"
-                          >
-                            <div className="flex items-start space-x-3">
-                              <div className="relative flex-shrink-0">
-                                {getAvatarUrl(request.user?.avatar) ? (
-                                  <Image
-                                    src={getAvatarUrl(request.user?.avatar)!}
-                                    alt={request.user?.first_name + ' ' + request.user?.last_name}
-                                    width={40}
-                                    height={40}
-                                    unoptimized={getAvatarUrl(request.user?.avatar)!.includes('/svg')}
-                                    className="w-10 h-10 rounded-full border-2 border-orange-400/50 group-hover:border-orange-400 transition-colors"
-                                  />
-                                ) : (
-                                  <div className="w-10 h-10 rounded-full bg-gradient-to-r from-emerald-400 to-teal-500 flex items-center justify-center text-white font-bold border-2 border-orange-400/50 group-hover:border-orange-400 transition-colors">
-                                    {request.user?.first_name?.[0] || request.user?.nickname?.[0] || '?'}{request.user?.last_name?.[0] || request.user?.nickname?.[1] || ''}
+                        {followRequests.length > 0 && (
+                          <div className="mb-4">
+                            <div className="flex items-center space-x-2 mb-3 px-2">
+                              <UserPlus className="w-4 h-4 text-blue-400" />
+                              <span className="text-blue-400 text-sm font-semibold">
+                                Follow Requests ({followRequests.length})
+                              </span>
+                            </div>
+                            <div className="space-y-2">
+                              {followRequests.map((request) => (
+                                console.log("Request:", request),
+                                console.log("Requester:", request.user?.avatar),
+                                <div
+                                  key={`follow-${request.request_id}`}
+                                  className="relative bg-gradient-to-br from-blue-500/10 via-purple-500/10 to-pink-500/10 backdrop-blur-sm rounded-xl p-3 border border-blue-400/20 hover:border-blue-400/40 shadow-lg hover:shadow-blue-500/10 transition-all duration-300 group overflow-hidden"
+                                >
+                                  {/* Subtle background pattern */}
+                                  <div className="absolute inset-0 bg-gradient-to-br from-transparent via-white/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+
+                                  <div className="relative z-10">
+                                    <div className="flex items-start space-x-3 mb-3">
+                                      <div className="relative flex-shrink-0">
+                                        {getAvatarUrl(request.user?.avatar) ? (
+                                          <Image
+                                            src={getAvatarUrl(request.user?.avatar)!}
+                                            alt={request.user?.first_name + ' ' + request.user?.last_name}
+                                            width={40}
+                                            height={40}
+                                            unoptimized={getAvatarUrl(request.user?.avatar)!.includes('/svg')}
+                                            className="w-10 h-10 rounded-full border-2 border-blue-400/50 group-hover:border-blue-400 group-hover:scale-105 transition-all duration-300 shadow-lg"
+                                          />
+                                        ) : (
+                                          <div className="w-10 h-10 rounded-full bg-gradient-to-r from-blue-400 to-purple-500 flex items-center justify-center text-white font-bold border-2 border-blue-400/50 group-hover:border-blue-400 group-hover:scale-105 transition-all duration-300 shadow-lg">
+                                            {request.user?.first_name?.[0] || request.user?.nickname?.[0] || '?'}{request.user?.last_name?.[0] || request.user?.nickname?.[1] || ''}
+                                          </div>
+                                        )}
+                                        <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full border-2 border-white flex items-center justify-center shadow-md">
+                                          <UserPlus className="w-2 h-2 text-white" />
+                                        </div>
+                                      </div>
+
+                                      <div className="flex-1 min-w-0">
+                                        <div className="flex items-start justify-between mb-2">
+                                          <div className="flex-1 min-w-0">
+                                            <p className="text-sm font-bold text-white truncate group-hover:text-blue-200 transition-colors">
+                                              {request.user?.first_name} {request.user?.last_name}
+                                            </p>
+                                            <p className="text-xs text-white/70 truncate">
+                                              @{request.user?.nickname || request.user?.nickname}
+                                            </p>
+                                          </div>
+                                          <div className="flex flex-col items-end ml-2">
+                                            <span className="text-xs text-white/50 font-medium">
+                                              {new Date(request.requested_at).toLocaleDateString('en-US', {
+                                                month: 'short',
+                                                day: 'numeric'
+                                              })}
+                                            </span>
+                                          </div>
+                                        </div>
+
+                                        <div className="flex items-center space-x-2">
+                                          <div className="px-2 py-0.5 bg-blue-500/20 rounded-full border border-blue-400/30">
+                                            <p className="text-xs text-blue-300 font-medium flex items-center">
+                                              <UserPlus className="w-3 h-3 mr-1" />
+                                              Follow Request
+                                            </p>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    </div>
+
+                                    <div className="flex items-center justify-center space-x-3">
+                                      <button
+                                        onClick={async (e) => {
+                                          e.stopPropagation();
+                                          try {
+                                            if (!request.user?.id) return;
+                                            await api.respondToFollowRequest(request.user.id, 'accept');
+                                            setFollowRequests(prev => prev.filter(r => r.request_id !== request.request_id));
+                                            success('Follow request accepted');
+                                          } catch (err) {
+                                            console.error('Failed to accept follow request:', err);
+                                            error('Failed to accept follow request');
+                                          }
+                                        }}
+                                        className="flex items-center justify-center space-x-1 px-4 py-1.5 bg-gradient-to-r from-emerald-500 to-green-500 hover:from-emerald-400 hover:to-green-400 text-white rounded-lg text-xs font-semibold transition-all duration-300 shadow-md hover:shadow-emerald-500/25 hover:scale-105"
+                                      >
+                                        <Check className="w-3 h-3" />
+                                        <span>Accept</span>
+                                      </button>
+                                      <button
+                                        onClick={async (e) => {
+                                          e.stopPropagation();
+                                          try {
+                                            if (!request.user?.id) return;
+                                            await api.respondToFollowRequest(request.user.id, 'decline');
+                                            setFollowRequests(prev => prev.filter(r => r.request_id !== request.request_id));
+                                            success('Follow request declined');
+                                          } catch (err) {
+                                            console.error('Failed to decline follow request:', err);
+                                            error('Failed to decline follow request');
+                                          }
+                                        }}
+                                        className="flex items-center justify-center space-x-1 px-4 py-1.5 bg-gradient-to-r from-red-500 to-pink-500 hover:from-red-400 hover:to-pink-400 text-white rounded-lg text-xs font-semibold transition-all duration-300 shadow-md hover:shadow-red-500/25 hover:scale-105"
+                                      >
+                                        <X className="w-3 h-3" />
+                                        <span>Decline</span>
+                                      </button>
+                                    </div>
                                   </div>
-                                )}
-                                <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-orange-500 rounded-full border-2 border-white flex items-center justify-center">
-                                  <UserPlus className="w-2 h-2 text-white" />
                                 </div>
-                              </div>
-
-                              <div className="flex-1 min-w-0">
-                                <div className="flex items-start justify-between mb-1">
-                                  <div>
-                                    <p className="text-sm font-semibold text-white truncate">
-                                      {request.user?.first_name} {request.user?.last_name}
-                                    </p>
-                                    <p className="text-xs text-white/60 truncate">
-                                      @{request.user?.nickname || request.user?.nickname}
-                                    </p>
-                                  </div>
-                                  <span className="text-xs text-white/50 ml-2 flex-shrink-0">
-                                    {new Date(request.requested_at).toLocaleDateString()}
-                                  </span>
-                                </div>
-
-                                <p className="text-xs text-white/70 mb-2">
-                                  Wants to follow you
-                                </p>
-
-                                <div className="flex items-center space-x-2">
-                                  <button
-                                    onClick={async (e) => {
-                                      e.stopPropagation();
-                                      try {
-                                        if (!request.user?.id) return;
-                                        await api.respondToFollowRequest(request.user.id, 'accept');
-                                        setFollowRequests(prev => prev.filter(r => r.request_id !== request.request_id));
-                                        success('Follow request accepted');
-                                      } catch (err) {
-                                        console.error('Failed to accept follow request:', err);
-                                        error('Failed to accept follow request');
-                                      }
-                                    }}
-                                    className="flex items-center space-x-1 px-3 py-1.5 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 hover:text-emerald-200 rounded-lg text-xs font-medium transition-all duration-200"
-                                  >
-                                    <Check className="w-3 h-3" />
-                                    <span>Accept</span>
-                                  </button>
-                                  <button
-                                    onClick={async (e) => {
-                                      e.stopPropagation();
-                                      try {
-                                        if (!request.user?.id) return;
-                                        await api.respondToFollowRequest(request.user.id, 'decline');
-                                        setFollowRequests(prev => prev.filter(r => r.request_id !== request.request_id));
-                                        success('Follow request declined');
-                                      } catch (err) {
-                                        console.error('Failed to decline follow request:', err);
-                                        error('Failed to decline follow request');
-                                      }
-                                    }}
-                                    className="flex items-center space-x-1 px-3 py-1.5 bg-red-500/20 hover:bg-red-500/30 text-red-300 hover:text-red-200 rounded-lg text-xs font-medium transition-all duration-200"
-                                  >
-                                    <X className="w-3 h-3" />
-                                    <span>Decline</span>
-                                  </button>
-                                </div>
-                              </div>
+                              ))}
                             </div>
                           </div>
-                        ))}
+                        )}
 
                         {/* Group Invitations and Join Requests */}
-                        {groupInvitations.map((invitation) => (
-                          <div
-                            key={`group-${invitation.id}`}
-                            className="bg-white/5 rounded-xl p-3 border border-white/10 hover:bg-white/10 transition-all duration-300 group"
-                          >
-                            <div className="flex items-start space-x-3">
-                              <div className="relative flex-shrink-0">
-                                {getAvatarUrl((invitation.type === 'join_request' ? invitation.request_user?.avatar : invitation.group?.creator?.avatar)) ? (
-                                  <Image
-                                    src={getAvatarUrl((invitation.type === 'join_request' ? invitation.request_user?.avatar : invitation.group?.creator?.avatar))!}
-                                    alt={invitation.type === 'join_request'
-                                      ? `${invitation.request_user?.first_name || ''} ${invitation.request_user?.last_name || ''}`
-                                      : `${invitation.group?.creator?.first_name || ''} ${invitation.group?.creator?.last_name || ''}`}
-                                    width={40}
-                                    height={40}
-                                    unoptimized={getAvatarUrl((invitation.type === 'join_request' ? invitation.request_user?.avatar : invitation.group?.creator?.avatar))!.includes('/svg')}
-                                    className="w-10 h-10 rounded-full border-2 border-orange-400/50 group-hover:border-orange-400 transition-colors"
-                                  />
-                                ) : (
-                                  <div className="w-10 h-10 rounded-full bg-gradient-to-r from-emerald-400 to-teal-500 flex items-center justify-center text-white font-bold border-2 border-orange-400/50 group-hover:border-orange-400 transition-colors">
-                                    {invitation.type === 'join_request'
-                                      ? (invitation.request_user?.first_name?.[0] || invitation.request_user?.nickname?.[0] || '?') + (invitation.request_user?.last_name?.[0] || invitation.request_user?.nickname?.[1] || '')
-                                      : (invitation.group?.creator?.first_name?.[0] || invitation.group?.title?.[0] || '?') + (invitation.group?.creator?.last_name?.[0] || invitation.group?.title?.[1] || '')}
+                        {groupInvitations.length > 0 && (
+                          <div>
+                            <div className="flex items-center space-x-2 mb-3 px-2">
+                              <Mail className="w-4 h-4 text-orange-400" />
+                              <span className="text-orange-400 text-sm font-semibold">
+                                Group Invitations ({groupInvitations.length})
+                              </span>
+                            </div>
+                            <div className="space-y-2">
+                              {groupInvitations.map((invitation) => (
+                                <div
+                                  key={`group-${invitation.id}`}
+                                  className="relative bg-gradient-to-br from-orange-500/10 via-red-500/10 to-pink-500/10 backdrop-blur-sm rounded-xl p-3 border border-orange-400/20 hover:border-orange-400/40 shadow-lg hover:shadow-orange-500/10 transition-all duration-300 group overflow-hidden"
+                                >
+                                  {/* Subtle background pattern */}
+                                  <div className="absolute inset-0 bg-gradient-to-br from-transparent via-white/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+
+                                  <div className="relative z-10">
+                                    <div className="flex items-start space-x-3 mb-3">
+                                      <div className="relative flex-shrink-0">
+                                        {getAvatarUrl((invitation.type === 'join_request' ? invitation.request_user?.avatar : invitation.group?.creator?.avatar)) ? (
+                                          <Image
+                                            src={getAvatarUrl((invitation.type === 'join_request' ? invitation.request_user?.avatar : invitation.group?.creator?.avatar))!}
+                                            alt={invitation.type === 'join_request'
+                                              ? `${invitation.request_user?.first_name || ''} ${invitation.request_user?.last_name || ''}`
+                                              : `${invitation.group?.creator?.first_name || ''} ${invitation.group?.creator?.last_name || ''}`}
+                                            width={40}
+                                            height={40}
+                                            unoptimized={getAvatarUrl((invitation.type === 'join_request' ? invitation.request_user?.avatar : invitation.group?.creator?.avatar))!.includes('/svg')}
+                                            className="w-10 h-10 rounded-full border-2 border-orange-400/50 group-hover:border-orange-400 group-hover:scale-105 transition-all duration-300 shadow-lg"
+                                          />
+                                        ) : (
+                                          <div className="w-10 h-10 rounded-full bg-gradient-to-r from-orange-400 to-red-500 flex items-center justify-center text-white font-bold border-2 border-orange-400/50 group-hover:border-orange-400 group-hover:scale-105 transition-all duration-300 shadow-lg">
+                                            {invitation.type === 'join_request'
+                                              ? (invitation.request_user?.first_name?.[0] || invitation.request_user?.nickname?.[0] || '?') + (invitation.request_user?.last_name?.[0] || invitation.request_user?.nickname?.[1] || '')
+                                              : (invitation.group?.creator?.first_name?.[0] || invitation.group?.title?.[0] || '?') + (invitation.group?.creator?.last_name?.[0] || invitation.group?.title?.[1] || '')}
+                                          </div>
+                                        )}
+                                        <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-gradient-to-r from-orange-500 to-red-500 rounded-full border-2 border-white flex items-center justify-center shadow-md">
+                                          <Users className="w-2 h-2 text-white" />
+                                        </div>
+                                      </div>
+
+                                      <div className="flex-1 min-w-0">
+                                        <div className="flex items-start justify-between mb-2">
+                                          <div className="flex-1 min-w-0">
+                                            <p className="text-sm font-bold text-white truncate group-hover:text-orange-200 transition-colors">
+                                              {invitation.group?.title}
+                                            </p>
+                                            <p className="text-xs text-white/70 truncate">
+                                              {invitation.type === 'join_request'
+                                                ? `${invitation.request_user?.first_name || ''} ${invitation.request_user?.last_name || ''}`
+                                                : `by ${invitation.group?.creator?.first_name || ''} ${invitation.group?.creator?.last_name || ''}`}
+                                            </p>
+                                          </div>
+                                          <div className="flex flex-col items-end ml-2">
+                                            <span className="text-xs text-white/50 font-medium">
+                                              {new Date(invitation.created_at).toLocaleDateString('en-US', {
+                                                month: 'short',
+                                                day: 'numeric'
+                                              })}
+                                            </span>
+                                          </div>
+                                        </div>
+
+                                        <div className="flex items-center space-x-2">
+                                          <div className="px-2 py-0.5 bg-orange-500/20 rounded-full border border-orange-400/30">
+                                            <p className="text-xs text-orange-300 font-medium flex items-center">
+                                              {invitation.type === 'join_request' ? (
+                                                <>
+                                                  <UserPlus className="w-3 h-3 mr-1" />
+                                                  Join Request
+                                                </>
+                                              ) : (
+                                                <>
+                                                  <Mail className="w-3 h-3 mr-1" />
+                                                  Group Invite
+                                                </>
+                                              )}
+                                            </p>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    </div>
+
+                                    <div className="flex items-center justify-center space-x-3">
+                                      {invitation.type === 'join_request' ? (
+                                        <>
+                                          <button
+                                            onClick={async (e) => {
+                                              e.stopPropagation();
+                                              try {
+                                                if (!invitation.group?.id || !invitation.request_user?.id) return;
+                                                await api.respondToJoinRequest(invitation.group.id, invitation.request_user.id, 'accept');
+                                                setGroupInvitations(prev => prev.filter(i => i.id !== invitation.id));
+                                                success('Join request accepted');
+                                              } catch (err) {
+                                                console.error('Failed to accept join request:', err);
+                                                error('Failed to accept join request');
+                                              }
+                                            }}
+                                            className="flex items-center justify-center space-x-1 px-4 py-1.5 bg-gradient-to-r from-emerald-500 to-green-500 hover:from-emerald-400 hover:to-green-400 text-white rounded-lg text-xs font-semibold transition-all duration-300 shadow-md hover:shadow-emerald-500/25 hover:scale-105"
+                                          >
+                                            <Check className="w-3 h-3" />
+                                            <span>Accept</span>
+                                          </button>
+                                          <button
+                                            onClick={async (e) => {
+                                              e.stopPropagation();
+                                              try {
+                                                if (!invitation.group?.id || !invitation.request_user?.id) return;
+                                                await api.respondToJoinRequest(invitation.group.id, invitation.request_user.id, 'decline');
+                                                setGroupInvitations(prev => prev.filter(i => i.id !== invitation.id));
+                                                success('Join request declined');
+                                              } catch (err) {
+                                                console.error('Failed to decline join request:', err);
+                                                error('Failed to decline join request');
+                                              }
+                                            }}
+                                            className="flex items-center justify-center space-x-1 px-4 py-1.5 bg-gradient-to-r from-red-500 to-pink-500 hover:from-red-400 hover:to-pink-400 text-white rounded-lg text-xs font-semibold transition-all duration-300 shadow-md hover:shadow-red-500/25 hover:scale-105"
+                                          >
+                                            <X className="w-3 h-3" />
+                                            <span>Decline</span>
+                                          </button>
+                                        </>
+                                      ) : (
+                                        <>
+                                          <button
+                                            onClick={async (e) => {
+                                              e.stopPropagation();
+                                              try {
+                                                if (!invitation.group?.id) return;
+                                                await api.acceptGroupInvitation(invitation.group.id);
+                                                setGroupInvitations(prev => prev.filter(i => i.id !== invitation.id));
+                                                success('Group invitation accepted');
+                                              } catch (err) {
+                                                console.error('Failed to accept group invitation:', err);
+                                                error('Failed to accept group invitation');
+                                              }
+                                            }}
+                                            className="flex items-center justify-center space-x-1 px-4 py-1.5 bg-gradient-to-r from-emerald-500 to-green-500 hover:from-emerald-400 hover:to-green-400 text-white rounded-lg text-xs font-semibold transition-all duration-300 shadow-md hover:shadow-emerald-500/25 hover:scale-105"
+                                          >
+                                            <Check className="w-3 h-3" />
+                                            <span>Accept</span>
+                                          </button>
+                                          <button
+                                            onClick={async (e) => {
+                                              e.stopPropagation();
+                                              try {
+                                                if (!invitation.group?.id) return;
+                                                await api.declineGroupInvitation(invitation.group.id);
+                                                setGroupInvitations(prev => prev.filter(i => i.id !== invitation.id));
+                                                success('Group invitation declined');
+                                              } catch (err) {
+                                                console.error('Failed to decline group invitation:', err);
+                                                error('Failed to decline group invitation');
+                                              }
+                                            }}
+                                            className="flex items-center justify-center space-x-1 px-4 py-1.5 bg-gradient-to-r from-red-500 to-pink-500 hover:from-red-400 hover:to-pink-400 text-white rounded-lg text-xs font-semibold transition-all duration-300 shadow-md hover:shadow-red-500/25 hover:scale-105"
+                                          >
+                                            <X className="w-3 h-3" />
+                                            <span>Decline</span>
+                                          </button>
+                                        </>
+                                      )}
+                                    </div>
                                   </div>
-                                )}
-                                <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-orange-500 rounded-full border-2 border-white flex items-center justify-center">
-                                  <Users className="w-2 h-2 text-white" />
                                 </div>
-                              </div>
-
-                              <div className="flex-1 min-w-0">
-                                <div className="flex items-start justify-between mb-1">
-                                  <div>
-                                    <p className="text-sm font-semibold text-white truncate">
-                                      {invitation.group?.title}
-                                    </p>
-                                    <p className="text-xs text-white/60 truncate">
-                                      {invitation.type === 'join_request'
-                                        ? `${invitation.request_user?.first_name || ''} ${invitation.request_user?.last_name || ''} requested to join`
-                                        : `by ${invitation.group?.creator?.first_name || ''} ${invitation.group?.creator?.last_name || ''}`}
-                                    </p>
-                                  </div>
-                                  <span className="text-xs text-white/50 ml-2 flex-shrink-0">
-                                    {new Date(invitation.created_at).toLocaleDateString()}
-                                  </span>
-                                </div>
-
-                                <p className="text-xs text-white/70 mb-2">
-                                  {invitation.type === 'join_request' ? 'Awaiting your approval' : 'Invited you to join this group'}
-                                </p>
-
-                                <div className="flex items-center space-x-2">
-                                  {invitation.type === 'join_request' ? (
-                                    <>
-                                      <button
-                                        onClick={async (e) => {
-                                          e.stopPropagation();
-                                          try {
-                                            if (!invitation.group?.id || !invitation.request_user?.id) return;
-                                            await api.respondToJoinRequest(invitation.group.id, invitation.request_user.id, 'accept');
-                                            setGroupInvitations(prev => prev.filter(i => i.id !== invitation.id));
-                                            success('Join request accepted');
-                                          } catch (err) {
-                                            console.error('Failed to accept join request:', err);
-                                            error('Failed to accept join request');
-                                          }
-                                        }}
-                                        className="flex items-center space-x-1 px-3 py-1.5 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 hover:text-emerald-200 rounded-lg text-xs font-medium transition-all duration-200"
-                                      >
-                                        <Check className="w-3 h-3" />
-                                        <span>Accept</span>
-                                      </button>
-                                      <button
-                                        onClick={async (e) => {
-                                          e.stopPropagation();
-                                          try {
-                                            if (!invitation.group?.id || !invitation.request_user?.id) return;
-                                            await api.respondToJoinRequest(invitation.group.id, invitation.request_user.id, 'decline');
-                                            setGroupInvitations(prev => prev.filter(i => i.id !== invitation.id));
-                                            success('Join request declined');
-                                          } catch (err) {
-                                            console.error('Failed to decline join request:', err);
-                                            error('Failed to decline join request');
-                                          }
-                                        }}
-                                        className="flex items-center space-x-1 px-3 py-1.5 bg-red-500/20 hover:bg-red-500/30 text-red-300 hover:text-red-200 rounded-lg text-xs font-medium transition-all duration-200"
-                                      >
-                                        <X className="w-3 h-3" />
-                                        <span>Decline</span>
-                                      </button>
-                                    </>
-                                  ) : (
-                                    <>
-                                      <button
-                                        onClick={async (e) => {
-                                          e.stopPropagation();
-                                          try {
-                                            if (!invitation.group?.id) return;
-                                            await api.acceptGroupInvitation(invitation.group.id);
-                                            setGroupInvitations(prev => prev.filter(i => i.id !== invitation.id));
-                                            success('Group invitation accepted');
-                                          } catch (err) {
-                                            console.error('Failed to accept group invitation:', err);
-                                            error('Failed to accept group invitation');
-                                          }
-                                        }}
-                                        className="flex items-center space-x-1 px-3 py-1.5 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 hover:text-emerald-200 rounded-lg text-xs font-medium transition-all duration-200"
-                                      >
-                                        <Check className="w-3 h-3" />
-                                        <span>Accept</span>
-                                      </button>
-                                      <button
-                                        onClick={async (e) => {
-                                          e.stopPropagation();
-                                          try {
-                                            if (!invitation.group?.id) return;
-                                            await api.declineGroupInvitation(invitation.group.id);
-                                            setGroupInvitations(prev => prev.filter(i => i.id !== invitation.id));
-                                            success('Group invitation declined');
-                                          } catch (err) {
-                                            console.error('Failed to decline group invitation:', err);
-                                            error('Failed to decline group invitation');
-                                          }
-                                        }}
-                                        className="flex items-center space-x-1 px-3 py-1.5 bg-red-500/20 hover:bg-red-500/30 text-red-300 hover:text-red-200 rounded-lg text-xs font-medium transition-all duration-200"
-                                      >
-                                        <X className="w-3 h-3" />
-                                        <span>Decline</span>
-                                      </button>
-                                    </>
-                                  )}
-                                </div>
-                              </div>
+                              ))}
                             </div>
                           </div>
-                        ))}
+                        )}
                       </>
                     ) : (
                       <div className="flex flex-col items-center justify-center py-12 text-center">

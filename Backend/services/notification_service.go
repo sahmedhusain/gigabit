@@ -204,14 +204,31 @@ func (s *NotificationService) NotifyFollowRequest(followerID, followingID uint) 
 		return err
 	}
 
+	// Check if the target user is private to determine the message
+	var isPrivate bool
+	err = s.db.QueryRow("SELECT is_private FROM users WHERE id = ?", followingID).Scan(&isPrivate)
+	if err != nil {
+		// Default to request message if we can't determine privacy
+		isPrivate = true
+	}
+
+	var title, message string
+	if isPrivate {
+		title = "New Follow Request"
+		message = follower.FirstName + " " + follower.LastName + " wants to follow you"
+	} else {
+		title = "New Follower"
+		message = follower.FirstName + " " + follower.LastName + " started following you"
+	}
+
 	notification := &models.Notification{
 		UserID:     followingID,
 		ActorID:    followerID,
 		Type:       models.NotificationFollowRequest,
 		EntityType: "user",
 		EntityID:   followerID,
-		Title:      "New Follow Request",
-		Message:    follower.FirstName + " " + follower.LastName + " wants to follow you",
+		Title:      title,
+		Message:    message,
 	}
 
 	return s.CreateNotification(notification)
@@ -302,6 +319,7 @@ func (s *NotificationService) NotifyEventCreated(creatorID, groupID, eventID uin
 	}
 
 	// Create notification for each group member
+	var failedCount int
 	for _, memberID := range memberIDs {
 		notification := &models.Notification{
 			UserID:     memberID,
@@ -314,9 +332,15 @@ func (s *NotificationService) NotifyEventCreated(creatorID, groupID, eventID uin
 		}
 
 		if err := s.CreateNotification(notification); err != nil {
-			// Continue with other notifications even if one fails
+			// Log the error and continue with other notifications
+			fmt.Printf("Failed to create event notification for user %d: %v\n", memberID, err)
+			failedCount++
 			continue
 		}
+	}
+
+	if failedCount > 0 {
+		fmt.Printf("Warning: %d/%d event notifications failed to send\n", failedCount, len(memberIDs))
 	}
 
 	return nil
@@ -407,6 +431,7 @@ func (s *NotificationService) NotifyGroupPostCreated(posterID, groupID, postID u
 	}
 
 	// Create notification for each group member
+	var failedCount int
 	for _, memberID := range memberIDs {
 		notification := &models.Notification{
 			UserID:     memberID,
@@ -419,9 +444,15 @@ func (s *NotificationService) NotifyGroupPostCreated(posterID, groupID, postID u
 		}
 
 		if err := s.CreateNotification(notification); err != nil {
-			// Continue with other notifications even if one fails
+			// Log the error and continue with other notifications
+			fmt.Printf("Failed to create group post notification for user %d: %v\n", memberID, err)
+			failedCount++
 			continue
 		}
+	}
+
+	if failedCount > 0 {
+		fmt.Printf("Warning: %d/%d group post notifications failed to send\n", failedCount, len(memberIDs))
 	}
 
 	return nil
@@ -460,13 +491,19 @@ func (s *NotificationService) NotifyGroupPostLiked(likerID, postOwnerID, groupID
 
 func (s *NotificationService) sendRealTimeNotification(notification *models.Notification) {
 	if s.hub == nil {
+		fmt.Printf("Hub is nil, cannot send real-time notification for notification ID %d\n", notification.ID)
 		return
 	}
 
 	actor, err := s.getUserInfo(notification.ActorID)
 	if err != nil {
-		// Log the error, but don't block sending the notification
-		fmt.Printf("Error getting actor info for notification: %v", err)
+		// Log the error and create a default actor to prevent nil pointer issues
+		fmt.Printf("Error getting actor info for notification ID %d: %v\n", notification.ID, err)
+		actor = &models.UserResponse{
+			ID:        notification.ActorID,
+			FirstName: "Unknown",
+			LastName:  "User",
+		}
 	}
 
 	notificationResponse := models.NotificationResponse{
@@ -494,7 +531,8 @@ func (s *NotificationService) sendRealTimeNotification(notification *models.Noti
 		Data:      notificationResponse,
 	}
 
-	s.hub.BroadcastMessage(wsMessage)
+	// Send to specific user, not broadcast to all
+	s.hub.SendToUser(notification.UserID, wsMessage)
 }
 
 func (s *NotificationService) getUserInfo(userID uint) (*models.UserResponse, error) {

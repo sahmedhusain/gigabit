@@ -15,16 +15,18 @@ import (
 )
 
 type FollowHandler struct {
-	followService *services.FollowService
-	userService   *services.UserService
-	hub           *websocket.Hub
+	followService       *services.FollowService
+	userService         *services.UserService
+	notificationService *services.NotificationService
+	hub                 *websocket.Hub
 }
 
 func NewFollowHandler(db *sql.DB, hub *websocket.Hub) *FollowHandler {
 	return &FollowHandler{
-		followService: services.NewFollowService(db),
-		userService:   services.NewUserService(db),
-		hub:           hub,
+		followService:       services.NewFollowService(db),
+		userService:         services.NewUserService(db),
+		notificationService: services.NewNotificationService(db, hub),
+		hub:                 hub,
 	}
 }
 
@@ -86,6 +88,17 @@ func (h *FollowHandler) SendFollowRequest(w http.ResponseWriter, r *http.Request
 	if err := h.followService.CreateFollowRequest(followRequest); err != nil {
 		writeError(w, http.StatusInternalServerError, "Failed to send follow request")
 		return
+	}
+
+	// Send notification to the TARGET user (person being followed)
+	if followRequest.Status == "pending" {
+		// For private users: send follow request notification
+		go h.notificationService.NotifyFollowRequest(currentUserID, uint(targetUserID))
+	} else {
+		// For public users: send "new follower" notification to the target
+		// Note: We still use NotifyFollowRequest since it creates the right notification
+		// (notifies the target that someone wants to follow them)
+		go h.notificationService.NotifyFollowRequest(currentUserID, uint(targetUserID))
 	}
 
 	message := "Follow request sent"
@@ -167,15 +180,20 @@ func (h *FollowHandler) RespondToFollowRequest(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	// Broadcast follower count updates if request was accepted
-	if req.Action == "accept" && h.hub != nil {
-		h.hub.BroadcastMessage(websocket.Message{
-			Type:      websocket.MessageTypeFollowerCountUpdate,
-			From:      0, // System message
-			Action:    "count_update",
-			Data:      h.getFollowerCounts(uint(followerID), currentUserID),
-			Timestamp: time.Now().Unix(),
-		})
+	// Send notification if request was accepted
+	if req.Action == "accept" {
+		go h.notificationService.NotifyFollowAccepted(uint(followerID), currentUserID)
+
+		// Broadcast follower count updates
+		if h.hub != nil {
+			h.hub.BroadcastMessage(websocket.Message{
+				Type:      websocket.MessageTypeFollowerCountUpdate,
+				From:      0, // System message
+				Action:    "count_update",
+				Data:      h.getFollowerCounts(uint(followerID), currentUserID),
+				Timestamp: time.Now().Unix(),
+			})
+		}
 	}
 
 	writeJSON(w, http.StatusOK, map[string]interface{}{

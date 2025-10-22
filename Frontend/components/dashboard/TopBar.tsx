@@ -228,7 +228,10 @@ export default function TopBar({
     if (suggestion.type === 'chat') {
       // Directly open conversation by id
       const conversationId = Number(suggestion.id)
-      router.push(`/chats/all?chat=${conversationId}`)
+      const meta = suggestion.metadata as Record<string, unknown> | undefined
+      const chatType = meta?.chatType as string || 'private'
+      const param = chatType === 'group' ? 'group' : 'chat'
+      router.push(`/chats/all?${param}=${conversationId}`)
       return
     }
 
@@ -237,8 +240,10 @@ export default function TopBar({
       const meta = suggestion.metadata as Record<string, unknown> | undefined
       const conversationId = meta?.conversationId ? Number(meta.conversationId) : Number(suggestion.id)
       const messageId = Number(suggestion.id)
+      const messageType = meta?.type as string || 'private'
+      const param = messageType === 'group' ? 'group' : 'chat'
       
-      router.push(`/chats/all?chat=${conversationId}&message=${messageId}`)
+      router.push(`/chats/all?${param}=${conversationId}&message=${messageId}`)
       return
     }
 
@@ -257,9 +262,10 @@ export default function TopBar({
         return
       }
       
-      // For member groups, navigate to chat (backend already provides the correct URL)
-      if (isMember && gmeta?.conversationId) {
-        router.push(`/chats/all?chat=${gmeta.conversationId}`)
+      // For member groups, navigate to chat using group parameter
+      if (isMember) {
+        const groupId = Number(suggestion.id)
+        router.push(`/chats/all?group=${groupId}`)
         return
       }
     }

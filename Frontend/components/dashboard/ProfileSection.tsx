@@ -1,6 +1,6 @@
 'use client'
 import Image from 'next/image'
-import { User, Lock, Globe, MessageSquare, Edit, Heart, MessageCircle, Send, Bookmark, MoreHorizontal, Trash2, EyeOff, UserPlus, UserMinus, X, UserX, Clock, Mail, Calendar, CalendarDays, FileText, Plus } from 'lucide-react'
+import { User, Lock, Globe, MessageSquare, Edit, Heart, MessageCircle, Send, Bookmark, MoreHorizontal, Trash2, EyeOff, UserPlus, UserMinus, X, UserX, Clock, Mail, Calendar, CalendarDays, FileText, Plus, Users, Search } from 'lucide-react'
 import { Post, api, CreatePostRequest } from '@/lib/api'
 import { useRealTimePosts, useFollowers, useConnectionStatus, useFollowerCounts } from '@/hooks'
 import { getAvatarUrl } from '@/utils/avatarUtils'
@@ -1366,7 +1366,7 @@ export default function ProfileSection({
                 About
               </h4>
               <p className="text-white/90 text-sm leading-relaxed">
-                {currentUser?.aboutMe || 'This user hasn&apos;t written a bio yet.'}
+                {currentUser?.aboutMe || ''}
               </p>
             </div>
 
@@ -1505,8 +1505,47 @@ export default function ProfileSection({
                       <div className="space-y-3 lg:space-y-4">
                         {displayPosts.map((post, index) => renderPost(post, index))}
                         {displayPosts.length === 0 && !showPrivacyOverlay && (
-                          <div className="text-white/60 text-center py-8">
-                            <p className="text-sm">No posts yet</p>
+                          <div className="text-center py-12 px-6">
+                            {isOwnProfile ? (
+                              <motion.div
+                                initial={{ opacity: 0, y: 20 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ duration: 0.5 }}
+                                className="max-w-md mx-auto"
+                              >
+                                <div className="w-20 h-20 bg-gradient-to-br from-emerald-500/20 to-teal-600/20 rounded-full flex items-center justify-center mx-auto mb-6 border border-emerald-400/30">
+                                  <Plus className="w-10 h-10 text-emerald-400" />
+                                </div>
+                                <h3 className="text-xl font-bold text-white mb-3">Create Your First Post</h3>
+                                <p className="text-white/70 text-sm mb-6 leading-relaxed">
+                                  Share your thoughts, experiences, or moments with your followers. Start building your story!
+                                </p>
+                                <motion.button
+                                  onClick={() => setShowCreatePost(true)}
+                                  className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-semibold rounded-xl transition-all duration-300 shadow-lg shadow-emerald-500/25 hover:scale-105 active:scale-95"
+                                  whileHover={{ scale: 1.05 }}
+                                  whileTap={{ scale: 0.95 }}
+                                >
+                                  <Plus className="w-4 h-4 mr-2" />
+                                  Create Post
+                                </motion.button>
+                              </motion.div>
+                            ) : (
+                              <motion.div
+                                initial={{ opacity: 0, y: 20 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ duration: 0.5 }}
+                                className="max-w-md mx-auto"
+                              >
+                                <div className="w-20 h-20 bg-gradient-to-br from-slate-500/20 to-gray-600/20 rounded-full flex items-center justify-center mx-auto mb-6 border border-slate-400/30">
+                                  <FileText className="w-10 h-10 text-slate-400" />
+                                </div>
+                                <h3 className="text-xl font-bold text-white mb-3">No Posts Yet</h3>
+                                <p className="text-white/70 text-sm leading-relaxed">
+                                  {currentUser?.name} hasn't shared any posts yet. Check back later for updates!
+                                </p>
+                              </motion.div>
+                            )}
                           </div>
                         )}
                         {!connectionStatus && displayPosts.length > 0 && (
@@ -1702,8 +1741,47 @@ export default function ProfileSection({
                             </div>
                           ))
                         ) : (
-                          <div className="text-white/60 text-center py-8">
-                            <p className="text-sm">No following yet</p>
+                          <div className="text-center py-12 px-6">
+                            {isOwnProfile ? (
+                              <motion.div
+                                initial={{ opacity: 0, y: 20 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ duration: 0.5 }}
+                                className="max-w-md mx-auto"
+                              >
+                                <div className="w-20 h-20 bg-gradient-to-br from-blue-500/20 to-purple-600/20 rounded-full flex items-center justify-center mx-auto mb-6 border border-blue-400/30">
+                                  <Users className="w-10 h-10 text-blue-400" />
+                                </div>
+                                <h3 className="text-xl font-bold text-white mb-3">Discover People</h3>
+                                <p className="text-white/70 text-sm mb-6 leading-relaxed">
+                                  Connect with friends, family, and interesting people. Start following others to see their posts in your feed!
+                                </p>
+                                <motion.button
+                                  onClick={() => router.push('/discover')}
+                                  className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white font-semibold rounded-xl transition-all duration-300 shadow-lg shadow-blue-500/25 hover:scale-105 active:scale-95"
+                                  whileHover={{ scale: 1.05 }}
+                                  whileTap={{ scale: 0.95 }}
+                                >
+                                  <Search className="w-4 h-4 mr-2" />
+                                  Discover People
+                                </motion.button>
+                              </motion.div>
+                            ) : (
+                              <motion.div
+                                initial={{ opacity: 0, y: 20 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ duration: 0.5 }}
+                                className="max-w-md mx-auto"
+                              >
+                                <div className="w-20 h-20 bg-gradient-to-br from-slate-500/20 to-gray-600/20 rounded-full flex items-center justify-center mx-auto mb-6 border border-slate-400/30">
+                                  <UserPlus className="w-10 h-10 text-slate-400" />
+                                </div>
+                                <h3 className="text-xl font-bold text-white mb-3">No Following Yet</h3>
+                                <p className="text-white/70 text-sm leading-relaxed">
+                                  {currentUser?.name} hasn't followed anyone yet. Their following list will appear here when they start connecting with others.
+                                </p>
+                              </motion.div>
+                            )}
                           </div>
                         )}
                       </div>
@@ -1914,8 +1992,38 @@ export default function ProfileSection({
                             </div>
                           ))
                         ) : (
-                          <div className="text-white/60 text-center py-8">
-                            <p className="text-sm">No followers yet</p>
+                          <div className="text-center py-12 px-6">
+                            {isOwnProfile ? (
+                              <motion.div
+                                initial={{ opacity: 0, y: 20 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ duration: 0.5 }}
+                                className="max-w-md mx-auto"
+                              >
+                                <div className="w-20 h-20 bg-gradient-to-br from-pink-500/20 to-rose-600/20 rounded-full flex items-center justify-center mx-auto mb-6 border border-pink-400/30">
+                                  <Heart className="w-10 h-10 text-pink-400" />
+                                </div>
+                                <h3 className="text-xl font-bold text-white mb-3">No Followers Yet</h3>
+                                <p className="text-white/70 text-sm leading-relaxed">
+                                  Your followers will appear here once people start following you. Keep sharing great content and engaging with the community!
+                                </p>
+                              </motion.div>
+                            ) : (
+                              <motion.div
+                                initial={{ opacity: 0, y: 20 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ duration: 0.5 }}
+                                className="max-w-md mx-auto"
+                              >
+                                <div className="w-20 h-20 bg-gradient-to-br from-slate-500/20 to-gray-600/20 rounded-full flex items-center justify-center mx-auto mb-6 border border-slate-400/30">
+                                  <UserPlus className="w-10 h-10 text-slate-400" />
+                                </div>
+                                <h3 className="text-xl font-bold text-white mb-3">No Followers Yet</h3>
+                                <p className="text-white/70 text-sm leading-relaxed">
+                                  {currentUser?.name} hasn't gained any followers yet. Be the first to follow them and show your support!
+                                </p>
+                              </motion.div>
+                            )}
                           </div>
                         )}
                       </div>

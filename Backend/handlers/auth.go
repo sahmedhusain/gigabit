@@ -401,3 +401,81 @@ func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 
 	writeJSON(w, http.StatusOK, map[string]string{"message": "Successfully logged out"})
 }
+
+func (h *AuthHandler) ChangePassword(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPut {
+		writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
+
+	userID := r.Context().Value("user_id")
+	if userID == nil {
+		writeError(w, http.StatusUnauthorized, "User not authenticated")
+		return
+	}
+
+	var req models.ChangePasswordRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	user, err := h.userService.GetUserByID(userID.(uint))
+	if err != nil {
+		writeError(w, http.StatusNotFound, "User not found")
+		return
+	}
+
+	// Check current password
+	if !utils.CheckPassword(req.CurrentPassword, user.Password) {
+		writeError(w, http.StatusUnauthorized, "Current password is incorrect")
+		return
+	}
+
+	// Validate new password
+	err = validatePassword(req.NewPassword)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	// Hash new password
+	hashedPassword, err := utils.HashPassword(req.NewPassword)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "Failed to hash password")
+		return
+	}
+
+	// Update password
+	user.Password = hashedPassword
+	if err := h.userService.UpdateUser(user); err != nil {
+		writeError(w, http.StatusInternalServerError, "Failed to update password")
+		return
+	}
+
+	// Invalidate all sessions except current
+	sessionID := r.Context().Value("session_id")
+	if sessionID != nil {
+		h.sessionService.DeleteUserSessions(userID.(uint))
+		// Recreate the current session
+		token, err := utils.GenerateSecureToken()
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "Failed to generate token")
+			return
+		}
+		newSession := &models.Session{
+			UserID:    userID.(uint),
+			Token:     token,
+			ExpiresAt: time.Now().Add(60 * time.Minute),
+		}
+		if err := h.sessionService.CreateSession(newSession); err != nil {
+			writeError(w, http.StatusInternalServerError, "Failed to create session")
+			return
+		}
+		// Note: Frontend will need to update token
+		writeJSON(w, http.StatusOK, map[string]interface{}{"message": "Password changed successfully", "new_token": token})
+	} else {
+		h.sessionService.DeleteUserSessions(userID.(uint))
+		writeJSON(w, http.StatusOK, map[string]string{"message": "Password changed successfully"})
+	}
+}

@@ -228,6 +228,11 @@ export default function ChatItem({ item, onClick, onDelete, getUserStatus, typin
         // For private chats, use the conversation ID
         const conversationId = isGroup ? (item.group?.id || item.id) : item.conversationId;
         
+        if (conversationId <= 0) {
+          console.error('Invalid conversation ID:', conversationId);
+          return;
+        }
+        
         await api.markConversationAsRead(conversationId, conversationType);
         
         // Callback to update UI
@@ -246,6 +251,11 @@ export default function ChatItem({ item, onClick, onDelete, getUserStatus, typin
         // For groups, use the group ID or fall back to conversation ID
         // For private chats, use the conversation ID
         const conversationId = isGroup ? (item.group?.id || item.id) : item.conversationId;
+        
+        if (conversationId <= 0) {
+          console.error('Invalid conversation ID:', conversationId);
+          return;
+        }
         
         await api.markConversationAsUnread(conversationId, conversationType);
         

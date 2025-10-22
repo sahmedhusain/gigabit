@@ -23,8 +23,17 @@ type AuthResponse struct {
 }
 
 type UpdateProfileRequest struct {
-	FirstName string `json:"first_name" binding:"max=50"`
-	LastName  string `json:"last_name" binding:"max=50"`
-	Bio       string `json:"bio" binding:"max=500"`
-	AvatarURL string `json:"avatar_url"`
+	FirstName   string  `json:"first_name" binding:"max=50"`
+	LastName    string  `json:"last_name" binding:"max=50"`
+	Email       string  `json:"email" binding:"email"`
+	Nickname    string  `json:"nickname" binding:"max=30"`
+	DateOfBirth string  `json:"date_of_birth"`
+	Bio         string  `json:"bio" binding:"max=500"`
+	AvatarURL   *string `json:"avatar_url"`
+	Gender      string  `json:"gender" binding:"omitempty,oneof=male female other prefer_not_to_say"`
+}
+
+type ChangePasswordRequest struct {
+	CurrentPassword string `json:"current_password" binding:"required"`
+	NewPassword     string `json:"new_password" binding:"required,min=6"`
 }

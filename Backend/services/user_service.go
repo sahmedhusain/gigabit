@@ -123,13 +123,13 @@ func (s *UserService) GetUserByID(id uint) (*models.User, error) {
 func (s *UserService) UpdateUser(user *models.User) error {
 	query := `
 		UPDATE users SET 
-			first_name = ?, last_name = ?, avatar = ?, nickname = ?, about_me = ?, is_private = ?, updated_at = ?
+			email = ?, first_name = ?, last_name = ?, date_of_birth = ?, avatar = ?, nickname = ?, about_me = ?, is_private = ?, password = ?, updated_at = ?
 		WHERE id = ?
 	`
 
 	now := time.Now()
-	_, err := s.db.Exec(query, user.FirstName, user.LastName, user.Avatar, user.Nickname,
-		user.AboutMe, user.IsPrivate, now, user.ID)
+	_, err := s.db.Exec(query, user.Email, user.FirstName, user.LastName, user.DateOfBirth, user.Avatar, user.Nickname,
+		user.AboutMe, user.IsPrivate, user.Password, now, user.ID)
 	if err != nil {
 		return err
 	}
@@ -265,4 +265,10 @@ func (s *UserService) GenerateUniqueNickname(email string) (string, error) {
 			return "", fmt.Errorf("unable to generate unique nickname")
 		}
 	}
+}
+
+func (s *UserService) DeleteUser(userID uint) error {
+	query := `DELETE FROM users WHERE id = ?`
+	_, err := s.db.Exec(query, userID)
+	return err
 }

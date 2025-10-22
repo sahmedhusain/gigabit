@@ -157,7 +157,7 @@ func (h *SearchHandler) SearchAll(w http.ResponseWriter, r *http.Request) {
 		// Sort by relevance
 		sort.Slice(results, func(i, j int) bool {
 			order := map[string]int{
-				"user": 1, "chat": 2, "group": 3, "event": 4, "post": 5, "tag": 6, "message": 7,
+				"user": 1, "private": 2, "group": 3, "event": 4, "post": 5, "tag": 6, "message": 7,
 			}
 			return order[results[i].Type] < order[results[j].Type]
 		})
@@ -295,10 +295,10 @@ func (h *SearchHandler) searchGroups(userID uint, pattern string, limit int, off
 		url := fmt.Sprintf("/group/%d", id)
 		if isMember {
 			if conversationID.Valid {
-				url = fmt.Sprintf("/chats/all?chat=%d", conversationID.Int64)
+				url = fmt.Sprintf("/chats/all?group=%d", id)
 			} else {
 				// Fallback: use group id; frontend can resolve
-				url = fmt.Sprintf("/chats/all?chat=%d", id)
+				url = fmt.Sprintf("/chats/all?group=%d", id)
 			}
 		}
 
@@ -546,6 +546,7 @@ func (h *SearchHandler) searchMessages(userID uint, pattern string, limit int, o
 			gm.created_at,
 			gm.sender_id,
 			gc.id as conversation_id,
+			g.id as group_id,
 			g.name as group_name,
 			u.avatar
 		FROM group_messages gm
@@ -602,7 +603,8 @@ func (h *SearchHandler) searchMessages(userID uint, pattern string, limit int, o
 			var content, createdAt, groupName, avatar string
 			var senderID uint
 			var conversationID uint
-			if err := grows.Scan(&messageID, &content, &createdAt, &senderID, &conversationID, &groupName, &avatar); err != nil {
+			var groupID uint
+			if err := grows.Scan(&messageID, &content, &createdAt, &senderID, &conversationID, &groupID, &groupName, &avatar); err != nil {
 				continue
 			}
 			displayContent := content
@@ -615,7 +617,7 @@ func (h *SearchHandler) searchMessages(userID uint, pattern string, limit int, o
 				Title:    displayContent,
 				Subtitle: "in " + groupName,
 				Image:    avatar,
-				URL:      fmt.Sprintf("/chats/all?chat=%d&message=%d", conversationID, messageID),
+				URL:      fmt.Sprintf("/chats/all?group=%d&message=%d", groupID, messageID),
 				Metadata: map[string]interface{}{
 					"conversationId": conversationID,
 					"senderId":       senderID,
@@ -666,12 +668,18 @@ func (h *SearchHandler) searchChats(userID uint, pattern string, limit int, offs
 		if c.LastMessage != nil {
 			subtitle = *c.LastMessage
 		}
+		url := fmt.Sprintf("/chats/all?chat=%d", c.ConversationID)
+		if c.Type == "group" {
+			if c.GroupID != nil {
+				url = fmt.Sprintf("/chats/all?group=%d", *c.GroupID)
+			}
+		}
 		results = append(results, SearchSuggestion{
-			Type:     "chat",
+			Type:     c.Type,
 			ID:       c.ConversationID,
 			Title:    c.Name,
 			Subtitle: subtitle,
-			URL:      fmt.Sprintf("/chats/all?chat=%d", c.ConversationID),
+			URL:      url,
 			Metadata: map[string]interface{}{
 				"chatType": c.Type,
 				"participantId": func() *uint {

@@ -93,7 +93,11 @@ function ChatsPage() {
     // lock to /chats/all as per requirement, but preserve filter in param for state
     params.set('filter', chatSubTab)
     if (openChatWindow && openChatWindow.conversationId) {
-      params.set('chat', openChatWindow.conversationId.toString())
+      if (openChatWindow.type === 'group') {
+        params.set('group', (openChatWindow.groupId || openChatWindow.conversationId).toString())
+      } else {
+        params.set('chat', openChatWindow.conversationId.toString())
+      }
     }
     if (openChatWindow?.highlightMessageId || highlightMessageParam) {
       params.set('message', (openChatWindow?.highlightMessageId || highlightMessageParam)!.toString())
@@ -147,6 +151,7 @@ function ChatsPage() {
           unread: conversation.unread_count || 0,
           isOnline: isOnline,
           isGroup: !!conversation.group?.id,
+          type: conversation.type,
           participantId: conversation.participant?.id,
           participantAvatar: conversation.participant?.avatar,
           lastMessageSenderId: conversation.last_message?.sender_id,
@@ -220,6 +225,38 @@ function ChatsPage() {
       fetchFollowers()
     }
   }, [user, fetchConversations, fetchFollowers, fetchGroups])
+
+  // Open chat from URL params after conversations are loaded
+  useEffect(() => {
+    if (chats.length > 0 && !openChatWindow) {
+      let chatToOpen = null
+      if (chatId) {
+        // Find private chat
+        chatToOpen = chats.find(c => c.id === parseInt(chatId) && c.type === 'private')
+        if (chatToOpen) {
+          setOpenChatWindow({
+            conversationId: chatToOpen.id,
+            type: 'private',
+            name: chatToOpen.name,
+            participantId: chatToOpen.participantId,
+            highlightMessageId: highlightMessageParam ? parseInt(highlightMessageParam) : undefined
+          })
+        }
+      } else if (groupParam) {
+        // Find group chat
+        chatToOpen = chats.find(c => c.groupId === parseInt(groupParam) || c.id === parseInt(groupParam))
+        if (chatToOpen) {
+          setOpenChatWindow({
+            conversationId: chatToOpen.id,
+            type: 'group',
+            name: chatToOpen.name,
+            groupId: chatToOpen.groupId,
+            highlightMessageId: highlightMessageParam ? parseInt(highlightMessageParam) : undefined
+          })
+        }
+      }
+    }
+  }, [chats, chatId, groupParam, highlightMessageParam, openChatWindow])
 
   // Update chat online status when online users change
   useEffect(() => {

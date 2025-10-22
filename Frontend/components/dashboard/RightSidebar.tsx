@@ -399,7 +399,12 @@ export default function RightSidebar({
                         />
                       ) : (
                         <div className="w-full h-full rounded-full bg-gradient-to-r from-emerald-400 to-teal-500 flex items-center justify-center text-white font-bold">
-                          {currentUser?.name?.[0]?.toUpperCase() || '?'}{currentUser?.name?.[1]?.toUpperCase() || ''}
+                          {(() => {
+                            const nameParts = currentUser?.name?.split(' ') || [];
+                            const firstName = nameParts[0] || '';
+                            const lastName = nameParts[nameParts.length - 1] || '';
+                            return (firstName[0]?.toUpperCase() || '?') + (lastName[0]?.toUpperCase() || '');
+                          })()}
                         </div>
                       );
                     })()}
@@ -839,25 +844,19 @@ export default function RightSidebar({
                 <Users className="w-4 h-4 text-emerald-400 mr-2.5" />
                 Following
                 <span className="ml-2 bg-emerald-500/20 text-emerald-300 text-xs px-2 py-0.5 rounded-full font-semibold">
-                  {(() => {
-                    // Combine followingUsers and onlineUsers, prioritizing followingUsers
-                    const allFollowing = followingUsers.length > 0 ? followingUsers : onlineUsers;
-                    return allFollowing.filter(user => user.username !== currentUser?.username).length;
-                  })()}
+                  {followingUsers.filter(user => user.username !== currentUser?.username).length}
                 </span>
               </h3>
               <div className="flex items-center space-x-2">
                 {(() => {
-                  // Use followingUsers if available, otherwise fall back to onlineUsers
-                  const allFollowing = followingUsers.length > 0 ? followingUsers : onlineUsers;
-                  const filteredUsers = allFollowing.filter(user =>
+                  const filteredFollowing = followingUsers.filter(user =>
                     (user.username !== currentUser?.username) &&
                     (user.id !== currentUser?.id) &&
                     (user.user_id !== currentUser?.id)
                   );
 
                   // Count online following users (users with status 'online')
-                  const onlineCount = filteredUsers.filter(user => {
+                  const onlineCount = filteredFollowing.filter(user => {
                     const onlineUser = onlineUsers.find(u => u.user_id === (user.id || user.user_id))
                     return onlineUser?.status === 'online'
                   }).length;
@@ -884,9 +883,8 @@ export default function RightSidebar({
                 <div className="flex-1 overflow-y-auto scrollbar-hide">
                   <div className="space-y-2">
                     {(() => {
-                      // Use followingUsers if available, otherwise fall back to onlineUsers
-                      const allFollowing = followingUsers.length > 0 ? followingUsers : onlineUsers;
-                      const filteredUsers = allFollowing.filter(user =>
+                      // Use only followingUsers
+                      const filteredUsers = followingUsers.filter(user =>
                         (user.username !== currentUser?.username) &&
                         (user.id !== currentUser?.id) &&
                         (user.user_id !== currentUser?.id)

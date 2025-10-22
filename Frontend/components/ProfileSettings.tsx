@@ -1,0 +1,994 @@
+'use client';
+
+import { useState, useEffect, useRef } from 'react';
+import { User as UserIcon, Edit3, Save, X, Check, Camera, Upload, Eye, EyeOff, Mail, Lock, User, Calendar } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { User as UserType, api } from '@/lib/api';
+
+interface UserProfile {
+  id: number;
+  email: string;
+  first_name: string;
+  last_name: string;
+  date_of_birth: string;
+  avatar?: string;
+  nickname?: string;
+  about_me?: string;
+  gender?: string;
+  is_private: boolean;
+}
+
+// Validation functions from registration form
+function validatePassword(password: string) {
+  const upper = /[A-Z]/
+  const lower = /[a-z]/
+  const number = /[0-9]/
+  const space = /\s/
+  // Allow only ASCII printable characters (excluding space, but including common symbols)
+  const allowedChars = /^[a-zA-Z0-9!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?`~]+$/
+
+  const errors = []
+
+  if (password.length < 8 || password.length > 32) {
+    errors.push("be between 8 and 32 characters long")
+  }
+
+  if (!upper.test(password)) {
+    errors.push("contain at least one uppercase letter")
+  }
+
+  if (!lower.test(password)) {
+    errors.push("contain at least one lowercase letter")
+  }
+
+  if (!number.test(password)) {
+    errors.push("contain at least one number")
+  }
+
+  if (space.test(password)) {
+    errors.push("not contain any spaces")
+  }
+
+  if (!allowedChars.test(password)) {
+    errors.push("only contain English letters, numbers, and common symbols (no emojis or special characters)")
+  }
+
+  // combine errors into a single message
+  if (errors.length > 0) {
+    const lastError = errors.pop() // for adding 'and' before the last error
+    return "Password must " + (errors.length ? errors.join(", ") + ", and " + lastError : lastError)
+  }
+
+  return null
+}
+
+function validateNickname(nickname: string) {
+  if (!nickname) return null // nickname is optional
+  
+  // Allow only English letters (a-z, A-Z), numbers (0-9), underscore (_), hyphen (-), and dot (.)
+  const allowedCharsRegex = /^[a-zA-Z0-9._-]+$/
+  
+  if (!allowedCharsRegex.test(nickname)) {
+    return "Nickname can only contain English letters, numbers, underscore (_), hyphen (-), and dot (.)"
+  }
+  
+  // Must start with a letter or number (not special characters)
+  const startsWithAlphanumeric = /^[a-zA-Z0-9]/
+  if (!startsWithAlphanumeric.test(nickname)) {
+    return "Nickname must start with a letter or number"
+  }
+  
+  // Must end with a letter or number (not special characters)
+  const endsWithAlphanumeric = /[a-zA-Z0-9]$/
+  if (!endsWithAlphanumeric.test(nickname)) {
+    return "Nickname must end with a letter or number"
+  }
+  
+  return null
+}
+
+  // Uniqueness checking functions
+  const checkEmailUniqueness = async (email: string): Promise<{ available: boolean; message?: string }> => {
+    try {
+      return await api.checkEmailUniqueness(email);
+    } catch (error) {
+      console.error('Error checking email uniqueness:', error);
+      return { available: false, message: 'This email is already used' };
+    }
+  };
+
+  const checkNicknameUniqueness = async (nickname: string): Promise<{ available: boolean; message?: string }> => {
+    try {
+      return await api.checkNicknameUniqueness(nickname);
+    } catch (error) {
+      console.error('Error checking nickname uniqueness:', error);
+      return { available: false, message: 'This nickname is already used' };
+    }
+  };
+
+export default function ProfileSettings() {
+  const [user, setUser] = useState<UserProfile | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState('');
+  const [isEditing, setIsEditing] = useState(false);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Validation state
+  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [checkingUniqueness, setCheckingUniqueness] = useState<Record<string, boolean>>({});
+
+  const [formData, setFormData] = useState({
+    first_name: '',
+    last_name: '',
+    email: '',
+    nickname: '',
+    date_of_birth: '',
+    about_me: '',
+    avatar: '',
+    gender: '',
+  });
+
+  const [originalData, setOriginalData] = useState({
+    first_name: '',
+    last_name: '',
+    email: '',
+    nickname: '',
+    date_of_birth: '',
+    about_me: '',
+    avatar: '',
+    gender: '',
+  });
+
+  useEffect(() => {
+    fetchUserProfile();
+  }, []);
+
+  const fetchUserProfile = async () => {
+    try {
+      const userData = await api.getMe();
+      console.log('Fetched user data:', userData);
+      setUser(userData);
+      const initialData = {
+        first_name: userData.first_name || '',
+        last_name: userData.last_name || '',
+        email: userData.email || '',
+        nickname: userData.nickname || '',
+        date_of_birth: userData.date_of_birth || '',
+        about_me: userData.about_me || '',
+        avatar: userData.avatar || '',
+        gender: userData.gender || '',
+      };
+      console.log('Setting form data:', initialData);
+      setFormData(initialData);
+      setOriginalData(initialData);
+    } catch (error) {
+      console.error('Failed to fetch user profile:', error);
+      setMessage('Failed to load profile data');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleEdit = () => {
+    setIsEditing(true);
+    setMessage('');
+    setFieldErrors({});
+  };
+
+  const handleCancel = () => {
+    setFormData(originalData);
+    setIsEditing(false);
+    setMessage('');
+    setFieldErrors({});
+  };
+
+  const handleSaveClick = async () => {
+    // Validate all fields before showing confirmation modal
+    const errors = await validateAllFields();
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors);
+      setMessage('Please fix the errors below before saving');
+      return;
+    }
+    setShowConfirmModal(true);
+  };
+
+  const handleConfirmSave = async () => {
+    setShowConfirmModal(false);
+    await handleSubmit();
+  };
+
+  const validateAllFields = async () => {
+    const errors: Record<string, string> = {};
+
+    // Required fields validation
+    if (!formData.email) {
+      errors.email = 'Email is required';
+    } else {
+      // Email format validation
+      const emailRegex = /^[a-zA-Z0-9!#$%&'*+/=?^_`{|}~]+(\.[a-zA-Z0-9!#$%&'*+/=?^_`{|}~]+)*@[a-zA-Z0-9-]+(\.[a-zA-Z0-9-]+)*\.[a-zA-Z]{2,}$/;
+      if (!emailRegex.test(formData.email)) {
+        errors.email = 'Please enter a valid email address';
+      } else if (formData.email !== originalData.email) {
+        // Check email uniqueness only if it has changed
+        setCheckingUniqueness(prev => ({ ...prev, email: true }));
+        const emailCheck = await checkEmailUniqueness(formData.email);
+        setCheckingUniqueness(prev => ({ ...prev, email: false }));
+        if (!emailCheck.available) {
+          errors.email = emailCheck.message || 'This email is already in use';
+        }
+      }
+    }
+
+    if (!formData.first_name) {
+      errors.first_name = 'First name is required';
+    } else if (formData.first_name.length < 3) {
+      errors.first_name = 'First name must be at least 3 characters long';
+    } else if (formData.first_name.length > 16) {
+      errors.first_name = 'First name is too long';
+    }
+
+    if (!formData.last_name) {
+      errors.last_name = 'Last name is required';
+    } else if (formData.last_name.length < 3) {
+      errors.last_name = 'Last name must be at least 3 characters long';
+    } else if (formData.last_name.length > 16) {
+      errors.last_name = 'Last name is too long';
+    }
+
+    if (!formData.date_of_birth) {
+      errors.date_of_birth = 'Date of birth is required';
+    } else {
+      // Validate date of birth
+      const birthDate = new Date(formData.date_of_birth);
+      const today = new Date();
+      const age = today.getFullYear() - birthDate.getFullYear();
+      const monthDiff = today.getMonth() - birthDate.getMonth();
+      
+      // Adjust age if birthday hasn't occurred this year
+      const adjustedAge = monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate()) 
+        ? age - 1 
+        : age;
+      
+      if (adjustedAge < 13) {
+        errors.date_of_birth = 'You must be at least 13 years old';
+      } else if (adjustedAge > 150) {
+        errors.date_of_birth = 'Date of birth is too far in the past';
+      } else if (birthDate > today) {
+        errors.date_of_birth = 'Date of birth must be less than today';
+      }
+    }
+
+    // Nickname validation (optional but if provided, must be valid)
+    if (formData.nickname) {
+      if (formData.nickname.length > 16) {
+        errors.nickname = 'Nickname is too long';
+      } else {
+        const nicknameValidation = validateNickname(formData.nickname);
+        if (nicknameValidation) {
+          errors.nickname = nicknameValidation;
+        } else if (formData.nickname !== originalData.nickname) {
+          // Check nickname uniqueness only if it has changed
+          setCheckingUniqueness(prev => ({ ...prev, nickname: true }));
+          const nicknameCheck = await checkNicknameUniqueness(formData.nickname);
+          setCheckingUniqueness(prev => ({ ...prev, nickname: false }));
+          if (!nicknameCheck.available) {
+            errors.nickname = nicknameCheck.message || 'This nickname is already in use';
+          }
+        }
+      }
+    }
+
+    // About me validation
+    if (formData.about_me.length > 128) {
+      errors.about_me = 'Your bio is too long';
+    }
+
+    return errors;
+  };
+
+  const handleSubmit = async () => {
+    setSaving(true);
+    setMessage('');
+
+    try {
+      // Prepare data for API - only send changed fields
+      const updateData: any = {};
+      if (formData.first_name !== originalData.first_name) updateData.first_name = formData.first_name;
+      if (formData.last_name !== originalData.last_name) updateData.last_name = formData.last_name;
+      if (formData.email !== originalData.email) updateData.email = formData.email;
+      if (formData.nickname !== originalData.nickname) updateData.nickname = formData.nickname;
+      if (formData.date_of_birth !== originalData.date_of_birth) updateData.date_of_birth = formData.date_of_birth;
+      if (formData.about_me !== originalData.about_me) updateData.bio = formData.about_me;
+      if (formData.avatar !== originalData.avatar) updateData.avatar_url = formData.avatar;
+      if (formData.gender !== originalData.gender) updateData.gender = formData.gender;
+
+      console.log('Sending update data:', updateData);
+
+      const updatedUser = await api.updateProfile(updateData);
+      console.log('Updated user:', updatedUser);
+      setUser(updatedUser);
+      const newData = {
+        first_name: updatedUser.first_name || '',
+        last_name: updatedUser.last_name || '',
+        email: updatedUser.email || '',
+        nickname: updatedUser.nickname || '',
+        date_of_birth: updatedUser.date_of_birth || '',
+        about_me: updatedUser.about_me || '',
+        avatar: updatedUser.avatar || '',
+        gender: updatedUser.gender || '',
+      };
+      setFormData(newData);
+      setOriginalData(newData);
+      setIsEditing(false);
+      setMessage('Profile updated successfully!');
+      setFieldErrors({});
+    } catch (error) {
+      console.error('Failed to update profile:', error);
+      setMessage('Failed to update profile');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      setMessage('Please select a valid image file');
+      return;
+    }
+
+    // Validate file size (5MB limit)
+    if (file.size > 5 * 1024 * 1024) {
+      setMessage('Image size must be less than 5MB');
+      return;
+    }
+
+    const formDataUpload = new FormData();
+    formDataUpload.append('avatar', file);
+
+    try {
+      const response = await fetch('/api/upload/avatar', {
+        method: 'POST',
+        body: formDataUpload,
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        setFormData(prev => ({ ...prev, avatar: result.avatar_url }));
+        setMessage('Avatar uploaded successfully!');
+      } else {
+        const error = await response.json();
+        setMessage(error.message || 'Failed to upload avatar');
+      }
+    } catch (error) {
+      console.error('Failed to upload avatar:', error);
+      setMessage('Failed to upload avatar');
+    }
+  };
+
+  const handleRemoveAvatar = () => {
+    setFormData(prev => ({ ...prev, avatar: '' }));
+    setMessage('Avatar removed. Changes will be saved when you confirm.');
+  };
+
+  const getInitials = () => {
+    const first = formData.first_name?.charAt(0)?.toUpperCase() || '';
+    const last = formData.last_name?.charAt(0)?.toUpperCase() || '';
+    return first + last || 'U';
+  };
+
+  const formatDateForInput = (dateString: string) => {
+    if (!dateString) return '';
+    try {
+      // Ensure the date is in YYYY-MM-DD format for HTML date input
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) return '';
+      return date.toISOString().split('T')[0];
+    } catch {
+      return '';
+    }
+  };
+
+  const handleGenderChange = (gender: string) => {
+    setFormData(prev => ({ ...prev, gender }));
+  };
+
+  const handleChange = async (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    
+    setFormData(prev => ({
+      ...prev,
+      [name]: value,
+    }));
+
+    // Real-time validation for nickname
+    if (name === 'nickname') {
+      const validation = validateNickname(value);
+      if (validation) {
+        setFieldErrors(prev => ({
+          ...prev,
+          nickname: validation
+        }));
+      } else if (value && value !== originalData.nickname) {
+        // Check uniqueness for changed nickname
+        setCheckingUniqueness(prev => ({ ...prev, nickname: true }));
+        const uniquenessCheck = await checkNicknameUniqueness(value);
+        setCheckingUniqueness(prev => ({ ...prev, nickname: false }));
+        setFieldErrors(prev => ({
+          ...prev,
+          nickname: uniquenessCheck.available ? '' : (uniquenessCheck.message || 'This nickname is already in use')
+        }));
+      } else {
+        setFieldErrors(prev => ({
+          ...prev,
+          nickname: ''
+        }));
+      }
+    }
+
+    // Real-time validation for email
+    if (name === 'email') {
+      const emailRegex = /^[a-zA-Z0-9!#$%&'*+/=?^_`{|}~]+(\.[a-zA-Z0-9!#$%&'*+/=?^_`{|}~]+)*@[a-zA-Z0-9-]+(\.[a-zA-Z0-9-]+)*\.[a-zA-Z]{2,}$/;
+      if (!emailRegex.test(value)) {
+        setFieldErrors(prev => ({
+          ...prev,
+          email: 'Please enter a valid email address'
+        }));
+      } else if (value !== originalData.email) {
+        // Check uniqueness for changed email
+        setCheckingUniqueness(prev => ({ ...prev, email: true }));
+        const uniquenessCheck = await checkEmailUniqueness(value);
+        setCheckingUniqueness(prev => ({ ...prev, email: false }));
+        setFieldErrors(prev => ({
+          ...prev,
+          email: uniquenessCheck.available ? '' : (uniquenessCheck.message || 'This email is already in use')
+        }));
+      } else {
+        setFieldErrors(prev => ({
+          ...prev,
+          email: ''
+        }));
+      }
+    }
+
+    // Real-time validation for date of birth
+    if (name === 'date_of_birth' && value) {
+      const birthDate = new Date(value);
+      const today = new Date();
+      const age = today.getFullYear() - birthDate.getFullYear();
+      const monthDiff = today.getMonth() - birthDate.getMonth();
+      
+      // Adjust age if birthday hasn't occurred this year
+      const adjustedAge = monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate()) 
+        ? age - 1 
+        : age;
+      
+      let dateError = '';
+      if (adjustedAge < 13) {
+        dateError = 'You must be at least 13 years old';
+      } else if (adjustedAge > 150) {
+        dateError = 'Date of birth is too far in the past';
+      } else if (birthDate > today) {
+        dateError = 'Date of birth must be less than today';
+      }
+      
+      setFieldErrors(prev => ({
+        ...prev,
+        date_of_birth: dateError
+      }));
+    }
+
+    // Clear field error when user starts typing
+    if (fieldErrors[name]) {
+      setFieldErrors(prev => ({
+        ...prev,
+        [name]: ''
+      }));
+    }
+  };
+
+  if (loading) {
+    return <div className="text-center py-8">Loading...</div>;
+  }
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center space-x-3">
+          <div className="p-2 bg-gradient-to-br from-blue-500 to-cyan-600 rounded-lg">
+            <UserIcon className="w-5 h-5 text-white" />
+          </div>
+          <h2 className="text-2xl font-bold text-white">Profile Settings</h2>
+        </div>
+
+        {!isEditing ? (
+          <button
+            onClick={handleEdit}
+            className="flex items-center space-x-2 px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded-xl transition-all duration-300 backdrop-blur-xl border border-white/20"
+          >
+            <Edit3 className="w-4 h-4" />
+            <span>Edit Profile</span>
+          </button>
+        ) : (
+          <div className="flex space-x-3">
+            <button
+              onClick={handleCancel}
+              className="flex items-center space-x-2 px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded-xl transition-all duration-300 backdrop-blur-xl border border-white/20"
+            >
+              <X className="w-4 h-4" />
+              <span>Cancel</span>
+            </button>
+            <button
+              onClick={handleSaveClick}
+              disabled={saving}
+              className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-cyan-600 hover:from-blue-600 hover:to-cyan-700 text-white rounded-xl transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <Save className="w-4 h-4" />
+              <span>Save Changes</span>
+            </button>
+          </div>
+        )}
+      </div>
+
+      {message && (
+        <div className={`mb-6 p-4 rounded-xl backdrop-blur-xl border transition-all duration-300 ${
+          message.includes('success')
+            ? 'bg-green-500/20 border-green-400/30 text-green-100'
+            : 'bg-red-500/20 border-red-400/30 text-red-100'
+        }`}>
+          {message}
+        </div>
+      )}
+
+      <div className="space-y-6">
+        {/* Avatar Section */}
+        <div className="flex items-center space-x-6 p-6 bg-white/5 backdrop-blur-xl border border-white/10 rounded-xl">
+          <div className="relative">
+            <div className="w-20 h-20 rounded-full overflow-hidden bg-gradient-to-br from-blue-500 to-cyan-600 flex items-center justify-center">
+              {formData.avatar ? (
+                <img
+                  src={formData.avatar}
+                  alt="Profile avatar"
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <span className="text-white font-bold text-lg">
+                  {getInitials()}
+                </span>
+              )}
+            </div>
+            {isEditing && (
+              <div className="absolute -bottom-1 -right-1">
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  className="p-2 bg-gradient-to-r from-blue-500 to-cyan-600 hover:from-blue-600 hover:to-cyan-700 text-white rounded-full transition-all duration-300 shadow-lg"
+                  aria-label="Upload new profile picture"
+                  title="Upload new profile picture"
+                >
+                  <Camera className="w-4 h-4" />
+                </button>
+              </div>
+            )}
+          </div>
+          <div className="flex-1">
+            <h3 className="text-lg font-semibold text-white mb-2">Profile Picture</h3>
+            <p className="text-white/70 text-sm mb-3">
+              {isEditing
+                ? "Click the camera icon to upload a new profile picture. Max size: 5MB"
+                : "Your current profile picture"
+              }
+            </p>
+            {isEditing && (
+              <div className="flex space-x-3">
+                <button
+                  onClick={handleRemoveAvatar}
+                  disabled={!formData.avatar}
+                  className="flex items-center space-x-2 px-4 py-2 bg-red-500 hover:bg-red-600 disabled:bg-gray-500 disabled:cursor-not-allowed text-white rounded-xl transition-all duration-300 shadow-lg"
+                  aria-label="Remove profile picture"
+                  title="Remove profile picture"
+                >
+                  <X className="w-4 h-4" />
+                  <span>Remove</span>
+                </button>
+                <label htmlFor="avatar-upload" className="sr-only">
+                  Upload profile picture
+                </label>
+                <input
+                  ref={fileInputRef}
+                  id="avatar-upload"
+                  type="file"
+                  accept="image/*"
+                  onChange={handleAvatarChange}
+                  className="hidden"
+                  aria-label="Upload profile picture"
+                />
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Gender Section */}
+        <div className="space-y-2">
+          <label className="block text-sm font-medium text-white/90">
+            Gender
+          </label>
+          <div className="flex space-x-4">
+            {['male', 'female', 'prefer_not_to_say'].map((genderOption) => (
+              <label
+                key={genderOption}
+                className={`flex items-center space-x-2 px-4 py-3 rounded-xl border backdrop-blur-xl transition-all duration-300 cursor-pointer ${
+                  isEditing
+                    ? 'bg-white/10 border-white/20 hover:bg-white/20'
+                    : 'bg-white/5 border-white/10 cursor-not-allowed'
+                } ${formData.gender === genderOption ? 'ring-2 ring-blue-400' : ''}`}
+              >
+                <input
+                  type="radio"
+                  name="gender"
+                  value={genderOption}
+                  checked={formData.gender === genderOption}
+                  onChange={(e) => handleGenderChange(e.target.value)}
+                  disabled={!isEditing}
+                  className="text-blue-400 focus:ring-blue-400"
+                />
+                <span className={`text-sm font-medium ${
+                  isEditing ? 'text-white' : 'text-white/60'
+                }`}>
+                  {genderOption === 'male' ? 'Male' :
+                   genderOption === 'female' ? 'Female' :
+                   'Prefer not to say'}
+                </span>
+              </label>
+            ))}
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="space-y-2">
+            <label htmlFor="first_name" className="block text-xs font-semibold text-white/90 uppercase tracking-wide">
+              First Name
+            </label>
+            <div className="relative group">
+              <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none z-10">
+                <User className={`h-4 w-4 ${fieldErrors.first_name ? 'text-red-400' : 'text-emerald-400/70 group-focus-within:text-emerald-400'} transition-colors`} />
+              </div>
+              <input
+                type="text"
+                id="first_name"
+                name="first_name"
+                value={formData.first_name}
+                onChange={handleChange}
+                readOnly={!isEditing}
+                className={`w-full pl-11 pr-4 py-3.5 rounded-xl text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent backdrop-blur-xl transition-all duration-300 ${
+                  isEditing
+                    ? `bg-white/10 border ${fieldErrors.first_name ? 'border-red-400/50' : 'border-white/20'}`
+                    : 'bg-white/5 border border-white/10 cursor-not-allowed'
+                }`}
+                placeholder={isEditing ? "Enter your first name" : (formData.first_name ? "" : "Not set")}
+                required={isEditing}
+              />
+            </div>
+            {fieldErrors.first_name && (
+              <motion.div
+                className="mt-2 flex items-start space-x-2 bg-gradient-to-r from-red-500/10 to-pink-500/10 backdrop-blur-sm rounded-xl p-3 border border-red-400/20"
+                initial={{ opacity: 0, y: -5, scale: 0.95 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                transition={{ type: 'spring', stiffness: 400, damping: 17 }}
+              >
+                <div className="w-4 h-4 rounded-full bg-red-400/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <X className="w-3 h-3 text-red-400" />
+                </div>
+                <p className="text-red-300/90 text-xs leading-relaxed">{fieldErrors.first_name}</p>
+              </motion.div>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <label htmlFor="last_name" className="block text-xs font-semibold text-white/90 uppercase tracking-wide">
+              Last Name
+            </label>
+            <div className="relative group">
+              <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none z-10">
+                <User className={`h-4 w-4 ${fieldErrors.last_name ? 'text-red-400' : 'text-emerald-400/70 group-focus-within:text-emerald-400'} transition-colors`} />
+              </div>
+              <input
+                type="text"
+                id="last_name"
+                name="last_name"
+                value={formData.last_name}
+                onChange={handleChange}
+                readOnly={!isEditing}
+                className={`w-full pl-11 pr-4 py-3.5 rounded-xl text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent backdrop-blur-xl transition-all duration-300 ${
+                  isEditing
+                    ? `bg-white/10 border ${fieldErrors.last_name ? 'border-red-400/50' : 'border-white/20'}`
+                    : 'bg-white/5 border border-white/10 cursor-not-allowed'
+                }`}
+                placeholder={isEditing ? "Enter your last name" : (formData.last_name ? "" : "Not set")}
+                required={isEditing}
+              />
+            </div>
+            {fieldErrors.last_name && (
+              <motion.div
+                className="mt-2 flex items-start space-x-2 bg-gradient-to-r from-red-500/10 to-pink-500/10 backdrop-blur-sm rounded-xl p-3 border border-red-400/20"
+                initial={{ opacity: 0, y: -5, scale: 0.95 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                transition={{ type: 'spring', stiffness: 400, damping: 17 }}
+              >
+                <div className="w-4 h-4 rounded-full bg-red-400/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <X className="w-3 h-3 text-red-400" />
+                </div>
+                <p className="text-red-300/90 text-xs leading-relaxed">{fieldErrors.last_name}</p>
+              </motion.div>
+            )}
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <label htmlFor="email" className="block text-xs font-semibold text-white/90 uppercase tracking-wide">
+            Email Address
+          </label>
+          <div className="relative group">
+            <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none z-10">
+              {checkingUniqueness.email ? (
+                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+              ) : (
+                <Mail className={`h-4 w-4 ${fieldErrors.email ? 'text-red-400' : 'text-emerald-400/70 group-focus-within:text-emerald-400'} transition-colors`} />
+              )}
+            </div>
+            <input
+              type="email"
+              id="email"
+              name="email"
+              value={formData.email}
+              onChange={handleChange}
+              readOnly={!isEditing}
+              className={`w-full pl-11 pr-4 py-3.5 rounded-xl text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent backdrop-blur-xl transition-all duration-300 ${
+                isEditing
+                  ? `bg-white/10 border ${fieldErrors.email ? 'border-red-400/50' : 'border-white/20'}`
+                  : 'bg-white/5 border border-white/10 cursor-not-allowed'
+              }`}
+              placeholder={isEditing ? "Enter your email address" : (formData.email ? "" : "Not set")}
+              required={isEditing}
+            />
+          </div>
+          {fieldErrors.email && (
+            <motion.div
+              className="mt-2 flex items-start space-x-2 bg-gradient-to-r from-red-500/10 to-pink-500/10 backdrop-blur-sm rounded-xl p-3 border border-red-400/20"
+              initial={{ opacity: 0, y: -5, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              transition={{ type: 'spring', stiffness: 400, damping: 17 }}
+            >
+              <div className="w-4 h-4 rounded-full bg-red-400/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+                <X className="w-3 h-3 text-red-400" />
+              </div>
+              <p className="text-red-300/90 text-xs leading-relaxed">{fieldErrors.email}</p>
+            </motion.div>
+          )}
+          {!fieldErrors.email && formData.email && isEditing && formData.email !== originalData.email && (
+            <motion.div
+              className="mt-2 flex items-start space-x-2 bg-gradient-to-r from-emerald-500/10 to-teal-500/10 backdrop-blur-sm rounded-xl p-3 border border-emerald-400/20"
+              initial={{ opacity: 0, y: -5, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              transition={{ type: 'spring', stiffness: 400, damping: 17 }}
+            >
+              <div className="w-4 h-4 rounded-full bg-emerald-400/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+                <Check className="w-3 h-3 text-emerald-400" />
+              </div>
+              <p className="text-emerald-300/90 text-xs leading-relaxed">Email is available</p>
+            </motion.div>
+          )}
+        </div>
+
+        <div className="space-y-2">
+          <label htmlFor="nickname" className="block text-xs font-semibold text-white/90 uppercase tracking-wide">
+            Nickname <span className="text-white/40 text-[10px] normal-case">(Optional)</span>
+          </label>
+          <div className="relative group">
+            <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none z-10">
+              {checkingUniqueness.nickname ? (
+                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+              ) : (
+                <Edit3 className={`h-4 w-4 ${fieldErrors.nickname ? 'text-red-400' : 'text-emerald-400/70 group-focus-within:text-emerald-400'} transition-colors`} />
+              )}
+            </div>
+            <input
+              type="text"
+              id="nickname"
+              name="nickname"
+              value={formData.nickname}
+              onChange={handleChange}
+              readOnly={!isEditing}
+              className={`w-full pl-11 pr-4 py-3.5 rounded-xl text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent backdrop-blur-xl transition-all duration-300 ${
+                isEditing
+                  ? `bg-white/10 border ${fieldErrors.nickname ? 'border-red-400/50' : 'border-white/20'}`
+                  : 'bg-white/5 border border-white/10 cursor-not-allowed'
+              }`}
+              placeholder={isEditing ? "Choose a unique nickname" : (formData.nickname ? "" : "Not set")}
+            />
+          </div>
+          {fieldErrors.nickname && (
+            <motion.div
+              className="mt-2 flex items-start space-x-2 bg-gradient-to-r from-red-500/10 to-pink-500/10 backdrop-blur-sm rounded-xl p-3 border border-red-400/20"
+              initial={{ opacity: 0, y: -5, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              transition={{ type: 'spring', stiffness: 400, damping: 17 }}
+            >
+              <div className="w-4 h-4 rounded-full bg-red-400/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+                <X className="w-3 h-3 text-red-400" />
+              </div>
+              <p className="text-red-300/90 text-xs leading-relaxed">{fieldErrors.nickname}</p>
+            </motion.div>
+          )}
+          {!fieldErrors.nickname && formData.nickname && isEditing && formData.nickname !== originalData.nickname && (
+            <motion.div
+              className="mt-2 flex items-start space-x-2 bg-gradient-to-r from-emerald-500/10 to-teal-500/10 backdrop-blur-sm rounded-xl p-3 border border-emerald-400/20"
+              initial={{ opacity: 0, y: -5, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              transition={{ type: 'spring', stiffness: 400, damping: 17 }}
+            >
+              <div className="w-4 h-4 rounded-full bg-emerald-400/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+                <Check className="w-3 h-3 text-emerald-400" />
+              </div>
+              <p className="text-emerald-300/90 text-xs leading-relaxed">Nickname is available</p>
+            </motion.div>
+          )}
+          {!fieldErrors.nickname && formData.nickname && isEditing && formData.nickname === originalData.nickname && (
+            <motion.div
+              className="mt-2 flex items-start space-x-2 bg-gradient-to-r from-emerald-500/10 to-teal-500/10 backdrop-blur-sm rounded-xl p-3 border border-emerald-400/20"
+              initial={{ opacity: 0, y: -5, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              transition={{ type: 'spring', stiffness: 400, damping: 17 }}
+            >
+              <div className="w-4 h-4 rounded-full bg-emerald-400/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+                <Check className="w-3 h-3 text-emerald-400" />
+              </div>
+              <p className="text-emerald-300/90 text-xs leading-relaxed">Valid nickname</p>
+            </motion.div>
+          )}
+        </div>
+
+        <div className="space-y-2">
+          <label htmlFor="date_of_birth" className="block text-xs font-semibold text-white/90 uppercase tracking-wide">
+            Date of Birth
+          </label>
+          <div className="relative group">
+            <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none z-10">
+              <Calendar className={`h-4 w-4 ${fieldErrors.date_of_birth ? 'text-red-400' : 'text-emerald-400/70 group-focus-within:text-emerald-400'} transition-colors`} />
+            </div>
+            {isEditing ? (
+              <input
+                type="date"
+                id="date_of_birth"
+                name="date_of_birth"
+                value={formatDateForInput(formData.date_of_birth)}
+                onChange={handleChange}
+                className={`w-full pl-11 pr-4 py-3.5 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent backdrop-blur-xl transition-all duration-300 bg-white/10 border ${fieldErrors.date_of_birth ? 'border-red-400/50' : 'border-white/20'} [color-scheme:dark]`}
+                required
+              />
+            ) : (
+              <div className="w-full pl-11 pr-4 py-3.5 rounded-xl text-white/70 bg-white/5 border border-white/10 cursor-not-allowed backdrop-blur-xl">
+                {formData.date_of_birth ? new Date(formData.date_of_birth).toLocaleDateString('en-US', {
+                  year: 'numeric',
+                  month: 'long',
+                  day: 'numeric'
+                }) : 'Not set'}
+              </div>
+            )}
+          </div>
+          {fieldErrors.date_of_birth && (
+            <motion.div
+              className="mt-2 flex items-start space-x-2 bg-gradient-to-r from-red-500/10 to-pink-500/10 backdrop-blur-sm rounded-xl p-3 border border-red-400/20"
+              initial={{ opacity: 0, y: -5, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              transition={{ type: 'spring', stiffness: 400, damping: 17 }}
+            >
+              <div className="w-4 h-4 rounded-full bg-red-400/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+                <X className="w-3 h-3 text-red-400" />
+              </div>
+              <p className="text-red-300/90 text-xs leading-relaxed">{fieldErrors.date_of_birth}</p>
+            </motion.div>
+          )}
+          {!fieldErrors.date_of_birth && formData.date_of_birth && isEditing && (
+            <motion.div
+              className="mt-2 flex items-start space-x-2 bg-gradient-to-r from-emerald-500/10 to-teal-500/10 backdrop-blur-sm rounded-xl p-3 border border-emerald-400/20"
+              initial={{ opacity: 0, y: -5, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              transition={{ type: 'spring', stiffness: 400, damping: 17 }}
+            >
+              <div className="w-4 h-4 rounded-full bg-emerald-400/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+                <Check className="w-3 h-3 text-emerald-400" />
+              </div>
+              <p className="text-emerald-300/90 text-xs leading-relaxed">Valid date of birth</p>
+            </motion.div>
+          )}
+        </div>
+
+        <div className="space-y-2">
+          <label htmlFor="about_me" className="block text-xs font-semibold text-white/90 uppercase tracking-wide">
+            About Me <span className="text-white/40 text-[10px] normal-case">(Optional)</span>
+          </label>
+          <div className="relative group">
+            <div className="absolute top-0 left-0 pl-3.5 flex items-start pointer-events-none z-10 pt-3.5">
+              <Edit3 className={`h-4 w-4 ${fieldErrors.about_me ? 'text-red-400' : 'text-emerald-400/70 group-focus-within:text-emerald-400'} transition-colors mt-3.5`} />
+            </div>
+            <textarea
+              id="about_me"
+              name="about_me"
+              value={formData.about_me}
+              onChange={handleChange}
+              rows={4}
+              readOnly={!isEditing}
+              className={`w-full pl-11 pr-4 py-3.5 rounded-xl text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent backdrop-blur-xl transition-all duration-300 resize-none ${
+                isEditing
+                  ? `bg-white/10 border ${fieldErrors.about_me ? 'border-red-400/50' : 'border-white/20'}`
+                  : 'bg-white/5 border border-white/10 cursor-not-allowed'
+              }`}
+              placeholder={isEditing ? "Tell us about yourself..." : (formData.about_me ? "" : "Not set")}
+            />
+          </div>
+          {fieldErrors.about_me && (
+            <motion.div
+              className="mt-2 flex items-start space-x-2 bg-gradient-to-r from-red-500/10 to-pink-500/10 backdrop-blur-sm rounded-xl p-3 border border-red-400/20"
+              initial={{ opacity: 0, y: -5, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              transition={{ type: 'spring', stiffness: 400, damping: 17 }}
+            >
+              <div className="w-4 h-4 rounded-full bg-red-400/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+                <X className="w-3 h-3 text-red-400" />
+              </div>
+              <p className="text-red-300/90 text-xs leading-relaxed">{fieldErrors.about_me}</p>
+            </motion.div>
+          )}
+        </div>
+      </div>
+
+      {/* Confirmation Modal */}
+      {showConfirmModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-white/10 backdrop-blur-xl border border-white/20 rounded-2xl p-6 max-w-md w-full mx-4">
+            <div className="flex items-center space-x-3 mb-4">
+              <div className="p-2 bg-gradient-to-br from-blue-500 to-cyan-600 rounded-lg">
+                <Check className="w-5 h-5 text-white" />
+              </div>
+              <h3 className="text-xl font-bold text-white">Confirm Changes</h3>
+            </div>
+
+            <p className="text-white/80 mb-6">
+              Are you sure you want to save these changes to your profile? This action cannot be undone.
+            </p>
+
+            <div className="flex space-x-3">
+              <button
+                onClick={() => setShowConfirmModal(false)}
+                className="flex-1 px-4 py-3 bg-white/10 hover:bg-white/20 text-white rounded-xl transition-all duration-300 backdrop-blur-xl border border-white/20"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmSave}
+                disabled={saving}
+                className="flex-1 px-4 py-3 bg-gradient-to-r from-blue-500 to-cyan-600 hover:from-blue-600 hover:to-cyan-700 text-white font-semibold rounded-xl transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {saving ? (
+                  <div className="flex items-center justify-center space-x-2">
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                    <span>Saving...</span>
+                  </div>
+                ) : (
+                  'Confirm Save'
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

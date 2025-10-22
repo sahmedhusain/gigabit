@@ -1176,3 +1176,34 @@ func (h *GroupHandler) GetInvitableUsers(w http.ResponseWriter, r *http.Request,
 		"count": len(users),
 	})
 }
+
+func (h *GroupHandler) CancelInvitation(w http.ResponseWriter, r *http.Request, groupIDStr string, invitationIDStr string) {
+	groupID, err := strconv.ParseUint(groupIDStr, 10, 32)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "Invalid group ID")
+		return
+	}
+
+	invitationID, err := strconv.ParseUint(invitationIDStr, 10, 32)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "Invalid invitation ID")
+		return
+	}
+
+	userID, ok := r.Context().Value("user_id").(uint)
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "User not authenticated")
+		return
+	}
+
+	if err := h.groupService.CancelInvitation(uint(groupID), uint(invitationID), userID); err != nil {
+		if err == sql.ErrNoRows {
+			writeError(w, http.StatusForbidden, "Cannot cancel this invitation")
+		} else {
+			writeError(w, http.StatusInternalServerError, "Failed to cancel invitation")
+		}
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]interface{}{"message": "Invitation cancelled successfully"})
+}

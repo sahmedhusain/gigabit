@@ -9,6 +9,7 @@ import (
 	"social/middleware"
 	"social/models"
 	"social/services"
+	"social/utils"
 	"social/websocket"
 )
 
@@ -78,11 +79,39 @@ func (h *UserHandler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
 	if req.LastName != "" {
 		user.LastName = req.LastName
 	}
+	if req.Email != "" {
+		// Check if email is already taken by another user
+		existingUser, err := h.userService.GetUserByEmail(req.Email)
+		if err == nil && existingUser != nil && existingUser.ID != userID {
+			writeError(w, http.StatusConflict, "Email already in use")
+			return
+		}
+		user.Email = req.Email
+	}
+	if req.Nickname != "" {
+		// Check if nickname is already taken by another user
+		existingUser, err := h.userService.GetUserByNickname(req.Nickname)
+		if err == nil && existingUser != nil && existingUser.ID != userID {
+			writeError(w, http.StatusConflict, "Nickname already in use")
+			return
+		}
+		user.Nickname = &req.Nickname
+	}
+	if req.DateOfBirth != "" {
+		user.DateOfBirth = req.DateOfBirth
+	}
 	if req.Bio != "" {
 		user.AboutMe = &req.Bio
 	}
-	if req.AvatarURL != "" {
-		user.Avatar = &req.AvatarURL
+	if req.AvatarURL != nil {
+		if *req.AvatarURL != "" {
+			user.Avatar = req.AvatarURL
+		} else {
+			user.Avatar = nil
+		}
+	}
+	if req.Gender != "" {
+		user.Gender = &req.Gender
 	}
 
 	if err := h.userService.UpdateUser(user); err != nil {
@@ -236,6 +265,85 @@ func (h *UserHandler) UpdateStatus(w http.ResponseWriter, r *http.Request) {
 	user, err := h.userService.GetUserByID(userID)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "Failed to get updated user")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, user.ToResponse())
+}
+
+func (h *UserHandler) DeleteAccount(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodDelete {
+		writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
+
+	userID, exists := middleware.GetUserID(r)
+	if !exists {
+		writeError(w, http.StatusUnauthorized, "User not authenticated")
+		return
+	}
+
+	var req struct {
+		Password string `json:"password"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	user, err := h.userService.GetUserByID(userID)
+	if err != nil {
+		writeError(w, http.StatusNotFound, "User not found")
+		return
+	}
+
+	// Verify password
+	if !utils.CheckPassword(req.Password, user.Password) {
+		writeError(w, http.StatusUnauthorized, "Incorrect password")
+		return
+	}
+
+	// Delete user (this will cascade delete related data if foreign keys are set)
+	if err := h.userService.DeleteUser(userID); err != nil {
+		writeError(w, http.StatusInternalServerError, "Failed to delete account")
+		return
+	}
+
+	// Delete sessions
+	h.db.Exec("DELETE FROM sessions WHERE user_id = ?", userID)
+
+	writeJSON(w, http.StatusOK, map[string]string{"message": "Account deleted successfully"})
+}
+
+func (h *UserHandler) TogglePrivacy(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPut {
+		writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
+
+	userID, exists := middleware.GetUserID(r)
+	if !exists {
+		writeError(w, http.StatusUnauthorized, "User not authenticated")
+		return
+	}
+
+	var req struct {
+		IsPrivate bool `json:"is_private"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	user, err := h.userService.GetUserByID(userID)
+	if err != nil {
+		writeError(w, http.StatusNotFound, "User not found")
+		return
+	}
+
+	user.IsPrivate = req.IsPrivate
+	if err := h.userService.UpdateUser(user); err != nil {
+		writeError(w, http.StatusInternalServerError, "Failed to update privacy")
 		return
 	}
 

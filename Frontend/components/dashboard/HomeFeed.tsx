@@ -551,12 +551,28 @@ export default function HomeFeed({
       return (
         <div className="text-center py-16">
           <Sparkles className="w-16 h-16 text-white/30 mx-auto mb-4" />
-          <p className="text-white/60 mb-2">No posts found</p>
-            <p className="text-white/40 text-sm">
+          <p className="text-white/60 mb-2">
+            {feedSubTab === 'following' && 'No posts from following'}
+            {feedSubTab === 'friends' && 'No posts from friends'}
+            {feedSubTab === 'all' && 'No posts found'}
+          </p>
+            <p className="text-white/40 text-sm mb-6">
             {feedSubTab === 'following' && 'Start following users to see their posts here'}
             {feedSubTab === 'friends' && 'Connect with friends to see their posts here'}
             {feedSubTab === 'all' && 'Be the first to share something!'}
             </p>
+
+            {feedSubTab === 'following' && (
+              <motion.button
+                onClick={() => window.location.href = '/discover'}
+                className="px-6 py-3 bg-gradient-to-r from-blue-500/20 to-indigo-500/20 hover:from-blue-500/30 hover:to-indigo-500/30 text-blue-300 rounded-xl border border-blue-400/30 hover:border-blue-400/50 transition-all duration-300 flex items-center space-x-2 mx-auto"
+                whileHover={{ scale: 1.05, y: -1 }}
+                whileTap={{ scale: 0.95 }}
+              >
+                <User className="w-4 h-4" />
+                <span>Discover People</span>
+              </motion.button>
+            )}
         </div>
       )
     }

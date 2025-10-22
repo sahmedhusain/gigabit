@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useEffect, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Image from 'next/image'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
@@ -150,6 +150,7 @@ export default function DiscoverPage() {
   const { isConnected } = useConnectionStatus()
   const { sendMessage } = useWebSocket()
   const router = useRouter()
+  const searchParams = useSearchParams()
 
   // State
   const [activeTab, setActiveTab] = useState<ActiveTab>('users')
@@ -185,6 +186,18 @@ export default function DiscoverPage() {
   const [filteredUsers, setFilteredUsers] = useState<DiscoverUser[]>([])
   const [filteredGroups, setFilteredGroups] = useState<DiscoverGroup[]>([])
   const [filteredRequests, setFilteredRequests] = useState<RequestItem[]>([])
+
+  // Initialize active tab from URL parameter
+  useEffect(() => {
+    const tabParam = searchParams.get('tab')
+    if (tabParam === 'groups') {
+      setActiveTab('groups')
+    } else if (tabParam === 'requests') {
+      setActiveTab('requests')
+    } else {
+      setActiveTab('users')
+    }
+  }, [searchParams])
 
   // Fetch users
   const fetchUsers = useCallback(async () => {
@@ -248,8 +261,8 @@ export default function DiscoverPage() {
         api.getUserGroups(currentUser.id)
       ])
 
-      const userGroupIds = new Set(userGroupsResponse.groups.map(g => g.id))
-      const userGroupRoles = new Map(userGroupsResponse.groups.map(g => [g.id, g.role]))
+      const userGroupIds = new Set(userGroupsResponse.groups ? userGroupsResponse.groups.map(g => g.id) : [])
+      const userGroupRoles = new Map(userGroupsResponse.groups ? userGroupsResponse.groups.map(g => [g.id, g.role]) : [])
 
       const publicGroups: DiscoverGroup[] = allGroupsResponse.groups
         .filter(group => group.privacy === 'public')
@@ -645,7 +658,7 @@ export default function DiscoverPage() {
 
   // Handle open group
   const handleOpenGroup = (groupId: number) => {
-    router.push(`/group/${groupId}`)
+    router.push(`/chats/all?group=${groupId}`)
   }
 
   // Handle cancel join request

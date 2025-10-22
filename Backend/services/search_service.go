@@ -178,9 +178,9 @@ func (s *SearchService) searchGroups(userID uint, pattern string, limit int) []S
 		url := fmt.Sprintf("/group/%d", id)
 		if isMember {
 			if conversationID.Valid {
-				url = fmt.Sprintf("/chats/all?chat=%d", conversationID.Int64)
+				url = fmt.Sprintf("/chats/all?group=%d", id)
 			} else {
-				url = fmt.Sprintf("/chats/all?chat=%d", id)
+				url = fmt.Sprintf("/chats/all?group=%d", id)
 			}
 		}
 
@@ -386,12 +386,18 @@ func (s *SearchService) searchChats(userID uint, pattern string, limit int) []Se
 		if c.LastMessage != nil {
 			subtitle = *c.LastMessage
 		}
+		url := fmt.Sprintf("/chats/all?chat=%d", c.ConversationID)
+		if c.Type == "group" {
+			if c.GroupID != nil {
+				url = fmt.Sprintf("/chats/all?group=%d", *c.GroupID)
+			}
+		}
 		results = append(results, SearchSuggestion{
 			Type:     "chat",
 			ID:       c.ConversationID,
 			Title:    c.Name,
 			Subtitle: subtitle,
-			URL:      fmt.Sprintf("/chats/all?chat=%d", c.ConversationID),
+			URL:      url,
 			Metadata: map[string]interface{}{
 				"chatType": c.Type,
 				"participantId": func() *uint {

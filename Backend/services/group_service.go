@@ -431,6 +431,43 @@ WHERE group_id = ? AND user_id = ?
 	return err
 }
 
+func (s *GroupService) CancelInvitation(groupID, invitationID, userID uint) error {
+	// Check if user has admin privileges
+	isAdmin, err := s.IsUserAdminOrCreator(groupID, userID)
+	if err != nil || !isAdmin {
+		return sql.ErrNoRows
+	}
+
+	// Check if the invitation exists and belongs to this group
+	query := `SELECT invited_by FROM group_members WHERE id = ? AND group_id = ? AND status = 'sent'`
+
+	var invitedBy sql.NullInt64
+	err = s.db.QueryRow(query, invitationID, groupID).Scan(&invitedBy)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return sql.ErrNoRows // No invitation found
+		}
+		return err
+	}
+
+	// Delete the invitation
+	result, err := s.db.Exec("DELETE FROM group_members WHERE id = ? AND group_id = ? AND status = 'sent'", invitationID, groupID)
+	if err != nil {
+		return err
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+
+	if rowsAffected == 0 {
+		return sql.ErrNoRows
+	}
+
+	return nil
+}
+
 func (s *GroupService) LeaveGroup(groupID, userID uint) error {
 	tx, err := s.db.Begin()
 	if err != nil {

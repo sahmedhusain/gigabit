@@ -30,6 +30,7 @@ export interface User {
   avatar: string;
   nickname: string;
   about_me: string;
+  gender: string;
   is_private: boolean;
   status: string;
   last_status_change: string;
@@ -227,6 +228,7 @@ export interface Chat {
   unread: number;
   isOnline: boolean;
   isGroup: boolean;
+  type: 'private' | 'group';
   participantId?: number;
   participantAvatar?: string; // Add participant avatar
   groupId?: number; // Add group ID for group chats
@@ -1239,8 +1241,11 @@ export class ApiClient {
       method: 'GET',
     });
 
+    // Ensure posts is an array
+    const posts = response.posts || [];
+
     // Transform PostResponse[] to Post[]
-    const transformedPosts: Post[] = response.posts.map(postResponse => ({
+    const transformedPosts: Post[] = posts.map(postResponse => ({
       id: postResponse.id,
       user: {
         id: postResponse.user.id,
@@ -1262,9 +1267,9 @@ export class ApiClient {
 
     return {
       posts: transformedPosts,
-      count: response.count,
-      limit: response.limit,
-      offset: response.offset,
+      count: response.count || 0,
+      limit: response.limit || limit,
+      offset: response.offset || offset,
     };
   }
 
@@ -1284,6 +1289,25 @@ export class ApiClient {
     return this.request<User>('/api/users/status', {
       method: 'PUT',
       body: JSON.stringify({ status }),
+    });
+  }
+  async updateProfile(data: { first_name?: string; last_name?: string; email?: string; nickname?: string; date_of_birth?: string; bio?: string; avatar_url?: string; gender?: string }): Promise<User> {
+    return this.request<User>('/api/profile', {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  // Validation endpoints for uniqueness checks
+  async checkEmailUniqueness(email: string): Promise<{ available: boolean; message?: string }> {
+    return this.request<{ available: boolean; message?: string }>(`/api/validation/email?email=${encodeURIComponent(email)}`, {
+      method: 'GET',
+    });
+  }
+
+  async checkNicknameUniqueness(nickname: string): Promise<{ available: boolean; message?: string }> {
+    return this.request<{ available: boolean; message?: string }>(`/api/validation/nickname?nickname=${encodeURIComponent(nickname)}`, {
+      method: 'GET',
     });
   }
 
@@ -1425,6 +1449,12 @@ export class ApiClient {
   async getFollowStatus(userId: number): Promise<{ is_following: boolean; is_pending: boolean; is_followed_by: boolean; status: string }> {
     return this.request<{ is_following: boolean; is_pending: boolean; is_followed_by: boolean; status: string }>(`/api/users/${userId}/follow-status`, {
       method: 'GET',
+    });
+  }
+
+  async cancelInvitation(groupId: number, invitationId: number): Promise<{ message: string }> {
+    return this.request<{ message: string }>(`/api/groups/${groupId}/cancel-invitation/${invitationId}`, {
+      method: 'DELETE',
     });
   }
 }

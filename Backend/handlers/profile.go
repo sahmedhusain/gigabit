@@ -93,8 +93,12 @@ func (h *ProfileHandler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
 	if req.Bio != "" {
 		user.AboutMe = &req.Bio
 	}
-	if req.AvatarURL != "" {
-		user.Avatar = &req.AvatarURL
+	if req.AvatarURL != nil {
+		if *req.AvatarURL != "" {
+			user.Avatar = req.AvatarURL
+		} else {
+			user.Avatar = nil
+		}
 	}
 
 	if err := h.userService.UpdateUser(user); err != nil {

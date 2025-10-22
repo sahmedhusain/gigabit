@@ -3,7 +3,11 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { ArrowRight, Users, MessageCircle, Calendar, Star, Globe, Zap, Shield, Heart, TrendingUp, Sparkles, Play, CheckCircle } from 'lucide-react';
+import { ArrowRight, Users, MessageCircle, Calendar, Star, Globe, Zap, Shield, TrendingUp, Sparkles, CheckCircle } from 'lucide-react';
+import TermsPopup from './TermsPopup';
+import PrivacyPopup from './PrivacyPopup';
+import CookiesPopup from './CookiesPopup';
+import SupportPopup from './SupportPopup';
 
 interface FloatingElementProps {
   children: React.ReactNode;
@@ -53,36 +57,12 @@ const FeatureCard = ({ icon: Icon, title, description, gradient }: {
   </div>
 );
 
-const TestimonialCard = ({ name, role, content, avatar }: {
-  name: string;
-  role: string;
-  content: string;
-  avatar: string;
-}) => (
-  <div className="group relative">
-    <div className="absolute inset-0 bg-gradient-to-r from-white/10 to-white/5 backdrop-blur-xl rounded-2xl border border-white/20 shadow-lg"></div>
-    <div className="relative p-6">
-      <div className="flex items-center mb-4">
-        <div className="w-12 h-12 rounded-full bg-gradient-to-r from-emerald-400 to-teal-500 flex items-center justify-center mr-4">
-          <span className="text-white font-semibold text-lg">{avatar}</span>
-        </div>
-        <div>
-          <h4 className="text-white font-semibold">{name}</h4>
-          <p className="text-white/60 text-sm">{role}</p>
-        </div>
-      </div>
-      <p className="text-white/80 italic">&ldquo;{content}&rdquo;</p>
-      <div className="flex text-yellow-400 mt-3">
-        {[...Array(5)].map((_, i) => (
-          <Star key={i} className="w-4 h-4 fill-current" />
-        ))}
-      </div>
-    </div>
-  </div>
-);
-
 export default function Homepage() {
   const [isVisible, setIsVisible] = useState(false);
+  const [showTerms, setShowTerms] = useState(false);
+  const [showPrivacy, setShowPrivacy] = useState(false);
+  const [showCookies, setShowCookies] = useState(false);
+  const [showSupport, setShowSupport] = useState(false);
 
   useEffect(() => {
     setIsVisible(true);
@@ -185,35 +165,6 @@ export default function Homepage() {
                   <ArrowRight className="ml-2 w-4 sm:w-5 h-4 sm:h-5 group-hover:translate-x-1 transition-transform" />
                 </span>
               </Link>
-              
-              <button className="group flex items-center w-full sm:w-auto px-6 sm:px-8 py-3 sm:py-4 rounded-2xl border border-white/30 text-white hover:bg-white/10 transition-all duration-300 backdrop-blur-sm font-semibold text-base sm:text-lg">
-                <div className="w-10 sm:w-12 h-10 sm:h-12 rounded-full bg-white/20 flex items-center justify-center mr-3 sm:mr-4 group-hover:bg-white/30 transition-colors">
-                  <Play className="w-5 sm:w-6 h-5 sm:h-6 ml-1" />
-                </div>
-                Watch Demo
-              </button>
-            </div>
-            
-            {/* Stats */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-4xl mx-auto">
-              <div className="text-center">
-                <div className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-emerald-400 to-teal-400 bg-clip-text text-transparent mb-2">
-                  10M+
-                </div>
-                <p className="text-white/70 font-medium">Active Users</p>
-              </div>
-              <div className="text-center">
-                <div className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-teal-400 to-cyan-400 bg-clip-text text-transparent mb-2">
-                  50M+
-                </div>
-                <p className="text-white/70 font-medium">Messages Sent Daily</p>
-              </div>
-              <div className="text-center">
-                <div className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-cyan-400 to-purple-400 bg-clip-text text-transparent mb-2">
-                  99.9%
-                </div>
-                <p className="text-white/70 font-medium">Uptime</p>
-              </div>
             </div>
           </div>
         </div>
@@ -254,60 +205,6 @@ export default function Homepage() {
               description="Create and manage events effortlessly. Invite friends and coordinate activities seamlessly."
               gradient="from-orange-500 to-red-500"
             />
-            <FeatureCard
-              icon={Globe}
-              title="Global Reach"
-              description="Connect with people worldwide. Break geographical barriers and expand your network."
-              gradient="from-cyan-500 to-blue-500"
-            />
-            <FeatureCard
-              icon={Shield}
-              title="Privacy First"
-              description="Your data is secure with end-to-end encryption and advanced privacy controls."
-              gradient="from-green-500 to-emerald-500"
-            />
-            <FeatureCard
-              icon={TrendingUp}
-              title="Smart Feed"
-              description="AI-powered content curation ensures you see what matters most to you."
-              gradient="from-purple-500 to-pink-500"
-            />
-          </div>
-        </div>
-      </section>
-
-      {/* Testimonials */}
-      <section className="relative z-20 px-6 py-20">
-        <div className="max-w-7xl mx-auto">
-          <div className="text-center mb-16">
-            <div className="inline-flex items-center px-6 py-3 rounded-full bg-white/10 backdrop-blur-sm border border-white/20 text-white/80 mb-8">
-              <Heart className="w-4 h-4 mr-2 text-red-400" />
-              <span className="text-sm font-medium">Loved by Users</span>
-            </div>
-            <h2 className="text-4xl md:text-6xl font-bold bg-gradient-to-r from-white to-emerald-100 bg-clip-text text-transparent mb-6">
-              What People Say
-            </h2>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            <TestimonialCard
-              name="Sarah Johnson"
-              role="Digital Creator"
-              content="Gigabit has completely transformed how I connect with my audience. The interface is intuitive and the features are exactly what I needed."
-              avatar="SJ"
-            />
-            <TestimonialCard
-              name="Michael Chen"
-              role="Community Manager"
-              content="The community features are outstanding. I've been able to build and manage thriving communities with ease."
-              avatar="MC"
-            />
-            <TestimonialCard
-              name="Elena Rodriguez"
-              role="Event Organizer"
-              content="Event planning has never been easier. The integration with messaging and communities is seamless."
-              avatar="ER"
-            />
           </div>
         </div>
       </section>
@@ -332,15 +229,16 @@ export default function Homepage() {
                 >
                   <div className="absolute inset-0 bg-gradient-to-r from-emerald-400 to-teal-600 rounded-2xl blur opacity-30 group-hover:opacity-50 transition-opacity"></div>
                   <span className="relative flex items-center">
-                    Create Free Account
+                    Create Account
                     <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
                   </span>
                 </Link>
-                
-                <div className="flex items-center text-white/60 text-sm">
-                  <CheckCircle className="w-4 h-4 mr-2 text-emerald-400" />
-                  <span>No credit card required</span>
-                </div>
+                <Link
+                  href="/login"
+                  className="px-8 py-4 rounded-2xl border border-white/30 text-white hover:bg-white/10 transition-all duration-300 backdrop-blur-sm font-semibold text-lg"
+                >
+                  Sign In
+                </Link>
               </div>
             </div>
           </div>
@@ -364,10 +262,10 @@ export default function Homepage() {
             </div>
             
             <div className="flex items-center flex-wrap justify-center gap-4 sm:gap-8 text-white/60 text-sm">
-              <button className="hover:text-white transition-colors">Terms</button>
-              <button className="hover:text-white transition-colors">Privacy</button>
-              <button className="hover:text-white transition-colors">Cookies</button>
-              <button className="hover:text-white transition-colors">Support</button>
+              <button onClick={() => setShowTerms(true)} className="hover:text-white transition-colors">Terms</button>
+              <button onClick={() => setShowPrivacy(true)} className="hover:text-white transition-colors">Privacy</button>
+              <button onClick={() => setShowCookies(true)} className="hover:text-white transition-colors">Cookies</button>
+              <button onClick={() => setShowSupport(true)} className="hover:text-white transition-colors">Support</button>
             </div>
           </div>
           
@@ -394,6 +292,12 @@ export default function Homepage() {
           <div className="w-1 h-3 bg-white/50 rounded-full mt-2 animate-pulse"></div>
         </div>
       </div>
+
+      {/* Popups */}
+      <TermsPopup isOpen={showTerms} onClose={() => setShowTerms(false)} />
+      <PrivacyPopup isOpen={showPrivacy} onClose={() => setShowPrivacy(false)} />
+      <CookiesPopup isOpen={showCookies} onClose={() => setShowCookies(false)} />
+      <SupportPopup isOpen={showSupport} onClose={() => setShowSupport(false)} />
     </div>
   );
 }

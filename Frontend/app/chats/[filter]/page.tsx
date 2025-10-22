@@ -37,6 +37,7 @@ function ChatsFilterPage() {
 
   // Get URL parameters
   const chatId = searchParams.get('chat')
+  const groupId = searchParams.get('group')
   const userParam = searchParams.get('user')
   const highlightMessageParam = searchParams.get('message')
 
@@ -90,22 +91,33 @@ function ChatsFilterPage() {
     '#React', '#TypeScript', '#NodeJS', '#Python', '#DevOps'
   ]
 
-  // Update URL when filter changes
+  // Update URL when filter changes - allow private/groups tabs, redirect others to /chats/all
   useEffect(() => {
-    const urlFilter = chatSubTab === 'group' ? 'groups' : chatSubTab
-    if (urlFilter !== filter) {
-      router.replace(`/chats/${urlFilter}`)
+    if (filter !== 'all' && filter !== 'private' && filter !== 'groups') {
+      router.replace('/chats/all')
     }
-  }, [chatSubTab, filter, router])
+  }, [filter, router])
 
-  // Open chat from URL parameter
+  // Open chat from URL parameter - respect current filter tab
   useEffect(() => {
     if (openChatWindow && openChatWindow.conversationId) {
-      router.replace(`/chats/${filter}?chat=${openChatWindow.conversationId}`)
+      const param = openChatWindow.type === 'group' ? 'group' : 'chat'
+      // If we're on the 'all' tab, use /chats/all with query params for deep linking
+      if (filter === 'all') {
+        router.replace(`/chats/all?${param}=${openChatWindow.conversationId}`)
+      } else {
+        // If we're on private/groups tabs, stay on current path but add query params
+        router.replace(`/chats/${filter}?${param}=${openChatWindow.conversationId}`)
+      }
     } else {
-      router.replace(`/chats/${filter}`)
+      // When closing chat, remove query params but stay on current filter
+      if (filter === 'all') {
+        router.replace('/chats/all')
+      } else {
+        router.replace(`/chats/${filter}`)
+      }
     }
-  }, [openChatWindow, filter, router])
+  }, [openChatWindow, router, filter])
 
   // Fetch data when component loads
   useEffect(() => {
@@ -155,6 +167,23 @@ function ChatsFilterPage() {
       }
     }
 
+    // Direct group open via ?group=
+    if (groupId) {
+      const id = parseInt(groupId)
+      if (!isNaN(id)) {
+        // If chats already loaded, try to find details; otherwise open with minimal info
+        const chat = chats.find(c => c.isGroup && c.groupId === id)
+        setOpenChatWindow({
+          conversationId: chat?.id || id, // Use conversation ID if found, otherwise use group ID
+          type: 'group',
+          name: chat?.name || 'Group Chat',
+          groupId: id,
+          highlightMessageId: highlightMessageParam ? parseInt(highlightMessageParam) : undefined
+        })
+        return
+      }
+    }
+
     // Open direct message via ?user=
     if (userParam) {
       const participantId = parseInt(userParam)
@@ -169,7 +198,7 @@ function ChatsFilterPage() {
         })
       }
     }
-  }, [chatId, chats, userParam, highlightMessageParam])
+  }, [chatId, groupId, chats, userParam, highlightMessageParam])
 
   const fetchConversations = async () => {
     try {
@@ -210,7 +239,8 @@ function ChatsFilterPage() {
           participantAvatar: String(participant?.['avatar'] ?? ''),
           lastMessageSenderId: Number(last_message?.['sender_id'] ?? 0),
           actualId: group?.['id'] ?? participant?.['id'],
-          groupId: group?.['id'] ? Number(group['id']) : undefined
+          groupId: group?.['id'] ? Number(group['id']) : undefined,
+          type: type as 'private' | 'group'
         }
       }))
     } catch (err) {

@@ -12,11 +12,9 @@ func GenerateSecureToken() (string, error) {
 		return "", err
 	}
 
-	// Convert to hex
 	return hex.EncodeToString(bytes), nil
 }
 
-// ValidateTokenFormat checks if the token has the correct format
 func ValidateTokenFormat(token string) error {
 	if len(token) != 64 {
 		return errors.New("invalid token format")

@@ -33,7 +33,6 @@ func (s *SessionService) CreateSession(session *models.Session) error {
 
 	session.ID = uint(id)
 
-	// Fetch the created timestamps from the database
 	query = `SELECT created_at, updated_at FROM sessions WHERE id = ?`
 	row := s.db.QueryRow(query, session.ID)
 	err = row.Scan(&session.CreatedAt, &session.UpdatedAt)
@@ -134,7 +133,6 @@ UPDATE sessions SET token = ? WHERE id = ?
 		return err
 	}
 
-	// Fetch the updated timestamp from the database (set by trigger)
 	query = `SELECT updated_at FROM sessions WHERE id = ?`
 	row := s.db.QueryRow(query, session.ID)
 	err = row.Scan(&session.UpdatedAt)
@@ -150,7 +148,6 @@ func (s *SessionService) ExtendSession(sessionID uint, extensionDuration time.Du
 UPDATE sessions SET expires_at = datetime(expires_at, ?) WHERE id = ?
 `
 
-	// Convert duration to SQLite datetime modifier format (e.g., "+60 minutes")
 	minutes := int(extensionDuration.Minutes())
 	modifier := fmt.Sprintf("+%d minutes", minutes)
 

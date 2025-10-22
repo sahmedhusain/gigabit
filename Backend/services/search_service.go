@@ -15,21 +15,20 @@ type SearchService struct {
 
 // SearchSuggestion represents a generic search result
 type SearchSuggestion struct {
-	Type        string      `json:"type"`        // "user", "event", "group", "post", "tag", "message"
-	ID          interface{} `json:"id"`          // Can be string or int
-	Title       string      `json:"title"`       // Main display text
-	Subtitle    string      `json:"subtitle"`    // Secondary info
-	Image       string      `json:"image"`       // Avatar/image URL
-	Description string      `json:"description"` // Additional context
-	URL         string      `json:"url"`         // Frontend route
-	Metadata    interface{} `json:"metadata"`    // Type-specific data
+	Type        string      `json:"type"`
+	ID          interface{} `json:"id"`
+	Title       string      `json:"title"`
+	Subtitle    string      `json:"subtitle"`
+	Image       string      `json:"image"`
+	Description string      `json:"description"`
+	URL         string      `json:"url"`
+	Metadata    interface{} `json:"metadata"`
 }
 
 func NewSearchService(db *sql.DB) *SearchService {
 	return &SearchService{db: db}
 }
 
-// SearchSuggestions performs a quick search across all categories for real-time suggestions
 func (s *SearchService) SearchSuggestions(userID uint, query string) ([]SearchSuggestion, error) {
 	if len(query) < 2 {
 		return []SearchSuggestion{}, nil

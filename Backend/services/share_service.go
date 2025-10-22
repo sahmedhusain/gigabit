@@ -3,7 +3,6 @@ package services
 import (
 	"database/sql"
 	"fmt"
-	"log"
 	"social/models"
 	"social/websocket"
 	"time"
@@ -22,74 +21,53 @@ func NewShareService(db *sql.DB, hub *websocket.Hub) *ShareService {
 }
 
 func (s *ShareService) SharePost(userID uint, req *models.ShareRequest) error {
-	// Validate max 5 each
 	if len(req.ConversationIDs) > 5 || len(req.GroupIDs) > 5 || len(req.UserIDs) > 5 {
-		return sql.ErrNoRows // Use as invalid input error
+		return sql.ErrNoRows
 	}
 
-	// Get post to share
 	post, err := s.getPostByID(req.PostID)
 	if err != nil {
 		return err
 	}
 
-	// Share to conversations
 	for _, convID := range req.ConversationIDs {
-		if err := s.shareToConversation(userID, req.PostID, convID, post); err != nil {
-			log.Printf("Failed to share post %d to conversation %d: %v", req.PostID, convID, err)
-			continue
-		}
+		_ = s.shareToConversation(userID, req.PostID, convID, post)
 	}
 
-	// Share to groups
 	for _, groupID := range req.GroupIDs {
-		if err := s.shareToGroup(userID, req.PostID, groupID, post); err != nil {
-			log.Printf("Failed to share post %d to group %d: %v", req.PostID, groupID, err)
-			continue
-		}
+		_ = s.shareToGroup(userID, req.PostID, groupID, post)
 	}
 
-	// Share to users (following users without existing conversations)
 	for _, targetUserID := range req.UserIDs {
-		if err := s.shareToUser(userID, req.PostID, targetUserID, post); err != nil {
-			log.Printf("Failed to share post %d to user %d: %v", req.PostID, targetUserID, err)
-			continue
-		}
+		_ = s.shareToUser(userID, req.PostID, targetUserID, post)
 	}
 
-	// Update share count
 	totalShares := len(req.ConversationIDs) + len(req.GroupIDs) + len(req.UserIDs)
 	if totalShares > 0 {
-		if err := s.incrementShareCount(req.PostID, totalShares); err != nil {
-			log.Printf("Failed to increment share count for post %d: %v", req.PostID, err)
-		}
+		_ = s.incrementShareCount(req.PostID, totalShares)
 	}
 
 	return nil
 }
 
 func (s *ShareService) shareToConversation(userID, postID, conversationID uint, post *models.PostResponse) error {
-	// Create message content
 	content := "Shared a post: " + post.Content
 	if len(content) > 100 {
 		content = content[:97] + "..."
 	}
 
-	// Get the other participant
 	var otherUserID uint
 	err := s.db.QueryRow("SELECT participant1_id, participant2_id FROM private_conversations WHERE id = ?", conversationID).Scan(&otherUserID, &otherUserID)
 	if err != nil {
 		return err
 	}
 	if otherUserID == userID {
-		// Get the other one
 		err = s.db.QueryRow("SELECT CASE WHEN participant1_id = ? THEN participant2_id ELSE participant1_id END FROM private_conversations WHERE id = ?", userID, conversationID).Scan(&otherUserID)
 		if err != nil {
 			return err
 		}
 	}
 
-	// Insert message into private_messages table
 	result, err := s.db.Exec(`
 		INSERT INTO private_messages (conversation_id, sender_id, content, is_read, created_at)
 		VALUES (?, ?, ?, false, ?)
@@ -103,7 +81,6 @@ func (s *ShareService) shareToConversation(userID, postID, conversationID uint, 
 		return err
 	}
 
-	// Record the share
 	_, err = s.db.Exec(`
 		INSERT INTO shares (post_id, user_id, conversation_id, message_id, created_at)
 		VALUES (?, ?, ?, ?, ?)
@@ -112,12 +89,10 @@ func (s *ShareService) shareToConversation(userID, postID, conversationID uint, 
 		return err
 	}
 
-	// Update conversation last message
 	_, err = s.db.Exec(`
 		UPDATE private_conversations SET last_message_id = ?, updated_at = ? WHERE id = ?
 	`, messageID, time.Now(), conversationID)
 
-	// Increment unread count for the receiver
 	updateQuery := `
 		UPDATE private_conversations
 		SET unread_count1 = CASE WHEN participant1_id = ? THEN unread_count1 + 1 ELSE unread_count1 END,
@@ -125,27 +100,21 @@ func (s *ShareService) shareToConversation(userID, postID, conversationID uint, 
 		    updated_at = ?
 		WHERE id = ?
 	`
-	_, updateErr := s.db.Exec(updateQuery, otherUserID, otherUserID, time.Now(), conversationID)
-	if updateErr != nil {
-		log.Printf("Failed to increment unread count: %v", updateErr)
-	}
+	_, _ = s.db.Exec(updateQuery, otherUserID, otherUserID, time.Now(), conversationID)
 
 	return err
 }
 
 func (s *ShareService) shareToGroup(userID, postID, groupID uint, post *models.PostResponse) error {
-	// Create message content
 	content := "Shared a post: " + post.Content
 	if len(content) > 100 {
 		content = content[:97] + "..."
 	}
 
-	// Get or create conversation
 	var conversationID uint
 	checkQuery := `SELECT id FROM group_conversations WHERE group_id = ?`
 	err := s.db.QueryRow(checkQuery, groupID).Scan(&conversationID)
 	if err == sql.ErrNoRows {
-		// Create new conversation
 		insertQuery := `INSERT INTO group_conversations (group_id, created_at, updated_at) VALUES (?, ?, ?)`
 		now := time.Now()
 		result, err := s.db.Exec(insertQuery, groupID, now, now)
@@ -161,7 +130,6 @@ func (s *ShareService) shareToGroup(userID, postID, groupID uint, post *models.P
 		return err
 	}
 
-	// Insert message into group_messages table
 	result, err := s.db.Exec(`
 		INSERT INTO group_messages (conversation_id, sender_id, content, is_read, created_at)
 		VALUES (?, ?, ?, false, ?)
@@ -175,7 +143,6 @@ func (s *ShareService) shareToGroup(userID, postID, groupID uint, post *models.P
 		return err
 	}
 
-	// Record the share
 	_, err = s.db.Exec(`
 		INSERT INTO shares (post_id, user_id, group_id, message_id, created_at)
 		VALUES (?, ?, ?, ?, ?)
@@ -184,7 +151,6 @@ func (s *ShareService) shareToGroup(userID, postID, groupID uint, post *models.P
 		return err
 	}
 
-	// Update conversation last message
 	_, err = s.db.Exec(`
 		UPDATE group_conversations SET last_message_id = ?, updated_at = ? WHERE id = ?
 	`, messageID, time.Now(), conversationID)
@@ -193,13 +159,11 @@ func (s *ShareService) shareToGroup(userID, postID, groupID uint, post *models.P
 }
 
 func (s *ShareService) shareToUser(userID, postID, targetUserID uint, post *models.PostResponse) error {
-	// Create message content
 	content := "Shared a post: " + post.Content
 	if len(content) > 100 {
 		content = content[:97] + "..."
 	}
 
-	// Check if conversation already exists
 	var conversationID uint
 	checkQuery := `
 		SELECT id FROM private_conversations
@@ -209,7 +173,6 @@ func (s *ShareService) shareToUser(userID, postID, targetUserID uint, post *mode
 	err := s.db.QueryRow(checkQuery, userID, targetUserID, targetUserID, userID).Scan(&conversationID)
 
 	if err == sql.ErrNoRows {
-		// Create new conversation
 		insertQuery := `
 			INSERT INTO private_conversations (participant1_id, participant2_id, created_at, updated_at)
 			VALUES (?, ?, ?, ?)
@@ -228,7 +191,6 @@ func (s *ShareService) shareToUser(userID, postID, targetUserID uint, post *mode
 		return err
 	}
 
-	// Insert message into private_messages table
 	result, err := s.db.Exec(`
 		INSERT INTO private_messages (conversation_id, sender_id, content, is_read, created_at)
 		VALUES (?, ?, ?, false, ?)
@@ -242,7 +204,6 @@ func (s *ShareService) shareToUser(userID, postID, targetUserID uint, post *mode
 		return err
 	}
 
-	// Record the share
 	_, err = s.db.Exec(`
 		INSERT INTO shares (post_id, user_id, conversation_id, message_id, created_at)
 		VALUES (?, ?, ?, ?, ?)
@@ -251,12 +212,10 @@ func (s *ShareService) shareToUser(userID, postID, targetUserID uint, post *mode
 		return err
 	}
 
-	// Update conversation last message
 	_, err = s.db.Exec(`
 		UPDATE private_conversations SET last_message_id = ?, updated_at = ? WHERE id = ?
 	`, messageID, time.Now(), conversationID)
 
-	// Increment unread count for the receiver
 	updateQuery := `
 		UPDATE private_conversations
 		SET unread_count1 = CASE WHEN participant1_id = ? THEN unread_count1 + 1 ELSE unread_count1 END,
@@ -264,10 +223,7 @@ func (s *ShareService) shareToUser(userID, postID, targetUserID uint, post *mode
 		    updated_at = ?
 		WHERE id = ?
 	`
-	_, updateErr := s.db.Exec(updateQuery, targetUserID, targetUserID, time.Now(), conversationID)
-	if updateErr != nil {
-		log.Printf("Failed to increment unread count: %v", updateErr)
-	}
+	_, _ = s.db.Exec(updateQuery, targetUserID, targetUserID, time.Now(), conversationID)
 
 	return err
 }

@@ -7,7 +7,6 @@ import (
 	"io"
 	"log"
 	"net/http"
-	"os"
 	"strings"
 	"time"
 
@@ -35,43 +34,32 @@ type Response struct {
 	Error   string      `json:"error,omitempty"`
 }
 
-// CORS middleware
 func corsMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Set CORS headers
 		w.Header().Set("Access-Control-Allow-Origin", "http://localhost:3000")
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", "Origin, Content-Type, Accept, Authorization, Upgrade, Connection, Sec-WebSocket-Key, Sec-WebSocket-Version, Sec-WebSocket-Protocol")
 		w.Header().Set("Access-Control-Expose-Headers", "Content-Length")
 		w.Header().Set("Access-Control-Allow-Credentials", "true")
 		w.Header().Set("Access-Control-Max-Age", "43200")
-
-		// Handle preflight requests
 		if r.Method == "OPTIONS" {
 			w.WriteHeader(http.StatusOK)
 			return
 		}
-
 		next.ServeHTTP(w, r)
 	})
 }
 
-// Logging middleware
 func loggingMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		start := time.Now()
 		next.ServeHTTP(w, r)
-		log.Printf("%s %s %v", r.Method, r.URL.Path, time.Since(start))
 	})
 }
 
-// JSON helper functions
 func writeJSON(w http.ResponseWriter, status int, data interface{}) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	if err := json.NewEncoder(w).Encode(data); err != nil {
-		log.Printf("Error encoding JSON: %v", err)
-	}
+	_ = json.NewEncoder(w).Encode(data)
 }
 
 func writeError(w http.ResponseWriter, status int, message string) {
@@ -218,46 +206,6 @@ func (s *Server) setupRoutes() {
 	s.router.HandleFunc("/api/polls", s.handlePollsRoute(pollHandler))
 	s.router.HandleFunc("/api/polls/", s.handlePollRoute(pollHandler))
 
-	// Dev-only debug routes (enable by setting ENABLE_DEBUG=1 in environment)
-	if os.Getenv("ENABLE_DEBUG") == "1" {
-		s.router.HandleFunc("/api/debug/sessions", func(w http.ResponseWriter, r *http.Request) {
-			if r.Method != http.MethodGet {
-				writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
-				return
-			}
-
-			db := s.DB.GetDB()
-			rows, err := db.Query(`SELECT id, user_id, token, expires_at, created_at, updated_at FROM sessions`)
-			if err != nil {
-				writeError(w, http.StatusInternalServerError, "Failed to query sessions")
-				return
-			}
-			defer rows.Close()
-
-			sessions := []map[string]interface{}{}
-			for rows.Next() {
-				var id int
-				var userID int
-				var token string
-				var expiresAt string
-				var createdAt string
-				var updatedAt string
-				if err := rows.Scan(&id, &userID, &token, &expiresAt, &createdAt, &updatedAt); err != nil {
-					continue
-				}
-				sessions = append(sessions, map[string]interface{}{
-					"id":         id,
-					"user_id":    userID,
-					"token":      token,
-					"expires_at": expiresAt,
-					"created_at": createdAt,
-					"updated_at": updatedAt,
-				})
-			}
-
-			writeJSON(w, http.StatusOK, map[string]interface{}{"sessions": sessions})
-		})
-	}
 }
 
 // Route handler wrapper

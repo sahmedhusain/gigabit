@@ -2,11 +2,9 @@ package websocket
 
 import (
 	"database/sql"
-	"log"
 	"time"
 )
 
-// handlePostUpdate broadcasts post updates to followers
 func (h *Hub) handlePostUpdate(message Message) {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
@@ -21,24 +19,20 @@ func (h *Hub) handlePostUpdate(message Message) {
 				select {
 				case client.Send <- message:
 				default:
-					log.Printf("Failed to send post update to user %d", userID)
 				}
 			}
 		}
 	}
 }
 
-// handleGroupPostUpdate broadcasts group post updates to group members
 func (h *Hub) handleGroupPostUpdate(message Message) {
 	if message.GroupID > 0 {
 		h.handleGroupMessage(message)
 	}
 }
 
-// handleCommentCreate processes comment creation via WebSocket
 func (h *Hub) handleCommentCreate(message Message) {
 	if h.db == nil {
-		log.Printf("Database not available")
 		return
 	}
 
@@ -56,7 +50,6 @@ func (h *Hub) handleCommentCreate(message Message) {
 
 		content, contentOk := commentData["content"].(string)
 		if !contentOk || content == "" {
-			log.Printf("Invalid comment content from user %d", userID)
 			errorMsg := Message{
 				Type:      MessageTypeError,
 				From:      0,
@@ -82,7 +75,6 @@ func (h *Hub) handleCommentCreate(message Message) {
 		now := time.Now()
 		result, err := h.db.Exec(query, postID, userID, content, imageURL, now, now)
 		if err != nil {
-			log.Printf("Failed to create comment via WebSocket: %v", err)
 			errorMsg := Message{
 				Type:      MessageTypeError,
 				From:      0,
@@ -96,7 +88,6 @@ func (h *Hub) handleCommentCreate(message Message) {
 
 		commentID, err := result.LastInsertId()
 		if err != nil {
-			log.Printf("Failed to get comment ID: %v", err)
 			return
 		}
 
@@ -107,7 +98,6 @@ func (h *Hub) handleCommentCreate(message Message) {
 
 		err = h.db.QueryRow(userQuery, userID).Scan(&firstName, &lastName, &avatar, &nickname)
 		if err != nil {
-			log.Printf("Failed to get user info: %v", err)
 			return
 		}
 
@@ -146,14 +136,10 @@ func (h *Hub) handleCommentCreate(message Message) {
 
 		// Broadcast the new comment to all clients
 		h.BroadcastCommentUpdate(postID, uint(commentID), userID, "create", responseData)
-
-		log.Printf("Comment created via WebSocket: postID=%d, userID=%d, commentID=%d", postID, userID, commentID)
 	} else {
-		log.Printf("Invalid comment data format from user %d", message.From)
 	}
 }
 
-// handleCommentUpdate broadcasts comment updates to post author and commenters
 func (h *Hub) handleCommentUpdate(message Message) {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
@@ -163,13 +149,11 @@ func (h *Hub) handleCommentUpdate(message Message) {
 			select {
 			case client.Send <- message:
 			default:
-				log.Printf("Failed to send comment update to user %d", userID)
 			}
 		}
 	}
 }
 
-// handleLikeUpdate broadcasts like updates to post author
 func (h *Hub) handleLikeUpdate(message Message) {
 	if message.To > 0 {
 		h.handlePrivateMessage(message)
@@ -183,36 +167,28 @@ func (h *Hub) handleLikeUpdate(message Message) {
 				select {
 				case client.Send <- message:
 				default:
-					log.Printf("Failed to send like update to user %d", userID)
 				}
 			}
 		}
 	}
 }
 
-// handleLike broadcasts like updates
 func (h *Hub) handleLike(message Message) {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
-
-	log.Printf("Broadcasting like update for post %d by user %d", message.PostID, message.From)
 
 	for userID, client := range h.clients {
 		if userID != message.From {
 			select {
 			case client.Send <- message:
-				log.Printf("Successfully sent like update to user %d", userID)
 			default:
-				log.Printf("Failed to send like update to user %d", userID)
 			}
 		}
 	}
 }
 
-// handleFollowStatus processes follow status queries
 func (h *Hub) handleFollowStatus(message Message) {
 	if h.db == nil {
-		log.Printf("Database not available")
 		h.sendErrorMessage(message.From, "Database not available")
 		return
 	}
@@ -221,7 +197,6 @@ func (h *Hub) handleFollowStatus(message Message) {
 	followerID := message.From
 
 	if targetUserID == 0 {
-		log.Printf("Invalid target user ID in follow status message")
 		h.sendErrorMessage(followerID, "Invalid target user")
 		return
 	}
@@ -231,7 +206,6 @@ func (h *Hub) handleFollowStatus(message Message) {
 	var firstName, lastName string
 	err := h.db.QueryRow("SELECT is_private, first_name, last_name FROM users WHERE id = ?", targetUserID).Scan(&isPrivate, &firstName, &lastName)
 	if err != nil {
-		log.Printf("User %d not found: %v", targetUserID, err)
 		h.sendErrorMessage(followerID, "User not found")
 		return
 	}
@@ -241,7 +215,6 @@ func (h *Hub) handleFollowStatus(message Message) {
 	var followID int
 	err = h.db.QueryRow("SELECT id, status FROM follows WHERE follower_id = ? AND following_id = ?", followerID, targetUserID).Scan(&followID, &status)
 	if err != nil && err != sql.ErrNoRows {
-		log.Printf("Error querying follow relationship: %v", err)
 		h.sendErrorMessage(followerID, "Failed to check follow status")
 		return
 	}
@@ -267,8 +240,6 @@ func (h *Hub) handleFollowStatus(message Message) {
 	err = h.db.QueryRow("SELECT 1 FROM follows WHERE follower_id = ? AND following_id = ? AND status = 'accepted'", targetUserID, followerID).Scan(new(int))
 	if err == nil {
 		isFollowedBy = true
-	} else if err != sql.ErrNoRows {
-		log.Printf("Error checking reverse follow relationship: %v", err)
 	}
 
 	// Send response to the requesting user
@@ -285,11 +256,8 @@ func (h *Hub) handleFollowStatus(message Message) {
 		},
 		Timestamp: time.Now().Unix(),
 	})
-
-	log.Printf("Follow status query from user %d to user %d: status=%s, is_followed_by=%v", followerID, targetUserID, followStatus, isFollowedBy)
 }
 
-// handleFollowUpdate broadcasts follow updates
 func (h *Hub) handleFollowUpdate(message Message) {
 	// Send to the user being followed
 	if message.To > 0 {
@@ -331,16 +299,13 @@ func (h *Hub) handleFollowUpdate(message Message) {
 			select {
 			case h.clients[userID].Send <- message:
 			default:
-				log.Printf("Failed to send follow update to user %d", userID)
 			}
 		}
 	}
 }
 
-// handleFollow processes follow requests for public users
 func (h *Hub) handleFollow(message Message) {
 	if h.db == nil {
-		log.Printf("Database not available")
 		h.sendErrorMessage(message.From, "Database not available")
 		return
 	}
@@ -349,7 +314,6 @@ func (h *Hub) handleFollow(message Message) {
 	followerID := message.From
 
 	if targetUserID == 0 {
-		log.Printf("Invalid target user ID in follow message")
 		h.sendErrorMessage(followerID, "Invalid target user")
 		return
 	}
@@ -359,14 +323,12 @@ func (h *Hub) handleFollow(message Message) {
 	var firstName, lastName string
 	err := h.db.QueryRow("SELECT is_private, first_name, last_name FROM users WHERE id = ?", targetUserID).Scan(&isPrivate, &firstName, &lastName)
 	if err != nil {
-		log.Printf("User %d not found: %v", targetUserID, err)
 		h.sendErrorMessage(followerID, "User not found")
 		return
 	}
 
 	// If user is private, send error - should use follow_request instead
 	if isPrivate {
-		log.Printf("User %d is private, follow request needed", targetUserID)
 		h.sendErrorMessage(followerID, "This user is private. Send a follow request instead")
 		return
 	}
@@ -375,7 +337,6 @@ func (h *Hub) handleFollow(message Message) {
 	var existingID int
 	err = h.db.QueryRow("SELECT id FROM follows WHERE follower_id = ? AND following_id = ? AND status = 'accepted'", followerID, targetUserID).Scan(&existingID)
 	if err == nil {
-		log.Printf("User %d already following user %d", followerID, targetUserID)
 		h.sendErrorMessage(followerID, "Already following this user")
 		return
 	}
@@ -385,7 +346,6 @@ func (h *Hub) handleFollow(message Message) {
 	_, err = h.db.Exec("INSERT INTO follows (follower_id, following_id, status, created_at, updated_at) VALUES (?, ?, 'accepted', ?, ?)",
 		followerID, targetUserID, now, now)
 	if err != nil {
-		log.Printf("Failed to create follow relationship: %v", err)
 		h.sendErrorMessage(followerID, "Failed to follow user")
 		return
 	}
@@ -423,14 +383,10 @@ func (h *Hub) handleFollow(message Message) {
 	// Broadcast follower count updates
 	h.broadcastFollowerCountUpdate(followerID)
 	h.broadcastFollowerCountUpdate(targetUserID)
-
-	log.Printf("User %d now following user %d", followerID, targetUserID)
 }
 
-// handleUnfollow processes unfollow requests
 func (h *Hub) handleUnfollow(message Message) {
 	if h.db == nil {
-		log.Printf("Database not available")
 		h.sendErrorMessage(message.From, "Database not available")
 		return
 	}
@@ -439,7 +395,6 @@ func (h *Hub) handleUnfollow(message Message) {
 	followerID := message.From
 
 	if targetUserID == 0 {
-		log.Printf("Invalid target user ID in unfollow message")
 		h.sendErrorMessage(followerID, "Invalid target user")
 		return
 	}
@@ -448,7 +403,6 @@ func (h *Hub) handleUnfollow(message Message) {
 	var followID int
 	err := h.db.QueryRow("SELECT id FROM follows WHERE follower_id = ? AND following_id = ? AND status = 'accepted'", followerID, targetUserID).Scan(&followID)
 	if err != nil {
-		log.Printf("User %d not following user %d: %v", followerID, targetUserID, err)
 		h.sendErrorMessage(followerID, "Not following this user")
 		return
 	}
@@ -456,7 +410,6 @@ func (h *Hub) handleUnfollow(message Message) {
 	// Remove follow relationship
 	_, err = h.db.Exec("DELETE FROM follows WHERE id = ?", followID)
 	if err != nil {
-		log.Printf("Failed to unfollow user: %v", err)
 		h.sendErrorMessage(followerID, "Failed to unfollow user")
 		return
 	}
@@ -485,14 +438,10 @@ func (h *Hub) handleUnfollow(message Message) {
 	// Broadcast follower count updates
 	h.broadcastFollowerCountUpdate(followerID)
 	h.broadcastFollowerCountUpdate(targetUserID)
-
-	log.Printf("User %d unfollowed user %d", followerID, targetUserID)
 }
 
-// handleFollowRequest processes follow requests for private users
 func (h *Hub) handleFollowRequest(message Message) {
 	if h.db == nil {
-		log.Printf("Database not available")
 		h.sendErrorMessage(message.From, "Database not available")
 		return
 	}
@@ -501,7 +450,6 @@ func (h *Hub) handleFollowRequest(message Message) {
 	followerID := message.From
 
 	if targetUserID == 0 {
-		log.Printf("Invalid target user ID in follow request message")
 		h.sendErrorMessage(followerID, "Invalid target user")
 		return
 	}
@@ -511,7 +459,6 @@ func (h *Hub) handleFollowRequest(message Message) {
 	var firstName, lastName string
 	err := h.db.QueryRow("SELECT is_private, first_name, last_name FROM users WHERE id = ?", targetUserID).Scan(&isPrivate, &firstName, &lastName)
 	if err != nil {
-		log.Printf("User %d not found: %v", targetUserID, err)
 		h.sendErrorMessage(followerID, "User not found")
 		return
 	}
@@ -541,7 +488,6 @@ func (h *Hub) handleFollowRequest(message Message) {
 	_, err = h.db.Exec("INSERT INTO follows (follower_id, following_id, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
 		followerID, targetUserID, status, now, now)
 	if err != nil {
-		log.Printf("Failed to create follow request: %v", err)
 		h.sendErrorMessage(followerID, "Failed to send follow request")
 		return
 	}
@@ -595,14 +541,10 @@ func (h *Hub) handleFollowRequest(message Message) {
 		},
 		Timestamp: time.Now().Unix(),
 	})
-
-	log.Printf("Follow request from user %d to user %d with status %s", followerID, targetUserID, status)
 }
 
-// handleCancelFollowRequest processes cancel follow request
 func (h *Hub) handleCancelFollowRequest(message Message) {
 	if h.db == nil {
-		log.Printf("Database not available")
 		h.sendErrorMessage(message.From, "Database not available")
 		return
 	}
@@ -611,7 +553,6 @@ func (h *Hub) handleCancelFollowRequest(message Message) {
 	followerID := message.From
 
 	if targetUserID == 0 {
-		log.Printf("Invalid target user ID in cancel follow request message")
 		h.sendErrorMessage(followerID, "Invalid target user")
 		return
 	}
@@ -620,7 +561,6 @@ func (h *Hub) handleCancelFollowRequest(message Message) {
 	var followID int
 	err := h.db.QueryRow("SELECT id FROM follows WHERE follower_id = ? AND following_id = ? AND status = 'pending'", followerID, targetUserID).Scan(&followID)
 	if err != nil {
-		log.Printf("No pending follow request from user %d to user %d: %v", followerID, targetUserID, err)
 		h.sendErrorMessage(followerID, "No pending follow request found")
 		return
 	}
@@ -628,7 +568,6 @@ func (h *Hub) handleCancelFollowRequest(message Message) {
 	// Delete the follow request
 	_, err = h.db.Exec("DELETE FROM follows WHERE id = ?", followID)
 	if err != nil {
-		log.Printf("Failed to cancel follow request: %v", err)
 		h.sendErrorMessage(followerID, "Failed to cancel follow request")
 		return
 	}
@@ -650,42 +589,34 @@ func (h *Hub) handleCancelFollowRequest(message Message) {
 		},
 		Timestamp: time.Now().Unix(),
 	})
-
-	log.Printf("Follow request cancelled by user %d to user %d", followerID, targetUserID)
 }
 
-// handleGroupUpdate broadcasts group updates to group members
 func (h *Hub) handleGroupUpdate(message Message) {
 	if message.GroupID > 0 {
 		h.handleGroupMessage(message)
 	}
 }
 
-// handleEventUpdate broadcasts event updates to group members
 func (h *Hub) handleEventUpdate(message Message) {
 	if message.GroupID > 0 {
 		h.handleGroupMessage(message)
 	}
 }
 
-// handlePollUpdate broadcasts poll updates to group members
 func (h *Hub) handlePollUpdate(message Message) {
 	if message.GroupID > 0 {
 		h.handleGroupMessage(message)
 	}
 }
 
-// handlePollVoteUpdate broadcasts poll vote updates to group members
 func (h *Hub) handlePollVoteUpdate(message Message) {
 	if message.GroupID > 0 {
 		h.handleGroupMessage(message)
 	}
 }
 
-// handleSearch processes real-time search requests
 func (h *Hub) handleSearch(message Message) {
 	if h.db == nil {
-		log.Printf("Database not available for search")
 		return
 	}
 
@@ -715,7 +646,6 @@ func (h *Hub) handleSearch(message Message) {
 	h.sendSearchResults(userID, results, query, len(results))
 }
 
-// performBasicSearch does a simple search without importing other packages
 func (h *Hub) performBasicSearch(userID uint, query string) []map[string]interface{} {
 	var results []map[string]interface{}
 
@@ -768,7 +698,6 @@ func (h *Hub) performBasicSearch(userID uint, query string) []map[string]interfa
 	return results
 }
 
-// sendSearchResults sends search results back to the requesting client
 func (h *Hub) sendSearchResults(userID uint, results []interface{}, query string, count int) {
 	h.mu.RLock()
 	client, exists := h.clients[userID]
@@ -794,6 +723,5 @@ func (h *Hub) sendSearchResults(userID uint, results []interface{}, query string
 	select {
 	case client.Send <- searchResultMessage:
 	default:
-		log.Printf("Failed to send search results to user %d", userID)
 	}
 }

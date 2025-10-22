@@ -29,35 +29,29 @@ func (s *ChatService) GetUnifiedChats(userID uint) ([]models.UnifiedChatItem, er
 
 	allChats := append(privateChats, groupChats...)
 
-	// Sort all chats: first by those with messages (by last message time), then groups without messages (by joining date)
 	sort.Slice(allChats, func(i, j int) bool {
-		// If both have messages, sort by last message time (newest first)
 		if allChats[i].LastMessage != nil && allChats[j].LastMessage != nil {
 			if allChats[i].LastMessageTime != nil && allChats[j].LastMessageTime != nil {
 				return allChats[i].LastMessageTime.After(*allChats[j].LastMessageTime)
 			}
-			return allChats[i].LastMessageTime != nil // i has time, comes first
+			return allChats[i].LastMessageTime != nil
 		}
-		// If only i has message, i comes first
 		if allChats[i].LastMessage != nil && allChats[j].LastMessage == nil {
 			return true
 		}
-		// If only j has message, j comes first
 		if allChats[i].LastMessage == nil && allChats[j].LastMessage != nil {
 			return false
 		}
-		// Both don't have messages (should only be groups), sort by joining date (newest first)
 		if allChats[i].LastMessageTime != nil && allChats[j].LastMessageTime != nil {
 			return allChats[i].LastMessageTime.After(*allChats[j].LastMessageTime)
 		}
-		return allChats[i].LastMessageTime != nil // i has time, comes first
+		return allChats[i].LastMessageTime != nil
 	})
 
 	return allChats, nil
 }
 
 func (s *ChatService) getPrivateChats(userID uint) ([]models.UnifiedChatItem, error) {
-	// Calculate unread count dynamically: count messages where current user is NOT the sender and is_read = false
 	query := `
 		SELECT c.id, c.participant1_id, c.participant2_id, c.last_message_id, c.updated_at,
 			   u1.id, u1.first_name, u1.last_name, u1.avatar, u1.nickname,
@@ -135,14 +129,12 @@ func (s *ChatService) getPrivateChats(userID uint) ([]models.UnifiedChatItem, er
 		var lastMessage *string
 		var lastMessageSender *models.UserResponse
 		if msgContent.Valid {
-			// Format message based on sender
 			content := msgContent.String
 			if msgSenderID.Valid && uint(msgSenderID.Int64) == userID {
 				formatted := "You: " + content
 				lastMessage = &formatted
 			} else {
 				lastMessage = &content
-				// For private chats, the sender is the other participant
 				lastMessageSender = &participant
 			}
 		}
@@ -258,11 +250,9 @@ func (s *ChatService) getGroupChats(userID uint) ([]models.UnifiedChatItem, erro
 
 		convIDValue := uint(convID.Int64)
 		if !convID.Valid {
-			// If no conversation yet, use group id as fallback
 			convIDValue = groupID
 		}
 
-		// Query unread count for this group conversation
 		unreadCount := 0
 		if convID.Valid {
 			unreadQuery := `SELECT COUNT(*) FROM group_messages m

@@ -2,7 +2,6 @@ package websocket
 
 import (
 	"fmt"
-	"log"
 	"time"
 )
 
@@ -11,7 +10,6 @@ func (h *Hub) BroadcastMessage(message Message) {
 	select {
 	case h.broadcast <- message:
 	default:
-		log.Printf("Broadcast channel full, dropping message")
 	}
 }
 
@@ -20,12 +18,10 @@ func (h *Hub) SendToUser(userID uint, message Message) {
 	h.mu.RLock()
 	client, exists := h.clients[userID]
 	h.mu.RUnlock()
-
 	if exists {
 		select {
 		case client.Send <- message:
 		default:
-			log.Printf("Failed to send message to user %d: send channel full", userID)
 		}
 	}
 }
@@ -35,18 +31,15 @@ func (h *Hub) SendToGroup(groupID uint, message Message, excludeUserID uint) {
 	message.GroupID = groupID
 	h.mu.RLock()
 	defer h.mu.RUnlock()
-
 	for userID, client := range h.clients {
 		if userID != excludeUserID {
 			client.mu.RLock()
 			isMember := client.Groups[groupID]
 			client.mu.RUnlock()
-
 			if isMember {
 				select {
 				case client.Send <- message:
 				default:
-					log.Printf("Failed to send message to user %d in group %d", userID, groupID)
 				}
 			}
 		}
@@ -55,10 +48,8 @@ func (h *Hub) SendToGroup(groupID uint, message Message, excludeUserID uint) {
 
 // BroadcastUserStatus sends user status updates to all connected clients
 func (h *Hub) BroadcastUserStatus(userID uint, status string) {
-	// Get username and status info from database for the broadcast
 	var username string
 	var lastStatusChange *time.Time
-
 	if h.db != nil {
 		var firstName, lastName string
 		err := h.db.QueryRow("SELECT first_name, last_name, last_status_change FROM users WHERE id = ?", userID).
@@ -70,38 +61,25 @@ func (h *Hub) BroadcastUserStatus(userID uint, status string) {
 	if username == "" {
 		username = fmt.Sprintf("User %d", userID)
 	}
-
 	messageData := map[string]interface{}{
 		"user_id":  userID,
 		"username": username,
 		"status":   status,
 	}
-
 	if lastStatusChange != nil {
 		messageData["last_status_change"] = lastStatusChange.Format(time.RFC3339)
 	}
-
 	message := Message{
 		Type: MessageTypeUserStatus,
 		From: userID,
 		Data: messageData,
 	}
-
 	h.mu.RLock()
 	defer h.mu.RUnlock()
-
-	deliveredCount := 0
-	failedCount := 0
-
-	// Send to ALL connected clients (including the user themselves for multi-tab sync)
-	for clientID, client := range h.clients {
+	for _, client := range h.clients {
 		select {
 		case client.Send <- message:
-			deliveredCount++
 		default:
-			// Client's send channel is full, close it
-			failedCount++
-			log.Printf("Failed to send user status to client %d: channel full", clientID)
 			go func(c *Client) {
 				h.mu.Lock()
 				delete(h.clients, c.ID)
@@ -110,8 +88,6 @@ func (h *Hub) BroadcastUserStatus(userID uint, status string) {
 			}(client)
 		}
 	}
-
-	log.Printf("Broadcasted status update for user %d (%s) | Delivered: %d | Failed: %d", userID, status, deliveredCount, failedCount)
 }
 
 // BroadcastPostUpdate broadcasts a post update to relevant users
@@ -170,7 +146,7 @@ func (h *Hub) BroadcastFollowUpdate(fromUserID, toUserID uint, action string, fo
 func (h *Hub) BroadcastToAll(messageType, action string, data interface{}) {
 	message := Message{
 		Type:      messageType,
-		From:      0, // System message
+		From:      0,
 		Action:    action,
 		Data:      data,
 		Timestamp: time.Now().Unix(),
@@ -183,29 +159,20 @@ func (h *Hub) broadcastFollowerCountUpdate(userID uint) {
 	if h.db == nil {
 		return
 	}
-
-	// Get updated follower counts from database
 	followersQuery := `SELECT COUNT(*) FROM follows WHERE following_id = ? AND status = 'accepted'`
 	followingQuery := `SELECT COUNT(*) FROM follows WHERE follower_id = ? AND status = 'accepted'`
-
 	var followersCount, followingCount int
-
 	err := h.db.QueryRow(followersQuery, userID).Scan(&followersCount)
 	if err != nil {
-		log.Printf("Failed to get followers count for user %d: %v", userID, err)
 		return
 	}
-
 	err = h.db.QueryRow(followingQuery, userID).Scan(&followingCount)
 	if err != nil {
-		log.Printf("Failed to get following count for user %d: %v", userID, err)
 		return
 	}
-
-	// Broadcast the count update to all connected clients
 	countUpdateMessage := Message{
 		Type:   MessageTypeFollowerCountUpdate,
-		From:   0, // System message
+		From:   0,
 		Action: "count_update",
 		Data: map[string]interface{}{
 			"user_id":         userID,
@@ -214,7 +181,6 @@ func (h *Hub) broadcastFollowerCountUpdate(userID uint) {
 		},
 		Timestamp: time.Now().Unix(),
 	}
-
 	h.BroadcastMessage(countUpdateMessage)
 }
 

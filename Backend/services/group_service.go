@@ -59,13 +59,11 @@ INSERT INTO group_members (group_id, user_id, status, role, invited_by, requesto
 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 `
 
-	// Creator is auto-member and admin
 	if _, execErr = tx.Exec(memberQuery, group.ID, group.CreatorID, "member", "admin", nil, nil, now, now); execErr != nil {
 		err = execErr
 		return err
 	}
 
-	// Seed invitations for selected users
 	inviteTime := now
 	for _, inviteeID := range invitees {
 		if inviteeID == group.CreatorID {
@@ -120,7 +118,6 @@ GROUP BY g.id, u.id
 	creator.ID = group.CreatorID
 	group.Creator = creator
 
-	// Check current user's membership status
 	memberStatus, err := s.GetUserMembershipStatus(groupID, currentUserID)
 	if err != nil {
 		return nil, err
@@ -135,7 +132,6 @@ GROUP BY g.id, u.id
 		}
 	}
 
-	// Get all members if user is a member
 	if group.IsMember {
 		members, err := s.GetGroupMembers(groupID, currentUserID)
 		if err == nil {
@@ -185,7 +181,6 @@ LIMIT ? OFFSET ?
 		creator.ID = group.CreatorID
 		group.Creator = creator
 
-		// Check current user's membership status
 		memberStatus, err := s.GetUserMembershipStatus(group.ID, currentUserID)
 		if err != nil {
 			return nil, err
@@ -256,7 +251,6 @@ LIMIT ? OFFSET ?
 }
 
 func (s *GroupService) UpdateGroup(groupID, userID uint, updateReq *models.UpdateGroupRequest) error {
-	// Check if user is the creator
 	var creatorID uint
 	err := s.db.QueryRow("SELECT creator_id FROM groups WHERE id = ?", groupID).Scan(&creatorID)
 	if err != nil {
@@ -264,7 +258,7 @@ func (s *GroupService) UpdateGroup(groupID, userID uint, updateReq *models.Updat
 	}
 
 	if creatorID != userID {
-		return sql.ErrNoRows // Unauthorized
+		return sql.ErrNoRows
 	}
 
 	query := `
@@ -278,7 +272,6 @@ WHERE id = ? AND creator_id = ?
 }
 
 func (s *GroupService) DeleteGroup(groupID, userID uint) error {
-	// Check if user is the creator
 	var creatorID uint
 	err := s.db.QueryRow("SELECT creator_id FROM groups WHERE id = ?", groupID).Scan(&creatorID)
 	if err != nil {
@@ -286,22 +279,19 @@ func (s *GroupService) DeleteGroup(groupID, userID uint) error {
 	}
 
 	if creatorID != userID {
-		return sql.ErrNoRows // Unauthorized
+		return sql.ErrNoRows
 	}
 
-	// Delete related data first
 	s.db.Exec("DELETE FROM group_members WHERE group_id = ?", groupID)
 	s.db.Exec("DELETE FROM group_posts WHERE group_id = ?", groupID)
 	s.db.Exec("DELETE FROM group_messages WHERE group_id = ?", groupID)
 	s.db.Exec("DELETE FROM events WHERE group_id = ?", groupID)
 
-	// Delete the group
 	_, err = s.db.Exec("DELETE FROM groups WHERE id = ? AND creator_id = ?", groupID, userID)
 	return err
 }
 
 func (s *GroupService) InviteUsers(groupID, inviterID uint, userIDs []uint) error {
-	// Check if inviter has admin privileges
 	isAdmin, err := s.IsUserAdminOrCreator(groupID, inviterID)
 	if err != nil || !isAdmin {
 		return sql.ErrNoRows
@@ -338,13 +328,11 @@ func (s *GroupService) InviteUsers(groupID, inviterID uint, userIDs []uint) erro
 }
 
 func (s *GroupService) RequestToJoin(groupID, userID uint) error {
-	// Determine group privacy
 	var privacy string
 	if err := s.db.QueryRow("SELECT privacy FROM groups WHERE id = ?", groupID).Scan(&privacy); err != nil {
 		return err
 	}
 
-	// Check current membership/request status
 	status, err := s.GetUserMembershipStatus(groupID, userID)
 	if err == nil && (status == "member" || status == "sent" || status == "requested") {
 		return sql.ErrNoRows
@@ -353,11 +341,9 @@ func (s *GroupService) RequestToJoin(groupID, userID uint) error {
 	now := time.Now()
 
 	if privacy == "private" {
-		// Private groups are invite-only: do not allow join requests
 		return sql.ErrNoRows
 	}
 
-	// Public group: create a join request for admins to review
 	query := `
 		INSERT INTO group_members (group_id, user_id, status, role, invited_by, requestor_id, created_at, updated_at)
 		VALUES (?, ?, 'requested', 'member', NULL, ?, ?, ?)
@@ -367,14 +353,12 @@ func (s *GroupService) RequestToJoin(groupID, userID uint) error {
 }
 
 func (s *GroupService) RespondToInvitation(groupID, userID uint, accept bool) error {
-	// Check if user has an invitation
 	status, err := s.GetUserMembershipStatus(groupID, userID)
 	if err != nil || status != "sent" {
-		return sql.ErrNoRows // No invitation found
+		return sql.ErrNoRows
 	}
 
 	if accept {
-		// Accept invitation - become member
 		query := `
 UPDATE group_members SET status = 'member', role = 'member', updated_at = ?
 WHERE group_id = ? AND user_id = ? AND status = 'sent'
@@ -382,7 +366,6 @@ WHERE group_id = ? AND user_id = ? AND status = 'sent'
 		now := time.Now()
 		_, err = s.db.Exec(query, now, groupID, userID)
 	} else {
-		// Decline invitation - mark as rejected
 		query := `
 UPDATE group_members SET status = 'rejected', updated_at = ?
 WHERE group_id = ? AND user_id = ? AND status = 'sent'
@@ -394,7 +377,6 @@ WHERE group_id = ? AND user_id = ? AND status = 'sent'
 }
 
 func (s *GroupService) RespondToJoinRequest(groupID, requestUserID, responderID uint, accept bool) error {
-	// Check if responder has admin rights
 	isAdmin, err := s.IsUserAdminOrCreator(groupID, responderID)
 	if err != nil || !isAdmin {
 		return sql.ErrNoRows
@@ -432,25 +414,22 @@ WHERE group_id = ? AND user_id = ?
 }
 
 func (s *GroupService) CancelInvitation(groupID, invitationID, userID uint) error {
-	// Check if user has admin privileges
 	isAdmin, err := s.IsUserAdminOrCreator(groupID, userID)
 	if err != nil || !isAdmin {
 		return sql.ErrNoRows
 	}
 
-	// Check if the invitation exists and belongs to this group
 	query := `SELECT invited_by FROM group_members WHERE id = ? AND group_id = ? AND status = 'sent'`
 
 	var invitedBy sql.NullInt64
 	err = s.db.QueryRow(query, invitationID, groupID).Scan(&invitedBy)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return sql.ErrNoRows // No invitation found
+			return sql.ErrNoRows
 		}
 		return err
 	}
 
-	// Delete the invitation
 	result, err := s.db.Exec("DELETE FROM group_members WHERE id = ? AND group_id = ? AND status = 'sent'", invitationID, groupID)
 	if err != nil {
 		return err
@@ -480,7 +459,6 @@ func (s *GroupService) LeaveGroup(groupID, userID uint) error {
 		}
 	}()
 
-	// Check if user is the creator
 	var creatorID uint
 	err = tx.QueryRow("SELECT creator_id FROM groups WHERE id = ?", groupID).Scan(&creatorID)
 	if err != nil {
@@ -488,9 +466,7 @@ func (s *GroupService) LeaveGroup(groupID, userID uint) error {
 	}
 
 	if creatorID == userID {
-		// Creator is leaving - implement succession logic
 
-		// First, check for existing admins (excluding creator)
 		adminQuery := `
 			SELECT user_id FROM group_members 
 			WHERE group_id = ? AND role = 'admin' AND status = 'member' AND user_id != ?
@@ -502,13 +478,11 @@ func (s *GroupService) LeaveGroup(groupID, userID uint) error {
 		adminErr := tx.QueryRow(adminQuery, groupID, creatorID).Scan(&nextAdminID)
 
 		if adminErr == nil {
-			// There's an existing admin - transfer ownership to them
 			_, err = tx.Exec("UPDATE groups SET creator_id = ? WHERE id = ?", nextAdminID, groupID)
 			if err != nil {
 				return err
 			}
 		} else {
-			// No admins - find the first joined member (WhatsApp style)
 			firstMemberQuery := `
 				SELECT user_id FROM group_members 
 				WHERE group_id = ? AND status = 'member' AND user_id != ?
@@ -520,26 +494,21 @@ func (s *GroupService) LeaveGroup(groupID, userID uint) error {
 			firstErr := tx.QueryRow(firstMemberQuery, groupID, creatorID).Scan(&firstMemberID)
 
 			if firstErr == nil {
-				// Transfer ownership to first member and make them admin
 				_, err = tx.Exec("UPDATE groups SET creator_id = ? WHERE id = ?", firstMemberID, groupID)
 				if err != nil {
 					return err
 				}
 
-				// Promote first member to admin
 				_, err = tx.Exec("UPDATE group_members SET role = 'admin' WHERE group_id = ? AND user_id = ?", groupID, firstMemberID)
 				if err != nil {
 					return err
 				}
 			} else {
-				// No members to transfer to - this shouldn't happen in normal cases
-				// but if it does, we'll delete the group
 				_, err = tx.Exec("DELETE FROM groups WHERE id = ?", groupID)
 				if err != nil {
 					return err
 				}
 
-				// Clean up related data
 				tx.Exec("DELETE FROM group_members WHERE group_id = ?", groupID)
 				tx.Exec("DELETE FROM group_posts WHERE group_id = ?", groupID)
 				tx.Exec("DELETE FROM events WHERE group_id = ?", groupID)
@@ -551,13 +520,11 @@ func (s *GroupService) LeaveGroup(groupID, userID uint) error {
 			}
 		}
 
-		// Remove the original creator from group members
 		_, err = tx.Exec("DELETE FROM group_members WHERE group_id = ? AND user_id = ?", groupID, userID)
 		if err != nil {
 			return err
 		}
 	} else {
-		// Regular member or admin leaving - just remove them
 		_, err = tx.Exec("DELETE FROM group_members WHERE group_id = ? AND user_id = ?", groupID, userID)
 		if err != nil {
 			return err
@@ -572,10 +539,9 @@ func (s *GroupService) LeaveGroup(groupID, userID uint) error {
 }
 
 func (s *GroupService) GetGroupMembers(groupID, currentUserID uint) ([]models.GroupMemberResponse, error) {
-	// Check if current user is a member
 	isMember, err := s.IsUserMember(groupID, currentUserID)
 	if err != nil || !isMember {
-		return nil, sql.ErrNoRows // Unauthorized
+		return nil, sql.ErrNoRows
 	}
 
 	query := `
@@ -624,7 +590,6 @@ ORDER BY gm.created_at ASC
 }
 
 func (s *GroupService) GetPendingRequests(groupID, userID uint) ([]models.GroupMemberResponse, error) {
-	// Only admins can review join requests
 	isAdmin, err := s.IsUserAdminOrCreator(groupID, userID)
 	if err != nil {
 		return nil, err
@@ -697,7 +662,6 @@ func (s *GroupService) IsUserMember(groupID, userID uint) (bool, error) {
 }
 
 func (s *GroupService) GetUserRole(groupID, userID uint) (string, error) {
-	// First check if user is the creator of the group
 	var creatorID uint
 	if err := s.db.QueryRow("SELECT creator_id FROM groups WHERE id = ?", groupID).Scan(&creatorID); err != nil {
 		return "", err
@@ -706,7 +670,6 @@ func (s *GroupService) GetUserRole(groupID, userID uint) (string, error) {
 		return "creator", nil
 	}
 
-	// If not creator, get their role from group_members
 	query := `SELECT role FROM group_members WHERE group_id = ? AND user_id = ? AND status = 'member'`
 
 	var role string
@@ -722,25 +685,20 @@ func (s *GroupService) GetUserRole(groupID, userID uint) (string, error) {
 }
 
 func (s *GroupService) IsUserAdminOrCreator(groupID, userID uint) (bool, error) {
-	// Check if user is creator
 	var creatorID uint
 	if err := s.db.QueryRow("SELECT creator_id FROM groups WHERE id = ?", groupID).Scan(&creatorID); err != nil {
 		return false, err
 	}
 	if creatorID == userID {
-		// Check if creator has been demoted to member
 		query := `SELECT role FROM group_members WHERE group_id = ? AND user_id = ? AND status = 'member'`
 		var role string
 		err := s.db.QueryRow(query, groupID, userID).Scan(&role)
 		if err == nil && role == "member" {
-			// Creator has been demoted, no admin privileges
 			return false, nil
 		}
-		// Creator still has admin privileges
 		return true, nil
 	}
 
-	// Check if user is admin
 	role, err := s.GetUserRole(groupID, userID)
 	if err != nil {
 		return false, err
@@ -748,7 +706,6 @@ func (s *GroupService) IsUserAdminOrCreator(groupID, userID uint) (bool, error) 
 	return role == "admin", nil
 }
 
-// CreateGroupPost creates a new post in a group
 func (s *GroupService) CreateGroupPost(groupPost *models.GroupPost) error {
 	query := `
 INSERT INTO group_posts (group_id, user_id, content, image_url, created_at, updated_at)
@@ -773,7 +730,6 @@ VALUES (?, ?, ?, ?, ?, ?)
 	return nil
 }
 
-// GetGroupPostByID retrieves a group post by ID with user details
 func (s *GroupService) GetGroupPostByID(postID, currentUserID uint) (*models.GroupPostResponse, error) {
 	query := `
 SELECT gp.id, gp.group_id, gp.user_id, gp.content, gp.image_url, gp.created_at, gp.updated_at,
@@ -801,19 +757,15 @@ WHERE gp.id = ?
 		return nil, err
 	}
 
-	// Process avatar URL similar to User.ToResponse()
 	var avatarURL *string
 	if avatar != nil && *avatar != "" {
 		processed := *avatar
-		// If it's already a full URL, use as is
 		if !strings.HasPrefix(processed, "http") && !strings.HasPrefix(processed, "/avatars/") && !strings.HasPrefix(processed, "image:") {
-			// For uploaded files, prepend the uploads path
 			processed = fmt.Sprintf("http://localhost:8080/api/uploads/%s", processed)
 		}
 		avatarURL = &processed
 	}
 
-	// Set user details
 	post.User = models.UserResponse{
 		ID:        post.UserID,
 		FirstName: firstName,
@@ -826,7 +778,6 @@ WHERE gp.id = ?
 	return &post, nil
 }
 
-// GetGroupPosts retrieves all posts in a group with pagination
 func (s *GroupService) GetGroupPosts(groupID, currentUserID uint, limit, offset int) ([]models.GroupPostResponse, error) {
 	query := `
 SELECT gp.id, gp.group_id, gp.user_id, gp.content, gp.image_url, gp.created_at, gp.updated_at,
@@ -861,22 +812,18 @@ LIMIT ? OFFSET ?
 			&post.LikeCount, &post.DislikeCount, &post.CommentCount, &post.IsLiked, &post.IsDisliked,
 		)
 		if err != nil {
-			return nil, err // Return error instead of silently skipping
+			return nil, err
 		}
 
-		// Process avatar URL similar to User.ToResponse()
 		var avatarURL *string
 		if avatar != nil && *avatar != "" {
 			processed := *avatar
-			// If it's already a full URL, use as is
 			if !strings.HasPrefix(processed, "http") && !strings.HasPrefix(processed, "/avatars/") && !strings.HasPrefix(processed, "image:") {
-				// For uploaded files, prepend the uploads path
 				processed = fmt.Sprintf("http://localhost:8080/api/uploads/%s", processed)
 			}
 			avatarURL = &processed
 		}
 
-		// Set user details
 		post.User = models.UserResponse{
 			ID:        post.UserID,
 			FirstName: firstName,
@@ -892,9 +839,7 @@ LIMIT ? OFFSET ?
 	return posts, nil
 }
 
-// DeleteGroupPost deletes a group post
 func (s *GroupService) DeleteGroupPost(postID, groupID, userID uint) error {
-	// Check if user owns the post or is admin/creator of the group
 	checkQuery := `
 SELECT gp.user_id, gm.role
 FROM group_posts gp
@@ -909,12 +854,10 @@ WHERE gp.id = ? AND gp.group_id = ? AND gm.user_id = ? AND gm.status = 'member'
 		return err
 	}
 
-	// User can delete if they own the post or are admin/creator
 	if postOwnerID != userID && userRole != "admin" && userRole != "creator" {
 		return sql.ErrNoRows
 	}
 
-	// Delete associated comments and likes first
 	_, err = s.db.Exec("DELETE FROM comments WHERE post_id = ?", postID)
 	if err != nil {
 		return err
@@ -925,7 +868,6 @@ WHERE gp.id = ? AND gp.group_id = ? AND gm.user_id = ? AND gm.status = 'member'
 		return err
 	}
 
-	// Delete the post
 	result, err := s.db.Exec("DELETE FROM group_posts WHERE id = ? AND group_id = ?", postID, groupID)
 	if err != nil {
 		return err
@@ -944,7 +886,6 @@ WHERE gp.id = ? AND gp.group_id = ? AND gm.user_id = ? AND gm.status = 'member'
 }
 
 func (s *GroupService) GetUserInvitations(userID uint) ([]models.GroupInvitationResponse, error) {
-	// 1) Regular invitations sent directly to this user (status = 'sent' and no requestor)
 	inviteQuery := `
 SELECT gm.id, gm.group_id, gm.created_at,
 	   g.name as group_name, g.description as group_description, g.privacy,
@@ -985,8 +926,6 @@ ORDER BY gm.created_at DESC`
 		invitations = append(invitations, invitation)
 	}
 
-	// 2) Join requests for groups where this user is an admin (or creator)
-	// Show pending requests (status = 'requested' with a requestor_id)
 	joinReqQuery := `
 SELECT gm.id, gm.group_id, gm.created_at, gm.user_id, gm.requestor_id,
 	   g.name as group_name, g.description as group_description, g.privacy,
@@ -1004,7 +943,7 @@ ORDER BY gm.created_at DESC`
 
 	rows2, err := s.db.Query(joinReqQuery, userID)
 	if err != nil {
-		return invitations, nil // fall back to invitations only
+		return invitations, nil
 	}
 	defer rows2.Close()
 
@@ -1042,22 +981,20 @@ ORDER BY gm.created_at DESC`
 }
 
 func (s *GroupService) PromoteToAdmin(groupID, requesterID, targetUserID uint) error {
-	// Check if requester is admin or creator
 	isAdmin, err := s.IsUserAdminOrCreator(groupID, requesterID)
 	if err != nil {
 		return err
 	}
 	if !isAdmin {
-		return sql.ErrNoRows // Forbidden
+		return sql.ErrNoRows
 	}
 
-	// Check if target user is a member
 	isMember, err := s.IsUserMember(groupID, targetUserID)
 	if err != nil {
 		return err
 	}
 	if !isMember {
-		return sql.ErrNoRows // Not a member
+		return sql.ErrNoRows
 	}
 
 	var creatorID uint
@@ -1065,12 +1002,10 @@ func (s *GroupService) PromoteToAdmin(groupID, requesterID, targetUserID uint) e
 		return err
 	}
 
-	// Creator is already admin by default
 	if targetUserID == creatorID {
 		return nil
 	}
 
-	// Ensure we do not exceed co-admin limit (3 besides creator)
 	var adminCount int
 	countQuery := `SELECT COUNT(*) FROM group_members WHERE group_id = ? AND role = 'admin' AND status = 'member' AND user_id != ?`
 	if err := s.db.QueryRow(countQuery, groupID, creatorID).Scan(&adminCount); err != nil {
@@ -1080,7 +1015,6 @@ func (s *GroupService) PromoteToAdmin(groupID, requesterID, targetUserID uint) e
 		return sql.ErrNoRows
 	}
 
-	// Skip if already admin
 	if role, roleErr := s.GetUserRole(groupID, targetUserID); roleErr == nil && role == "admin" {
 		return nil
 	}
@@ -1095,7 +1029,6 @@ func (s *GroupService) PromoteToAdmin(groupID, requesterID, targetUserID uint) e
 }
 
 func (s *GroupService) DemoteAdmin(groupID, requesterID, targetUserID uint) error {
-	// Only the creator can demote admins
 	var creatorID uint
 	if err := s.db.QueryRow("SELECT creator_id FROM groups WHERE id = ?", groupID).Scan(&creatorID); err != nil {
 		return err
@@ -1104,21 +1037,18 @@ func (s *GroupService) DemoteAdmin(groupID, requesterID, targetUserID uint) erro
 		return sql.ErrNoRows
 	}
 
-	// Cannot demote yourself
 	if requesterID == targetUserID {
-		return sql.ErrNoRows // Cannot demote yourself
+		return sql.ErrNoRows
 	}
 
-	// Check if target user is an admin
 	targetRole, err := s.GetUserRole(groupID, targetUserID)
 	if err != nil {
 		return err
 	}
 	if targetRole != "admin" {
-		return sql.ErrNoRows // Not an admin
+		return sql.ErrNoRows
 	}
 
-	// Update role to member
 	query := `
 		UPDATE group_members
 		SET role = 'member', updated_at = ?
@@ -1128,7 +1058,6 @@ func (s *GroupService) DemoteAdmin(groupID, requesterID, targetUserID uint) erro
 	return err
 }
 
-// CountAdmins returns the number of admin users in a group
 func (s *GroupService) CountAdmins(groupID uint) (int, error) {
 	query := `SELECT COUNT(*) FROM group_members WHERE group_id = ? AND role = 'admin' AND status = 'member'`
 
@@ -1137,7 +1066,6 @@ func (s *GroupService) CountAdmins(groupID uint) (int, error) {
 	return count, err
 }
 
-// UpdateUserRole updates the role of a user in a group
 func (s *GroupService) UpdateUserRole(groupID, userID uint, newRole string) error {
 	query := `UPDATE group_members SET role = ?, updated_at = ? WHERE group_id = ? AND user_id = ? AND status = 'member'`
 
@@ -1145,7 +1073,6 @@ func (s *GroupService) UpdateUserRole(groupID, userID uint, newRole string) erro
 	return err
 }
 
-// RemoveMember removes a user from a group
 func (s *GroupService) RemoveMember(groupID, userID uint) error {
 	query := `DELETE FROM group_members WHERE group_id = ? AND user_id = ?`
 
@@ -1153,21 +1080,17 @@ func (s *GroupService) RemoveMember(groupID, userID uint) error {
 	return err
 }
 
-// GetNextAdmin returns information about who would become the next admin if creator leaves
 func (s *GroupService) GetNextAdmin(groupID, currentUserID uint) (map[string]interface{}, error) {
-	// Check if user is a member of the group
 	isMember, err := s.IsUserMember(groupID, currentUserID)
 	if err != nil || !isMember {
 		return nil, sql.ErrNoRows
 	}
 
-	// Get the group creator ID
 	var creatorID uint
 	if err := s.db.QueryRow("SELECT creator_id FROM groups WHERE id = ?", groupID).Scan(&creatorID); err != nil {
 		return nil, err
 	}
 
-	// Check if there are existing admins (excluding creator)
 	adminQuery := `
 		SELECT gm.user_id, u.first_name, u.last_name
 		FROM group_members gm 
@@ -1185,10 +1108,8 @@ func (s *GroupService) GetNextAdmin(groupID, currentUserID uint) (map[string]int
 	var nextAdmin string
 
 	if hasAdmins {
-		// There are existing admins, next admin is the first admin
 		nextAdmin = fmt.Sprintf("%s %s", adminFirstName, adminLastName)
 	} else {
-		// No admins, find the first joined member (WhatsApp style)
 		firstMemberQuery := `
 			SELECT gm.user_id, u.first_name, u.last_name
 			FROM group_members gm 
@@ -1212,12 +1133,11 @@ func (s *GroupService) GetNextAdmin(groupID, currentUserID uint) (map[string]int
 	return map[string]interface{}{
 		"next_admin":   nextAdmin,
 		"has_admins":   hasAdmins,
-		"first_member": nextAdmin, // For frontend compatibility
+		"first_member": nextAdmin,
 	}, nil
 }
 
 func (s *GroupService) UpdateGroupPrivacy(groupID uint, privacy string, userID uint) error {
-	// Check if user is the creator
 	var creatorID uint
 	err := s.db.QueryRow("SELECT creator_id FROM groups WHERE id = ?", groupID).Scan(&creatorID)
 	if err != nil {
@@ -1225,7 +1145,7 @@ func (s *GroupService) UpdateGroupPrivacy(groupID uint, privacy string, userID u
 	}
 
 	if creatorID != userID {
-		return sql.ErrNoRows // Unauthorized
+		return sql.ErrNoRows
 	}
 
 	query := `
@@ -1239,7 +1159,6 @@ WHERE id = ? AND creator_id = ?
 }
 
 func (s *GroupService) UpdateGroupPermissions(groupID uint, permissions *models.UpdateGroupPermissionsRequest, userID uint) error {
-	// Check if user is admin or creator
 	isAdmin, err := s.IsUserAdminOrCreator(groupID, userID)
 	if err != nil || !isAdmin {
 		return sql.ErrNoRows
@@ -1256,7 +1175,6 @@ WHERE id = ?
 }
 
 func (s *GroupService) GetInvitableUsers(groupID uint, currentUserID uint, searchTerm string) ([]models.User, error) {
-	// Check if current user is admin or creator
 	isAdmin, err := s.IsUserAdminOrCreator(groupID, currentUserID)
 	if err != nil || !isAdmin {
 		return nil, sql.ErrNoRows
@@ -1273,14 +1191,12 @@ AND u.id NOT IN (
 
 	args := []interface{}{currentUserID, groupID}
 
-	// Add search filter if provided
 	if searchTerm != "" {
 		query += ` AND (u.first_name LIKE ? OR u.last_name LIKE ? OR u.nickname LIKE ?)`
 		searchPattern := "%" + searchTerm + "%"
 		args = append(args, searchPattern, searchPattern, searchPattern)
 	}
 
-	// Filter out private profiles that current user doesn't follow
 	query += `
 AND (u.status != 'private' OR u.id IN (
     SELECT f.following_id FROM follows f WHERE f.follower_id = ?
@@ -1311,7 +1227,6 @@ AND (u.status != 'private' OR u.id IN (
 }
 
 func (s *GroupService) GetSentJoinRequests(groupID uint, userID uint) ([]models.GroupMemberResponse, error) {
-	// Only admins can view sent requests
 	isAdmin, err := s.IsUserAdminOrCreator(groupID, userID)
 	if err != nil || !isAdmin {
 		return nil, sql.ErrNoRows
@@ -1409,7 +1324,6 @@ ORDER BY gm.created_at DESC
 }
 
 func (s *GroupService) GetReceivedJoinRequests(groupID uint, userID uint) ([]models.GroupMemberResponse, error) {
-	// This is the same as GetPendingRequests
 	return s.GetPendingRequests(groupID, userID)
 }
 

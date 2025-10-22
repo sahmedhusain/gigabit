@@ -225,14 +225,12 @@ func (s *FollowService) GetFollowStatus(followerID, followingID uint) (string, e
 }
 
 func (s *FollowService) GetFollowCounts(userID uint) (followers, following int, err error) {
-	// Get followers count
 	followersQuery := `SELECT COUNT(*) FROM follows WHERE following_id = ? AND status = 'accepted'`
 	err = s.db.QueryRow(followersQuery, userID).Scan(&followers)
 	if err != nil {
 		return 0, 0, err
 	}
 
-	// Get following count
 	followingQuery := `SELECT COUNT(*) FROM follows WHERE follower_id = ? AND status = 'accepted'`
 	err = s.db.QueryRow(followingQuery, userID).Scan(&following)
 	if err != nil {

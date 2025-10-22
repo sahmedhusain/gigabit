@@ -1,7 +1,6 @@
 package websocket
 
 import (
-	"log"
 	"net/http"
 	"time"
 
@@ -22,33 +21,19 @@ func (c *Client) readPump() {
 		c.Hub.unregister <- c
 		c.Conn.Close()
 	}()
-
-	// Set read deadline and pong handler for connection health
 	c.Conn.SetReadDeadline(time.Now().Add(60 * time.Second))
 	c.Conn.SetPongHandler(func(string) error {
 		c.Conn.SetReadDeadline(time.Now().Add(60 * time.Second))
 		return nil
 	})
-
 	for {
 		var message Message
 		err := c.Conn.ReadJSON(&message)
 		if err != nil {
-			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
-				log.Printf("Websocket error: %v", err)
-			}
 			break
 		}
-
-		// Set the sender ID
 		message.From = c.ID
 		message.Timestamp = time.Now().Unix()
-
-		// Log incoming message from user
-		log.Printf("📨 Received message from User %d | Type: %s | To: %d | GroupID: %d | Content: %s",
-			message.From, message.Type, message.To, message.GroupID, message.Content)
-
-		// Broadcast the message
 		c.Hub.BroadcastMessage(message)
 	}
 }
@@ -60,7 +45,6 @@ func (c *Client) writePump() {
 		ticker.Stop()
 		c.Conn.Close()
 	}()
-
 	for {
 		select {
 		case message, ok := <-c.Send:
@@ -69,16 +53,9 @@ func (c *Client) writePump() {
 				c.Conn.WriteMessage(websocket.CloseMessage, []byte{})
 				return
 			}
-
 			if err := c.Conn.WriteJSON(message); err != nil {
-				log.Printf("Error writing message: %v", err)
 				return
 			}
-
-			// Log outgoing message being sent to client
-			log.Printf("📤 Sent message to User %d | Type: %s | From: %d | Content: %s",
-				c.ID, message.Type, message.From, message.Content)
-
 		case <-ticker.C:
 			c.Conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
 			if err := c.Conn.WriteMessage(websocket.PingMessage, nil); err != nil {
@@ -92,10 +69,8 @@ func (c *Client) writePump() {
 func (h *Hub) ServeWS(w http.ResponseWriter, r *http.Request, userID uint) {
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		log.Printf("Websocket upgrade error: %v", err)
 		return
 	}
-
 	client := &Client{
 		ID:        userID,
 		Hub:       h,
@@ -106,16 +81,11 @@ func (h *Hub) ServeWS(w http.ResponseWriter, r *http.Request, userID uint) {
 		LastPing:  time.Now(),
 		Closed:    false,
 	}
-
-	// Load user's group memberships
 	if h.db != nil {
 		h.loadUserGroups(client)
 		h.loadUserFollowing(client)
 	}
-
 	client.Hub.register <- client
-
-	// Start goroutines for reading and writing
 	go client.writePump()
 	go client.readPump()
 }

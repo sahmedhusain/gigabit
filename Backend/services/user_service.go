@@ -3,10 +3,8 @@ package services
 import (
 	"database/sql"
 	"fmt"
-	"log"
-	"time"
-
 	"social/models"
+	"time"
 )
 
 func min(a, b int) int {
@@ -31,12 +29,6 @@ func (s *UserService) CreateUser(user *models.User) error {
 	`
 
 	now := time.Now()
-
-	log.Printf("Creating user with avatar: %v", user.Avatar)
-	if user.Avatar != nil {
-		log.Printf("Avatar length: %d", len(*user.Avatar))
-		log.Printf("Avatar starts with: %s", (*user.Avatar)[:min(100, len(*user.Avatar))])
-	}
 
 	// Set default status if not provided
 	if user.Status == "" {

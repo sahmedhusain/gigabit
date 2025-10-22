@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"log"
 	"social/models"
 	"social/websocket"
 	"strings"
@@ -540,7 +539,6 @@ LIMIT ? OFFSET ?
 
 	rows, err := s.db.Query(query, userID, limit, offset)
 	if err != nil {
-		log.Printf("Error executing GetUserEvents query: %v", err)
 		return nil, err
 	}
 	defer rows.Close()
@@ -561,7 +559,6 @@ LIMIT ? OFFSET ?
 			&group.Title,
 		)
 		if err != nil {
-			log.Printf("Error scanning event row: %v", err)
 			return nil, err
 		}
 
@@ -581,14 +578,12 @@ LIMIT ? OFFSET ?
 		// Get response counts
 		event.GoingCount, event.NotGoingCount, err = s.getEventResponseCounts(event.ID)
 		if err != nil {
-			log.Printf("Error getting event response counts for event %d: %v", event.ID, err)
 			return nil, err
 		}
 
 		// Get current user's response
 		event.UserResponse, err = s.GetUserEventResponse(event.ID, userID)
 		if err != nil && err != sql.ErrNoRows {
-			log.Printf("Error getting user event response for event %d, user %d: %v", event.ID, userID, err)
 			return nil, err
 		}
 

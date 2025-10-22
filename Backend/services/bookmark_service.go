@@ -3,7 +3,6 @@ package services
 import (
 	"database/sql"
 	"fmt"
-	"log"
 
 	"social/models"
 	"social/websocket"
@@ -39,7 +38,6 @@ func (s *BookmarkService) BookmarkPost(userID, postID uint) error {
 		return fmt.Errorf("failed to create bookmark: %v", err)
 	}
 
-	log.Printf("User %d bookmarked post %d", userID, postID)
 	return nil
 }
 
@@ -58,7 +56,6 @@ func (s *BookmarkService) UnbookmarkPost(userID, postID uint) error {
 		return fmt.Errorf("bookmark not found")
 	}
 
-	log.Printf("User %d unbookmarked post %d", userID, postID)
 	return nil
 }
 

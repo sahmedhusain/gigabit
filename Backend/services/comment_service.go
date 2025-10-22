@@ -41,7 +41,6 @@ func (s *CommentService) CreateComment(comment *models.Comment) error {
 	comment.CreatedAt = now
 	comment.UpdatedAt = now
 
-	// Broadcast real-time comment creation
 	if s.hub != nil {
 		commentData := map[string]interface{}{
 			"id":         comment.ID,
@@ -62,7 +61,7 @@ func (s *CommentService) GetPostComments(postID uint, limit, offset int) ([]mode
 }
 
 func (s *CommentService) GetPostCommentsSorted(postID uint, limit, offset int, sort string) ([]models.CommentResponse, error) {
-	orderBy := "c.created_at DESC" // Default: newest first
+	orderBy := "c.created_at DESC"
 	if sort == "oldest" {
 		orderBy = "c.created_at ASC"
 	}
@@ -99,7 +98,6 @@ func (s *CommentService) GetPostCommentsSorted(postID uint, limit, offset int, s
 			return nil, err
 		}
 
-		// Handle nullable fields
 		if avatar.Valid {
 			user.Avatar = &avatar.String
 		}
@@ -118,7 +116,6 @@ func (s *CommentService) GetPostCommentsSorted(postID uint, limit, offset int, s
 }
 
 func (s *CommentService) UpdateComment(commentID uint, userID uint, updateReq *models.UpdateCommentRequest) error {
-	// Check if user owns the comment
 	var ownerID uint
 	err := s.db.QueryRow("SELECT user_id FROM comments WHERE id = ?", commentID).Scan(&ownerID)
 	if err != nil {
@@ -126,7 +123,7 @@ func (s *CommentService) UpdateComment(commentID uint, userID uint, updateReq *m
 	}
 
 	if ownerID != userID {
-		return sql.ErrNoRows // Unauthorized
+		return sql.ErrNoRows
 	}
 
 	var imageURL *string
@@ -145,7 +142,6 @@ func (s *CommentService) UpdateComment(commentID uint, userID uint, updateReq *m
 }
 
 func (s *CommentService) DeleteComment(commentID uint, userID uint) error {
-	// Check if user owns the comment OR owns the post
 	var ownerID uint
 	var postID uint
 	err := s.db.QueryRow("SELECT user_id, post_id FROM comments WHERE id = ?", commentID).Scan(&ownerID, &postID)
@@ -153,14 +149,12 @@ func (s *CommentService) DeleteComment(commentID uint, userID uint) error {
 		return err
 	}
 
-	// If user is the comment owner, allow deletion
 	if ownerID == userID {
 		query := `DELETE FROM comments WHERE id = ? AND user_id = ?`
 		_, err = s.db.Exec(query, commentID, userID)
 		return err
 	}
 
-	// If user is not the comment owner, check if they own the post
 	var postOwnerID uint
 	err = s.db.QueryRow("SELECT user_id FROM posts WHERE id = ?", postID).Scan(&postOwnerID)
 	if err != nil {
@@ -168,10 +162,9 @@ func (s *CommentService) DeleteComment(commentID uint, userID uint) error {
 	}
 
 	if postOwnerID != userID {
-		return sql.ErrNoRows // Unauthorized - user doesn't own comment or post
+		return sql.ErrNoRows
 	}
 
-	// User owns the post, allow deletion
 	query := `DELETE FROM comments WHERE id = ?`
 	_, err = s.db.Exec(query, commentID)
 	return err

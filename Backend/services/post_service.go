@@ -2,7 +2,6 @@ package services
 
 import (
 	"database/sql"
-	"log"
 	"social/models"
 	"social/websocket"
 	"time"
@@ -41,7 +40,6 @@ func (s *PostService) CreatePost(post *models.Post) error {
 	post.CreatedAt = now
 	post.UpdatedAt = now
 
-	// Broadcast real-time post creation to followers
 	if s.hub != nil {
 		postData := map[string]interface{}{
 			"id":         post.ID,
@@ -134,30 +132,23 @@ GROUP BY p.id, u.id
 	user.ID = post.UserID
 	post.User = user
 
-	// Check if current user can view this post
 	canView, err := s.CanViewPost(postID, currentUserID)
 	if err != nil || !canView {
 		return nil, err
 	}
 
-	// Fetch specific user IDs for listed posts
 	if post.Privacy == "listed" {
 		userIDs, err := s.GetPostPrivacyUsers(postID)
 		if err != nil {
-			log.Printf("Failed to get privacy users for post %d: %v", postID, err)
-			// Don't fail the request, just set empty list
 			post.SpecificUserIDs = []uint{}
 		} else {
 			post.SpecificUserIDs = userIDs
 		}
 	}
 
-	// Fetch comments for this post
 	commentService := NewCommentService(s.db, s.hub)
-	comments, err := commentService.GetPostCommentsSorted(postID, 50, 0, sort) // Get up to 50 comments
+	comments, err := commentService.GetPostCommentsSorted(postID, 50, 0, sort)
 	if err != nil {
-		log.Printf("Failed to get comments for post %d: %v", postID, err)
-		// Don't fail the request, just set empty comments
 		post.Comments = []models.CommentResponse{}
 	} else {
 		post.Comments = comments
@@ -207,7 +198,6 @@ LIMIT ? OFFSET ?
 			return nil, err
 		}
 
-		// Check if current user can view this post
 		canView, err := s.CanViewPost(post.ID, currentUserID)
 		if err != nil || !canView {
 			continue
@@ -237,7 +227,6 @@ LIMIT ? OFFSET ?
 
 	rows, err := s.db.Query(query, currentUserID, currentUserID, limit, offset)
 	if err != nil {
-		log.Printf("Error getting feed posts: %v", err)
 		return nil, err
 	}
 	defer rows.Close()
@@ -257,7 +246,6 @@ LIMIT ? OFFSET ?
 			return nil, err
 		}
 
-		// Check if current user can view this post
 		canView, err := s.CanViewPost(post.ID, currentUserID)
 		if err != nil || !canView {
 			continue
@@ -272,7 +260,6 @@ LIMIT ? OFFSET ?
 }
 
 func (s *PostService) UpdatePost(postID uint, userID uint, updateReq *models.UpdatePostRequest) error {
-	// First check if user owns the post
 	var ownerID uint
 	err := s.db.QueryRow("SELECT user_id FROM posts WHERE id = ?", postID).Scan(&ownerID)
 	if err != nil {
@@ -280,7 +267,7 @@ func (s *PostService) UpdatePost(postID uint, userID uint, updateReq *models.Upd
 	}
 
 	if ownerID != userID {
-		return sql.ErrNoRows // Unauthorized
+		return sql.ErrNoRows
 	}
 
 	query := `
@@ -294,14 +281,10 @@ func (s *PostService) UpdatePost(postID uint, userID uint, updateReq *models.Upd
 		return err
 	}
 
-	// Update post privacy if privacy is 'listed'
 	if updateReq.Privacy == "listed" {
-		// Clear existing privacy settings
 		s.db.Exec("DELETE FROM post_privacy WHERE post_id = ?", postID)
-		// Add new privacy settings
 		s.AddPostPrivacyUsers(postID, updateReq.SpecificUserIDs)
 	} else {
-		// If not listed, clear any existing privacy settings
 		s.db.Exec("DELETE FROM post_privacy WHERE post_id = ?", postID)
 	}
 
@@ -309,7 +292,6 @@ func (s *PostService) UpdatePost(postID uint, userID uint, updateReq *models.Upd
 }
 
 func (s *PostService) DeletePost(postID uint, userID uint) error {
-	// Check if user owns the post
 	var ownerID uint
 	err := s.db.QueryRow("SELECT user_id FROM posts WHERE id = ?", postID).Scan(&ownerID)
 	if err != nil {
@@ -317,15 +299,13 @@ func (s *PostService) DeletePost(postID uint, userID uint) error {
 	}
 
 	if ownerID != userID {
-		return sql.ErrNoRows // Unauthorized
+		return sql.ErrNoRows
 	}
 
-	// Delete related data first (foreign key constraints)
 	s.db.Exec("DELETE FROM post_privacy WHERE post_id = ?", postID)
 	s.db.Exec("DELETE FROM likes WHERE post_id = ?", postID)
 	s.db.Exec("DELETE FROM comments WHERE post_id = ?", postID)
 
-	// Delete the post
 	_, err = s.db.Exec("DELETE FROM posts WHERE id = ? AND user_id = ?", postID, userID)
 	return err
 }
@@ -344,7 +324,6 @@ func (s *PostService) CanViewPost(postID uint, currentUserID uint) (bool, error)
 		return false, err
 	}
 
-	// User can always view their own posts
 	if ownerID == currentUserID {
 		return true, nil
 	}
@@ -353,13 +332,10 @@ func (s *PostService) CanViewPost(postID uint, currentUserID uint) (bool, error)
 	case "public":
 		return true, nil
 	case "followers":
-		// Check if current user follows the post owner
 		return s.isFollowing(currentUserID, ownerID)
 	case "friends":
-		// Check if users are mutual followers (friends)
 		return s.AreFriends(currentUserID, ownerID)
 	case "listed":
-		// Check if current user is in the specific user list
 		return s.isInPostPrivacyList(postID, currentUserID)
 	default:
 		return false, nil
@@ -396,7 +372,6 @@ WHERE post_id = ? AND user_id = ?
 	return count > 0, nil
 }
 
-// GetUserLikedPosts returns posts that the user has liked
 func (s *PostService) GetUserLikedPosts(userID uint, limit, offset int) ([]models.PostResponse, error) {
 	query := `
 SELECT DISTINCT p.id, p.user_id, p.content, p.image_url, p.privacy, p.share_count, p.created_at, p.updated_at,
@@ -445,7 +420,6 @@ LIMIT ? OFFSET ?
 	return posts, nil
 }
 
-// GetUserCommentedPosts returns posts that the user has commented on
 func (s *PostService) GetUserCommentedPosts(userID uint, limit, offset int) ([]models.PostResponse, error) {
 	query := `
 	SELECT DISTINCT p.id, p.user_id, p.content, p.image_url, p.privacy, p.share_count, p.created_at, p.updated_at,
@@ -495,14 +469,11 @@ func (s *PostService) GetUserCommentedPosts(userID uint, limit, offset int) ([]m
 	return posts, nil
 }
 
-// GetAllFeedPosts returns all posts that the user is allowed to see, regardless of who posted them
 func (s *PostService) GetAllFeedPosts(currentUserID uint, limit int, offset int) ([]models.PostResponse, error) {
-	// This is the same as the original GetFeedPosts - shows all posts user can see
 	posts, err := s.GetFeedPosts(currentUserID, limit, offset)
 	return posts, err
 }
 
-// GetFollowingFeedPosts returns posts only from users that the current user is following
 func (s *PostService) GetFollowingFeedPosts(currentUserID uint, limit int, offset int) ([]models.PostResponse, error) {
 	query := `
 SELECT p.id, p.user_id, p.content, p.image_url, p.privacy, p.share_count, p.created_at, p.updated_at,
@@ -520,7 +491,6 @@ LIMIT ? OFFSET ?
 
 	rows, err := s.db.Query(query, currentUserID, currentUserID, currentUserID, limit, offset)
 	if err != nil {
-		log.Printf("Error getting following feed posts: %v", err)
 		return nil, err
 	}
 	defer rows.Close()
@@ -540,7 +510,6 @@ LIMIT ? OFFSET ?
 			return nil, err
 		}
 
-		// Check if current user can view this post (respects privacy settings)
 		canView, err := s.CanViewPost(post.ID, currentUserID)
 		if err != nil || !canView {
 			continue
@@ -554,7 +523,6 @@ LIMIT ? OFFSET ?
 	return posts, nil
 }
 
-// GetFriendsFeedPosts returns posts only from friends (mutual followers)
 func (s *PostService) GetFriendsFeedPosts(currentUserID uint, limit int, offset int) ([]models.PostResponse, error) {
 	query := `
 SELECT p.id, p.user_id, p.content, p.image_url, p.privacy, p.share_count, p.created_at, p.updated_at,
@@ -577,7 +545,6 @@ LIMIT ? OFFSET ?
 
 	rows, err := s.db.Query(query, currentUserID, currentUserID, currentUserID, limit, offset)
 	if err != nil {
-		log.Printf("Error getting friends feed posts: %v", err)
 		return nil, err
 	}
 	defer rows.Close()
@@ -597,7 +564,6 @@ LIMIT ? OFFSET ?
 			return nil, err
 		}
 
-		// Check if current user can view this post (respects privacy settings)
 		canView, err := s.CanViewPost(post.ID, currentUserID)
 		if err != nil || !canView {
 			continue

@@ -1,6 +1,6 @@
 'use client'
 import { useState, useEffect } from 'react'
-import { useRouter, useParams } from 'next/navigation'
+import { useRouter, useParams, useSearchParams } from 'next/navigation'
 import ProtectedRoute from '@/components/ProtectedRoute'
 import ChatWindow from '@/components/ChatWindow'
 import { useAuth } from '@/context/AuthContext'
@@ -27,12 +27,19 @@ import CreateDirectMessage from '@/components/dashboard/CreateDirectMessage'
 function ChatsFilterPage() {
   const router = useRouter()
   const params = useParams()
+  const searchParams = useSearchParams()
   const filter = params.filter as string
   const { user } = useAuth()
   const { isConnected, onlineUsers } = useWebSocket()
   const { success, error } = useToast()
   const { items: _liveNotifications, unread: _liveUnreadCount } = useNotifications()
   const { conversations: _liveConversations } = useConversations()
+
+  // Get URL parameters
+  const chatId = searchParams.get('chat')
+  const groupId = searchParams.get('group')
+  const userParam = searchParams.get('user')
+  const highlightMessageParam = searchParams.get('message')
 
   const [chatSubTab, setChatSubTab] = useState(filter === 'groups' ? 'group' : filter || 'all')
   const [showCreateGroup, setShowCreateGroup] = useState(false)
@@ -84,22 +91,33 @@ function ChatsFilterPage() {
     '#React', '#TypeScript', '#NodeJS', '#Python', '#DevOps'
   ]
 
-  // Update URL when filter changes
+  // Update URL when filter changes - allow private/groups tabs, redirect others to /chats/all
   useEffect(() => {
-    const urlFilter = chatSubTab === 'group' ? 'groups' : chatSubTab
-    if (urlFilter !== filter) {
-      router.replace(`/chats/${urlFilter}`)
+    if (filter !== 'all' && filter !== 'private' && filter !== 'groups') {
+      router.replace('/chats/all')
     }
-  }, [chatSubTab, filter, router])
+  }, [filter, router])
 
-  // Open chat from URL parameter
+  // Open chat from URL parameter - respect current filter tab
   useEffect(() => {
     if (openChatWindow && openChatWindow.conversationId) {
-      router.replace(`/chats/${filter}?chat=${openChatWindow.conversationId}`)
+      const param = openChatWindow.type === 'group' ? 'group' : 'chat'
+      // If we're on the 'all' tab, use /chats/all with query params for deep linking
+      if (filter === 'all') {
+        router.replace(`/chats/all?${param}=${openChatWindow.conversationId}`)
+      } else {
+        // If we're on private/groups tabs, stay on current path but add query params
+        router.replace(`/chats/${filter}?${param}=${openChatWindow.conversationId}`)
+      }
     } else {
-      router.replace(`/chats/${filter}`)
+      // When closing chat, remove query params but stay on current filter
+      if (filter === 'all') {
+        router.replace('/chats/all')
+      } else {
+        router.replace(`/chats/${filter}`)
+      }
     }
-  }, [openChatWindow, filter, router])
+  }, [openChatWindow, router, filter])
 
   // Fetch data when component loads
   useEffect(() => {
@@ -128,6 +146,59 @@ function ChatsFilterPage() {
       )
     }
   }, [onlineUsers, chats.length])
+
+  // Open chat from URL parameters
+  useEffect(() => {
+    // Direct conversation open via ?chat=
+    if (chatId) {
+      const id = parseInt(chatId)
+      if (!isNaN(id)) {
+        // If chats already loaded, try to find details; otherwise open with minimal info
+        const chat = chats.find(c => c.id === id)
+        setOpenChatWindow({
+          conversationId: id,
+          type: chat?.isGroup ? 'group' : 'private',
+          name: chat?.name || 'Chat',
+          participantId: chat?.participantId,
+          groupId: chat?.isGroup ? chat.groupId : undefined,
+          highlightMessageId: highlightMessageParam ? parseInt(highlightMessageParam) : undefined
+        })
+        return
+      }
+    }
+
+    // Direct group open via ?group=
+    if (groupId) {
+      const id = parseInt(groupId)
+      if (!isNaN(id)) {
+        // If chats already loaded, try to find details; otherwise open with minimal info
+        const chat = chats.find(c => c.isGroup && c.groupId === id)
+        setOpenChatWindow({
+          conversationId: chat?.id || id, // Use conversation ID if found, otherwise use group ID
+          type: 'group',
+          name: chat?.name || 'Group Chat',
+          groupId: id,
+          highlightMessageId: highlightMessageParam ? parseInt(highlightMessageParam) : undefined
+        })
+        return
+      }
+    }
+
+    // Open direct message via ?user=
+    if (userParam) {
+      const participantId = parseInt(userParam)
+      if (!isNaN(participantId)) {
+        const existing = chats.find(c => !c.isGroup && c.participantId === participantId)
+        setOpenChatWindow({
+          conversationId: existing?.id || 0,
+          type: 'private',
+          name: existing?.name || 'Direct Message',
+          participantId,
+          highlightMessageId: highlightMessageParam ? parseInt(highlightMessageParam) : undefined
+        })
+      }
+    }
+  }, [chatId, groupId, chats, userParam, highlightMessageParam])
 
   const fetchConversations = async () => {
     try {
@@ -168,7 +239,8 @@ function ChatsFilterPage() {
           participantAvatar: String(participant?.['avatar'] ?? ''),
           lastMessageSenderId: Number(last_message?.['sender_id'] ?? 0),
           actualId: group?.['id'] ?? participant?.['id'],
-          groupId: group?.['id'] ? Number(group['id']) : undefined
+          groupId: group?.['id'] ? Number(group['id']) : undefined,
+          type: type as 'private' | 'group'
         }
       }))
     } catch (err) {

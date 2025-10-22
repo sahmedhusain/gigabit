@@ -1,11 +1,12 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"io"
 	"log"
 	"net/http"
-	"os"
 	"strings"
 	"time"
 
@@ -33,43 +34,32 @@ type Response struct {
 	Error   string      `json:"error,omitempty"`
 }
 
-// CORS middleware
 func corsMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Set CORS headers
 		w.Header().Set("Access-Control-Allow-Origin", "http://localhost:3000")
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", "Origin, Content-Type, Accept, Authorization, Upgrade, Connection, Sec-WebSocket-Key, Sec-WebSocket-Version, Sec-WebSocket-Protocol")
 		w.Header().Set("Access-Control-Expose-Headers", "Content-Length")
 		w.Header().Set("Access-Control-Allow-Credentials", "true")
 		w.Header().Set("Access-Control-Max-Age", "43200")
-
-		// Handle preflight requests
 		if r.Method == "OPTIONS" {
 			w.WriteHeader(http.StatusOK)
 			return
 		}
-
 		next.ServeHTTP(w, r)
 	})
 }
 
-// Logging middleware
 func loggingMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		start := time.Now()
 		next.ServeHTTP(w, r)
-		log.Printf("%s %s %v", r.Method, r.URL.Path, time.Since(start))
 	})
 }
 
-// JSON helper functions
 func writeJSON(w http.ResponseWriter, status int, data interface{}) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	if err := json.NewEncoder(w).Encode(data); err != nil {
-		log.Printf("Error encoding JSON: %v", err)
-	}
+	_ = json.NewEncoder(w).Encode(data)
 }
 
 func writeError(w http.ResponseWriter, status int, message string) {
@@ -126,7 +116,7 @@ func (s *Server) setupRoutes() {
 	})
 
 	// Static file serving for images
-	// s.router.Handle("/uploads/", http.StripPrefix("/uploads/", http.FileServer(http.Dir("./uploads"))))
+	s.router.Handle("/uploads/", http.StripPrefix("/uploads/", http.FileServer(http.Dir("./uploads"))))
 
 	// Public routes
 	s.router.HandleFunc("/api/register", s.handleRoute(authHandler.Register, false))
@@ -136,15 +126,20 @@ func (s *Server) setupRoutes() {
 	// Protected routes
 	s.router.HandleFunc("/api/me", s.handleRoute(authHandler.GetMe, true))
 	s.router.HandleFunc("/api/logout", s.handleRoute(authHandler.Logout, true))
+	s.router.HandleFunc("/api/change-password", s.handleRoute(authHandler.ChangePassword, true))
 
 	// Profile routes
 	s.router.HandleFunc("/api/profile/", s.handleProfileRoute(profileHandler))
-	s.router.HandleFunc("/api/profile", s.handleRoute(profileHandler.UpdateProfile, true))
+	s.router.HandleFunc("/api/profile", s.handleRoute(userHandler.UpdateProfile, true))
 	s.router.HandleFunc("/api/profile/image", s.handleRoute(profileHandler.UpdateProfileImage, true))
 	s.router.HandleFunc("/api/profile/privacy", s.handleRoute(profileHandler.TogglePrivacy, true))
 	s.router.HandleFunc("/api/users/search", s.handleRoute(profileHandler.SearchUsers, true))
 	// Public stats route (no authentication required)
 	s.router.HandleFunc("/api/stats/", s.handlePublicStatsRoute(profileHandler))
+
+	// Validation routes
+	s.router.HandleFunc("/api/validation/email", s.handleRoute(profileHandler.CheckEmailUniqueness, true))
+	s.router.HandleFunc("/api/validation/nickname", s.handleRoute(profileHandler.CheckNicknameUniqueness, true))
 
 	// Search routes
 	s.router.HandleFunc("/api/search/suggestions", s.handleRoute(searchHandler.UnifiedSearch, true))
@@ -160,6 +155,7 @@ func (s *Server) setupRoutes() {
 	s.router.HandleFunc("/api/users/status", s.handleRoute(userHandler.UpdateStatus, true))
 	s.router.HandleFunc("/api/users/", s.handleUserRoute(followHandler, wsHandler))
 	s.router.HandleFunc("/api/users/invitable/", s.handleInvitableUsersRoute(groupHandler))
+	s.router.HandleFunc("/api/account", s.handleRoute(userHandler.DeleteAccount, true))
 
 	// Status routes
 	s.router.HandleFunc("/api/status/me", s.handleRoute(statusHandler.GetMyStatus, true))
@@ -184,6 +180,8 @@ func (s *Server) setupRoutes() {
 	s.router.HandleFunc("/api/groups/", s.handleGroupRoute(groupHandler, eventHandler, pollHandler))
 	s.router.HandleFunc("/api/groups/invitations", s.handleRoute(groupHandler.GetUserInvitations, true))
 	s.router.HandleFunc("/api/follow/requests", s.handleRoute(followHandler.GetFollowRequests, true))
+	s.router.HandleFunc("/api/follow/requests/outgoing", s.handleRoute(followHandler.GetOutgoingFollowRequests, true))
+	s.router.HandleFunc("/api/groups/join-requests/outgoing", s.handleRoute(groupHandler.GetOutgoingGroupJoinRequests, true))
 
 	// Event routes
 	s.router.HandleFunc("/api/events", s.handleUserEventsRoute(eventHandler))
@@ -206,51 +204,12 @@ func (s *Server) setupRoutes() {
 
 	// Upload routes
 	s.router.HandleFunc("/api/uploads", s.handleRoute(uploadHandler.UploadImage, true))
+	s.router.HandleFunc("/api/upload/avatar", s.handleRoute(uploadHandler.UploadAvatar, true))
 
 	// Poll routes
 	s.router.HandleFunc("/api/polls", s.handlePollsRoute(pollHandler))
 	s.router.HandleFunc("/api/polls/", s.handlePollRoute(pollHandler))
 
-	// Dev-only debug routes (enable by setting ENABLE_DEBUG=1 in environment)
-	if os.Getenv("ENABLE_DEBUG") == "1" {
-		s.router.HandleFunc("/api/debug/sessions", func(w http.ResponseWriter, r *http.Request) {
-			if r.Method != http.MethodGet {
-				writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
-				return
-			}
-
-			db := s.DB.GetDB()
-			rows, err := db.Query(`SELECT id, user_id, token, expires_at, created_at, updated_at FROM sessions`)
-			if err != nil {
-				writeError(w, http.StatusInternalServerError, "Failed to query sessions")
-				return
-			}
-			defer rows.Close()
-
-			sessions := []map[string]interface{}{}
-			for rows.Next() {
-				var id int
-				var userID int
-				var token string
-				var expiresAt string
-				var createdAt string
-				var updatedAt string
-				if err := rows.Scan(&id, &userID, &token, &expiresAt, &createdAt, &updatedAt); err != nil {
-					continue
-				}
-				sessions = append(sessions, map[string]interface{}{
-					"id":         id,
-					"user_id":    userID,
-					"token":      token,
-					"expires_at": expiresAt,
-					"created_at": createdAt,
-					"updated_at": updatedAt,
-				})
-			}
-
-			writeJSON(w, http.StatusOK, map[string]interface{}{"sessions": sessions})
-		})
-	}
 }
 
 // Route handler wrapper
@@ -330,6 +289,14 @@ func (s *Server) handleUserRoute(followHandler *handlers.FollowHandler, wsHandle
 				default:
 					writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
 				}
+			})).ServeHTTP(w, r)
+		case "follow-status":
+			if r.Method != http.MethodGet {
+				writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
+				return
+			}
+			authMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				followHandler.GetFollowStatus(w, r)
 			})).ServeHTTP(w, r)
 		case "followers":
 			if r.Method != http.MethodGet {
@@ -830,6 +797,19 @@ func (s *Server) handleGroupRoute(groupHandler *handlers.GroupHandler, eventHand
 				} else {
 					writeError(w, http.StatusNotFound, "Message ID required")
 				}
+			case "cancel-invitation":
+				if len(parts) >= 3 {
+					invitationID := parts[2]
+					if r.Method != http.MethodDelete {
+						writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
+						return
+					}
+					authMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+						groupHandler.CancelInvitation(w, r, groupID, invitationID)
+					})).ServeHTTP(w, r)
+				} else {
+					writeError(w, http.StatusNotFound, "Invitation ID required")
+				}
 			default:
 				writeError(w, http.StatusNotFound, "Invalid endpoint")
 			}
@@ -937,9 +917,9 @@ func (s *Server) handleMessageRoute(handler *handlers.MessageHandler) http.Handl
 				return
 			}
 			if messageType == "read" {
-				authMiddleware(http.HandlerFunc(handler.MarkConversationAsRead)).ServeHTTP(w, r)
+				authMiddleware(http.HandlerFunc(s.handleReadRequest(handler))).ServeHTTP(w, r)
 			} else if messageType == "unread" {
-				authMiddleware(http.HandlerFunc(handler.MarkConversationAsUnread)).ServeHTTP(w, r)
+				authMiddleware(http.HandlerFunc(s.handleUnreadRequest(handler))).ServeHTTP(w, r)
 			} else if messageType == "search" {
 				authMiddleware(http.HandlerFunc(handler.SearchMessages)).ServeHTTP(w, r)
 			}
@@ -1218,5 +1198,83 @@ func (s *Server) handlePollRoute(handler *handlers.PollHandler) http.HandlerFunc
 		} else {
 			writeError(w, http.StatusNotFound, "Route not found")
 		}
+	}
+}
+
+// handleReadRequest differentiates between marking individual messages as read vs marking a conversation as read
+func (s *Server) handleReadRequest(handler *handlers.MessageHandler) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// Read the request body to determine the type
+		bodyBytes, err := io.ReadAll(r.Body)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, "Invalid request body")
+			return
+		}
+
+		// Restore the body for the handler to read again
+		r.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
+
+		// Try to parse as MarkReadRequest (message_ids)
+		var markReadReq struct {
+			MessageIDs []uint `json:"message_ids"`
+		}
+		if json.Unmarshal(bodyBytes, &markReadReq) == nil && len(markReadReq.MessageIDs) > 0 {
+			// This is a request to mark individual messages as read
+			handler.MarkAsRead(w, r)
+			return
+		}
+
+		// Try to parse as conversation read request
+		var convReadReq struct {
+			ConversationID   uint   `json:"conversation_id"`
+			ConversationType string `json:"conversation_type"`
+		}
+		if json.Unmarshal(bodyBytes, &convReadReq) == nil && convReadReq.ConversationID > 0 {
+			// This is a request to mark a conversation as read
+			handler.MarkConversationAsRead(w, r)
+			return
+		}
+
+		// If neither parsing worked, return an error
+		writeError(w, http.StatusBadRequest, "Invalid request body: must contain either message_ids or conversation_id")
+	}
+}
+
+// handleUnreadRequest differentiates between marking individual messages as unread vs marking a conversation as unread
+func (s *Server) handleUnreadRequest(handler *handlers.MessageHandler) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// Read the request body to determine the type
+		bodyBytes, err := io.ReadAll(r.Body)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, "Invalid request body")
+			return
+		}
+
+		// Restore the body for the handler to read again
+		r.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
+
+		// Try to parse as MarkReadRequest (message_ids)
+		var markUnreadReq struct {
+			MessageIDs []uint `json:"message_ids"`
+		}
+		if json.Unmarshal(bodyBytes, &markUnreadReq) == nil && len(markUnreadReq.MessageIDs) > 0 {
+			// This is a request to mark individual messages as unread
+			handler.MarkAsUnread(w, r)
+			return
+		}
+
+		// Try to parse as conversation unread request
+		var convUnreadReq struct {
+			ConversationID   uint   `json:"conversation_id"`
+			ConversationType string `json:"conversation_type"`
+		}
+		if json.Unmarshal(bodyBytes, &convUnreadReq) == nil && convUnreadReq.ConversationID > 0 {
+			// This is a request to mark a conversation as unread
+			handler.MarkConversationAsUnread(w, r)
+			return
+		}
+
+		// If neither parsing worked, return an error
+		writeError(w, http.StatusBadRequest, "Invalid request body: must contain either message_ids or conversation_id")
 	}
 }

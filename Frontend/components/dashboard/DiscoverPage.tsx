@@ -1,362 +1,618 @@
 'use client'
+
 import React, { useState, useEffect, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Image from 'next/image'
-import { 
-  Search, 
-  User, 
-  MessageCircle, 
-  Users, 
-  Sparkles, 
-  TrendingUp, 
-  Globe, 
-  UserCheck, 
+import { motion, AnimatePresence } from 'framer-motion'
+import {
+  Search,
+  Users,
+  Globe,
   UserPlus,
-  MapPin,
-  Calendar,
-  Eye,
-  Grid3X3,
-  Hash,
-  Plus,
-  ArrowUp,
-  ArrowDown,
-  Minus,
+  UserCheck,
+  Clock,
   Check,
-  Clock3,
-  XCircle,
-  ShieldCheck,
-  Lock
+  X,
+  MessageCircle,
+  Eye,
+  Filter,
+  Grid3X3,
+  List,
+  UserX,
+  ArrowRightLeft,
+  Bell,
+  Send,
+  Inbox,
+  UserMinus,
+  ChevronDown,
+  ArrowDown,
+  ArrowUp,
+  Lock,
+  Heart
 } from 'lucide-react'
-import { api, User as UserType, GroupResponse, GroupMemberStatus } from '@/lib/api'
-import { useAuth } from '@/context/AuthContext'
+import { useRealTimePosts, useFollowers, useConnectionStatus, useFollowerCounts } from '@/hooks'
+import { getAvatarUrl } from '@/utils/avatarUtils'
 import { useToast } from '@/context/ToastContext'
-import { useConnectionStatus } from '@/hooks'
-import FollowHandler, { FollowStatus, getFollowStatusFromAPI } from './FollowHandler'
-import CreateGroup from './CreateGroup'
+import { useAuth } from '@/context/AuthContext'
+import { useWebSocket } from '@/context/WebSocketContext'
+import { FollowStatus } from './FollowHandler'
+import { User, api, GroupResponse, FollowRequestItem } from '@/lib/api'
+import FollowHandler from './FollowHandler'
 
-const normalizeGroupStatus = (group: { member_status?: GroupMemberStatus; is_member?: boolean }): GroupMemberStatus => {
-  const status = group.member_status ?? (group.is_member ? 'member' : 'none')
-  if (status === 'member' || status === 'sent' || status === 'requested' || status === 'rejected') {
-    return status
+// Letter Avatar Component with Chat Style
+function LetterAvatar({
+  name,
+  size = 64,
+  className = ''
+}: {
+  name: string
+  size?: number
+  className?: string
+}) {
+  const firstTwoLetters = name.substring(0, 2).toUpperCase()
+  const colors = [
+    'bg-blue-500',
+    'bg-green-500',
+    'bg-yellow-500',
+    'bg-red-500',
+    'bg-purple-500',
+    'bg-pink-500',
+    'bg-indigo-500',
+    'bg-teal-500'
+  ]
+  const colorIndex = name.length % colors.length
+  const bgColor = colors[colorIndex]
+
+  const sizeClasses = {
+    48: 'w-12 h-12 text-sm',
+    64: 'w-16 h-16 text-lg'
   }
-  return 'none'
+
+  return (
+    <motion.div
+      className={`w-14 h-14 bg-gradient-to-br from-emerald-400 to-teal-600 rounded-full flex items-center justify-center text-white font-bold text-xl shadow-lg overflow-hidden ${className}`}
+      whileHover={{ rotate: [0, -5, 5, 0], scale: 1.05 }}
+      transition={{ duration: 0.3 }}
+    >
+      <span className="text-white font-bold text-xl">
+        {firstTwoLetters}
+      </span>
+    </motion.div>
+  )
 }
 
-interface UserWithFollowStatus extends UserType {
-  followStatus: FollowStatus
-  mutualFollowers?: number
-  memberSince?: string
-  recentActivity?: string
-  location?: string
-  isOnline?: boolean
+interface DiscoverUser extends User {
+  followStatus: FollowStatus & { isFollowedBy: boolean }
+  isOnline: boolean
 }
 
-interface GroupWithJoinStatus extends GroupResponse {
-  recent_activity?: string
-  trending_score?: number
+interface DiscoverGroup extends GroupResponse {
+  joinStatus: 'none' | 'sent' | 'requested' | 'member' | 'rejected'
 }
 
-interface TrendingTag {
-  tag: string
-  count: number
-  growth: number
-  trend: 'up' | 'down' | 'stable'
+interface GroupJoinRequest {
+  id: number
+  group: GroupResponse
+  user: User
+  requested_at: string
+  status: 'pending' | 'accepted' | 'declined'
 }
 
-type UserFilter = 'all' | 'not_following' | 'online' | 'new_members'
-type GroupFilter = 'all' | 'available' | 'joined' | 'active'
-type SortBy = 'newest' | 'members' | 'active' | 'name_asc' | 'name_desc'
-type DiscoverTab = 'users' | 'groups' | 'trending'
+type RequestItem = {
+  request_id: number
+  user: {
+    id: number
+    first_name?: string
+    last_name?: string
+    avatar?: string
+    nickname?: string
+  }
+  requested_at: string
+  type: 'follow'
+  direction?: 'incoming' | 'outgoing'
+} | {
+  request_id: number
+  user: {
+    id: number
+    first_name?: string
+    last_name?: string
+    avatar?: string
+    nickname?: string
+  }
+  requested_at: string
+  type: 'group_join'
+  group: GroupResponse
+  direction?: 'incoming' | 'outgoing'
+} | {
+  request_id: number
+  user: {
+    id: number
+    first_name?: string
+    last_name?: string
+    avatar?: string
+    nickname?: string
+  }
+  requested_at: string
+  type: 'group_invitation'
+  group: GroupResponse
+  direction?: 'incoming' | 'outgoing'
+}
+
+type ViewMode = 'grid' | 'list'
+type ActiveTab = 'users' | 'groups' | 'requests'
+type UserFilter = 'all' | 'following' | 'not_following' | 'pending'
+type GroupFilter = 'all' | 'member' | 'not_member' | 'requested' | 'sent' | 'rejected'
+type RequestType = 'all' | 'incoming' | 'outgoing'
 
 export default function DiscoverPage() {
   const { user: currentUser } = useAuth()
   const { success, error, warning } = useToast()
   const { isConnected } = useConnectionStatus()
+  const { sendMessage } = useWebSocket()
   const router = useRouter()
-  
-  // Tab state
-  const [activeTab, setActiveTab] = useState<DiscoverTab>('users')
-  
-  // Users state
-  const [users, setUsers] = useState<UserWithFollowStatus[]>([])
-  const [filteredUsers, setFilteredUsers] = useState<UserWithFollowStatus[]>([])
-  const [userFilter, setUserFilter] = useState<UserFilter>('not_following')
-  
-  // Groups state
-  const [groups, setGroups] = useState<GroupWithJoinStatus[]>([])
-  const [filteredGroups, setFilteredGroups] = useState<GroupWithJoinStatus[]>([])
-  const [groupFilter, setGroupFilter] = useState<GroupFilter>('all')
-  const [pendingRequests, setPendingRequests] = useState<{ [groupId: number]: Array<{ user: UserType; requested_at: string }> }>({})
-  
-  // Trending tags state
-  const [trendingTags, setTrendingTags] = useState<TrendingTag[]>([])
-  
-  // General state
-  const [isLoading, setIsLoading] = useState(true)
+  const searchParams = useSearchParams()
+
+  // State
+  const [activeTab, setActiveTab] = useState<ActiveTab>('users')
+  const [viewMode, setViewMode] = useState<ViewMode>('grid')
   const [searchQuery, setSearchQuery] = useState('')
-  const [sortBy, setSortBy] = useState<SortBy>('newest')
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
-  const [showCreateGroup, setShowCreateGroup] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
 
+  // Filter states
+  const [userFilter, setUserFilter] = useState<UserFilter>('all')
+  const [groupFilter, setGroupFilter] = useState<GroupFilter>('all')
+  const [requestType, setRequestType] = useState<RequestType>('all')
+
+  // Data state
+  const [users, setUsers] = useState<DiscoverUser[]>([])
+  const [groups, setGroups] = useState<DiscoverGroup[]>([])
+  const [followRequests, setFollowRequests] = useState<{
+    incoming: FollowRequestItem[]
+    outgoing: FollowRequestItem[]
+  }>({ incoming: [], outgoing: [] })
+  const [groupRequests, setGroupRequests] = useState<{
+    incoming: GroupJoinRequest[]
+    outgoing: GroupJoinRequest[]
+  }>({ incoming: [], outgoing: [] })
+  const [groupInvitations, setGroupInvitations] = useState<{
+    incoming: GroupJoinRequest[]
+    outgoing: GroupJoinRequest[]
+  }>({ incoming: [], outgoing: [] })
+
+  // Confirmation modal states
+  const [showUnfollowConfirm, setShowUnfollowConfirm] = useState<{ userId: number; userName: string } | null>(null)
+
+  // Filtered data
+  const [filteredUsers, setFilteredUsers] = useState<DiscoverUser[]>([])
+  const [filteredGroups, setFilteredGroups] = useState<DiscoverGroup[]>([])
+  const [filteredRequests, setFilteredRequests] = useState<RequestItem[]>([])
+
+  // Initialize active tab from URL parameter
+  useEffect(() => {
+    const tabParam = searchParams.get('tab')
+    if (tabParam === 'groups') {
+      setActiveTab('groups')
+    } else if (tabParam === 'requests') {
+      setActiveTab('requests')
+    } else {
+      setActiveTab('users')
+    }
+  }, [searchParams])
+
+  // Fetch users
   const fetchUsers = useCallback(async () => {
-    try {
-      const [usersResponse, followingResponse] = await Promise.all([
-        api.getUsers(),
-        api.getFollowing(currentUser!.id)
-      ])
-
-      const allUsers = usersResponse.users || []
-      const followingUsers = followingResponse.following || []
-      
-      const followingIds = new Set(followingUsers.map(u => u.id))
-      
-      const usersWithStatus: UserWithFollowStatus[] = allUsers
-        .filter((u: UserType) => u.id !== currentUser!.id)
-        .map((u: UserType) => ({
-          ...u,
-          followStatus: getFollowStatusFromAPI(followingIds.has(u.id)),
-          mutualFollowers: Math.floor(Math.random() * 10),
-          memberSince: new Date(Date.now() - Math.random() * 365 * 24 * 60 * 60 * 1000).toLocaleDateString(),
-          recentActivity: Math.random() > 0.7 ? 'Active today' : undefined,
-          location: Math.random() > 0.6 ? ['New York', 'London', 'Paris', 'Tokyo', 'Sydney'][Math.floor(Math.random() * 5)] : undefined,
-          isOnline: Math.random() > 0.5
-        }))
-
-      setUsers(usersWithStatus)
-    } catch (err: unknown) {
-      console.error('Failed to fetch users:', err)
-    }
-  }, [currentUser])
-
-  const fetchGroups = useCallback(async () => {
-    try {
-      const response = await api.getAllGroups(50, 0)
-      
-      let userGroups: GroupResponse[] = []
-      try {
-        const userGroupsResponse = await api.getUserGroups(currentUser!.id)
-        userGroups = Array.isArray(userGroupsResponse.groups) ? userGroupsResponse.groups : []
-      } catch {
-        userGroups = []
-      }
-
-      const userGroupMeta = new Map(
-        userGroups.map(group => [
-          group.id,
-          {
-            status: normalizeGroupStatus(group),
-            role: group.role
-          }
-        ])
-      )
-
-      const groupsWithStatus: GroupWithJoinStatus[] = (response.groups || []).map(group => {
-        const meta = userGroupMeta.get(group.id)
-        const normalizedStatus = normalizeGroupStatus({
-          member_status: group.member_status ?? meta?.status,
-          is_member: group.is_member ?? (meta?.status === 'member')
-        })
-        return {
-          ...group,
-          is_member: normalizedStatus === 'member',
-          member_status: normalizedStatus,
-          role: group.role ?? meta?.role,
-          recent_activity: Math.random() > 0.6 ? `${Math.floor(Math.random() * 10) + 1} recent posts` : undefined,
-          trending_score: Math.random() * 100
-        }
-      })
-
-      setGroups(groupsWithStatus)
-    } catch (err: unknown) {
-      console.error('Failed to fetch groups:', err)
-    }
-  }, [currentUser])
-
-  const fetchTrendingTags = useCallback(async () => {
-    // Mock trending tags data - replace with real API call when available
-    const mockTags: TrendingTag[] = [
-      { tag: 'technology', count: 1250, growth: 15.3, trend: 'up' },
-      { tag: 'photography', count: 892, growth: 8.7, trend: 'up' },
-      { tag: 'travel', count: 756, growth: -2.1, trend: 'down' },
-      { tag: 'coding', count: 634, growth: 22.4, trend: 'up' },
-      { tag: 'food', count: 543, growth: 0.8, trend: 'stable' },
-      { tag: 'music', count: 432, growth: 12.1, trend: 'up' },
-      { tag: 'fitness', count: 321, growth: 5.6, trend: 'up' },
-      { tag: 'art', count: 298, growth: -1.2, trend: 'down' },
-      { tag: 'gaming', count: 267, growth: 18.9, trend: 'up' },
-      { tag: 'nature', count: 234, growth: 3.4, trend: 'stable' }
-    ]
-    
-    setTrendingTags(mockTags)
-  }, [])
-
-  const fetchData = useCallback(async () => {
     if (!currentUser) return
 
     try {
-      setIsLoading(true)
-      
-      await Promise.all([
-        fetchUsers(),
-        fetchGroups(),
-        fetchTrendingTags()
+      const [usersResponse] = await Promise.all([
+        api.getUsers()
       ])
-    } catch (err: unknown) {
-      console.error('Failed to fetch discover data:', err)
-      error('Failed to load discover data')
-    } finally {
-      setIsLoading(false)
-    }
-  }, [currentUser, error, fetchUsers, fetchGroups, fetchTrendingTags])
 
-  useEffect(() => {
-    fetchData()
-  }, [fetchData])
+      // Get follow status for each user to determine mutual follows
+      const followStatusPromises = usersResponse.users
+        .filter(u => u.id !== currentUser.id)
+        .map(user => api.getFollowStatus(user.id).catch(() => ({ is_following: false, is_pending: false, is_followed_by: false, status: 'not_following' })))
 
-  const applyUserFiltersAndSort = useCallback(() => {
-    let filtered = [...users]
+      const followStatuses = await Promise.all(followStatusPromises)
 
-    // Apply search filter
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase()
-      filtered = filtered.filter(user => 
-        `${user.first_name} ${user.last_name}`.toLowerCase().includes(query) ||
-        user.nickname?.toLowerCase().includes(query) ||
-        user.email.toLowerCase().includes(query)
-      )
-    }
+      const discoverUsers: DiscoverUser[] = usersResponse.users
+        .filter(u => u.id !== currentUser.id)
+        .map((user, index) => {
+          const followStatus = followStatuses[index] || { is_following: false, is_pending: false, is_followed_by: false, status: 'not_following' }
+          const isFollowing = followStatus.is_following
+          const isPending = followStatus.is_pending
+          const isFollowedBy = followStatus.is_followed_by || false
 
-    // Apply category filter
-    switch (userFilter) {
-      case 'not_following':
-        filtered = filtered.filter(user => !user.followStatus.isFollowing)
-        break
-      case 'online':
-        filtered = filtered.filter(user => user.isOnline)
-        break
-      case 'new_members':
-        filtered = filtered.filter(user => {
-          const memberDate = new Date(user.memberSince || '')
-          const oneMonthAgo = new Date()
-          oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1)
-          return memberDate > oneMonthAgo
+          let status: FollowStatus['status'] = 'not_following'
+          if (isPending) {
+            status = 'pending'
+          } else if (isFollowing) {
+            status = isFollowedBy ? 'follow_back' : 'following'
+          } else if (isFollowedBy) {
+            status = 'follow_back'
+          }
+
+          return {
+            ...user,
+            followStatus: {
+              isFollowing,
+              isPending,
+              isFollowedBy,
+              status
+            },
+            isOnline: Math.random() > 0.5 // Mock online status
+          }
         })
-        break
+
+      setUsers(discoverUsers)
+    } catch (err) {
+      console.error('Failed to fetch users:', err)
+      error('Failed to load users')
     }
+  }, [currentUser, error])
 
-    // Apply sorting
-    filtered.sort((a, b) => {
-      switch (sortBy) {
-        case 'name_asc':
-          return `${a.first_name} ${a.last_name}`.localeCompare(`${b.first_name} ${b.last_name}`)
-        case 'name_desc':
-          return `${b.first_name} ${b.last_name}`.localeCompare(`${a.first_name} ${a.last_name}`)
-        case 'newest':
-          return new Date(b.memberSince || '').getTime() - new Date(a.memberSince || '').getTime()
-        case 'members':
-          return (b.mutualFollowers || 0) - (a.mutualFollowers || 0)
-        case 'active':
-          return (b.mutualFollowers || 0) - (a.mutualFollowers || 0)
-        default:
-          return 0
-      }
-    })
+  // Fetch groups
+  const fetchGroups = useCallback(async () => {
+    if (!currentUser) return
 
-    setFilteredUsers(filtered)
-  }, [users, searchQuery, userFilter, sortBy])
+    try {
+      const [allGroupsResponse, userGroupsResponse] = await Promise.all([
+        api.getAllGroups(50, 0),
+        api.getUserGroups(currentUser.id)
+      ])
 
-  const applyGroupFiltersAndSort = useCallback(() => {
-    let filtered = [...groups]
+      const userGroupIds = new Set(userGroupsResponse.groups ? userGroupsResponse.groups.map(g => g.id) : [])
+      const userGroupRoles = new Map(userGroupsResponse.groups ? userGroupsResponse.groups.map(g => [g.id, g.role]) : [])
 
-    // Apply search filter
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase()
-      filtered = filtered.filter(group => 
-        group.title.toLowerCase().includes(query) ||
-        group.description?.toLowerCase().includes(query)
-      )
+      const publicGroups: DiscoverGroup[] = allGroupsResponse.groups
+        .filter(group => group.privacy === 'public')
+        .map(group => ({
+          ...group,
+          joinStatus: group.member_status || (userGroupIds.has(group.id) ? 'member' : 'none'),
+          role: userGroupRoles.get(group.id)
+        }))
+
+      setGroups(publicGroups)
+    } catch (err) {
+      console.error('Failed to fetch groups:', err)
+      error('Failed to load groups')
     }
+  }, [currentUser, error])
 
-    // Apply category filter
-    switch (groupFilter) {
-      case 'available':
-        filtered = filtered.filter(group => {
-          const status = normalizeGroupStatus(group)
-          return status === 'none' || status === 'rejected'
-        })
-        break
-      case 'joined':
-        filtered = filtered.filter(group => normalizeGroupStatus(group) === 'member')
-        break
-      case 'active':
-        filtered = filtered.filter(group => group.recent_activity)
-        break
-    }
+  // Fetch requests
+  const fetchRequests = useCallback(async () => {
+    if (!currentUser) return
 
-    // Apply sorting
-    filtered.sort((a, b) => {
-      switch (sortBy) {
-        case 'name_asc':
-          return a.title.localeCompare(b.title)
-        case 'name_desc':
-          return b.title.localeCompare(a.title)
-        case 'newest':
-          return new Date(b.created_at || '').getTime() - new Date(a.created_at || '').getTime()
-        case 'members':
-          return (b.member_count || 0) - (a.member_count || 0)
-        case 'active':
-          return (b.trending_score || 0) - (a.trending_score || 0)
-        default:
-          return 0
-      }
-    })
+    try {
+      const [followRequestsResponse, outgoingFollowRequestsResponse, groupInvitationsResponse, outgoingGroupJoinRequestsResponse] = await Promise.all([
+        api.getFollowRequests(),
+        api.getOutgoingFollowRequests(),
+        api.getGroupInvitations ? api.getGroupInvitations() : Promise.resolve({ invitations: [] }),
+        api.getOutgoingGroupJoinRequests()
+      ])
 
-    setFilteredGroups(filtered)
-  }, [groups, searchQuery, groupFilter, sortBy])
-
-  useEffect(() => {
-    if (activeTab === 'users') {
-      applyUserFiltersAndSort()
-    } else if (activeTab === 'groups') {
-      applyGroupFiltersAndSort()
-    }
-  }, [users, groups, searchQuery, userFilter, groupFilter, sortBy, activeTab, applyUserFiltersAndSort, applyGroupFiltersAndSort])
-
-  // Fetch pending requests for admin groups
-  useEffect(() => {
-    if (currentUser && groups.length > 0) {
+      // Get group requests for groups where user is admin
       const adminGroups = groups.filter(group => group.role === 'admin' || group.role === 'creator')
-      adminGroups.forEach(group => {
-        if (!pendingRequests[group.id]) {
-          fetchPendingRequests(group.id)
+
+      const groupRequestsPromises = adminGroups
+        .map(group => api.getPendingJoinRequests(group.id))
+
+      const groupRequestsResponses = await Promise.all(groupRequestsPromises)
+
+      const incomingGroupRequests: GroupJoinRequest[] = []
+      groupRequestsResponses.forEach((response, index) => {
+        const group = groups.filter(g => g.role === 'admin' || g.role === 'creator')[index]
+        if (response.requests) {
+          response.requests.forEach(request => {
+            incomingGroupRequests.push({
+              id: Math.random(), // Mock ID
+              group,
+              user: request.user,
+              requested_at: request.requested_at,
+              status: 'pending'
+            })
+          })
         }
       })
-    }
-  }, [currentUser, groups, pendingRequests])
 
-  const handleFollowStatusChange = (userId: number, newStatus: FollowStatus) => {
-    setUsers(prevUsers => 
-      prevUsers.map(user => 
-        user.id === userId 
-          ? { ...user, followStatus: newStatus }
+      // Process outgoing group join requests
+      const outgoingGroupRequests: GroupJoinRequest[] = (outgoingGroupJoinRequestsResponse.requests || [])
+        .filter((request: any) => request.group) // Filter out requests with no group
+        .map((request: any) => ({
+          id: request.id,
+          group: request.group,
+          user: request.user || { id: currentUser.id, first_name: currentUser.first_name, last_name: currentUser.last_name, avatar: currentUser.avatar, nickname: currentUser.nickname },
+          requested_at: request.created_at,
+          status: 'pending'
+        }))
+
+      // Process group invitations
+      const incomingGroupInvitations: GroupJoinRequest[] = (groupInvitationsResponse.invitations || [])
+        .filter((invitation: any) => invitation.invited_by || invitation.user) // Filter out invitations with no user
+        .map((invitation: any) => ({
+          id: invitation.id,
+          group: invitation.group,
+          user: invitation.invited_by || invitation.user, // The user who sent the invitation
+          requested_at: invitation.invited_at || invitation.requested_at,
+          status: 'pending'
+        }))
+
+      const outgoingGroupInvitations: GroupJoinRequest[] = []
+
+      setFollowRequests({
+        incoming: followRequestsResponse.requests || [],
+        outgoing: outgoingFollowRequestsResponse.requests || []
+      })
+
+      setGroupRequests({
+        incoming: incomingGroupRequests,
+        outgoing: outgoingGroupRequests
+      })
+
+      setGroupInvitations({
+        incoming: incomingGroupInvitations,
+        outgoing: outgoingGroupInvitations
+      })
+    } catch (err) {
+      console.error('Failed to fetch requests:', err)
+      setFollowRequests({ incoming: [], outgoing: [] })
+      setGroupRequests({ incoming: [], outgoing: [] })
+      setGroupInvitations({ incoming: [], outgoing: [] })
+    }
+  }, [currentUser, groups])
+
+  // Load data
+  useEffect(() => {
+    const loadData = async () => {
+      setIsLoading(true)
+      await Promise.all([fetchUsers(), fetchGroups()])
+      setIsLoading(false)
+    }
+
+    loadData()
+  }, [fetchUsers, fetchGroups])
+
+  // Load requests when groups are loaded
+  useEffect(() => {
+    if (groups.length > 0) {
+      fetchRequests()
+    }
+  }, [groups, fetchRequests])
+
+  // Filter data based on search and filters
+  useEffect(() => {
+    if (activeTab === 'users') {
+      let filtered = users.filter(user =>
+        searchQuery === '' ||
+        `${user.first_name} ${user.last_name}`.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        user.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        user.nickname?.toLowerCase().includes(searchQuery.toLowerCase())
+      )
+
+      // Apply user filter
+      switch (userFilter) {
+        case 'following':
+          filtered = filtered.filter(user => user.followStatus.isFollowing)
+          break
+        case 'not_following':
+          filtered = filtered.filter(user => !user.followStatus.isFollowing && !user.followStatus.isPending)
+          break
+        case 'pending':
+          filtered = filtered.filter(user => user.followStatus.isPending)
+          break
+      }
+
+      setFilteredUsers(filtered)
+    } else if (activeTab === 'groups') {
+      let filtered = groups.filter(group =>
+        searchQuery === '' ||
+        group.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        group.description?.toLowerCase().includes(searchQuery.toLowerCase())
+      )
+
+      // Apply group filter
+      switch (groupFilter) {
+        case 'member':
+          filtered = filtered.filter(group => group.joinStatus === 'member')
+          break
+        case 'not_member':
+          filtered = filtered.filter(group => group.joinStatus === 'none')
+          break
+        case 'requested':
+          filtered = filtered.filter(group => group.joinStatus === 'requested')
+          break
+        case 'sent':
+          filtered = filtered.filter(group => group.joinStatus === 'sent')
+          break
+        case 'rejected':
+          filtered = filtered.filter(group => group.joinStatus === 'rejected')
+          break
+      }
+
+      setFilteredGroups(filtered)
+    } else if (activeTab === 'requests') {
+      const requests = requestType === 'incoming'
+        ? [
+            ...(followRequests.incoming || [])
+              .filter(r => r.user) // Filter out requests with no user
+              .map(r => ({
+                request_id: r.user.id,
+                user: r.user,
+                requested_at: r.requested_at,
+                type: 'follow' as const
+              })),
+            ...(groupRequests.incoming || [])
+              .filter(r => r.user) // Filter out requests with no user
+              .map(r => ({
+                request_id: r.id,
+                user: r.user,
+                requested_at: r.requested_at,
+                type: 'group_join' as const,
+                group: r.group
+              })),
+            ...(groupInvitations.incoming || [])
+              .filter(r => r.user) // Filter out requests with no user
+              .map(r => ({
+                request_id: r.id,
+                user: r.user,
+                requested_at: r.requested_at,
+                type: 'group_invitation' as const,
+                group: r.group
+              }))
+          ]
+        : requestType === 'outgoing'
+        ? [
+            ...(followRequests.outgoing || [])
+              .filter(r => r.user) // Filter out requests with no user
+              .map(r => ({
+                request_id: r.request_id || r.user.id,
+                user: r.user,
+                requested_at: r.requested_at,
+                type: 'follow' as const
+              })),
+            ...(groupRequests.outgoing || [])
+              .filter(r => r.user) // Filter out requests with no user
+              .map(r => ({
+                request_id: r.id,
+                user: r.user,
+                requested_at: r.requested_at,
+                type: 'group_join' as const,
+                group: r.group
+              })),
+            ...(groupInvitations.outgoing || [])
+              .filter(r => r.user) // Filter out requests with no user
+              .map(r => ({
+                request_id: r.id,
+                user: r.user,
+                requested_at: r.requested_at,
+                type: 'group_invitation' as const,
+                group: r.group
+              }))
+          ]
+        : [
+            // All requests
+            ...(followRequests.incoming || [])
+              .filter(r => r.user)
+              .map(r => ({
+                request_id: r.user.id,
+                user: r.user,
+                requested_at: r.requested_at,
+                type: 'follow' as const,
+                direction: 'incoming' as const
+              })),
+            ...(followRequests.outgoing || [])
+              .filter(r => r.user)
+              .map(r => ({
+                request_id: r.request_id || r.user.id,
+                user: r.user,
+                requested_at: r.requested_at,
+                type: 'follow' as const,
+                direction: 'outgoing' as const
+              })),
+            ...(groupRequests.incoming || [])
+              .filter(r => r.user)
+              .map(r => ({
+                request_id: r.id,
+                user: r.user,
+                requested_at: r.requested_at,
+                type: 'group_join' as const,
+                group: r.group,
+                direction: 'incoming' as const
+              })),
+            ...(groupRequests.outgoing || [])
+              .filter(r => r.user)
+              .map(r => ({
+                request_id: r.id,
+                user: r.user,
+                requested_at: r.requested_at,
+                type: 'group_join' as const,
+                group: r.group,
+                direction: 'outgoing' as const
+              })),
+            ...(groupInvitations.incoming || [])
+              .filter(r => r.user)
+              .map(r => ({
+                request_id: r.id,
+                user: r.user,
+                requested_at: r.requested_at,
+                type: 'group_invitation' as const,
+                group: r.group,
+                direction: 'incoming' as const
+              })),
+            ...(groupInvitations.outgoing || [])
+              .filter(r => r.user)
+              .map(r => ({
+                request_id: r.id,
+                user: r.user,
+                requested_at: r.requested_at,
+                type: 'group_invitation' as const,
+                group: r.group,
+                direction: 'outgoing' as const
+              }))
+          ]
+
+      const filtered = requests.filter(request =>
+        searchQuery === '' ||
+        `${request.user?.first_name || ''} ${request.user?.last_name || ''}`.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (request.user?.nickname || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (request.type === 'group_join' && request.group?.title?.toLowerCase().includes(searchQuery.toLowerCase())) ||
+        (request.type === 'group_invitation' && request.group?.title?.toLowerCase().includes(searchQuery.toLowerCase()))
+      )
+
+      setFilteredRequests(filtered)
+    }
+  }, [users, groups, followRequests, groupRequests, groupInvitations, searchQuery, activeTab, userFilter, groupFilter, requestType])
+
+  // Handle unfollow confirmation
+  const handleUnfollowConfirm = (userId: number, userName: string) => {
+    setShowUnfollowConfirm({ userId, userName })
+  }
+
+  // Handle confirmed unfollow
+  const handleConfirmedUnfollow = async () => {
+    if (!showUnfollowConfirm) return
+
+    // Update the follow status directly
+    setUsers(prevUsers =>
+      prevUsers.map(user =>
+        user.id === showUnfollowConfirm.userId
+          ? { ...user, followStatus: { ...user.followStatus, isFollowing: false, status: user.followStatus.isFollowedBy ? 'follow_back' : 'not_following' } }
+          : user
+      )
+    )
+
+    // Send unfollow WebSocket message
+    sendMessage({
+      type: 'unfollow' as const,
+      to: showUnfollowConfirm.userId,
+      action: 'unfollow',
+      data: {
+        user_id: showUnfollowConfirm.userId,
+        user_name: showUnfollowConfirm.userName,
+        is_private: false // We don't have this info in the discover context
+      }
+    })
+
+    setShowUnfollowConfirm(null)
+  }
+
+  // Handle follow status change
+  const handleFollowStatusChange = (userId: number, status: FollowStatus) => {
+    setUsers(prevUsers =>
+      prevUsers.map(user =>
+        user.id === userId
+          ? { ...user, followStatus: status }
           : user
       )
     )
   }
 
+  // Handle user click
   const handleUserClick = (userId: number) => {
-    if (!currentUser) return
-    
-    // Check if clicking on own profile
-    if (userId === currentUser.id) {
-      // Navigate to own profile route
-      router.push(`/profile/${userId}`) // or router.push('/dashboard') to go to dashboard profile tab
-    } else {
-      // Navigate to other user's profile page
-      router.push(`/profile/${userId}`)
-    }
+    router.push(`/profile/${userId}`)
   }
 
+  // Handle group join
   const handleJoinGroup = async (groupId: number) => {
     if (!isConnected) {
       warning('Connection required to join groups')
@@ -365,26 +621,20 @@ export default function DiscoverPage() {
 
     try {
       await api.joinGroup(groupId)
-      const targetGroup = groups.find(group => group.id === groupId)
-      const joinStatus: GroupMemberStatus = targetGroup?.privacy === 'private' ? 'requested' : 'member'
-      setGroups(prevGroups => 
-        prevGroups.map(group => 
-          group.id === groupId 
-            ? { 
-                ...group, 
-                is_member: joinStatus === 'member',
-                member_status: joinStatus,
-                role: joinStatus === 'member' ? (group.role ?? 'member') : group.role
-              }
+      setGroups(prevGroups =>
+        prevGroups.map(group =>
+          group.id === groupId
+            ? { ...group, joinStatus: 'requested' }
             : group
         )
       )
-      success(joinStatus === 'member' ? 'Successfully joined the group!' : 'Join request sent for approval')
-    } catch {
-      error('Failed to join group')
+      success('Join request sent! Waiting for approval.')
+    } catch (err) {
+      error('Failed to send join request')
     }
   }
 
+  // Handle group leave
   const handleLeaveGroup = async (groupId: number) => {
     if (!isConnected) {
       warning('Connection required to leave groups')
@@ -393,128 +643,208 @@ export default function DiscoverPage() {
 
     try {
       await api.leaveGroup(groupId)
-      setGroups(prevGroups => 
-        prevGroups.map(group => 
-          group.id === groupId 
-            ? { 
-                ...group, 
-                is_member: false,
-                member_status: 'none',
-                role: undefined
-              }
+      setGroups(prevGroups =>
+        prevGroups.map(group =>
+          group.id === groupId
+            ? { ...group, joinStatus: 'none' }
             : group
         )
       )
       success('Successfully left the group!')
-    } catch {
+    } catch (err) {
       error('Failed to leave group')
     }
   }
 
-  const fetchPendingRequests = async (groupId: number) => {
-    try {
-      const response = await api.getPendingJoinRequests(groupId)
-      const safeRequests = Array.isArray((response as any)?.requests) ? (response as any).requests : []
-      setPendingRequests(prev => ({
-        ...prev,
-        // Always store an array to avoid re-fetch loops when value is falsy/undefined
-        [groupId]: safeRequests
-      }))
-    } catch (err) {
-      console.error('Failed to fetch pending requests:', err)
-    }
+  // Handle open group
+  const handleOpenGroup = (groupId: number) => {
+    router.push(`/chats/all?group=${groupId}`)
   }
 
-  const handleRespondToJoinRequest = async (groupId: number, userId: number, action: 'accept' | 'decline') => {
+  // Handle cancel join request
+  const handleCancelJoinRequest = async (groupId: number) => {
     if (!isConnected) {
-      warning('Connection required to respond to requests')
+      warning('Connection required to cancel join request')
       return
     }
 
     try {
-      await api.respondToJoinRequest(groupId, userId, action)
-      
-      // Update the pending requests state
-      setPendingRequests(prev => ({
-        ...prev,
-        [groupId]: prev[groupId]?.filter(request => request.user.id !== userId) || []
-      }))
-
-      success(`Join request ${action === 'accept' ? 'accepted' : 'declined'}`)
-    } catch {
-      error('Failed to respond to join request')
+      await api.leaveGroup(groupId)
+      setGroups(prevGroups =>
+        prevGroups.map(group =>
+          group.id === groupId
+            ? { ...group, joinStatus: 'none' }
+            : group
+        )
+      )
+      success('Join request cancelled!')
+    } catch (err) {
+      error('Failed to cancel join request')
     }
   }
 
-  const userFilters = [
-    { id: 'all', label: 'All Users', icon: <Users className="w-4 h-4" />, count: users.length },
-    { id: 'not_following', label: 'Not Following', icon: <UserPlus className="w-4 h-4" />, count: users.filter(u => !u.followStatus.isFollowing).length },
-    { id: 'online', label: 'Online Now', icon: <Eye className="w-4 h-4" />, count: users.filter(u => u.isOnline).length },
-    { id: 'new_members', label: 'New Members', icon: <Sparkles className="w-4 h-4" /> }
-  ]
+  // Handle follow request response
+  const handleFollowRequestResponse = async (userId: number, action: 'accept' | 'decline') => {
+    try {
+      await api.respondToFollowRequest(userId, action)
+      setFollowRequests(prev => ({
+        ...prev,
+        incoming: prev.incoming.filter(r => r.user.id !== userId)
+      }))
+      success(`Follow request ${action}ed`)
+    } catch (err) {
+      error('Failed to respond to follow request')
+    }
+  }
 
-  const groupFilters = [
-    { id: 'all', label: 'All Groups', icon: <Users className="w-4 h-4" />, count: groups.length },
-    { id: 'available', label: 'Available to Join', icon: <Plus className="w-4 h-4" />, count: groups.filter(g => {
-      const status = normalizeGroupStatus(g)
-      return status === 'none' || status === 'rejected'
-    }).length },
-    { id: 'joined', label: 'Already Joined', icon: <Check className="w-4 h-4" />, count: groups.filter(g => normalizeGroupStatus(g) === 'member').length },
-    { id: 'active', label: 'Most Active', icon: <TrendingUp className="w-4 h-4" />, count: groups.filter(g => g.recent_activity).length }
-  ]
+  // Handle group invitation response
+  const handleGroupInvitationResponse = async (groupId: number, action: 'accept' | 'decline') => {
+    try {
+      if (action === 'accept') {
+        await api.acceptGroupInvitation(groupId)
+        setGroups(prevGroups =>
+          prevGroups.map(group =>
+            group.id === groupId
+              ? { ...group, joinStatus: 'member' }
+              : group
+          )
+        )
+      } else {
+        await api.declineGroupInvitation(groupId)
+        setGroups(prevGroups =>
+          prevGroups.map(group =>
+            group.id === groupId
+              ? { ...group, joinStatus: 'none' }
+              : group
+          )
+        )
+      }
+      setGroupInvitations(prev => ({
+        ...prev,
+        incoming: prev.incoming.filter(r => r.group.id !== groupId)
+      }))
+      success(`Group invitation ${action}ed`)
+    } catch (err) {
+      error('Failed to respond to group invitation')
+    }
+  }
 
-  const sortOptions: { id: SortBy; label: string }[] = [
-    { id: 'newest', label: 'Newest First' },
-    { id: 'name_asc', label: 'Name (A-Z)' },
-    { id: 'name_desc', label: 'Name (Z-A)' },
-    { id: 'members', label: 'Most Members' },
-    { id: 'active', label: 'Most Active' }
-  ]
+  // Handle group join request response
+  const handleGroupJoinRequestResponse = async (groupId: number, userId: number, action: 'accept' | 'decline') => {
+    try {
+      await api.respondToJoinRequest(groupId, userId, action)
+      setGroupRequests(prev => ({
+        ...prev,
+        incoming: prev.incoming.filter(r => r.group.id !== groupId || r.user.id !== userId)
+      }))
+      success(`Join request ${action}ed`)
+    } catch (err) {
+      error('Failed to respond to group join request')
+    }
+  }
 
+  // Handle cancel follow request
+  const handleCancelFollowRequest = async (userId: number) => {
+    if (!isConnected) {
+      warning('Connection required to cancel follow request')
+      return
+    }
+
+    try {
+      // Use DELETE unfollow endpoint to cancel an outgoing follow request
+      // Try DELETE first (current server expects this for cancelling your outgoing request).
+      // If the server returns not-found or doesn't support this semantic, fall back to the PUT 'remove' action.
+      console.debug('Attempting to cancel outgoing follow request (DELETE) for user:', userId)
+      await api.unfollowUser(userId)
+      setFollowRequests(prev => ({
+        ...prev,
+        outgoing: prev.outgoing.filter(r => r.user.id !== userId)
+      }))
+      success('Follow request cancelled!')
+    } catch (err) {
+      // If unfollow returned 404/not found, some servers expect a PUT remove action where the follower id
+      // is in the URL and the authenticated user is the target (remove follower). Try the alternate path.
+      console.debug('unfollowUser failed, attempting fallback respondToFollowRequest remove. error=', err)
+  const status = (err as any)?.status || (err as any)?.statusCode || (err instanceof Error && (err as any).status)
+      if (status === 404) {
+        try {
+          await api.respondToFollowRequest(userId, 'remove')
+          setFollowRequests(prev => ({
+            ...prev,
+            outgoing: prev.outgoing.filter(r => r.user.id !== userId)
+          }))
+          success('Follow request cancelled!')
+          return
+        } catch (err2) {
+          console.error('Fallback respondToFollowRequest remove failed:', err2)
+        }
+      }
+
+      error('Failed to cancel follow request')
+    }
+  }
+
+  // Handle cancel group join request
+  const handleCancelGroupJoinRequest = async (groupId: number) => {
+    if (!isConnected) {
+      warning('Connection required to cancel join request')
+      return
+    }
+
+    try {
+      // Use existing leaveGroup method to cancel request
+      await api.leaveGroup(groupId)
+      setGroupRequests(prev => ({
+        ...prev,
+        outgoing: prev.outgoing.filter(r => r.group.id !== groupId)
+      }))
+      setGroups(prevGroups =>
+        prevGroups.map(group =>
+          group.id === groupId
+            ? { ...group, joinStatus: 'none' }
+            : group
+        )
+      )
+      success('Join request cancelled!')
+    } catch (err) {
+      error('Failed to cancel join request')
+    }
+  }
+
+  // Handle cancel group invitation
+  const handleCancelGroupInvitation = async (groupId: number, userId: number) => {
+    if (!isConnected) {
+      warning('Connection required to cancel invitation')
+      return
+    }
+
+    try {
+      // For now, just remove from local state since API method may not exist
+      setGroupInvitations(prev => ({
+        ...prev,
+        outgoing: prev.outgoing.filter(r => r.group.id !== groupId && r.user.id !== userId)
+      }))
+      success('Invitation cancelled!')
+    } catch (err) {
+      error('Failed to cancel invitation')
+    }
+  }
+
+  // Loading state
   if (isLoading) {
     return (
       <div className="flex-1 min-w-0 max-h-screen overflow-hidden">
         <div className="bg-white/5 backdrop-blur-xl rounded-3xl border border-white/10 shadow-2xl max-h-[calc(100vh-8rem)] flex flex-col overflow-hidden">
-          {/* Fixed Header */}
-          <div className="flex-shrink-0 p-6 border-b border-white/10">
-            <div className="flex items-center justify-between">
-              <div>
-                <h1 className="text-3xl font-bold text-white flex items-center">
-                  <Search className="w-8 h-8 text-emerald-400 mr-3" />
-                  Discover
-                </h1>
-                <p className="text-white/70 mt-2">
-                  Find new people, groups, and trending topics
-                </p>
-              </div>
-            </div>
-
-            {/* Tab Navigation */}
-            <div className="flex space-x-1 bg-white/10 rounded-xl p-1 mt-6">
-              {[
-                { id: 'users', label: 'Users', icon: <Users className="w-4 h-4" /> },
-                { id: 'groups', label: 'Groups', icon: <Globe className="w-4 h-4" /> },
-                { id: 'trending', label: 'Trending', icon: <Hash className="w-4 h-4" /> }
-              ].map((tab) => (
-                <div key={tab.id} className="flex items-center space-x-2 px-4 py-3 rounded-lg flex-1 justify-center bg-white/5 animate-pulse">
-                  {tab.icon}
-                  <span className="font-medium text-white/50">{tab.label}</span>
-                  <div className="bg-white/20 h-5 w-8 rounded-full"></div>
-                </div>
-              ))}
-            </div>
-
-            {/* Search Bar Skeleton */}
-            <div className="relative mt-4">
-              <div className="w-full h-12 bg-white/10 rounded-xl animate-pulse"></div>
+          <div className="flex-shrink-0 p-4 border-b border-white/10">
+            <div className="animate-pulse">
+              <div className="h-6 bg-white/10 rounded-xl w-40 mb-2"></div>
+              <div className="h-3 bg-white/10 rounded-lg w-48"></div>
             </div>
           </div>
-          
-          {/* Content Skeleton */}
-          <div className="flex-1 overflow-y-auto p-6 min-h-0">
+          <div className="flex-1 p-4">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {[...Array(9)].map((_, i) => (
-                <div key={i} className="bg-white/5 backdrop-blur-xl rounded-xl border border-white/10 p-4 animate-pulse">
+              {[...Array(6)].map((_, i) => (
+                <div key={i} className="bg-white/5 rounded-xl p-4 animate-pulse">
                   <div className="space-y-3">
                     <div className="w-16 h-16 bg-white/20 rounded-full mx-auto"></div>
                     <div className="h-4 bg-white/20 rounded w-3/4 mx-auto"></div>
@@ -529,680 +859,1175 @@ export default function DiscoverPage() {
     )
   }
 
-  // Users Tab Component
-  function UsersTab() {
-    const displayUsers = filteredUsers
+  return (
+    <div className="flex-1 min-w-0 max-h-screen overflow-hidden">
+      <div className="bg-white/5 backdrop-blur-xl rounded-3xl border border-white/10 shadow-2xl max-h-[calc(100vh-8rem)] flex flex-col overflow-hidden">
 
-    if (displayUsers.length === 0) {
-      return (
-        <div className="bg-white/5 backdrop-blur-xl rounded-2xl border border-white/10 p-12 text-center">
-          <Users className="w-16 h-16 text-white/30 mx-auto mb-4" />
-          <h3 className="text-xl font-semibold text-white mb-2">No users found</h3>
-          <p className="text-white/60">
-            {searchQuery ? 'Try adjusting your search or filters' : 'No users match the selected filters'}
-          </p>
-        </div>
-      )
-    }
-
-    return (
-      <div className={viewMode === 'grid' 
-        ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4'
-        : 'space-y-3'
-      }>
-        {displayUsers.map((user) => (
-          <div 
-            key={user.id} 
-            className={`group cursor-pointer ${
-              viewMode === 'grid' 
-                ? 'bg-white/5 backdrop-blur-xl rounded-xl border border-white/10 p-6 hover:bg-white/10 transition-all duration-300 text-center'
-                : 'bg-white/5 backdrop-blur-xl rounded-xl border border-white/10 p-4 hover:bg-white/10 transition-all duration-300'
-            }`}
-            onClick={() => handleUserClick(user.id)}
-          >
-            {viewMode === 'grid' ? (
-              // Grid View
-              <>
-                <div className="relative mb-4">
-                  {user.avatar ? (
-                    <Image 
-                      src={user.avatar} 
-                      alt={`${user.first_name} ${user.last_name}`} 
-                      width={80} 
-                      height={80} 
-                      className="rounded-full mx-auto object-cover"
-                    />
-                  ) : (
-                    <div className="w-20 h-20 bg-gradient-to-br from-emerald-400 to-teal-600 rounded-full flex items-center justify-center mx-auto">
-                      <span className="text-white text-2xl font-bold">
-                        {(user.first_name?.charAt(0) || user.last_name?.charAt(0) || user.email?.charAt(0) || 'U').toUpperCase()}
-                      </span>
-                    </div>
-                  )}
-                  {user.isOnline && (
-                    <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-green-500 border-2 border-white rounded-full"></div>
-                  )}
-                </div>
-                <div className="space-y-2">
-                  <h3 className="font-semibold text-white group-hover:text-emerald-200 transition-colors">
-                    {[user.first_name, user.last_name].filter(Boolean).join(' ') || user.email || 'Anonymous'}
-                  </h3>
-                  {user.mutualFollowers !== undefined && user.mutualFollowers > 0 && (
-                    <p className="text-emerald-400 text-sm">
-                      {user.mutualFollowers} mutual connection{user.mutualFollowers !== 1 ? 's' : ''}
-                    </p>
-                  )}
-                  <div className="flex justify-center space-x-2">
-                    <FollowHandler
-                      targetUser={user}
-                      currentFollowStatus={user.followStatus || { isFollowing: false, isPending: false, status: 'not_following' }}
-                      onStatusChange={(newStatus) => handleFollowStatusChange(user.id, newStatus)}
-                      disabled={!isConnected}
-                      size="sm"
-                    />
-                    <button
-                      disabled={!isConnected}
-                      className={`p-2 rounded-lg transition-all duration-200 ${
-                        isConnected 
-                          ? 'text-white/70 hover:text-white hover:bg-white/10' 
-                          : 'text-white/30 cursor-not-allowed'
-                      }`}
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        warning('Messaging feature coming soon!')
-                      }}
-                      title="Send message"
-                    >
-                      <MessageCircle className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-              </>
-            ) : (
-              // List View
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-4 flex-1 min-w-0">
-                  <div className="relative flex-shrink-0">
-                    {user.avatar ? (
-                      <Image 
-                        src={user.avatar} 
-                        alt={`${user.first_name} ${user.last_name}`} 
-                        width={48} 
-                        height={48} 
-                        className="rounded-full object-cover"
-                      />
-                    ) : (
-                      <div className="w-12 h-12 bg-gradient-to-br from-emerald-400 to-teal-600 rounded-full flex items-center justify-center">
-                        <span className="text-white text-lg font-bold">
-                          {(user.first_name?.charAt(0) || user.last_name?.charAt(0) || user.email?.charAt(0) || 'U').toUpperCase()}
-                        </span>
-                      </div>
-                    )}
-                    {user.isOnline && (
-                      <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-green-500 border-2 border-white rounded-full"></div>
-                    )}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="font-semibold text-white group-hover:text-emerald-200 transition-colors truncate">
-                      {[user.first_name, user.last_name].filter(Boolean).join(' ') || user.email || 'Anonymous'}
-                    </div>
-                    {user.mutualFollowers !== undefined && user.mutualFollowers > 0 && (
-                      <div className="text-emerald-400 text-sm">
-                        {user.mutualFollowers} mutual connection{user.mutualFollowers !== 1 ? 's' : ''}
-                      </div>
-                    )}
-                  </div>
-                </div>
-                <div className="flex items-center space-x-2 flex-shrink-0">
-                  <FollowHandler
-                    targetUser={user}
-                    currentFollowStatus={user.followStatus || { isFollowing: false, isPending: false, status: 'not_following' }}
-                    onStatusChange={(newStatus) => handleFollowStatusChange(user.id, newStatus)}
-                    disabled={!isConnected}
-                    size="sm"
-                  />
-                  <button
-                    disabled={!isConnected}
-                    className={`p-2 rounded-lg transition-all duration-200 ${
-                      isConnected 
-                        ? 'text-white/70 hover:text-white hover:bg-white/10' 
-                        : 'text-white/30 cursor-not-allowed'
-                    }`}
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      warning('Messaging feature coming soon!')
-                    }}
-                    title="Send message"
-                  >
-                    <MessageCircle className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        ))}
-      </div>
-    )
-  }
-
-  // Groups Tab Component
-  function GroupsTab() {
-    const displayGroups = filteredGroups
-
-    if (displayGroups.length === 0) {
-      return (
-        <div className="space-y-6">
-          {/* Create Group CTA */}
-          <div className="bg-gradient-to-r from-emerald-500/10 to-teal-500/10 backdrop-blur-xl rounded-2xl border border-emerald-400/20 p-8 text-center">
-            <Users className="w-16 h-16 text-emerald-400 mx-auto mb-4" />
-            <h3 className="text-xl font-semibold text-white mb-2">Create Your First Group</h3>
-            <p className="text-white/60 mb-6">
-              Start a community around shared interests and connect with like-minded people.
-            </p>
+        {/* Header */}
+        <div className="flex-shrink-0 p-4 border-b border-white/10">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h1 className="text-2xl font-bold text-white flex items-center">
+                <Search className="w-7 h-7 text-emerald-400 mr-2" />
+                Discover
+              </h1>
+              <p className="text-white/70 mt-1 text-sm">
+                Find new people and communities
+              </p>
+            </div>
             <button
-              onClick={() => setShowCreateGroup(true)}
-              disabled={!isConnected}
-              className="px-6 py-3 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 rounded-xl text-white font-semibold transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+              onClick={() => router.back()}
+              className="p-2 rounded-xl bg-white/10 hover:bg-white/20 transition-all duration-200"
+              title="Close"
             >
-              {isConnected ? 'Create Group' : 'Offline'}
+              <X className="w-4 h-4 text-white" />
             </button>
           </div>
 
-          <div className="bg-white/5 backdrop-blur-xl rounded-2xl border border-white/10 p-12 text-center">
-            <Users className="w-16 h-16 text-white/30 mx-auto mb-4" />
-            <h3 className="text-xl font-semibold text-white mb-2">No groups found</h3>
-            <p className="text-white/60">
-              {searchQuery ? 'Try adjusting your search or filters' : 'No groups match the selected filters'}
-            </p>
+          {/* Tab Navigation */}
+          <div className="flex space-x-1 bg-white/5 backdrop-blur-sm rounded-2xl p-1.5 mb-4 border border-white/10 shadow-lg overflow-hidden">
+            <button
+              onClick={() => setActiveTab('users')}
+              className={`flex items-center space-x-2 px-3 py-2.5 rounded-xl transition-all duration-300 flex-1 justify-center text-sm font-medium ${
+                activeTab === 'users'
+                  ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-lg shadow-emerald-500/25'
+                  : 'text-white/60 hover:text-white hover:bg-white/10'
+              }`}
+            >
+              <Users className="w-4 h-4" />
+              <span>Users</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('groups')}
+              className={`flex items-center space-x-2 px-3 py-2.5 rounded-xl transition-all duration-300 flex-1 justify-center text-sm font-medium ${
+                activeTab === 'groups'
+                  ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-lg shadow-emerald-500/25'
+                  : 'text-white/60 hover:text-white hover:bg-white/10'
+              }`}
+            >
+              <Globe className="w-4 h-4" />
+              <span>Groups</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('requests')}
+              className={`flex items-center space-x-2 px-3 py-2.5 rounded-xl transition-all duration-300 flex-1 justify-center text-sm font-medium ${
+                activeTab === 'requests'
+                  ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-lg shadow-emerald-500/25'
+                  : 'text-white/60 hover:text-white hover:bg-white/10'
+              }`}
+            >
+              <Bell className="w-4 h-4" />
+              <span>
+                Requests
+                {((followRequests.incoming?.length || 0) + (groupRequests.incoming?.length || 0) + (groupInvitations.incoming?.length || 0) + (followRequests.outgoing?.length || 0) + (groupRequests.outgoing?.length || 0) + (groupInvitations.outgoing?.length || 0)) > 0 && (
+                  <span className="ml-1 bg-gradient-to-r from-red-500 to-pink-500 text-white text-xs px-1.5 py-0.5 rounded-full font-bold shadow-lg">
+                    {(followRequests.incoming?.length || 0) + (groupRequests.incoming?.length || 0) + (groupInvitations.incoming?.length || 0) + (followRequests.outgoing?.length || 0) + (groupRequests.outgoing?.length || 0) + (groupInvitations.outgoing?.length || 0)}
+                  </span>
+                )}
+              </span>
+            </button>
           </div>
-        </div>
-      )
-    }
 
-    return (
-      <div className="space-y-6">
-        {/* Show pending requests for admin groups */}
-        {groups
-          .filter(group => group.role === 'admin' || group.role === 'creator')
-          .map(group => {
-            const requests = pendingRequests[group.id] || []
-            if (requests.length === 0) return null
-            
-            return (
-              <div key={`requests-${group.id}`} className="bg-white/5 backdrop-blur-xl rounded-xl border border-white/10 p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-white font-semibold flex items-center">
-                    <Clock3 className="w-5 h-5 mr-2 text-amber-400" />
-                    Pending Join Requests - {group.title}
-                  </h3>
-                  <button
-                    onClick={() => fetchPendingRequests(group.id)}
-                    className="text-emerald-400 hover:text-emerald-300 text-sm"
+          {/* Search and Controls */}
+          <div className="flex flex-col sm:flex-row gap-3">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-white/50" />
+              <input
+                type="text"
+                placeholder={`Search ${activeTab}...`}
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-10 pr-4 py-2.5 bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-emerald-400/50 focus:border-emerald-400/50 transition-all duration-200 text-sm shadow-lg"
+              />
+            </div>
+
+            <div className="flex items-center space-x-2">
+              {/* Filters */}
+              {activeTab === 'users' && (
+                <div className="relative">
+                  <select
+                    value={userFilter}
+                    onChange={(e) => setUserFilter(e.target.value as UserFilter)}
+                    className="px-3 py-2 pr-8 bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400/50 focus:border-emerald-400/50 transition-all duration-200 shadow-lg appearance-none cursor-pointer hover:bg-white/10"
+                    title="Filter users"
                   >
-                    Refresh
+                    <option value="all">All Users</option>
+                    <option value="following">Following</option>
+                    <option value="not_following">Not Following</option>
+                    <option value="pending">Pending</option>
+                  </select>
+                  <ChevronDown className="absolute right-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-white/50 pointer-events-none" />
+                </div>
+              )}
+
+              {activeTab === 'groups' && (
+                <div className="relative">
+                  <select
+                    value={groupFilter}
+                    onChange={(e) => setGroupFilter(e.target.value as GroupFilter)}
+                    className="px-3 py-2 pr-8 bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400/50 focus:border-emerald-400/50 transition-all duration-200 shadow-lg appearance-none cursor-pointer hover:bg-white/10"
+                    title="Filter groups"
+                  >
+                    <option value="all">All Groups</option>
+                    <option value="member">Member</option>
+                    <option value="not_member">Not Member</option>
+                    <option value="requested">Requested</option>
+                    <option value="sent">Invited</option>
+                    <option value="rejected">Rejected</option>
+                  </select>
+                  <ChevronDown className="absolute right-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-white/50 pointer-events-none" />
+                </div>
+              )}
+
+              {activeTab === 'requests' && (
+                <div className="flex bg-white/5 backdrop-blur-sm rounded-xl p-1 border border-white/10 shadow-lg">
+                  <button
+                    onClick={() => setRequestType('all')}
+                    className={`flex items-center space-x-2 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200 ${
+                      requestType === 'all' ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-lg shadow-emerald-500/25' : 'text-white/60 hover:text-white hover:bg-white/10'
+                    }`}
+                  >
+                    <Inbox className="w-4 h-4" />
+                    <span>All</span>
+                  </button>
+                  <button
+                    onClick={() => setRequestType('incoming')}
+                    className={`flex items-center space-x-2 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200 ${
+                      requestType === 'incoming' ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-lg shadow-emerald-500/25' : 'text-white/60 hover:text-white hover:bg-white/10'
+                    }`}
+                  >
+                    <ArrowDown className="w-4 h-4" />
+                    <span>Incoming</span>
+                  </button>
+                  <button
+                    onClick={() => setRequestType('outgoing')}
+                    className={`flex items-center space-x-2 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200 ${
+                      requestType === 'outgoing' ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-lg shadow-emerald-500/25' : 'text-white/60 hover:text-white hover:bg-white/10'
+                    }`}
+                  >
+                    <ArrowUp className="w-4 h-4" />
+                    <span>Outgoing</span>
                   </button>
                 </div>
-                <div className="space-y-3">
-                  {requests.map((request) => (
-                    <div key={request.user.id} className="flex items-center justify-between bg-white/5 rounded-lg p-3">
-                      <div className="flex items-center space-x-3">
-                        {request.user.avatar ? (
-                          <Image 
-                            src={request.user.avatar} 
-                            alt={request.user.first_name || 'User'} 
-                            width={32} 
-                            height={32} 
-                            className="rounded-full object-cover"
-                          />
-                        ) : (
-                          <div className="w-8 h-8 bg-gradient-to-br from-emerald-400 to-teal-600 rounded-full flex items-center justify-center">
-                            <span className="text-white text-xs font-bold">
-                              {(request.user.first_name?.charAt(0) || request.user.last_name?.charAt(0) || request.user.email?.charAt(0) || 'U').toUpperCase()}
-                            </span>
-                          </div>
-                        )}
-                        <div>
-                          <p className="text-white font-medium">
-                            {[request.user.first_name, request.user.last_name].filter(Boolean).join(' ') || request.user.email || 'Anonymous'}
-                          </p>
-                          <p className="text-white/60 text-xs">
-                            Requested {new Date(request.requested_at).toLocaleDateString()}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex space-x-2">
-                        <button
-                          onClick={() => handleRespondToJoinRequest(group.id, request.user.id, 'accept')}
-                          disabled={!isConnected}
-                          className="px-3 py-1 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 border border-emerald-400/20 rounded-lg transition-all duration-200 disabled:opacity-50 text-sm"
-                        >
-                          Accept
-                        </button>
-                        <button
-                          onClick={() => handleRespondToJoinRequest(group.id, request.user.id, 'decline')}
-                          disabled={!isConnected}
-                          className="px-3 py-1 bg-rose-500/20 hover:bg-rose-500/30 text-rose-400 border border-rose-400/20 rounded-lg transition-all duration-200 disabled:opacity-50 text-sm"
-                        >
-                          Decline
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )
-          })}
+              )}
 
-        {displayGroups.map((group) => {
-          const status = normalizeGroupStatus(group)
-          const role = group.role
-          const privacy = group.privacy
-          const statusBadge = (() => {
-            switch (status) {
-              case 'member':
-                return {
-                  label: role === 'admin' ? 'Admin' : 'Member',
-                  className: 'bg-emerald-500/20 text-emerald-200 border border-emerald-400/30',
-                  icon: role === 'admin' ? <ShieldCheck className="w-3 h-3 mr-1" /> : <Check className="w-3 h-3 mr-1" />
-                }
-              case 'sent':
-              case 'requested':
-                return {
-                  label: 'Pending',
-                  className: 'bg-amber-500/20 text-amber-200 border border-amber-400/30',
-                  icon: <Clock3 className="w-3 h-3 mr-1" />
-                }
-              case 'rejected':
-                return {
-                  label: 'Declined',
-                  className: 'bg-rose-500/20 text-rose-200 border border-rose-400/30',
-                  icon: <XCircle className="w-3 h-3 mr-1" />
-                }
-              default:
-                return null
-            }
-          })()
-          const privacyBadge = privacy ? {
-            label: privacy === 'private' ? 'Private' : 'Public',
-            className: privacy === 'private'
-              ? 'bg-slate-500/30 text-slate-200 border border-slate-400/30'
-              : 'bg-cyan-500/20 text-cyan-200 border border-cyan-400/30',
-            icon: privacy === 'private' ? <Lock className="w-3 h-3 mr-1" /> : <Users className="w-3 h-3 mr-1" />
-          } : null
-
-          const statusMessage = status === 'sent'
-            ? 'Join request pending approval'
-            : status === 'requested'
-              ? 'Join request pending approval'
-              : status === 'rejected'
-                ? 'Your join request was declined'
-                : undefined
-          const isMember = status === 'member'
-          const joinDisabled = !isConnected || status === 'sent' || status === 'requested'
-          const joinLabel = status === 'sent' || status === 'requested' ? 'Request Pending' : status === 'rejected' ? 'Request Again' : 'Join Group'
-          const joinButtonTone = status === 'sent' || status === 'requested'
-            ? 'bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 border border-amber-400/20'
-            : 'bg-gradient-to-r from-emerald-500/20 to-teal-500/20 hover:from-emerald-500/30 hover:to-teal-500/30 text-white border border-emerald-400/20'
-
-          return (
-            <div key={group.id} className={`group ${
-              viewMode === 'grid' 
-                ? 'bg-white/5 backdrop-blur-xl rounded-xl border border-white/10 p-6 hover:bg-white/10 transition-all duration-300'
-                : 'bg-white/5 backdrop-blur-xl rounded-xl border border-white/10 p-4 hover:bg-white/10 transition-all duration-300'
-            }`}>
-              {viewMode === 'grid' ? (
-                // Grid View
-                <>
-                  <div className="mb-4">
-                    <div className="flex items-start justify-between mb-2">
-                      <h3 className="text-white font-semibold group-hover:text-emerald-200 transition-colors flex-1">
-                        {group.title}
-                      </h3>
-                      <div className="flex flex-wrap gap-2 justify-end ml-2">
-                        {statusBadge && (
-                          <span className={`inline-flex items-center px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider rounded-full ${statusBadge.className}`}>
-                            {statusBadge.icon}
-                            {statusBadge.label}
-                          </span>
-                        )}
-                        {privacyBadge && (
-                          <span className={`inline-flex items-center px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider rounded-full ${privacyBadge.className}`}>
-                            {privacyBadge.icon}
-                            {privacyBadge.label}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    {group.description && (
-                      <p className="text-white/70 text-sm line-clamp-2">
-                        {group.description}
-                      </p>
-                    )}
-                    {statusMessage && (
-                      <div className={`text-xs mt-2 ${status === 'rejected' ? 'text-rose-200' : 'text-amber-200'}`}>
-                        {statusMessage}
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="space-y-2 mb-4">
-                    <div className="flex items-center text-white/60 text-sm">
-                      <Users className="w-4 h-4 mr-2" />
-                      {group.member_count} members
-                    </div>
-                    {group.recent_activity && (
-                      <div className="flex items-center text-emerald-400 text-sm">
-                        <Sparkles className="w-4 h-4 mr-2" />
-                        {group.recent_activity}
-                      </div>
-                    )}
-                    <div className="flex items-center text-white/60 text-sm">
-                      <Calendar className="w-4 h-4 mr-2" />
-                      Created {new Date(group.created_at || '').toLocaleDateString()}
-                    </div>
-                  </div>
-
-                  <div className="flex space-x-2">
-                    {isMember ? (
-                      <button
-                        onClick={() => handleLeaveGroup(group.id)}
-                        disabled={!isConnected}
-                        className="flex-1 py-2 px-4 bg-red-500/20 hover:bg-red-500/30 text-red-400 border border-red-400/20 rounded-lg transition-all duration-200 disabled:opacity-50 text-sm font-medium"
-                      >
-                        Leave Group
-                      </button>
-                    ) : (
-                      <button
-                        onClick={() => handleJoinGroup(group.id)}
-                        disabled={joinDisabled}
-                        className={`flex-1 py-2 px-4 rounded-lg transition-all duration-200 disabled:opacity-60 disabled:cursor-not-allowed text-sm font-medium ${joinButtonTone}`}
-                      >
-                        {joinLabel}
-                      </button>
-                    )}
-                    <button
-                      className="p-2 text-white/60 hover:text-white hover:bg-white/10 rounded-lg transition-all duration-200"
-                      title="View group"
-                      onClick={() => warning('Group details coming soon!')}
-                    >
-                      <Eye className="w-4 h-4" />
-                    </button>
-                  </div>
-                </>
-              ) : (
-                // List View
-                <div className="flex items-center justify-between">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center flex-wrap gap-2 mb-1">
-                      <h3 className="text-white font-semibold group-hover:text-emerald-200 transition-colors truncate">
-                        {group.title}
-                      </h3>
-                      {statusBadge && (
-                        <span className={`inline-flex items-center px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider rounded-full ${statusBadge.className}`}>
-                          {statusBadge.icon}
-                          {statusBadge.label}
-                        </span>
-                      )}
-                      {privacyBadge && (
-                        <span className={`inline-flex items-center px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider rounded-full ${privacyBadge.className}`}>
-                          {privacyBadge.icon}
-                          {privacyBadge.label}
-                        </span>
-                      )}
-                    </div>
-                    {group.description && (
-                      <p className="text-white/70 text-sm truncate mb-2">
-                        {group.description}
-                      </p>
-                    )}
-                    {statusMessage && (
-                      <div className={`text-xs mb-2 ${status === 'rejected' ? 'text-rose-200' : 'text-amber-200'}`}>
-                        {statusMessage}
-                      </div>
-                    )}
-                    <div className="flex items-center space-x-4 text-xs text-white/50">
-                      <span className="flex items-center">
-                        <Users className="w-3 h-3 mr-1" />
-                        {group.member_count} members
-                      </span>
-                      {group.recent_activity && (
-                        <span className="flex items-center text-emerald-400">
-                          <Sparkles className="w-3 h-3 mr-1" />
-                          {group.recent_activity}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-center space-x-2 flex-shrink-0">
-                    {isMember ? (
-                      <button
-                        onClick={() => handleLeaveGroup(group.id)}
-                        disabled={!isConnected}
-                        className="py-1.5 px-3 bg-red-500/20 hover:bg-red-500/30 text-red-400 border border-red-400/20 rounded-lg transition-all duration-200 disabled:opacity-50 text-sm"
-                      >
-                        Leave
-                      </button>
-                    ) : (
-                      <button
-                        onClick={() => handleJoinGroup(group.id)}
-                        disabled={joinDisabled}
-                        className={`py-1.5 px-3 rounded-lg transition-all duration-200 disabled:opacity-60 disabled:cursor-not-allowed text-sm ${joinButtonTone}`}
-                      >
-                        {joinLabel === 'Join Group' ? 'Join' : joinLabel}
-                      </button>
-                    )}
-                    <button
-                      className="p-2 text-white/60 hover:text-white hover:bg-white/10 rounded-lg transition-all duration-200"
-                      title="View group"
-                      onClick={() => warning('Group details coming soon!')}
-                    >
-                      <Eye className="w-4 h-4" />
-                    </button>
-                  </div>
+              {/* View Mode */}
+              {activeTab !== 'requests' && (
+                <div className="flex bg-white/5 backdrop-blur-sm rounded-xl p-1 border border-white/10 shadow-lg">
+                  <button
+                    onClick={() => setViewMode('grid')}
+                    className={`p-2 rounded-lg transition-all duration-200 ${
+                      viewMode === 'grid' ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-lg shadow-emerald-500/25' : 'text-white/60 hover:text-white hover:bg-white/10'
+                    }`}
+                    title="Grid view"
+                  >
+                    <Grid3X3 className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => setViewMode('list')}
+                    className={`p-2 rounded-lg transition-all duration-200 ${
+                      viewMode === 'list' ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-lg shadow-emerald-500/25' : 'text-white/60 hover:text-white hover:bg-white/10'
+                    }`}
+                    title="List view"
+                  >
+                    <List className="w-4 h-4" />
+                  </button>
                 </div>
               )}
             </div>
-          )
-        })}
-      </div>
-    )
-  }
-
-  // Trending Tab Component
-  function TrendingTab() {
-    return (
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {trendingTags.map((tag, index) => (
-          <div key={tag.tag} className="bg-white/5 backdrop-blur-xl rounded-xl border border-white/10 p-6 hover:bg-white/10 transition-all duration-300 group">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center space-x-2">
-                <div className={`p-2 rounded-lg ${
-                  index < 3 ? 'bg-gradient-to-r from-yellow-500/20 to-orange-500/20 border border-yellow-400/20' : 'bg-white/10'
-                }`}>
-                  <Hash className={`w-5 h-5 ${index < 3 ? 'text-yellow-400' : 'text-white/60'}`} />
-                </div>
-                <span className={`text-xs font-medium px-2 py-1 rounded-full ${
-                  index < 3 ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-400/20' : 'bg-white/10 text-white/60'
-                }`}>
-                  #{index + 1}
-                </span>
-              </div>
-              <div className="flex items-center space-x-1">
-                <TrendingUp className={`w-4 h-4 ${index < 3 ? 'text-yellow-400' : 'text-white/60'}`} />
-                <span className={`text-xs font-medium ${index < 3 ? 'text-yellow-400' : 'text-white/60'}`}>
-                  Trending
-                </span>
-              </div>
-            </div>
-            
-            <div className="space-y-3">
-              <h3 className="text-lg font-bold text-white group-hover:text-emerald-200 transition-colors">
-                #{tag.tag}
-              </h3>
-              <p className="text-white/70 text-sm">
-                {tag.count.toLocaleString()} posts
-              </p>
-            </div>
-            
-            <button 
-              className="w-full py-2 px-4 bg-gradient-to-r from-emerald-500/20 to-teal-500/20 hover:from-emerald-500/30 hover:to-teal-500/30 text-white border border-emerald-400/20 rounded-lg transition-all duration-200 text-sm font-medium"
-              onClick={() => warning('Tag exploration coming soon!')}
-            >
-              Explore Tag
-            </button>
           </div>
-        ))}
+        </div>
+
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto scrollbar-hide p-4 min-h-0">
+          {activeTab === 'users' ? (
+            <UsersSection
+              users={filteredUsers}
+              viewMode={viewMode}
+              onUserClick={handleUserClick}
+              onFollowStatusChange={handleFollowStatusChange}
+              onUnfollowConfirm={handleUnfollowConfirm}
+              isConnected={isConnected}
+            />
+          ) : activeTab === 'groups' ? (
+            <GroupsSection
+              groups={filteredGroups}
+              viewMode={viewMode}
+              onJoinGroup={handleJoinGroup}
+              onLeaveGroup={handleLeaveGroup}
+              onOpenGroup={handleOpenGroup}
+              onCancelJoinRequest={handleCancelJoinRequest}
+              onGroupInvitationResponse={handleGroupInvitationResponse}
+              isConnected={isConnected}
+            />
+          ) : (
+            <RequestsSection
+              requests={filteredRequests}
+              requestType={requestType}
+              onFollowResponse={handleFollowRequestResponse}
+              onGroupJoinResponse={handleGroupJoinRequestResponse}
+              onGroupInvitationResponse={handleGroupInvitationResponse}
+              onCancelFollowRequest={handleCancelFollowRequest}
+              onCancelGroupJoinRequest={handleCancelGroupJoinRequest}
+              onCancelGroupInvitation={handleCancelGroupInvitation}
+              isConnected={isConnected}
+              currentUser={currentUser}
+            />
+          )}
+        </div>
+      </div>
+
+      {/* Unfollow Confirmation Modal */}
+      <AnimatePresence>
+        {showUnfollowConfirm && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+            onClick={() => setShowUnfollowConfirm(null)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-gradient-to-br from-slate-800/95 to-slate-900/95 backdrop-blur-xl border border-white/20 rounded-2xl p-6 max-w-sm w-full mx-4"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="text-center">
+                <div className="w-12 h-12 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <UserMinus className="w-6 h-6 text-red-400" />
+                </div>
+                <h3 className="text-white font-semibold text-lg mb-2">Unfollow User</h3>
+                <p className="text-white/70 text-sm mb-6">
+                  Are you sure you want to unfollow <span className="text-white font-medium">{showUnfollowConfirm.userName}</span>?
+                  You will no longer see their posts in your feed.
+                </p>
+                <div className="flex space-x-3">
+                  <button
+                    onClick={() => setShowUnfollowConfirm(null)}
+                    className="flex-1 px-6 py-3 border border-white/30 rounded-xl text-white hover:bg-white/10 hover:border-white/50 transition-all duration-300 text-sm lg:text-base font-medium"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => {
+                      handleConfirmedUnfollow()
+                    }}
+                    className="flex-1 px-6 py-3 rounded-xl text-white font-semibold text-sm lg:text-base transition-all duration-300 shadow-lg bg-gradient-to-r from-red-500 to-pink-600 hover:from-red-600 hover:to-pink-700 shadow-red-500/25"
+                  >
+                    Unfollow
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  )
+}
+
+// Users Section Component
+function UsersSection({
+  users,
+  viewMode,
+  onUserClick,
+  onFollowStatusChange,
+  onUnfollowConfirm,
+  isConnected
+}: {
+  users: DiscoverUser[]
+  viewMode: ViewMode
+  onUserClick: (userId: number) => void
+  onFollowStatusChange: (userId: number, status: FollowStatus) => void
+  onUnfollowConfirm: (userId: number, userName: string) => void
+  isConnected: boolean
+}) {
+  if (users.length === 0) {
+    return (
+      <div className="text-center py-12">
+        <Users className="w-16 h-16 text-white/30 mx-auto mb-4" />
+        <h3 className="text-xl font-semibold text-white/70 mb-2">No users found</h3>
+        <p className="text-white/50">Try adjusting your search or filters</p>
       </div>
     )
   }
 
   return (
-    <div className="flex-1 min-w-0 max-h-screen overflow-hidden">
-      <div className="bg-white/5 backdrop-blur-xl rounded-3xl border border-white/10 shadow-2xl max-h-[calc(100vh-8rem)] flex flex-col overflow-hidden">
-        {/* Fixed Header - Non-scrollable */}
-        <div className="flex-shrink-0 p-6 border-b border-white/10 bg-white/5 backdrop-blur-xl">
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h1 className="text-3xl font-bold text-white flex items-center">
-                <Search className="w-8 h-8 text-emerald-400 mr-3" />
-                Discover
-              </h1>
-              <p className="text-white/70 mt-2">
-                Find new people, groups, and trending topics
-              </p>
+    <div className={viewMode === 'grid'
+      ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
+      : "space-y-3"
+    }>
+      {users.map((user) => (
+        <motion.div
+          key={user.id}
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3 }}
+          className={`group relative overflow-hidden ${
+            viewMode === 'grid'
+              ? 'bg-gradient-to-br from-white/8 to-white/4 backdrop-blur-xl rounded-2xl border border-white/20 shadow-xl shadow-black/20 hover:shadow-2xl hover:shadow-emerald-500/10 p-6 hover:bg-gradient-to-br hover:from-white/12 hover:to-white/6'
+              : 'bg-gradient-to-r from-white/8 to-white/4 backdrop-blur-xl rounded-2xl border border-white/20 shadow-xl shadow-black/20 hover:shadow-2xl hover:shadow-emerald-500/10 p-6 hover:bg-gradient-to-r hover:from-white/12 hover:to-white/6 flex items-center space-x-6'
+          } transition-all duration-500 cursor-pointer`}
+          whileHover={{ y: -4 }}
+          onClick={() => onUserClick(user.id)}
+        >
+          {/* Background gradient overlay */}
+          <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/5 via-transparent to-teal-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+
+          {viewMode === 'grid' && (
+            <>
+              {/* Badges */}
+              <div className="absolute top-4 right-4 flex flex-col gap-1 z-10">
+                {user.is_private && (
+                  <motion.span
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    className="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold bg-gradient-to-r from-purple-500/20 to-pink-500/20 text-purple-300 border border-purple-400/30 backdrop-blur-sm shadow-lg"
+                  >
+                    <Lock className="w-3 h-3 mr-1" />
+                    Private
+                  </motion.span>
+                )}
+                {user.followStatus.isFollowedBy && (
+                  <motion.span
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    transition={{ delay: 0.1 }}
+                    className="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold bg-gradient-to-r from-blue-500/20 to-cyan-500/20 text-blue-300 border border-blue-400/30 backdrop-blur-sm shadow-lg"
+                  >
+                    <Heart className="w-3 h-3 mr-1" />
+                    Follows You
+                  </motion.span>
+                )}
+              </div>
+            </>
+          )}
+
+          {/* Avatar Section */}
+          <div className={`relative ${viewMode === 'grid' ? 'mb-6' : ''}`}>
+            <div className={`relative ${viewMode === 'grid' ? 'mx-auto w-fit' : ''}`}>
+              {/* Avatar glow effect */}
+              <div className="absolute inset-0 bg-gradient-to-br from-emerald-400 to-teal-600 rounded-full blur-lg opacity-30 group-hover:opacity-50 transition-opacity duration-500 scale-110" />
+
+              {user.avatar ? (
+                <motion.div
+                  className={`relative w-16 h-16 bg-gradient-to-br from-emerald-400 to-teal-600 rounded-full overflow-hidden ring-2 ring-white/20 group-hover:ring-white/40 transition-all duration-300 ${viewMode === 'grid' ? '' : ''}`}
+                  whileHover={{ rotate: [0, -5, 5, 0], scale: 1.05 }}
+                  transition={{ duration: 0.3 }}
+                >
+                  <Image
+                    src={user.avatar}
+                    alt={`${user.first_name} ${user.last_name}`}
+                    width={viewMode === 'list' ? 56 : 64}
+                    height={viewMode === 'list' ? 56 : 64}
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      const target = e.target as HTMLImageElement
+                      target.style.display = 'none'
+                      const parent = target.parentElement
+                      if (parent) {
+                        const letterAvatar = document.createElement('div')
+                        letterAvatar.className = `flex items-center justify-center bg-gradient-to-br from-emerald-400 to-teal-600 text-white font-bold rounded-full w-full h-full text-xl`
+                        letterAvatar.textContent = `${user.first_name.charAt(0)}${user.last_name.charAt(0)}`.toUpperCase()
+                        parent.appendChild(letterAvatar)
+                      }
+                    }}
+                  />
+                </motion.div>
+              ) : (
+                <motion.div
+                  className={`relative ${viewMode === 'grid' ? '' : ''}`}
+                  whileHover={{ rotate: [0, -5, 5, 0], scale: 1.05 }}
+                  transition={{ duration: 0.3 }}
+                >
+                  <LetterAvatar
+                    name={`${user.first_name} ${user.last_name}`}
+                    size={viewMode === 'list' ? 56 : 64}
+                    className="ring-2 ring-white/20 group-hover:ring-white/40 transition-all duration-300"
+                  />
+                </motion.div>
+              )}
             </div>
           </div>
 
-          {/* Tab Navigation */}
-          <div className="flex space-x-1 bg-white/10 rounded-xl p-1 mb-6">
-            {[
-              { id: 'users', label: 'Users', icon: <Users className="w-4 h-4" />, count: users.filter(u => !u.followStatus.isFollowing).length },
-              { id: 'groups', label: 'Groups', icon: <Globe className="w-4 h-4" />, count: groups.length },
-              { id: 'trending', label: 'Trending', icon: <Hash className="w-4 h-4" />, count: trendingTags.length }
-            ].map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id as DiscoverTab)}
-                className={`flex items-center space-x-2 px-4 py-3 rounded-lg transition-all duration-200 flex-1 justify-center ${
-                  activeTab === tab.id
-                    ? 'bg-gradient-to-r from-emerald-500/30 to-teal-500/30 border border-emerald-400/50 text-white'
-                    : 'text-white/70 hover:bg-white/10 hover:text-white'
-                }`}
-              >
-                {tab.icon}
-                <span className="font-medium">{tab.label}</span>
-                <span className="bg-white/20 text-xs px-2 py-0.5 rounded-full">{tab.count}</span>
-              </button>
-            ))}
-          </div>
-
-          {/* Search Bar */}
-          <div className="relative mb-4">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-white/60" />
-            <input
-              type="text"
-              placeholder={`Search ${activeTab}...`}
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-11 pr-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/60 focus:outline-none focus:ring-2 focus:ring-emerald-400/50 focus:border-emerald-400/50 transition-all duration-200"
-            />
-          </div>
-
-          {/* Filter and Sort Controls */}
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-            {/* Filter Tabs */}
-            <div className="flex flex-wrap gap-2">
-              {(activeTab === 'users' ? userFilters : activeTab === 'groups' ? groupFilters : []).map((filter) => (
-                <button
-                  key={filter.id}
-                  onClick={() => {
-                    if (activeTab === 'users') {
-                      setUserFilter(filter.id as UserFilter)
-                    } else {
-                      setGroupFilter(filter.id as GroupFilter)
-                    }
-                  }}
-                  className={`flex items-center space-x-2 px-4 py-2 rounded-xl transition-all duration-200 ${
-                    (activeTab === 'users' ? userFilter : groupFilter) === filter.id
-                      ? 'bg-gradient-to-r from-emerald-500/30 to-teal-500/30 border border-emerald-400/50 text-white'
-                      : 'bg-white/10 border border-white/20 text-white/70 hover:bg-white/20 hover:text-white'
-                  }`}
-                >
-                  {filter.icon}
-                  <span className="text-sm font-medium">{filter.label}</span>
-                  {filter.count !== undefined && (
-                    <span className="bg-white/20 text-xs px-2 py-0.5 rounded-full">{filter.count}</span>
+          {/* Content Section */}
+          <div className={`flex-1 relative z-10 ${viewMode === 'grid' ? 'text-center' : ''}`}>
+            {viewMode === 'list' ? (
+              <div className="flex items-center justify-between">
+                <div className="flex-1">
+                  <motion.h3
+                    className="font-bold text-white text-xl mb-2 group-hover:text-emerald-300 transition-colors duration-300"
+                    initial={{ opacity: 0.9 }}
+                    whileHover={{ opacity: 1 }}
+                  >
+                    {user.first_name} {user.last_name}
+                  </motion.h3>
+                  {user.nickname && (
+                    <p className="text-emerald-400 text-sm mb-2 group-hover:text-emerald-300 transition-colors duration-300">
+                      @{user.nickname}
+                    </p>
                   )}
-                </button>
-              ))}
-            </div>
-
-            {/* Sort and View Controls */}
-            {activeTab !== 'trending' && (
-              <div className="flex items-center space-x-3">
-                <select
-                  value={sortBy}
-                  onChange={(e) => setSortBy(e.target.value as SortBy)}
-                  className="px-3 py-2 bg-white/10 border border-white/20 rounded-xl text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400/50"
-                  title="Sort options"
-                  aria-label="Sort by"
-                >
-                  {sortOptions.map((option) => (
-                    <option key={option.id} value={option.id} className="bg-gray-800">
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-
-                <div className="flex bg-white/10 rounded-xl p-1">
-                  <button
-                    onClick={() => setViewMode('list')}
-                    className={`p-2 rounded-lg transition-all duration-200 ${
-                      viewMode === 'list' ? 'bg-emerald-500/30 text-white' : 'text-white/60 hover:text-white'
-                    }`}
-                    title="List view"
-                    aria-label="Switch to list view"
-                  >
-                    <div className="flex flex-col space-y-0.5">
-                      <div className="w-3 h-0.5 bg-current"></div>
-                      <div className="w-3 h-0.5 bg-current"></div>
-                      <div className="w-3 h-0.5 bg-current"></div>
-                    </div>
-                  </button>
-                  <button
-                    onClick={() => setViewMode('grid')}
-                    className={`p-2 rounded-lg transition-all duration-200 ${
-                      viewMode === 'grid' ? 'bg-emerald-500/30 text-white' : 'text-white/60 hover:text-white'
-                    }`}
-                    title="Grid view"
-                    aria-label="Switch to grid view"
-                  >
-                    <Grid3X3 className="w-3 h-3" />
-                  </button>
+                  <p className="text-white/60 text-sm group-hover:text-white/80 transition-colors duration-300">
+                    {user.email}
+                  </p>
+                </div>
+                <div className="flex flex-col gap-1 ml-4">
+                  {user.is_private && (
+                    <motion.span
+                      initial={{ scale: 0 }}
+                      animate={{ scale: 1 }}
+                      className="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold bg-gradient-to-r from-purple-500/20 to-pink-500/20 text-purple-300 border border-purple-400/30 backdrop-blur-sm shadow-lg"
+                    >
+                      <Lock className="w-3 h-3 mr-1" />
+                      Private
+                    </motion.span>
+                  )}
+                  {user.followStatus.isFollowedBy && (
+                    <motion.span
+                      initial={{ scale: 0 }}
+                      animate={{ scale: 1 }}
+                      transition={{ delay: 0.1 }}
+                      className="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold bg-gradient-to-r from-blue-500/20 to-cyan-500/20 text-blue-300 border border-blue-400/30 backdrop-blur-sm shadow-lg"
+                    >
+                      <Heart className="w-3 h-3 mr-1" />
+                      Follows You
+                    </motion.span>
+                  )}
                 </div>
               </div>
+            ) : (
+              <>
+                <motion.h3
+                  className="font-bold text-white text-xl mb-2 group-hover:text-emerald-300 transition-colors duration-300"
+                  initial={{ opacity: 0.9 }}
+                  whileHover={{ opacity: 1 }}
+                >
+                  {user.first_name} {user.last_name}
+                </motion.h3>
+                {user.nickname && (
+                  <p className="text-emerald-400 text-sm mb-2 group-hover:text-emerald-300 transition-colors duration-300">
+                    @{user.nickname}
+                  </p>
+                )}
+              </>
             )}
           </div>
 
-          {/* Offline Warning */}
-          {!isConnected && (
-            <div className="bg-yellow-500/10 border border-yellow-400/20 rounded-xl p-4 mt-4">
-              <div className="flex items-center space-x-2">
-                <Eye className="w-5 h-5 text-yellow-400" />
-                <p className="text-yellow-400 font-medium">You&apos;re offline. Actions are disabled.</p>
+          {/* Action Button */}
+          <div className={`relative z-10 ${viewMode === 'grid' ? 'mt-auto flex justify-center' : ''}`}>
+            <div onClick={(e) => e.stopPropagation()}>
+              <FollowHandler
+                targetUser={user}
+                currentFollowStatus={user.followStatus}
+                onStatusChange={(status) => onFollowStatusChange(user.id, status)}
+                confirmUnfollow={true}
+                onUnfollowConfirm={() => onUnfollowConfirm(user.id, `${user.first_name} ${user.last_name}`)}
+                size={viewMode === 'list' ? 'sm' : 'md'}
+              />
+            </div>
+          </div>
+        </motion.div>
+      ))}
+    </div>
+  )
+}
+
+// Groups Section Component
+function GroupsSection({
+  groups,
+  viewMode,
+  onJoinGroup,
+  onLeaveGroup,
+  onOpenGroup,
+  onCancelJoinRequest,
+  onGroupInvitationResponse,
+  isConnected
+}: {
+  groups: DiscoverGroup[]
+  viewMode: ViewMode
+  onJoinGroup: (groupId: number) => void
+  onLeaveGroup: (groupId: number) => void
+  onOpenGroup: (groupId: number) => void
+  onCancelJoinRequest: (groupId: number) => void
+  onGroupInvitationResponse: (groupId: number, action: 'accept' | 'decline') => void
+  isConnected: boolean
+}) {
+  if (groups.length === 0) {
+    return (
+      <div className="text-center py-12">
+        <Globe className="w-16 h-16 text-white/30 mx-auto mb-4" />
+        <h3 className="text-xl font-semibold text-white/70 mb-2">No groups found</h3>
+        <p className="text-white/50">Try adjusting your search or filters</p>
+      </div>
+    )
+  }
+
+  return (
+    <div className={viewMode === 'grid'
+      ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
+      : "space-y-4"
+    }>
+      {groups.map((group) => (
+        <motion.div
+          key={group.id}
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3 }}
+          className={`group relative overflow-hidden ${
+            viewMode === 'grid'
+              ? 'bg-gradient-to-br from-white/8 to-white/4 backdrop-blur-xl rounded-2xl border border-white/20 shadow-xl shadow-black/20 hover:shadow-2xl hover:shadow-emerald-500/10 p-6 hover:bg-gradient-to-br hover:from-white/12 hover:to-white/6'
+              : 'bg-gradient-to-r from-white/8 to-white/4 backdrop-blur-xl rounded-2xl border border-white/20 shadow-xl shadow-black/20 hover:shadow-2xl hover:shadow-emerald-500/10 p-6 hover:bg-gradient-to-r hover:from-white/12 hover:to-white/6 flex items-center space-x-6'
+          } transition-all duration-500 cursor-pointer`}
+          whileHover={{ y: -4 }}
+        >
+          {/* Background gradient overlay */}
+          <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/5 via-transparent to-teal-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+
+          {viewMode === 'grid' && (
+            <>
+              {/* Badges - repositioned for better visibility */}
+              <div className="absolute top-4 right-4 flex flex-col gap-2 z-10">
+                {group.joinStatus === 'sent' && (
+                  <motion.span
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold bg-gradient-to-r from-emerald-500/20 to-teal-500/20 text-emerald-300 border border-emerald-400/30 backdrop-blur-sm shadow-lg"
+                  >
+                    <Bell className="w-3 h-3 mr-1.5" />
+                    Invited
+                  </motion.span>
+                )}
+                {(group.role === 'admin' || group.role === 'creator') && (
+                  <motion.span
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    transition={{ delay: 0.1 }}
+                    className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold bg-gradient-to-r from-purple-500/20 to-pink-500/20 text-purple-300 border border-purple-400/30 backdrop-blur-sm shadow-lg"
+                  >
+                    <UserCheck className="w-3 h-3 mr-1.5" />
+                    Admin
+                  </motion.span>
+                )}
+                {group.joinStatus === 'member' && !(group.role === 'admin' || group.role === 'creator') && (
+                  <motion.span
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    transition={{ delay: 0.2 }}
+                    className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold bg-gradient-to-r from-blue-500/20 to-cyan-500/20 text-blue-300 border border-blue-400/30 backdrop-blur-sm shadow-lg"
+                  >
+                    <Users className="w-3 h-3 mr-1.5" />
+                    Member
+                  </motion.span>
+                )}
+                {group.joinStatus === 'requested' && (
+                  <motion.span
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    transition={{ delay: 0.3 }}
+                    className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold bg-gradient-to-r from-yellow-500/20 to-orange-500/20 text-yellow-300 border border-yellow-400/30 backdrop-blur-sm shadow-lg"
+                  >
+                    <Clock className="w-3 h-3 mr-1.5" />
+                    Requested
+                  </motion.span>
+                )}
+                {group.joinStatus === 'rejected' && (
+                  <motion.span
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    transition={{ delay: 0.4 }}
+                    className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold bg-gradient-to-r from-red-500/20 to-pink-500/20 text-red-300 border border-red-400/30 backdrop-blur-sm shadow-lg"
+                  >
+                    <X className="w-3 h-3 mr-1.5" />
+                    Rejected
+                  </motion.span>
+                )}
+              </div>
+            </>
+          )}
+
+          {/* Avatar Section */}
+          <div className={`relative ${viewMode === 'grid' ? 'mb-6' : ''}`}>
+            <div className={`relative ${viewMode === 'grid' ? 'mx-auto w-fit' : ''}`}>
+              {/* Avatar glow effect */}
+              <div className="absolute inset-0 bg-gradient-to-br from-emerald-400 to-teal-600 rounded-full blur-lg opacity-30 group-hover:opacity-50 transition-opacity duration-500 scale-110" />
+
+              {group.avatar ? (
+                <motion.div
+                  className={`relative w-16 h-16 bg-gradient-to-br from-emerald-400 to-teal-600 rounded-full overflow-hidden ring-2 ring-white/20 group-hover:ring-white/40 transition-all duration-300 ${viewMode === 'grid' ? '' : ''}`}
+                  whileHover={{ rotate: [0, -5, 5, 0], scale: 1.05 }}
+                  transition={{ duration: 0.3 }}
+                >
+                  <Image
+                    src={group.avatar}
+                    alt={group.title}
+                    width={viewMode === 'list' ? 56 : 64}
+                    height={viewMode === 'list' ? 56 : 64}
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      const target = e.target as HTMLImageElement
+                      target.style.display = 'none'
+                      const parent = target.parentElement
+                      if (parent) {
+                        const letterAvatar = document.createElement('div')
+                        letterAvatar.className = `flex items-center justify-center bg-gradient-to-br from-emerald-400 to-teal-600 text-white font-bold rounded-full w-full h-full text-xl`
+                        letterAvatar.textContent = group.title.substring(0, 2).toUpperCase()
+                        parent.appendChild(letterAvatar)
+                      }
+                    }}
+                  />
+                </motion.div>
+              ) : (
+                <motion.div
+                  className={`relative ${viewMode === 'grid' ? '' : ''}`}
+                  whileHover={{ rotate: [0, -5, 5, 0], scale: 1.05 }}
+                  transition={{ duration: 0.3 }}
+                >
+                  <LetterAvatar
+                    name={group.title}
+                    size={viewMode === 'list' ? 56 : 64}
+                    className="ring-2 ring-white/20 group-hover:ring-white/40 transition-all duration-300"
+                  />
+                </motion.div>
+              )}
+            </div>
+          </div>
+
+          {/* Content Section */}
+          <div className={`flex-1 relative z-10 ${viewMode === 'grid' ? 'text-center' : ''}`}>
+            <motion.h3
+              className="font-bold text-white text-xl mb-2 group-hover:text-emerald-300 transition-colors duration-300"
+              initial={{ opacity: 0.9 }}
+              whileHover={{ opacity: 1 }}
+            >
+              {group.title}
+            </motion.h3>
+            <p className="text-white/70 text-sm mb-4 line-clamp-2 leading-relaxed group-hover:text-white/80 transition-colors duration-300">
+              {group.description || 'No description available'}
+            </p>
+
+            {/* Stats */}
+            <div className={`flex items-center ${viewMode === 'grid' ? 'justify-center' : ''} space-x-6 mb-6 text-sm text-white/60`}>
+              <motion.div
+                className="flex items-center space-x-2 group-hover:text-emerald-400 transition-colors duration-300"
+                whileHover={{ scale: 1.05 }}
+              >
+                <Users className="w-4 h-4" />
+                <span className="font-medium">{group.member_count || 0}</span>
+              </motion.div>
+              <motion.div
+                className="flex items-center space-x-2 group-hover:text-blue-400 transition-colors duration-300"
+                whileHover={{ scale: 1.05 }}
+              >
+                <Eye className="w-4 h-4" />
+                <span className="font-medium">Public</span>
+              </motion.div>
+
+              {viewMode === 'list' && (
+                <div className="flex flex-col gap-1 ml-1">
+                  {group.joinStatus === 'sent' && (
+                    <motion.span
+                      initial={{ scale: 0 }}
+                      animate={{ scale: 1 }}
+                      className="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold bg-gradient-to-r from-emerald-500/20 to-teal-500/20 text-emerald-300 border border-emerald-400/30 backdrop-blur-sm shadow-lg"
+                    >
+                      <Bell className="w-3 h-3 mr-1" />
+                      Invited
+                    </motion.span>
+                  )}
+                  {(group.role === 'admin' || group.role === 'creator') && (
+                    <motion.span
+                      initial={{ scale: 0 }}
+                      animate={{ scale: 1 }}
+                      transition={{ delay: 0.1 }}
+                      className="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold bg-gradient-to-r from-purple-500/20 to-pink-500/20 text-purple-300 border border-purple-400/30 backdrop-blur-sm shadow-lg"
+                    >
+                      <UserCheck className="w-3 h-3 mr-1" />
+                      Admin
+                    </motion.span>
+                  )}
+                  {group.joinStatus === 'member' && !(group.role === 'admin' || group.role === 'creator') && (
+                    <motion.span
+                      initial={{ scale: 0 }}
+                      animate={{ scale: 1 }}
+                      transition={{ delay: 0.2 }}
+                      className="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold bg-gradient-to-r from-blue-500/20 to-cyan-500/20 text-blue-300 border border-blue-400/30 backdrop-blur-sm shadow-lg"
+                    >
+                      <Users className="w-3 h-3 mr-1" />
+                      Member
+                    </motion.span>
+                  )}
+                  {group.joinStatus === 'requested' && (
+                    <motion.span
+                      initial={{ scale: 0 }}
+                      animate={{ scale: 1 }}
+                      transition={{ delay: 0.3 }}
+                      className="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold bg-gradient-to-r from-yellow-500/20 to-orange-500/20 text-yellow-300 border border-yellow-400/30 backdrop-blur-sm shadow-lg"
+                    >
+                      <Clock className="w-3 h-3 mr-1" />
+                      Requested
+                    </motion.span>
+                  )}
+                  {group.joinStatus === 'rejected' && (
+                    <motion.span
+                      initial={{ scale: 0 }}
+                      animate={{ scale: 1 }}
+                      transition={{ delay: 0.4 }}
+                      className="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold bg-gradient-to-r from-red-500/20 to-pink-500/20 text-red-300 border border-red-400/30 backdrop-blur-sm shadow-lg"
+                    >
+                      <X className="w-3 h-3 mr-1" />
+                      Rejected
+                    </motion.span>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Action Button */}
+          <div className={`relative z-10 ${viewMode === 'grid' ? 'mt-auto' : ''}`}>
+            {group.joinStatus === 'member' ? (
+              <motion.button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onOpenGroup(group.id)
+                }}
+                className="w-full flex items-center justify-center px-6 py-3 bg-gradient-to-r from-white/10 to-white/5 hover:from-white/20 hover:to-white/10 text-white/80 hover:text-white border border-white/30 hover:border-white/50 rounded-2xl transition-all duration-300 font-semibold shadow-lg hover:shadow-xl backdrop-blur-sm"
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+              >
+                <Eye className="w-4 h-4 mr-2" />
+                Open Group
+              </motion.button>
+            ) : group.joinStatus === 'sent' ? (
+              <div className="flex space-x-3">
+                <motion.button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onGroupInvitationResponse(group.id, 'accept')
+                  }}
+                  disabled={!isConnected}
+                  className="flex-1 flex items-center justify-center px-4 py-3 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white shadow-lg shadow-emerald-500/25 rounded-xl transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed font-semibold"
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                >
+                  <Check className="w-4 h-4 mr-2" />
+                  Accept
+                </motion.button>
+                <motion.button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onGroupInvitationResponse(group.id, 'decline')
+                  }}
+                  disabled={!isConnected}
+                  className="flex-1 flex items-center justify-center px-4 py-3 bg-gradient-to-r from-red-500 to-pink-600 hover:from-red-600 hover:to-pink-700 text-white shadow-lg shadow-red-500/25 rounded-xl transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed font-semibold"
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                >
+                  <X className="w-4 h-4 mr-2" />
+                  Decline
+                </motion.button>
+              </div>
+            ) : group.joinStatus === 'requested' ? (
+              <motion.button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onCancelJoinRequest(group.id)
+                }}
+                disabled={!isConnected}
+                className="w-full flex items-center justify-center px-6 py-3 bg-gradient-to-r from-yellow-500 to-orange-600 hover:from-yellow-600 hover:to-orange-700 text-white shadow-lg shadow-yellow-500/25 rounded-xl transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed font-semibold"
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+              >
+                <X className="w-4 h-4 mr-2" />
+                Cancel Request
+              </motion.button>
+            ) : group.joinStatus === 'rejected' ? (
+              <motion.button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onJoinGroup(group.id)
+                }}
+                disabled={!isConnected}
+                className="w-full flex items-center justify-center px-6 py-3 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white shadow-lg shadow-emerald-500/25 rounded-xl transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed font-semibold"
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+              >
+                <UserPlus className="w-4 h-4 mr-2" />
+                Try Again
+              </motion.button>
+            ) : (
+              <motion.button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onJoinGroup(group.id)
+                }}
+                disabled={!isConnected}
+                className="w-full flex items-center justify-center px-6 py-3 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white shadow-lg shadow-emerald-500/25 rounded-xl transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed font-semibold"
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+              >
+                <UserPlus className="w-4 h-4 mr-2" />
+                Join Group
+              </motion.button>
+            )}
+          </div>
+        </motion.div>
+      ))}
+    </div>
+  )
+}
+
+// Requests Section Component
+function RequestsSection({
+  requests,
+  requestType,
+  onFollowResponse,
+  onGroupJoinResponse,
+  onGroupInvitationResponse,
+  onCancelFollowRequest,
+  onCancelGroupJoinRequest,
+  onCancelGroupInvitation,
+  isConnected,
+  currentUser
+}: {
+  requests: RequestItem[]
+  requestType: RequestType
+  onFollowResponse: (userId: number, action: 'accept' | 'decline') => void
+  onGroupJoinResponse: (groupId: number, userId: number, action: 'accept' | 'decline') => void
+  onGroupInvitationResponse: (groupId: number, action: 'accept' | 'decline') => void
+  onCancelFollowRequest: (userId: number) => void
+  onCancelGroupJoinRequest: (groupId: number) => void
+  onCancelGroupInvitation: (groupId: number, userId: number) => void
+  isConnected: boolean
+  currentUser: User | null
+}) {
+  if (requests.length === 0) {
+    return (
+      <div className="text-center py-12">
+        <Bell className="w-16 h-16 text-white/30 mx-auto mb-4" />
+        <h3 className="text-xl font-semibold text-white/70 mb-2">
+          No {requestType === 'all' ? '' : requestType} requests
+        </h3>
+        <p className="text-white/50">
+          {requestType === 'incoming'
+            ? 'You have no pending requests to respond to'
+            : requestType === 'outgoing'
+            ? 'You have no pending requests sent'
+            : 'You have no pending requests'
+          }
+        </p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-4">
+      {requests.map((request) => (
+        <motion.div
+          key={request.request_id}
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3 }}
+          className="group relative overflow-hidden bg-gradient-to-br from-white/8 to-white/4 backdrop-blur-xl rounded-2xl border border-white/20 shadow-xl shadow-black/20 hover:shadow-2xl hover:shadow-emerald-500/10 p-6 hover:bg-gradient-to-br hover:from-white/12 hover:to-white/6 transition-all duration-500"
+          whileHover={{ y: -2 }}
+        >
+          {/* Background gradient overlay */}
+          <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/5 via-transparent to-teal-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+
+          <div className="relative z-10 flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              {/* Avatar display logic */}
+              {(request.type === 'group_join' || request.type === 'group_invitation') && request.group ? (
+                request.group.avatar ? (
+                  <div className="relative">
+                    <div className="w-14 h-14 rounded-full p-0.5 bg-gradient-to-br from-emerald-400 to-teal-600">
+                      <motion.div
+                        className="w-full h-full bg-gradient-to-br from-emerald-400 to-teal-600 rounded-full overflow-hidden ring-2 ring-white/20 group-hover:ring-white/40 transition-all duration-300"
+                        whileHover={{ rotate: [0, -5, 5, 0], scale: 1.05 }}
+                        transition={{ duration: 0.3 }}
+                      >
+                        <Image
+                          src={request.group.avatar}
+                          alt={request.group.title}
+                          width={48}
+                          height={48}
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            const target = e.target as HTMLImageElement
+                            target.style.display = 'none'
+                            const parent = target.parentElement
+                            if (parent) {
+                              const letterAvatar = document.createElement('div')
+                              letterAvatar.className = `flex items-center justify-center bg-gradient-to-br from-emerald-400 to-teal-600 text-white font-bold rounded-full w-full h-full text-xl`
+                              letterAvatar.textContent = request.group.title.substring(0, 2).toUpperCase()
+                              parent.appendChild(letterAvatar)
+                            }
+                          }}
+                        />
+                      </motion.div>
+                    </div>
+                  </div>
+                ) : (
+                  <motion.div
+                    className="relative"
+                    whileHover={{ rotate: [0, -5, 5, 0], scale: 1.05 }}
+                    transition={{ duration: 0.3 }}
+                  >
+                    <LetterAvatar
+                      name={request.group.title}
+                      size={56}
+                      className="ring-2 ring-white/20 group-hover:ring-white/40 transition-all duration-300"
+                    />
+                  </motion.div>
+                )
+              ) : request.user?.avatar ? (
+                <div className="relative">
+                  <div className="w-14 h-14 rounded-full p-0.5 bg-gradient-to-br from-emerald-400 to-teal-600">
+                    <motion.div
+                      className="w-full h-full bg-gradient-to-br from-emerald-400 to-teal-600 rounded-full overflow-hidden ring-2 ring-white/20 group-hover:ring-white/40 transition-all duration-300"
+                      whileHover={{ rotate: [0, -5, 5, 0], scale: 1.05 }}
+                      transition={{ duration: 0.3 }}
+                    >
+                      <Image
+                        src={request.user.avatar}
+                        alt={`${request.user?.first_name || 'User'} ${request.user?.last_name || ''}`}
+                        width={48}
+                        height={48}
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          const target = e.target as HTMLImageElement
+                          target.style.display = 'none'
+                          const parent = target.parentElement
+                          if (parent) {
+                            const letterAvatar = document.createElement('div')
+                            letterAvatar.className = `flex items-center justify-center bg-gradient-to-br from-emerald-400 to-teal-600 text-white font-bold rounded-full w-full h-full text-xl`
+                            letterAvatar.textContent = `${(request.user?.first_name || 'U').charAt(0)}${(request.user?.last_name || '').charAt(0) || (request.user?.first_name || 'U').charAt(1) || 'U'}`.toUpperCase()
+                            parent.appendChild(letterAvatar)
+                          }
+                        }}
+                      />
+                    </motion.div>
+                  </div>
+                </div>
+              ) : (
+                <motion.div
+                  className="relative"
+                  whileHover={{ rotate: [0, -5, 5, 0], scale: 1.05 }}
+                  transition={{ duration: 0.3 }}
+                >
+                  <LetterAvatar
+                    name={`${request.user?.first_name || 'Unknown'} ${request.user?.last_name || 'User'}`}
+                    size={56}
+                    className="ring-2 ring-white/20 group-hover:ring-white/40 transition-all duration-300"
+                  />
+                </motion.div>
+              )}
+              <div className="flex-1">
+                <motion.h3
+                  className="font-bold text-white text-xl mb-1 group-hover:text-emerald-300 transition-colors duration-300"
+                  initial={{ opacity: 0.9 }}
+                  whileHover={{ opacity: 1 }}
+                >
+                  {(request.type === 'group_join' || request.type === 'group_invitation') && request.group
+                    ? request.group.title || 'Unknown Group'
+                    : `${request.user?.first_name || 'Unknown'} ${request.user?.last_name || 'User'}`}
+                </motion.h3>
+                {(request.type === 'group_join' || request.type === 'group_invitation') && request.group ? (
+                  <p className="text-emerald-400 text-sm mb-2 group-hover:text-emerald-300 transition-colors duration-300">
+                    {((request.type === 'group_join' || request.type === 'group_invitation') && request.user?.id === currentUser?.id)
+                      ? `by you`
+                      : `by ${request.user?.first_name || 'Unknown'} ${request.user?.last_name || 'User'}${request.user?.nickname ? ` (@${request.user.nickname})` : ''}`
+                    }
+                  </p>
+                ) : (
+                  request.user?.nickname && (
+                    <p className="text-emerald-400 text-sm mb-2 group-hover:text-emerald-300 transition-colors duration-300">
+                      @{request.user.nickname}
+                    </p>
+                  )
+                )}
+                <p className="text-white/70 text-sm mb-2 group-hover:text-white/80 transition-colors duration-300">
+                  {request.type === 'follow'
+                    ? (request.direction === 'incoming' ? 'Wants to follow you' : 'Follow request sent')
+                    : request.type === 'group_join'
+                    ? (request.user?.id === currentUser?.id ? 'Join request sent' : 'Join request received')
+                    : (request.user?.id === currentUser?.id ? 'Group invitation sent' : 'Group invitation received')
+                  }
+                </p>
+                <p className="text-white/50 text-xs group-hover:text-white/60 transition-colors duration-300">
+                  {(() => {
+                    try {
+                      const dateStr = request.requested_at
+                      if (!dateStr) return 'Date unavailable'
+
+                      // Try different date parsing strategies
+                      let date: Date | null = null
+
+                      // Strategy 1: Direct Date constructor (ISO format)
+                      date = new Date(dateStr)
+                      if (isNaN(date.getTime())) {
+                        // Strategy 2: Replace space with 'T' for ISO-like format
+                        const isoStr = dateStr.replace(' ', 'T')
+                        date = new Date(isoStr)
+                      }
+                      if (isNaN(date.getTime())) {
+                        // Strategy 3: Try parsing as YYYY-MM-DD HH:mm:ss
+                        const match = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})\s+(\d{2}):(\d{2}):(\d{2})/)
+                        if (match) {
+                          date = new Date(
+                            parseInt(match[1]),
+                            parseInt(match[2]) - 1, // Month is 0-indexed
+                            parseInt(match[3]),
+                            parseInt(match[4]),
+                            parseInt(match[5]),
+                            parseInt(match[6])
+                          )
+                        }
+                      }
+                      if (isNaN(date.getTime())) {
+                        // Strategy 4: Try parsing as DD/MM/YYYY or MM/DD/YYYY
+                        const parts = dateStr.split(/[/\-]/)
+                        if (parts.length === 3) {
+                          // Assume MM/DD/YYYY format
+                          date = new Date(parseInt(parts[2]), parseInt(parts[0]) - 1, parseInt(parts[1]))
+                          if (isNaN(date.getTime())) {
+                            // Try DD/MM/YYYY format
+                            date = new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]))
+                          }
+                        }
+                      }
+
+                      if (date && !isNaN(date.getTime())) {
+                        return date.toLocaleDateString()
+                      }
+
+                      return 'Date unavailable'
+                    } catch {
+                      return 'Date unavailable'
+                    }
+                  })()}
+                </p>
               </div>
             </div>
-          )}
-        </div>
 
-        {/* Scrollable Content Area */}
-        <div className="flex-1 overflow-y-auto p-6 min-h-0">
-          {activeTab === 'users' && <UsersTab />}
-          {activeTab === 'groups' && <GroupsTab />}
-          {activeTab === 'trending' && <TrendingTab />}
-        </div>
-      </div>
+            {((request.type === 'follow' && request.direction === 'incoming') ||
+              ((request.type === 'group_join' || request.type === 'group_invitation') && request.user?.id !== currentUser?.id) ||
+              requestType === 'incoming') ? (
+              <div className="flex space-x-3">
+                {request.type === 'follow' ? (
+                  <>
+                    <motion.button
+                      onClick={() => request.user?.id && onFollowResponse(request.user.id, 'accept')}
+                      disabled={!isConnected || !request.user?.id}
+                      className="flex items-center justify-center px-4 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white shadow-lg shadow-emerald-500/25 rounded-xl transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed font-semibold"
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                    >
+                      <Check className="w-4 h-4 mr-2" />
+                      Accept
+                    </motion.button>
+                    <motion.button
+                      onClick={() => request.user?.id && onFollowResponse(request.user.id, 'decline')}
+                      disabled={!isConnected || !request.user?.id}
+                      className="flex items-center justify-center px-4 py-2.5 bg-gradient-to-r from-red-500 to-pink-600 hover:from-red-600 hover:to-pink-700 text-white shadow-lg shadow-red-500/25 rounded-xl transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed font-semibold backdrop-blur-sm"
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                    >
+                      <X className="w-4 h-4 mr-2" />
+                      Decline
+                    </motion.button>
+                  </>
+                ) : request.type === 'group_join' ? (
+                  <>
+                    <motion.button
+                      onClick={() => request.user?.id && request.group?.id && onGroupJoinResponse(request.group.id, request.user.id, 'accept')}
+                      disabled={!isConnected || !request.user?.id || !request.group?.id}
+                      className="flex items-center justify-center px-4 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white shadow-lg shadow-emerald-500/25 rounded-xl transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed font-semibold"
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                    >
+                      <Check className="w-4 h-4 mr-2" />
+                      Accept
+                    </motion.button>
+                    <motion.button
+                      onClick={() => request.user?.id && request.group?.id && onGroupJoinResponse(request.group.id, request.user.id, 'decline')}
+                      disabled={!isConnected || !request.user?.id || !request.group?.id}
+                      className="flex items-center justify-center px-4 py-2.5 bg-gradient-to-r from-red-500 to-pink-600 hover:from-red-600 hover:to-pink-700 text-white shadow-lg shadow-red-500/25 rounded-xl transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed font-semibold backdrop-blur-sm"
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                    >
+                      <X className="w-4 h-4 mr-2" />
+                      Decline
+                    </motion.button>
+                  </>
+                ) : (
+                  <>
+                    <motion.button
+                      onClick={() => request.group?.id && onGroupInvitationResponse(request.group.id, 'accept')}
+                      disabled={!isConnected || !request.group?.id}
+                      className="flex items-center justify-center px-4 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white shadow-lg shadow-emerald-500/25 rounded-xl transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed font-semibold"
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                    >
+                      <Check className="w-4 h-4 mr-2" />
+                      Accept
+                    </motion.button>
+                    <motion.button
+                      onClick={() => request.group?.id && onGroupInvitationResponse(request.group.id, 'decline')}
+                      disabled={!isConnected || !request.group?.id}
+                      className="flex items-center justify-center px-4 py-2.5 bg-gradient-to-r from-red-500 to-pink-600 hover:from-red-600 hover:to-pink-700 text-white shadow-lg shadow-red-500/25 rounded-xl transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed font-semibold backdrop-blur-sm"
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                    >
+                      <X className="w-4 h-4 mr-2" />
+                      Decline
+                    </motion.button>
+                  </>
+                )}
+              </div>
+            ) : (
+              <div className="flex space-x-3">
+                {request.type === 'follow' ? (
+                  <motion.button
+                    onClick={() => request.user?.id && onCancelFollowRequest(request.user.id)}
+                    disabled={!isConnected || !request.user?.id}
+                    className="flex items-center justify-center px-4 py-2.5 bg-gradient-to-r from-yellow-500 to-orange-600 hover:from-yellow-600 hover:to-orange-700 text-white shadow-lg shadow-yellow-500/25 rounded-xl transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed font-semibold"
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                  >
+                    <X className="w-4 h-4 mr-2" />
+                    Cancel Request
+                  </motion.button>
+                ) : request.type === 'group_join' ? (
+                  <motion.button
+                    onClick={() => request.group?.id && onCancelGroupJoinRequest(request.group.id)}
+                    disabled={!isConnected || !request.group?.id}
+                    className="flex items-center justify-center px-4 py-2.5 bg-gradient-to-r from-yellow-500 to-orange-600 hover:from-yellow-600 hover:to-orange-700 text-white shadow-lg shadow-yellow-500/25 rounded-xl transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed font-semibold"
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                  >
+                    <X className="w-4 h-4 mr-2" />
+                    Cancel Request
+                  </motion.button>
+                ) : (
+                  <motion.button
+                    onClick={() => request.group?.id && request.user?.id && onCancelGroupInvitation(request.group.id, request.user.id)}
+                    disabled={!isConnected || !request.group?.id || !request.user?.id}
+                    className="flex items-center justify-center px-4 py-2.5 bg-gradient-to-r from-yellow-500 to-orange-600 hover:from-yellow-600 hover:to-orange-700 text-white shadow-lg shadow-yellow-500/25 rounded-xl transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed font-semibold"
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                  >
+                    <X className="w-4 h-4 mr-2" />
+                    Cancel Invitation
+                  </motion.button>
+                )}
+              </div>
+            )}
+          </div>
+        </motion.div>
+      ))}
     </div>
   )
 }

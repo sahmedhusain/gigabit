@@ -33,25 +33,28 @@ function EventsAllPage() {
   
   const [showCreateEvent, setShowCreateEvent] = useState(false)
 
-  // Scroll to event from hash
+  // Scroll to event from hash or query param
   useEffect(() => {
-    const hash = window.location.hash
+    let id: number | null = null;
+    const hash = window.location.hash;
     if (hash.startsWith('#event-')) {
-      const id = parseInt(hash.replace('#event-', ''))
-      if (!isNaN(id) && liveEvents.length > 0) {
-        // Wait a bit for the DOM to be ready
-        setTimeout(() => {
-          const element = document.getElementById(`event-${id}`)
-          if (element) {
-            element.scrollIntoView({ behavior: 'smooth', block: 'center' })
-            setHighlightedEventId(id)
-            // Remove highlight after animation
-            setTimeout(() => setHighlightedEventId(null), 3000)
-          }
-        }, 300)
-      }
+      id = parseInt(hash.replace('#event-', ''));
+    } else if (eventId) {
+      id = parseInt(eventId);
     }
-  }, [liveEvents])
+    if (id && !isNaN(id) && liveEvents.length > 0) {
+      // Wait a bit for the DOM to be ready
+      setTimeout(() => {
+        const element = document.getElementById(`event-${id}`);
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          setHighlightedEventId(id);
+          // Remove highlight after animation
+          setTimeout(() => setHighlightedEventId(null), 3000);
+        }
+      }, 300);
+    }
+  }, [liveEvents, eventId]);
 
   // Update URL when event ID changes
   useEffect(() => {

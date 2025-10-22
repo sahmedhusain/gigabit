@@ -428,6 +428,19 @@ const GroupSettingsTab: React.FC<GroupSettingsTabProps> = ({ groupId }) => {
     return true
   }
 
+  // Handle cancel invitation
+  const handleCancelInvitation = async (invitationId: number) => {
+    try {
+      await api.cancelInvitation(groupId, invitationId)
+      success('Invitation cancelled successfully!')
+      // Refresh sent requests
+      fetchJoinRequests()
+    } catch (error) {
+      console.error('Failed to cancel invitation:', error)
+      toastError('Failed to cancel invitation. Please try again.')
+    }
+  }
+
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
@@ -1000,8 +1013,17 @@ const GroupSettingsTab: React.FC<GroupSettingsTabProps> = ({ groupId }) => {
                                 </div>
                               </div>
                             </div>
-                            <div className="text-white/60 text-sm">
-                              Pending response
+                            <div className="flex items-center space-x-2">
+                              <span className="text-white/60 text-sm">Pending response</span>
+                              <motion.button
+                                onClick={() => handleCancelInvitation(request.id)}
+                                className="flex items-center space-x-2 px-3 py-1 bg-red-500/20 text-red-300 hover:bg-red-500/30 rounded-xl transition-all duration-200 text-xs font-medium"
+                                whileHover={{ scale: 1.05 }}
+                                whileTap={{ scale: 0.95 }}
+                              >
+                                <X className="w-3 h-3" />
+                                <span>Cancel</span>
+                              </motion.button>
                             </div>
                           </div>
                         </div>

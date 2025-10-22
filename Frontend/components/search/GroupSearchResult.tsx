@@ -61,13 +61,8 @@ export default function GroupSearchResult({ result }: GroupSearchResultProps) {
     if (isMember) {
       // If user is a member, go to chat or group page
       router.push(result.url)
-    } else if (joinable || memberStatus === 'requested' || memberStatus === 'sent') {
-      // If joinable or has pending request, go to group page to show join option
-      router.push(`/group/${result.id}`)
-    } else {
-      // For private groups, still show the group page but with limited info
-      router.push(`/group/${result.id}`)
     }
+    // If not a member, do not redirect - user must join first
   }
 
   const getStatusBadge = () => {
@@ -168,12 +163,12 @@ export default function GroupSearchResult({ result }: GroupSearchResultProps) {
   return (
     <div
       onClick={handleClick}
-      className="bg-gradient-to-br from-white/10 via-white/5 to-transparent backdrop-blur-xl rounded-3xl border border-white/20 shadow-2xl p-6 hover:shadow-emerald-500/10 transition-all duration-500 group cursor-pointer"
+      className={`bg-gradient-to-br from-white/10 via-white/5 to-transparent backdrop-blur-xl rounded-3xl border border-white/20 shadow-2xl p-6 hover:shadow-emerald-500/10 transition-all duration-500 group ${isMember ? 'cursor-pointer' : 'cursor-default'}`}
     >
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-4 flex-1">
           {/* Enhanced Icon with Gradient Border */}
-          <div className="relative group cursor-pointer">
+            <div className={`relative group ${isMember ? 'cursor-pointer' : ''}`}>
             {result.image ? (
               <img 
                 src={result.image} 
@@ -196,9 +191,9 @@ export default function GroupSearchResult({ result }: GroupSearchResultProps) {
 
           <div className="flex-1">
             {/* Enhanced Name with Hover Effects */}
-            <div className="group cursor-pointer">
+            <div className={`group ${isMember ? 'cursor-pointer' : ''}`}>
               <span
-                className="text-white font-bold text-xl hover:text-emerald-300 transition-colors duration-200"
+                className={`text-white font-bold text-xl ${isMember ? 'hover:text-emerald-300 transition-colors duration-200' : ''}`}
               >
                 {result.title}
               </span>
@@ -207,7 +202,7 @@ export default function GroupSearchResult({ result }: GroupSearchResultProps) {
             {/* Enhanced Subtitle */}
             {result.subtitle && (
               <p
-                className="text-white/70 text-sm cursor-pointer hover:text-white/90 transition-colors duration-200 mt-1 line-clamp-2"
+                className={`text-white/70 text-sm ${isMember ? 'cursor-pointer hover:text-white/90 transition-colors duration-200' : ''} mt-1 line-clamp-2`}
               >
                 {result.subtitle}
               </p>

@@ -14,9 +14,11 @@ export default function MessageSearchResult({ result }: MessageSearchResultProps
     // Navigate to chats page with the specific conversation and message highlighted
     const conversationId = result.metadata?.conversationId
     const messageId = result.id
+    const messageType = result.metadata?.type as string || 'private'
+    const param = messageType === 'group' ? 'group' : 'chat'
     
     if (conversationId) {
-      router.push(`/chats/all?chat=${conversationId}&message=${messageId}`)
+      router.push(`/chats/all?${param}=${conversationId}&message=${messageId}`)
     } else {
       router.push(result.url)
     }

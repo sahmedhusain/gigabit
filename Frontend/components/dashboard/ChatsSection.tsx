@@ -88,11 +88,19 @@ export default function ChatsSection({
   const handleMarkAsRead = async (conversationId: number) => {
     try {
       // Find the chat to get details
-      const chat = normalizedChats.find(c => c.id === conversationId)
+      const chat = normalizedChats.find(c => {
+        const chatIdNum = c.id ? (typeof c.id === 'string' ? parseInt(c.id.replace(/\D/g, '')) : c.id) : 0;
+        return chatIdNum === conversationId;
+      });
       if (!chat) return
 
       const conversationType = chat.type === 'group' ? 'group' : 'private';
       const actualConversationId = chat.type === 'group' ? (chat.groupId || conversationId) : conversationId;
+      
+      if (actualConversationId <= 0) {
+        console.error('Invalid conversation ID:', actualConversationId);
+        return;
+      }
       
       await api.markConversationAsRead(actualConversationId, conversationType);
 
@@ -101,7 +109,10 @@ export default function ChatsSection({
         if (!current) return current
         const updated = Array.isArray(current) ? current : current.conversations
         if (!Array.isArray(updated)) return current
-        const next = updated.map((c: any) => c?.id === conversationId ? { ...c, unread_count: 0 } : c)
+        const next = updated.map((c: any) => {
+          const cIdNum = c?.id ? (typeof c.id === 'string' ? parseInt(c.id.replace(/\D/g, '')) : c.id) : 0;
+          return cIdNum === conversationId ? { ...c, unread_count: 0 } : c;
+        });
         return Array.isArray(current) ? next : { ...current, conversations: next }
       }, false)
       
@@ -115,11 +126,19 @@ export default function ChatsSection({
   const handleMarkAsUnread = async (conversationId: number) => {
     try {
       // Find the chat to get details
-      const chat = normalizedChats.find(c => c.id === conversationId)
+      const chat = normalizedChats.find(c => {
+        const chatIdNum = c.id ? (typeof c.id === 'string' ? parseInt(c.id.replace(/\D/g, '')) : c.id) : 0;
+        return chatIdNum === conversationId;
+      });
       if (!chat) return
 
       const conversationType = chat.type === 'group' ? 'group' : 'private';
       const actualConversationId = chat.type === 'group' ? (chat.groupId || conversationId) : conversationId;
+      
+      if (actualConversationId <= 0) {
+        console.error('Invalid conversation ID:', actualConversationId);
+        return;
+      }
       
       await api.markConversationAsUnread(actualConversationId, conversationType);
 
@@ -128,7 +147,10 @@ export default function ChatsSection({
         if (!current) return current
         const updated = Array.isArray(current) ? current : current.conversations
         if (!Array.isArray(updated)) return current
-        const next = updated.map((c: any) => c?.id === conversationId ? { ...c, unread_count: 1, has_unread: true } : c)
+        const next = updated.map((c: any) => {
+          const cIdNum = c?.id ? (typeof c.id === 'string' ? parseInt(c.id.replace(/\D/g, '')) : c.id) : 0;
+          return cIdNum === conversationId ? { ...c, unread_count: 1, has_unread: true } : c;
+        });
         return Array.isArray(current) ? next : { ...current, conversations: next }
       }, false)
       
@@ -141,7 +163,10 @@ export default function ChatsSection({
 
   const handleShowInfo = (conversationId: number, type: 'private' | 'group') => {
     // Navigate to the chat and open info tab
-    const chat = normalizedChats.find(c => c.id === conversationId)
+    const chat = normalizedChats.find(c => {
+      const chatIdNum = c.id ? (typeof c.id === 'string' ? parseInt(c.id.replace(/\D/g, '')) : c.id) : 0;
+      return chatIdNum === conversationId;
+    });
     if (chat) {
       onChatClick({
         conversationId,
@@ -165,7 +190,10 @@ export default function ChatsSection({
 
   const handleShowSettings = (conversationId: number, type: 'private' | 'group') => {
     // Navigate to the chat and open settings tab
-    const chat = normalizedChats.find(c => c.id === conversationId)
+    const chat = normalizedChats.find(c => {
+      const chatIdNum = c.id ? (typeof c.id === 'string' ? parseInt(c.id.replace(/\D/g, '')) : c.id) : 0;
+      return chatIdNum === conversationId;
+    });
     if (chat) {
       onChatClick({
         conversationId,
@@ -364,8 +392,8 @@ export default function ChatsSection({
           showNewGroup: false,
           newChatLabel: 'New Chat',
           emptyState: {
-            title: 'No private chats',
-            description: 'Start a conversation with someone',
+            title: 'No private chats yet',
+            description: 'Connect with friends and start meaningful conversations. Find people you know or discover new connections.',
             buttonText: 'Start Chat'
           }
         }
@@ -391,8 +419,8 @@ export default function ChatsSection({
           showNewGroup: true,
           newGroupLabel: 'New Group',
           emptyState: {
-            title: 'No group chats',
-            description: 'Create or join a group conversation',
+            title: 'No group chats yet',
+            description: 'Connect with communities! Create groups for projects, hobbies, or interests and invite friends to join the conversation.',
             buttonText: 'Create Group'
           }
         }
@@ -421,9 +449,10 @@ export default function ChatsSection({
           newChatLabel: 'New Chat',
           newGroupLabel: 'New Group',
           emptyState: {
-            title: 'No conversations found',
-            description: 'Start a new conversation to see it here',
-            buttonText: 'Start a Chat'
+            title: 'No conversations yet',
+            description: 'Start your social journey! Connect with friends through private chats or join communities in group conversations.',
+            buttonText: 'Start a Chat',
+            showDiscoverButtons: true
           }
         }
     }
@@ -588,7 +617,56 @@ export default function ChatsSection({
         >
           <tabConfig.icon className={`w-16 h-16 ${tabConfig.iconColor} mb-4`} />
           <h3 className="text-xl font-semibold text-white mb-2">{tabConfig.emptyState.title}</h3>
-          <p className="text-white/60 mb-6">{tabConfig.emptyState.description}</p>
+          <p className="text-white/60 mb-6 max-w-md">{tabConfig.emptyState.description}</p>
+
+          <div className="flex flex-col space-y-3">
+            {tabConfig.emptyState.buttonText && (
+              <motion.button
+                onClick={() => {
+                  if (normalizedSubTab === 'private' || normalizedSubTab === 'all') {
+                    setShowCreateDirectMessage(true)
+                  } else if (normalizedSubTab === 'group') {
+                    setShowCreateGroup(true)
+                  }
+                }}
+                className="px-6 py-3 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white rounded-xl font-semibold transition-all duration-300 shadow-lg hover:shadow-xl"
+                whileHover={{ scale: 1.05, y: -1 }}
+                whileTap={{ scale: 0.95 }}
+              >
+                {tabConfig.emptyState.buttonText}
+              </motion.button>
+            )}
+
+            {tabConfig.emptyState.showDiscoverButtons && (
+              <div className="flex space-x-3">
+                <motion.button
+                  onClick={() => {
+                    // Navigate to discover users page
+                    window.location.href = '/discover'
+                  }}
+                  className="px-4 py-2 bg-gradient-to-r from-blue-500/20 to-indigo-500/20 hover:from-blue-500/30 hover:to-indigo-500/30 text-blue-300 rounded-lg border border-blue-400/30 hover:border-blue-400/50 transition-all duration-300 flex items-center space-x-2"
+                  whileHover={{ scale: 1.05, y: -1 }}
+                  whileTap={{ scale: 0.95 }}
+                >
+                  <User className="w-4 h-4" />
+                  <span>Discover People</span>
+                </motion.button>
+
+                <motion.button
+                  onClick={() => {
+                    // Navigate to discover groups page
+                    window.location.href = '/discover?tab=groups'
+                  }}
+                  className="px-4 py-2 bg-gradient-to-r from-purple-500/20 to-pink-500/20 hover:from-purple-500/30 hover:to-pink-500/30 text-purple-300 rounded-lg border border-purple-400/30 hover:border-purple-400/50 transition-all duration-300 flex items-center space-x-2"
+                  whileHover={{ scale: 1.05, y: -1 }}
+                  whileTap={{ scale: 0.95 }}
+                >
+                  <Users className="w-4 h-4" />
+                  <span>Discover Groups</span>
+                </motion.button>
+              </div>
+            )}
+          </div>
         </motion.div>
       )
     }

@@ -284,7 +284,7 @@ body {
   display: flex;
   flex-direction: column;
   gap: 16px;
-  overflow: hidden; /* Prevent scrolling */
+  overflow: hidden; /* Prevent scrolling on parent container */
   box-sizing: border-box;
 }
 
@@ -345,8 +345,8 @@ body {
   height: 100%;
   max-height: 100%;
   gap: 16px;
-  /* Allow scrolling if content exceeds viewport */
-  overflow-y: auto;
+  /* Parent should not scroll; internal sections handle scrolling */
+  overflow-y: hidden;
   box-sizing: border-box;
 }
 
@@ -366,7 +366,7 @@ body {
 
 /* Add specific constraints for following section when expanded */
 .sidebar-section:has(.following-content).expandable {
-  max-height: calc(55vh - 80px); /* Even more reduced height for optimal viewport management */
+  max-height: calc(50vh - 80px); /* Reduced height to prevent sidebar scrollbar */
   flex: 0 0 auto;
 }
 
@@ -390,6 +390,26 @@ body {
   padding-top: 0;
 }
 
+/* Make invitations section header completely fixed and non-scrollable */
+.invitations-header-sticky {
+  position: sticky;
+  top: 16px; /* Position from top of section */
+  z-index: 15;
+  background: inherit;
+  -webkit-backdrop-filter: inherit;
+  backdrop-filter: inherit;
+  border-radius: inherit;
+  padding-bottom: 16px;
+  margin-bottom: 0; /* Remove bottom margin to prevent gap */
+  pointer-events: auto;
+}
+
+/* Adjust invitations section content to account for sticky header */
+.invitations-content-expanded {
+  margin-top: 0;
+  padding-top: 0;
+}
+
 /* Add class to invitation content for targeting */
 .invitation-content {
   /* Specific styling for invitation content */
@@ -402,7 +422,7 @@ body {
 .following-content {
   /* Specific styling for following content */
   position: relative;
-  max-height: calc(55vh - 80px); /* Match section constraint */
+  max-height: calc(50vh - 80px); /* Match section constraint */
   overflow-y: auto; /* Allow internal scrolling */
 }
 
@@ -636,19 +656,28 @@ body {
     display: none !important;
   }
 
-  .main-content-layout.has-fixed-sidebar {
-    margin-right: 0;
+  .fixed-right-sidebar.mobile-open {
+    display: flex !important;
+    transform: translateX(0);
+    z-index: 45;
   }
 }
 
 /* Mobile-specific adjustments */
 @media (max-width: 1023px) {
   .sidebar-layout {
-    z-index: 35;
+    z-index: 45;
+    top: 64px; /* Move below topbar */
+    height: calc(100vh - 64px); /* Adjust height to account for topbar */
   }
   
   .topbar-layout {
-    z-index: 45;
+    z-index: 50;
+  }
+  
+  .fixed-right-sidebar.mobile-open {
+    top: 64px; /* Move below topbar */
+    height: calc(100vh - 64px); /* Adjust height to account for topbar */
   }
 }
 
@@ -707,6 +736,33 @@ body {
     opacity: 1;
   }
 }
+
+/* Force-hide scrollbars for right sidebar sections to ensure consistency */
+.fixed-right-sidebar .space-y-4,
+.fixed-right-sidebar .section-content,
+.fixed-right-sidebar .following-content,
+.fixed-right-sidebar .invitation-content,
+.fixed-right-sidebar .invitation-content > .flex-1,
+.fixed-right-sidebar .following-content > .flex-1 {
+  /* Firefox */
+  scrollbar-width: none !important;
+  /* IE 10+ */
+  -ms-overflow-style: none !important;
+  /* Ensure transparent color fallback */
+  scrollbar-color: transparent transparent !important;
+}
+
+.fixed-right-sidebar .space-y-4::-webkit-scrollbar,
+.fixed-right-sidebar .section-content::-webkit-scrollbar,
+.fixed-right-sidebar .following-content::-webkit-scrollbar,
+.fixed-right-sidebar .invitation-content::-webkit-scrollbar,
+.fixed-right-sidebar .invitation-content > .flex-1::-webkit-scrollbar,
+.fixed-right-sidebar .following-content > .flex-1::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
 
 .animate-slide-up {
   animation: slide-up 0.3s ease-out;

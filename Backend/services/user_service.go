@@ -3,10 +3,8 @@ package services
 import (
 	"database/sql"
 	"fmt"
-	"log"
-	"time"
-
 	"social/models"
+	"time"
 )
 
 func min(a, b int) int {
@@ -31,12 +29,6 @@ func (s *UserService) CreateUser(user *models.User) error {
 	`
 
 	now := time.Now()
-
-	log.Printf("Creating user with avatar: %v", user.Avatar)
-	if user.Avatar != nil {
-		log.Printf("Avatar length: %d", len(*user.Avatar))
-		log.Printf("Avatar starts with: %s", (*user.Avatar)[:min(100, len(*user.Avatar))])
-	}
 
 	// Set default status if not provided
 	if user.Status == "" {
@@ -123,13 +115,13 @@ func (s *UserService) GetUserByID(id uint) (*models.User, error) {
 func (s *UserService) UpdateUser(user *models.User) error {
 	query := `
 		UPDATE users SET 
-			first_name = ?, last_name = ?, avatar = ?, nickname = ?, about_me = ?, is_private = ?, updated_at = ?
+			email = ?, first_name = ?, last_name = ?, date_of_birth = ?, avatar = ?, nickname = ?, about_me = ?, is_private = ?, password = ?, updated_at = ?
 		WHERE id = ?
 	`
 
 	now := time.Now()
-	_, err := s.db.Exec(query, user.FirstName, user.LastName, user.Avatar, user.Nickname,
-		user.AboutMe, user.IsPrivate, now, user.ID)
+	_, err := s.db.Exec(query, user.Email, user.FirstName, user.LastName, user.DateOfBirth, user.Avatar, user.Nickname,
+		user.AboutMe, user.IsPrivate, user.Password, now, user.ID)
 	if err != nil {
 		return err
 	}
@@ -265,4 +257,10 @@ func (s *UserService) GenerateUniqueNickname(email string) (string, error) {
 			return "", fmt.Errorf("unable to generate unique nickname")
 		}
 	}
+}
+
+func (s *UserService) DeleteUser(userID uint) error {
+	query := `DELETE FROM users WHERE id = ?`
+	_, err := s.db.Exec(query, userID)
+	return err
 }

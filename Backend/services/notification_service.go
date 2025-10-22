@@ -44,7 +44,6 @@ func (s *NotificationService) CreateNotification(notification *models.Notificati
 	notification.CreatedAt = now
 	notification.UpdatedAt = now
 
-	// Send real-time notification via websocket
 	s.sendRealTimeNotification(notification)
 
 	return nil
@@ -64,7 +63,6 @@ LIMIT ? OFFSET ?
 
 	rows, err := s.db.Query(query, userID, limit, offset)
 	if err != nil {
-		fmt.Println("GetUserNotifications - query error:", err, "query:", query, "args:", userID, limit, offset)
 		return nil, err
 	}
 	defer rows.Close()
@@ -89,7 +87,6 @@ LIMIT ? OFFSET ?
 			&firstName, &lastName, &avatar, &nickname,
 		)
 		if err != nil {
-			fmt.Println("GetUserNotifications - scan error:", err)
 			return nil, err
 		}
 
@@ -107,7 +104,6 @@ LIMIT ? OFFSET ?
 			notification.Title = title.String
 		}
 
-		// Map nullable DB fields into actor response
 		if firstName.Valid {
 			actor.FirstName = firstName.String
 		} else {
@@ -133,7 +129,6 @@ LIMIT ? OFFSET ?
 
 		notification.Actor = actor
 
-		// Add additional data based on notification type
 		notification.Data = s.getNotificationData(notification.Type, notification.EntityType, notification.EntityID)
 
 		notifications = append(notifications, notification)
@@ -155,7 +150,6 @@ func (s *NotificationService) MarkAsRead(userID uint, notificationIDs []uint) er
 		return nil
 	}
 
-	// Create placeholders for IN clause
 	placeholders := make([]string, len(notificationIDs))
 	args := make([]interface{}, 0, len(notificationIDs)+2)
 
@@ -195,8 +189,6 @@ func (s *NotificationService) DeleteAllRead(userID uint) error {
 	_, err := s.db.Exec(query, userID)
 	return err
 }
-
-// Convenience methods for creating specific types of notifications
 
 func (s *NotificationService) NotifyFollowRequest(followerID, followingID uint) error {
 	follower, err := s.getUserInfo(followerID)
@@ -312,13 +304,11 @@ func (s *NotificationService) NotifyEventCreated(creatorID, groupID, eventID uin
 		return err
 	}
 
-	// Get all group members except creator
 	memberIDs, err := s.getGroupMemberIDs(groupID, creatorID)
 	if err != nil {
 		return err
 	}
 
-	// Create notification for each group member
 	var failedCount int
 	for _, memberID := range memberIDs {
 		notification := &models.Notification{
@@ -332,9 +322,6 @@ func (s *NotificationService) NotifyEventCreated(creatorID, groupID, eventID uin
 		}
 
 		if err := s.CreateNotification(notification); err != nil {
-			// Log the error and continue with other notifications
-			fmt.Printf("Failed to create event notification for user %d: %v\n", memberID, err)
-			failedCount++
 			continue
 		}
 	}
@@ -366,7 +353,6 @@ func (s *NotificationService) NotifyNewMessage(senderID, receiverID uint, messag
 }
 
 func (s *NotificationService) NotifyPostLiked(likerID, postOwnerID, postID uint) error {
-	// Don't notify if user likes their own post
 	if likerID == postOwnerID {
 		return nil
 	}
@@ -390,7 +376,6 @@ func (s *NotificationService) NotifyPostLiked(likerID, postOwnerID, postID uint)
 }
 
 func (s *NotificationService) NotifyPostCommented(commenterID, postOwnerID, postID uint) error {
-	// Don't notify if user comments on their own post
 	if commenterID == postOwnerID {
 		return nil
 	}
@@ -424,7 +409,6 @@ func (s *NotificationService) NotifyGroupPostCreated(posterID, groupID, postID u
 		return err
 	}
 
-	// Get all group members except poster
 	memberIDs, err := s.getGroupMemberIDs(groupID, posterID)
 	if err != nil {
 		return err
@@ -444,9 +428,6 @@ func (s *NotificationService) NotifyGroupPostCreated(posterID, groupID, postID u
 		}
 
 		if err := s.CreateNotification(notification); err != nil {
-			// Log the error and continue with other notifications
-			fmt.Printf("Failed to create group post notification for user %d: %v\n", memberID, err)
-			failedCount++
 			continue
 		}
 	}
@@ -459,7 +440,6 @@ func (s *NotificationService) NotifyGroupPostCreated(posterID, groupID, postID u
 }
 
 func (s *NotificationService) NotifyGroupPostLiked(likerID, postOwnerID, groupID, postID uint) error {
-	// Don't notify if user likes their own post
 	if likerID == postOwnerID {
 		return nil
 	}
@@ -487,8 +467,6 @@ func (s *NotificationService) NotifyGroupPostLiked(likerID, postOwnerID, groupID
 	return s.CreateNotification(notification)
 }
 
-// Helper methods
-
 func (s *NotificationService) sendRealTimeNotification(notification *models.Notification) {
 	if s.hub == nil {
 		fmt.Printf("Hub is nil, cannot send real-time notification for notification ID %d\n", notification.ID)
@@ -497,13 +475,6 @@ func (s *NotificationService) sendRealTimeNotification(notification *models.Noti
 
 	actor, err := s.getUserInfo(notification.ActorID)
 	if err != nil {
-		// Log the error and create a default actor to prevent nil pointer issues
-		fmt.Printf("Error getting actor info for notification ID %d: %v\n", notification.ID, err)
-		actor = &models.UserResponse{
-			ID:        notification.ActorID,
-			FirstName: "Unknown",
-			LastName:  "User",
-		}
 	}
 
 	notificationResponse := models.NotificationResponse{
@@ -599,7 +570,6 @@ func (s *NotificationService) getGroupMemberIDs(groupID, excludeUserID uint) ([]
 }
 
 func (s *NotificationService) getNotificationData(notificationType, entityType string, entityID uint) interface{} {
-	// Return additional data based on notification type
 	switch notificationType {
 	case models.NotificationEventCreated:
 		if event, err := s.getEventInfo(entityID); err == nil {

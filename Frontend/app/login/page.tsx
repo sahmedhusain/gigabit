@@ -5,7 +5,10 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
-import { Eye, EyeOff, Mail, Lock, ArrowRight, Sparkles } from 'lucide-react'
+import { Eye, EyeOff, Mail, Lock, ArrowRight, Sparkles, X } from 'lucide-react'
+import { motion } from 'framer-motion'
+import TermsPopup from '@/components/TermsPopup'
+import PrivacyPopup from '@/components/PrivacyPopup'
 
 function LoginPage() {
   const router = useRouter()
@@ -18,6 +21,8 @@ function LoginPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [showTerms, setShowTerms] = useState(false)
+  const [showPrivacy, setShowPrivacy] = useState(false)
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({
@@ -107,21 +112,7 @@ function LoginPage() {
               <h1 className="text-4xl lg:text-6xl xl:text-7xl font-bold bg-gradient-to-r from-white via-emerald-100 to-teal-200 bg-clip-text text-transparent mb-6 leading-tight">
                 Welcome Back
               </h1>
-              <p className="text-xl lg:text-2xl text-white/80 font-light leading-relaxed mb-6">
-                Sign in to continue your journey and connect with your community.
-              </p>
-              
-              {/* Stats or Key Features */}
-              <div className="grid grid-cols-2 gap-4 mb-6">
-                <div className="flex items-center space-x-3">
-                  <div className="w-3 h-3 bg-emerald-400 rounded-full animate-pulse"></div>
-                  <span className="text-white/70 text-sm">10K+ Active Users</span>
-                </div>
-                <div className="flex items-center space-x-3">
-                  <div className="w-3 h-3 bg-teal-400 rounded-full animate-pulse delay-300"></div>
-                  <span className="text-white/70 text-sm">Real-time Chat</span>
-                </div>
-              </div>
+
             </div>
 
             {/* Features */}
@@ -174,11 +165,44 @@ function LoginPage() {
                     <p className="text-white/60 text-sm">Enter your credentials to continue</p>
                   </div>
 
-                  {/* Error Message */}
+                  {/* Error Message Below Header */}
                   {error && (
-                    <div className="bg-red-500/20 border border-red-500/30 rounded-2xl p-4 mb-6">
-                      <p className="text-red-300 text-sm text-center">{error}</p>
-                    </div>
+                    <motion.div
+                      className="bg-gradient-to-br from-red-500/10 via-pink-500/10 to-rose-500/10 backdrop-blur-sm rounded-3xl p-4 border border-red-400/30 shadow-xl shadow-red-500/20 mb-6"
+                      initial={{ opacity: 0, y: -10, scale: 0.95 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      transition={{ type: 'spring', stiffness: 400, damping: 17 }}
+                    >
+                      <div className="absolute inset-0 bg-gradient-to-r from-red-500/5 via-pink-500/5 to-rose-500/5 rounded-3xl"></div>
+                      <div className="relative flex items-start space-x-4">
+                        <motion.div
+                          className="flex-shrink-0 w-8 h-8 rounded-full bg-gradient-to-r from-red-400/20 to-pink-400/20 flex items-center justify-center border border-red-400/30"
+                          initial={{ scale: 0 }}
+                          animate={{ scale: 1 }}
+                          transition={{ delay: 0.1, type: 'spring', stiffness: 400, damping: 17 }}
+                        >
+                          <X className="w-4 h-4 text-red-400" />
+                        </motion.div>
+                        <div className="flex-1">
+                          <motion.p
+                            className="text-red-200/90 text-sm leading-relaxed"
+                            initial={{ opacity: 0, x: -10 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            transition={{ delay: 0.2, duration: 0.3 }}
+                          >
+                            {error}
+                          </motion.p>
+                        </div>
+                      </div>
+                      <div className="absolute top-3 right-3">
+                        <motion.div
+                          className="w-2 h-2 bg-red-400 rounded-full animate-pulse"
+                          initial={{ scale: 0 }}
+                          animate={{ scale: [1, 1.2, 1] }}
+                          transition={{ delay: 0.3, duration: 1.5, repeat: Infinity }}
+                        />
+                      </div>
+                    </motion.div>
                   )}
 
                   {/* Email Input */}
@@ -260,11 +284,17 @@ function LoginPage() {
                   {/* Terms */}
                   <div className="text-center text-sm text-white/60 mb-4">
                     By signing in, you agree to our{' '}
-                    <button className="text-emerald-300 hover:text-emerald-200 hover:underline transition-colors">
+                    <button
+                      onClick={() => setShowTerms(true)}
+                      className="text-emerald-300 hover:text-emerald-200 hover:underline transition-colors"
+                    >
                       Terms of Service
                     </button>{' '}
                     and{' '}
-                    <button className="text-emerald-300 hover:text-emerald-200 hover:underline transition-colors">
+                    <button
+                      onClick={() => setShowPrivacy(true)}
+                      className="text-emerald-300 hover:text-emerald-200 hover:underline transition-colors"
+                    >
                       Privacy Policy
                     </button>
                   </div>
@@ -292,11 +322,15 @@ function LoginPage() {
       {/* Footer */}
       <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2">
         <div className="flex items-center space-x-6 text-xs text-white/40">
-          <button className="hover:text-white/60 transition-colors">Terms</button>
-          <button className="hover:text-white/60 transition-colors">Privacy</button>
+          <button onClick={() => setShowTerms(true)} className="hover:text-white/60 transition-colors">Terms</button>
+          <button onClick={() => setShowPrivacy(true)} className="hover:text-white/60 transition-colors">Privacy</button>
           <button className="hover:text-white/60 transition-colors">© 2025 Gigabit</button>
         </div>
       </div>
+
+      {/* Popups */}
+      <TermsPopup isOpen={showTerms} onClose={() => setShowTerms(false)} />
+      <PrivacyPopup isOpen={showPrivacy} onClose={() => setShowPrivacy(false)} />
     </div>
   )
 }

@@ -157,7 +157,7 @@ func (h *SearchHandler) SearchAll(w http.ResponseWriter, r *http.Request) {
 		// Sort by relevance
 		sort.Slice(results, func(i, j int) bool {
 			order := map[string]int{
-				"user": 1, "chat": 2, "group": 3, "event": 4, "post": 5, "tag": 6, "message": 7,
+				"user": 1, "private": 2, "group": 3, "event": 4, "post": 5, "tag": 6, "message": 7,
 			}
 			return order[results[i].Type] < order[results[j].Type]
 		})
@@ -295,10 +295,10 @@ func (h *SearchHandler) searchGroups(userID uint, pattern string, limit int, off
 		url := fmt.Sprintf("/group/%d", id)
 		if isMember {
 			if conversationID.Valid {
-				url = fmt.Sprintf("/chats/all?chat=%d", conversationID.Int64)
+				url = fmt.Sprintf("/chats/all?group=%d", id)
 			} else {
 				// Fallback: use group id; frontend can resolve
-				url = fmt.Sprintf("/chats/all?chat=%d", id)
+				url = fmt.Sprintf("/chats/all?group=%d", id)
 			}
 		}
 
@@ -344,16 +344,17 @@ func (h *SearchHandler) searchGroups(userID uint, pattern string, limit int, off
 
 func (h *SearchHandler) searchEvents(userID uint, pattern string, limit int, offset int) []SearchSuggestion {
 	query := `
-		SELECT e.id, e.title, e.description, e.event_date, e.location, g.name as group_name,
+		SELECT e.id, e.title, e.description, e.event_date, e.location, g.name as group_name, g.id as group_id,
 			   (SELECT COUNT(*) FROM event_responses WHERE event_id = e.id AND response = 'going') as going_count
 		FROM events e
 		JOIN groups g ON e.group_id = g.id
+		JOIN group_members gm ON gm.group_id = g.id AND gm.user_id = ? AND gm.status = 'member'
 		WHERE LOWER(e.title) LIKE ? OR LOWER(e.description) LIKE ? OR LOWER(e.location) LIKE ?
 		ORDER BY e.event_date ASC
 		LIMIT ? OFFSET ?
 	`
 
-	rows, err := h.db.Query(query, pattern, pattern, pattern, limit, offset)
+	rows, err := h.db.Query(query, userID, pattern, pattern, pattern, limit, offset)
 	if err != nil {
 		return []SearchSuggestion{}
 	}
@@ -363,9 +364,10 @@ func (h *SearchHandler) searchEvents(userID uint, pattern string, limit int, off
 	for rows.Next() {
 		var id uint
 		var title, description, eventDate, location, groupName string
+		var groupID uint
 		var goingCount int
 
-		err := rows.Scan(&id, &title, &description, &eventDate, &location, &groupName, &goingCount)
+		err := rows.Scan(&id, &title, &description, &eventDate, &location, &groupName, &groupID, &goingCount)
 		if err != nil {
 			continue
 		}
@@ -383,6 +385,7 @@ func (h *SearchHandler) searchEvents(userID uint, pattern string, limit int, off
 				"eventDate":  eventDate,
 				"location":   location,
 				"groupName":  groupName,
+				"group_id":   groupID,
 				"goingCount": goingCount,
 			},
 		})
@@ -393,30 +396,36 @@ func (h *SearchHandler) searchEvents(userID uint, pattern string, limit int, off
 
 func (h *SearchHandler) searchPosts(userID uint, pattern string, limit int, offset int) []SearchSuggestion {
 	query := `
-SELECT p.id, p.content, p.created_at, u.first_name, u.last_name, u.avatar,
-   (SELECT COUNT(*) FROM likes WHERE post_id = p.id AND is_like = 1) as like_count
+SELECT p.id, p.content, p.image_url, p.created_at, u.first_name, u.last_name, u.avatar,
+	(SELECT COUNT(*) FROM likes WHERE post_id = p.id AND reaction_type = 'like') as like_count,
+   (SELECT COUNT(*) FROM comments WHERE post_id = p.id) as comment_count
 FROM posts p
 JOIN users u ON p.user_id = u.id
-LEFT JOIN follows f ON f.follower_id = ? AND f.followed_id = p.user_id AND f.status = 'accepted'
-LEFT JOIN post_privacy pp ON p.id = pp.post_id
 WHERE LOWER(p.content) LIKE ?
   AND (
     p.user_id = ?
     OR p.privacy = 'public'
-    OR (p.privacy = 'followers' AND f.id IS NOT NULL)
-    OR (p.privacy = 'friends' AND f.id IS NOT NULL AND EXISTS (
-        SELECT 1 FROM follows f2 
-        WHERE f2.follower_id = p.user_id 
-        AND f2.followed_id = ? 
-        AND f2.status = 'accepted'
+	OR (p.privacy = 'followers' AND EXISTS (
+		SELECT 1 FROM follows f 
+		WHERE f.follower_id = ? AND f.following_id = p.user_id AND f.status = 'accepted'
+	))
+	OR (p.privacy = 'friends' AND EXISTS (
+		SELECT 1 FROM follows f1 
+		WHERE f1.follower_id = ? AND f1.following_id = p.user_id AND f1.status = 'accepted'
+	) AND EXISTS (
+		SELECT 1 FROM follows f2 
+		WHERE f2.follower_id = p.user_id AND f2.following_id = ? AND f2.status = 'accepted'
+	))
+    OR (p.privacy = 'listed' AND EXISTS (
+        SELECT 1 FROM post_privacy pp 
+        WHERE pp.post_id = p.id AND pp.user_id = ?
     ))
-    OR (p.privacy = 'listed' AND pp.user_id = ?)
   )
 ORDER BY p.created_at DESC
 LIMIT ? OFFSET ?
 `
 
-	rows, err := h.db.Query(query, userID, pattern, userID, userID, userID, limit, offset)
+	rows, err := h.db.Query(query, pattern, userID, userID, userID, userID, userID, limit, offset)
 	if err != nil {
 		return []SearchSuggestion{}
 	}
@@ -425,10 +434,10 @@ LIMIT ? OFFSET ?
 	var results []SearchSuggestion
 	for rows.Next() {
 		var id uint
-		var content, createdAt, firstName, lastName, avatar string
-		var likeCount int
+		var content, imageUrl, createdAt, firstName, lastName, avatar string
+		var likeCount, commentCount int
 
-		err := rows.Scan(&id, &content, &createdAt, &firstName, &lastName, &avatar, &likeCount)
+		err := rows.Scan(&id, &content, &imageUrl, &createdAt, &firstName, &lastName, &avatar, &likeCount, &commentCount)
 		if err != nil {
 			continue
 		}
@@ -446,12 +455,14 @@ LIMIT ? OFFSET ?
 			ID:       id,
 			Title:    displayContent,
 			Subtitle: "by " + authorName,
-			Image:    avatar,
+			Image:    avatar, // User avatar for search results
 			URL:      fmt.Sprintf("/post/%d", id),
 			Metadata: map[string]interface{}{
-				"authorName": authorName,
-				"createdAt":  createdAt,
-				"likeCount":  likeCount,
+				"authorName":   authorName,
+				"createdAt":    createdAt,
+				"likeCount":    likeCount,
+				"commentCount": commentCount,
+				"postImage":    imageUrl, // Post image if exists
 			},
 		})
 	}
@@ -535,6 +546,7 @@ func (h *SearchHandler) searchMessages(userID uint, pattern string, limit int, o
 			gm.created_at,
 			gm.sender_id,
 			gc.id as conversation_id,
+			g.id as group_id,
 			g.name as group_name,
 			u.avatar
 		FROM group_messages gm
@@ -591,7 +603,8 @@ func (h *SearchHandler) searchMessages(userID uint, pattern string, limit int, o
 			var content, createdAt, groupName, avatar string
 			var senderID uint
 			var conversationID uint
-			if err := grows.Scan(&messageID, &content, &createdAt, &senderID, &conversationID, &groupName, &avatar); err != nil {
+			var groupID uint
+			if err := grows.Scan(&messageID, &content, &createdAt, &senderID, &conversationID, &groupID, &groupName, &avatar); err != nil {
 				continue
 			}
 			displayContent := content
@@ -604,7 +617,7 @@ func (h *SearchHandler) searchMessages(userID uint, pattern string, limit int, o
 				Title:    displayContent,
 				Subtitle: "in " + groupName,
 				Image:    avatar,
-				URL:      fmt.Sprintf("/chats/all?chat=%d&message=%d", conversationID, messageID),
+				URL:      fmt.Sprintf("/chats/all?group=%d&message=%d", groupID, messageID),
 				Metadata: map[string]interface{}{
 					"conversationId": conversationID,
 					"senderId":       senderID,
@@ -655,12 +668,18 @@ func (h *SearchHandler) searchChats(userID uint, pattern string, limit int, offs
 		if c.LastMessage != nil {
 			subtitle = *c.LastMessage
 		}
+		url := fmt.Sprintf("/chats/all?chat=%d", c.ConversationID)
+		if c.Type == "group" {
+			if c.GroupID != nil {
+				url = fmt.Sprintf("/chats/all?group=%d", *c.GroupID)
+			}
+		}
 		results = append(results, SearchSuggestion{
-			Type:     "chat",
+			Type:     c.Type,
 			ID:       c.ConversationID,
 			Title:    c.Name,
 			Subtitle: subtitle,
-			URL:      fmt.Sprintf("/chats/all?chat=%d", c.ConversationID),
+			URL:      url,
 			Metadata: map[string]interface{}{
 				"chatType": c.Type,
 				"participantId": func() *uint {
@@ -719,11 +738,12 @@ func (h *SearchHandler) countEvents(userID uint, pattern string) int {
 SELECT COUNT(*)
 FROM events e
 JOIN groups g ON e.group_id = g.id
+JOIN group_members gm ON gm.group_id = g.id AND gm.user_id = ? AND gm.status = 'member'
 WHERE LOWER(e.title) LIKE ? OR LOWER(e.description) LIKE ? OR LOWER(e.location) LIKE ?
 `
 
 	var count int
-	err := h.db.QueryRow(query, pattern, pattern, pattern).Scan(&count)
+	err := h.db.QueryRow(query, userID, pattern, pattern, pattern).Scan(&count)
 	if err != nil {
 		return 0
 	}
@@ -735,25 +755,30 @@ func (h *SearchHandler) countPosts(userID uint, pattern string) int {
 SELECT COUNT(*)
 FROM posts p
 JOIN users u ON p.user_id = u.id
-LEFT JOIN follows f ON f.follower_id = ? AND f.followed_id = p.user_id AND f.status = 'accepted'
-LEFT JOIN post_privacy pp ON p.id = pp.post_id
 WHERE LOWER(p.content) LIKE ?
   AND (
     p.user_id = ?
     OR p.privacy = 'public'
-    OR (p.privacy = 'followers' AND f.id IS NOT NULL)
-    OR (p.privacy = 'friends' AND f.id IS NOT NULL AND EXISTS (
-        SELECT 1 FROM follows f2 
-        WHERE f2.follower_id = p.user_id 
-        AND f2.followed_id = ? 
-        AND f2.status = 'accepted'
+    OR (p.privacy = 'followers' AND EXISTS (
+        SELECT 1 FROM follows f 
+        WHERE f.follower_id = ? AND f.followed_id = p.user_id AND f.status = 'accepted'
     ))
-    OR (p.privacy = 'listed' AND pp.user_id = ?)
+    OR (p.privacy = 'friends' AND EXISTS (
+        SELECT 1 FROM follows f1 
+        WHERE f1.follower_id = ? AND f1.followed_id = p.user_id AND f1.status = 'accepted'
+    ) AND EXISTS (
+        SELECT 1 FROM follows f2 
+        WHERE f2.follower_id = p.user_id AND f2.followed_id = ? AND f2.status = 'accepted'
+    ))
+    OR (p.privacy = 'listed' AND EXISTS (
+        SELECT 1 FROM post_privacy pp 
+        WHERE pp.post_id = p.id AND pp.user_id = ?
+    ))
   )
 `
 
 	var count int
-	err := h.db.QueryRow(query, userID, pattern, userID, userID, userID).Scan(&count)
+	err := h.db.QueryRow(query, pattern, userID, userID, userID, userID, userID).Scan(&count)
 	if err != nil {
 		return 0
 	}

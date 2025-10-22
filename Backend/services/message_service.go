@@ -22,10 +22,9 @@ func (s *MessageService) GetDB() *sql.DB {
 }
 
 func (s *MessageService) SendPrivateMessage(message *models.Message) error {
-	// Check if users are following each other or one has public profile
 	canMessage, err := s.canUsersMessage(message.SenderID, message.ReceiverID)
 	if err != nil || !canMessage {
-		return sql.ErrNoRows // Unauthorized to message
+		return sql.ErrNoRows
 	}
 
 	query := `
@@ -35,13 +34,11 @@ func (s *MessageService) SendPrivateMessage(message *models.Message) error {
 
 	now := time.Now()
 
-	// Get or create conversation first
 	conversationID, err := s.getOrCreatePrivateConversation(message.SenderID, message.ReceiverID)
 	if err != nil {
 		return err
 	}
 
-	// Restore conversation for sender if they had deleted it
 	restoreQuery := `
 		UPDATE private_conversations
 		SET participant1_deleted = CASE WHEN participant1_id = ? THEN FALSE ELSE participant1_deleted END,
@@ -53,7 +50,6 @@ func (s *MessageService) SendPrivateMessage(message *models.Message) error {
 		return err
 	}
 
-	// Also restore conversation for receiver if they had deleted it, so new incoming message reappears
 	_, err = s.db.Exec(restoreQuery, message.ReceiverID, message.ReceiverID, conversationID)
 	if err != nil {
 		return err
@@ -75,40 +71,30 @@ func (s *MessageService) SendPrivateMessage(message *models.Message) error {
 	message.CreatedAt = now
 	message.UpdatedAt = now
 
-	// Update conversation with last message
 	err = s.updatePrivateConversationLastMessage(conversationID, uint(id))
 	if err != nil {
-		// Log error but don't fail the message send
-		fmt.Printf("Failed to update conversation: %v\n", err)
 	}
 
-	// Increment unread count for the receiver
 	err = s.incrementPrivateUnreadCount(conversationID, message.ReceiverID)
 	if err != nil {
-		// Log error but don't fail the message send
-		fmt.Printf("Failed to increment unread count: %v\n", err)
 	}
 
-	// Create notification for the receiver
 	s.createMessageNotification(message.SenderID, message.ReceiverID, message.ID)
 
 	return nil
 }
 
 func (s *MessageService) SendGroupMessage(message *models.Message) error {
-	// Check if user is a member of the group
 	isMember, err := s.isUserGroupMember(*message.GroupID, message.SenderID)
 	if err != nil || !isMember {
-		return sql.ErrNoRows // Unauthorized
+		return sql.ErrNoRows
 	}
 
-	// Check group permissions for sending messages
 	role, err := s.getUserRoleInGroup(*message.GroupID, message.SenderID)
 	if err != nil {
 		return errors.New("user is not a member of this group")
 	}
 
-	// Check if user has permission to send messages
 	canSendMessages, err := s.canUserSendMessages(*message.GroupID, role)
 	if err != nil {
 		return err
@@ -124,7 +110,6 @@ func (s *MessageService) SendGroupMessage(message *models.Message) error {
 
 	now := time.Now()
 
-	// Get or create conversation first
 	conversationID, err := s.getOrCreateGroupConversation(*message.GroupID)
 	if err != nil {
 		return err
@@ -146,30 +131,24 @@ func (s *MessageService) SendGroupMessage(message *models.Message) error {
 	message.CreatedAt = now
 	message.UpdatedAt = now
 
-	// Update conversation with last message
 	err = s.updateGroupConversationLastMessage(conversationID, uint(id))
 	if err != nil {
-		// Log error but don't fail the message send
-		fmt.Printf("Failed to update group conversation: %v\n", err)
 	}
 
 	return nil
 }
 
 func (s *MessageService) GetPrivateMessages(userID1, userID2 uint, limit, offset int) ([]models.MessageResponse, error) {
-	// Check if users can message each other
 	canMessage, err := s.canUsersMessage(userID1, userID2)
 	if err != nil || !canMessage {
 		return nil, sql.ErrNoRows
 	}
 
-	// Get conversation ID first
 	conversationID, err := s.GetPrivateConversationID(userID1, userID2)
 	if err != nil {
 		return nil, err
 	}
 
-	// Determine deletion boundary for requesting user - apply if user has deleted_at timestamp (even if restored)
 	var p1ID, p2ID uint
 	var delAt sql.NullString
 	var isDeleted bool
@@ -183,7 +162,6 @@ func (s *MessageService) GetPrivateMessages(userID1, userID2 uint, limit, offset
 		return nil, err
 	}
 
-	// Base query with optional deleted_at filter (apply if user has deleted_at, regardless of current deleted flag)
 	query := `
 	SELECT m.id, m.sender_id, m.content, m.is_read, m.created_at,
 	   u.first_name, u.last_name, u.avatar, u.nickname,
@@ -252,20 +230,16 @@ func (s *MessageService) GetPrivateMessages(userID1, userID2 uint, limit, offset
 		sender.ID = message.SenderID
 		message.Sender = sender
 		message.MessageType = "private"
-		message.UpdatedAt = message.CreatedAt // Use created_at as fallback
+		message.UpdatedAt = message.CreatedAt
 
-		// Set receiver ID based on who is not the sender
 		if message.SenderID == userID1 {
 			message.ReceiverID = userID2
-			// If current user is the sender, mark as read (sender always sees their own messages as read)
 			message.IsRead = true
 		} else {
 			message.ReceiverID = userID1
-			// If current user is the receiver, use the actual is_read status from DB
 			message.IsRead = isReadInDB
 		}
 
-		// Build shared post if exists
 		if shareID > 0 && postID > 0 {
 			var postImageURLPtr *string
 			if postImageURL != "" {
@@ -300,7 +274,6 @@ func (s *MessageService) GetPrivateMessages(userID1, userID2 uint, limit, offset
 				ShareCount:   shareCount,
 			}
 
-			// Parse created_at if valid
 			if postCreatedAt != "" {
 				if parsedTime, err := time.Parse(time.RFC3339, postCreatedAt); err == nil {
 					sharedPost.CreatedAt = parsedTime
@@ -317,13 +290,11 @@ func (s *MessageService) GetPrivateMessages(userID1, userID2 uint, limit, offset
 }
 
 func (s *MessageService) GetGroupMessages(groupID, userID uint, limit, offset int) ([]models.MessageResponse, error) {
-	// Check if user is a member of the group
 	isMember, err := s.isUserGroupMember(groupID, userID)
 	if err != nil || !isMember {
 		return nil, sql.ErrNoRows
 	}
 
-	// Get conversation ID first
 	conversationID, err := s.GetGroupConversationID(groupID)
 	if err != nil {
 		return nil, err
@@ -393,7 +364,7 @@ func (s *MessageService) GetGroupMessages(groupID, userID uint, limit, offset in
 		message.Sender = sender
 		message.MessageType = "group"
 		message.GroupID = &groupID
-		message.UpdatedAt = message.CreatedAt // Use created_at as fallback
+		message.UpdatedAt = message.CreatedAt
 
 		group := models.GroupMessageResponse{
 			ID:    groupID,
@@ -401,7 +372,6 @@ func (s *MessageService) GetGroupMessages(groupID, userID uint, limit, offset in
 		}
 		message.Group = &group
 
-		// Build shared post if exists
 		if shareID > 0 && postID > 0 {
 			var postImageURLPtr *string
 			if postImageURL != "" {
@@ -436,7 +406,6 @@ func (s *MessageService) GetGroupMessages(groupID, userID uint, limit, offset in
 				ShareCount:   shareCount,
 			}
 
-			// Parse created_at if valid
 			if postCreatedAt != "" {
 				if parsedTime, err := time.Parse(time.RFC3339, postCreatedAt); err == nil {
 					sharedPost.CreatedAt = parsedTime
@@ -453,7 +422,6 @@ func (s *MessageService) GetGroupMessages(groupID, userID uint, limit, offset in
 }
 
 func (s *MessageService) canUsersMessage(userID1, userID2 uint) (bool, error) {
-	// Check if users are following each other or one has public profile
 	query := `
 		SELECT 
 			(SELECT COUNT(*) FROM follows 
@@ -507,19 +475,16 @@ func (s *MessageService) getUserRoleInGroup(groupID, userID uint) (string, error
 }
 
 func (s *MessageService) canUserSendMessages(groupID uint, userRole string) (bool, error) {
-	// Get group permissions
 	var sendMessages string
 	err := s.db.QueryRow("SELECT send_messages FROM groups WHERE id = ?", groupID).Scan(&sendMessages)
 	if err != nil {
 		return false, err
 	}
 
-	// Check if user has permission
 	return sendMessages == "all_members" || userRole == "admin" || userRole == "creator", nil
 }
 
 func (s *MessageService) createMessageNotification(senderID, receiverID, messageID uint) error {
-	// Get sender info
 	senderQuery := `SELECT first_name, last_name FROM users WHERE id = ?`
 	var firstName, lastName string
 	err := s.db.QueryRow(senderQuery, senderID).Scan(&firstName, &lastName)
@@ -527,7 +492,6 @@ func (s *MessageService) createMessageNotification(senderID, receiverID, message
 		return err
 	}
 
-	// Create notification
 	notificationQuery := `
 		INSERT INTO notifications (user_id, actor_id, type, entity_type, entity_id, title, message, is_read, created_at, updated_at)
 		VALUES (?, ?, 'new_message', 'message', ?, 'New Message', ?, false, ?, ?)
@@ -540,10 +504,7 @@ func (s *MessageService) createMessageNotification(senderID, receiverID, message
 	return err
 }
 
-// Helper methods for conversation management
-
 func (s *MessageService) getOrCreatePrivateConversation(userID1, userID2 uint) (uint, error) {
-	// Ensure consistent ordering of participant IDs
 	var participant1ID, participant2ID uint
 	if userID1 < userID2 {
 		participant1ID = userID1
@@ -553,7 +514,6 @@ func (s *MessageService) getOrCreatePrivateConversation(userID1, userID2 uint) (
 		participant2ID = userID1
 	}
 
-	// Check if conversation already exists
 	var existingID uint
 	checkQuery := `
 		SELECT id FROM private_conversations
@@ -562,7 +522,6 @@ func (s *MessageService) getOrCreatePrivateConversation(userID1, userID2 uint) (
 	err := s.db.QueryRow(checkQuery, participant1ID, participant2ID).Scan(&existingID)
 
 	if err == sql.ErrNoRows {
-		// Create new conversation
 		insertQuery := `
 			INSERT INTO private_conversations (participant1_id, participant2_id, created_at, updated_at)
 			VALUES (?, ?, ?, ?)
@@ -577,7 +536,6 @@ func (s *MessageService) getOrCreatePrivateConversation(userID1, userID2 uint) (
 	} else if err != nil {
 		return 0, err
 	} else {
-		// Return existing conversation ID
 		return existingID, nil
 	}
 }
@@ -594,7 +552,6 @@ func (s *MessageService) updatePrivateConversationLastMessage(conversationID, me
 }
 
 func (s *MessageService) getOrCreateGroupConversation(groupID uint) (uint, error) {
-	// Check if conversation already exists
 	var existingID uint
 	checkQuery := `
 		SELECT id FROM group_conversations
@@ -603,7 +560,6 @@ func (s *MessageService) getOrCreateGroupConversation(groupID uint) (uint, error
 	err := s.db.QueryRow(checkQuery, groupID).Scan(&existingID)
 
 	if err == sql.ErrNoRows {
-		// Create new conversation
 		insertQuery := `
 			INSERT INTO group_conversations (group_id, created_at, updated_at)
 			VALUES (?, ?, ?)
@@ -618,7 +574,6 @@ func (s *MessageService) getOrCreateGroupConversation(groupID uint) (uint, error
 	} else if err != nil {
 		return 0, err
 	} else {
-		// Return existing conversation ID
 		return existingID, nil
 	}
 }
@@ -635,7 +590,6 @@ func (s *MessageService) updateGroupConversationLastMessage(conversationID, mess
 }
 
 func (s *MessageService) GetPrivateConversationID(userID1, userID2 uint) (uint, error) {
-	// Ensure consistent ordering of participant IDs
 	var participant1ID, participant2ID uint
 	if userID1 < userID2 {
 		participant1ID = userID1
@@ -665,7 +619,6 @@ func (s *MessageService) GetGroupConversationID(groupID uint) (uint, error) {
 }
 
 func (s *MessageService) GetConversationMessages(conversationID, userID uint, limit, offset int) ([]models.MessageResponse, error) {
-	// Check if it's a private conversation
 	var participant1ID, participant2ID uint
 	privateQuery := `
 		SELECT participant1_id, participant2_id FROM private_conversations
@@ -673,20 +626,18 @@ func (s *MessageService) GetConversationMessages(conversationID, userID uint, li
 	`
 	err := s.db.QueryRow(privateQuery, conversationID).Scan(&participant1ID, &participant2ID)
 	if err == nil {
-		// It's a private conversation
 		var otherUserID uint
 		if participant1ID == userID {
 			otherUserID = participant2ID
 		} else if participant2ID == userID {
 			otherUserID = participant1ID
 		} else {
-			return nil, sql.ErrNoRows // Not a participant
+			return nil, sql.ErrNoRows
 		}
 
 		return s.GetPrivateMessages(userID, otherUserID, limit, offset)
 	}
 
-	// Check if it's a group conversation
 	var groupID uint
 	groupQuery := `
 		SELECT group_id FROM group_conversations
@@ -694,11 +645,9 @@ func (s *MessageService) GetConversationMessages(conversationID, userID uint, li
 	`
 	err = s.db.QueryRow(groupQuery, conversationID).Scan(&groupID)
 	if err == nil {
-		// It's a group conversation
 		return s.GetGroupMessages(groupID, userID, limit, offset)
 	}
 
-	// Conversation not found
 	return nil, sql.ErrNoRows
 }
 
@@ -707,7 +656,6 @@ func (s *MessageService) MarkMessagesAsRead(messageIDs []uint, userID uint) erro
 		return nil
 	}
 
-	// Only mark messages as read where the current user is the RECEIVER (not the sender)
 	query := `
 		UPDATE private_messages 
 		SET is_read = TRUE 
@@ -719,15 +667,13 @@ func (s *MessageService) MarkMessagesAsRead(messageIDs []uint, userID uint) erro
 		)
 	`
 
-	// Convert uint slice to interface slice for the query
 	ids := make([]interface{}, len(messageIDs))
 	for i, id := range messageIDs {
 		ids[i] = id
 	}
 
-	// Build the IN clause
 	inClause := strings.Repeat("?,", len(messageIDs))
-	inClause = inClause[:len(inClause)-1] // Remove trailing comma
+	inClause = inClause[:len(inClause)-1]
 
 	fullQuery := strings.Replace(query, "?", inClause, 1)
 
@@ -740,11 +686,9 @@ func (s *MessageService) MarkMessagesAsRead(messageIDs []uint, userID uint) erro
 
 	rowsAffected, _ := result.RowsAffected()
 	if rowsAffected > 0 {
-		// Decrement unread count for the user
 		s.decrementPrivateUnreadCountByMessages(messageIDs, userID)
 	}
 
-	// Also mark group messages as read
 	groupQuery := `
 		UPDATE group_messages 
 		SET is_read = TRUE 
@@ -771,7 +715,6 @@ func (s *MessageService) MarkMessagesAsUnread(messageIDs []uint, userID uint) er
 		return nil
 	}
 
-	// Only mark messages as unread where the current user is the RECEIVER (not the sender)
 	query := `
 		UPDATE private_messages 
 		SET is_read = FALSE 
@@ -783,15 +726,13 @@ func (s *MessageService) MarkMessagesAsUnread(messageIDs []uint, userID uint) er
 		)
 	`
 
-	// Convert uint slice to interface slice for the query
 	ids := make([]interface{}, len(messageIDs))
 	for i, id := range messageIDs {
 		ids[i] = id
 	}
 
-	// Build the IN clause
 	inClause := strings.Repeat("?,", len(messageIDs))
-	inClause = inClause[:len(inClause)-1] // Remove trailing comma
+	inClause = inClause[:len(inClause)-1]
 
 	fullQuery := strings.Replace(query, "?", inClause, 1)
 
@@ -804,11 +745,9 @@ func (s *MessageService) MarkMessagesAsUnread(messageIDs []uint, userID uint) er
 
 	rowsAffected, _ := result.RowsAffected()
 	if rowsAffected > 0 {
-		// Increment unread count for the user
 		s.incrementPrivateUnreadCountByMessages(messageIDs, userID)
 	}
 
-	// Also mark group messages as unread
 	groupQuery := `
 		UPDATE group_messages 
 		SET is_read = FALSE 
@@ -835,7 +774,6 @@ func (s *MessageService) incrementPrivateUnreadCountByMessages(messageIDs []uint
 		return nil
 	}
 
-	// Get conversation IDs for the affected messages where user is receiver
 	query := `
 		SELECT DISTINCT conversation_id 
 		FROM private_messages 
@@ -847,13 +785,11 @@ func (s *MessageService) incrementPrivateUnreadCountByMessages(messageIDs []uint
 		)
 	`
 
-	// Build the IN clause
 	inClause := strings.Repeat("?,", len(messageIDs))
-	inClause = inClause[:len(inClause)-1] // Remove trailing comma
+	inClause = inClause[:len(inClause)-1]
 
 	fullQuery := strings.Replace(query, "?", inClause, 1)
 
-	// Convert uint slice to interface slice
 	ids := make([]interface{}, len(messageIDs))
 	for i, id := range messageIDs {
 		ids[i] = id
@@ -876,7 +812,6 @@ func (s *MessageService) incrementPrivateUnreadCountByMessages(messageIDs []uint
 		conversationIDs = append(conversationIDs, convID)
 	}
 
-	// Increment unread count for each conversation
 	for _, convID := range conversationIDs {
 		err = s.incrementPrivateUnreadCount(convID, userID)
 		if err != nil {
@@ -905,8 +840,6 @@ func (s *MessageService) decrementPrivateUnreadCountByMessages(messageIDs []uint
 		return nil
 	}
 
-	// Count how many messages were marked as read for this user
-	// Only count messages where the user is the RECEIVER (not the sender)
 	countQuery := `
 		SELECT COUNT(*) FROM private_messages 
 		WHERE id IN (?) 
@@ -917,15 +850,13 @@ func (s *MessageService) decrementPrivateUnreadCountByMessages(messageIDs []uint
 		)
 	`
 
-	// Convert uint slice to interface slice for the query
 	ids := make([]interface{}, len(messageIDs))
 	for i, id := range messageIDs {
 		ids[i] = id
 	}
 
-	// Build the IN clause
 	inClause := strings.Repeat("?,", len(messageIDs))
-	inClause = inClause[:len(inClause)-1] // Remove trailing comma
+	inClause = inClause[:len(inClause)-1]
 
 	fullCountQuery := strings.Replace(countQuery, "?", inClause, 1)
 	countArgs := append(ids, userID, userID, userID)
@@ -937,10 +868,9 @@ func (s *MessageService) decrementPrivateUnreadCountByMessages(messageIDs []uint
 	}
 
 	if count == 0 {
-		return nil // No messages to decrement
+		return nil
 	}
 
-	// Decrement the unread count
 	updateQuery := `
 		UPDATE private_conversations
 		SET unread_count1 = CASE WHEN participant1_id = ? THEN GREATEST(unread_count1 - ?, 0) ELSE unread_count1 END,
@@ -953,10 +883,8 @@ func (s *MessageService) decrementPrivateUnreadCountByMessages(messageIDs []uint
 	return err
 }
 
-// MarkConversationAsRead marks all messages in a conversation as read for the user
 func (s *MessageService) MarkConversationAsRead(conversationID uint, userID uint, conversationType string) error {
 	if conversationType == "group" {
-		// Mark all group messages as read where user is not the sender
 		query := `
 			UPDATE group_messages 
 			SET is_read = TRUE 
@@ -967,7 +895,6 @@ func (s *MessageService) MarkConversationAsRead(conversationID uint, userID uint
 		_, err := s.db.Exec(query, conversationID, userID)
 		return err
 	} else {
-		// Mark all private messages as read where user is not the sender
 		query := `
 			UPDATE private_messages 
 			SET is_read = TRUE 
@@ -980,13 +907,8 @@ func (s *MessageService) MarkConversationAsRead(conversationID uint, userID uint
 	}
 }
 
-// MarkConversationAsUnread marks a conversation as having unread status
-// This doesn't change individual message read status, but adds an unread indicator
 func (s *MessageService) MarkConversationAsUnread(conversationID uint, userID uint, conversationType string) error {
-	// For unread status, we'll use a separate table or field to track conversation-level unread status
-	// For now, let's mark the latest message the user received as unread
 	if conversationType == "group" {
-		// Find the latest message in the group that wasn't sent by the user
 		query := `
 			UPDATE group_messages 
 			SET is_read = FALSE 
@@ -1002,7 +924,6 @@ func (s *MessageService) MarkConversationAsUnread(conversationID uint, userID ui
 		_, err := s.db.Exec(query, conversationID, userID, conversationID, userID)
 		return err
 	} else {
-		// Find the latest message in the private conversation that wasn't sent by the user
 		query := `
 			UPDATE private_messages 
 			SET is_read = FALSE 
@@ -1020,16 +941,12 @@ func (s *MessageService) MarkConversationAsUnread(conversationID uint, userID ui
 	}
 }
 
-// SearchMessages searches for messages containing the query text
-// Returns conversations that have messages matching the search
 func (s *MessageService) SearchMessages(userID uint, query string, limit, offset int) ([]models.ConversationSearchResult, error) {
 	if strings.TrimSpace(query) == "" {
 		return []models.ConversationSearchResult{}, nil
 	}
 
 	searchPattern := "%" + strings.ToLower(query) + "%"
-	fmt.Printf("SearchMessages called with userID=%d, query='%s', limit=%d, offset=%d\n", userID, query, limit, offset)
-	fmt.Printf("Search pattern: '%s'\n", searchPattern)
 
 	// Search in private messages - simplified query
 	privateQuery := `
@@ -1091,21 +1008,17 @@ func (s *MessageService) SearchMessages(userID uint, query string, limit, offset
 			}
 		}
 		// Fallback to now to avoid failing the whole search on parse issues
-		fmt.Printf("SearchMessages: failed to parse time '%s', defaulting to now\n", s)
 		return time.Now()
 	}
 
 	// Search private messages
-	fmt.Printf("Executing private query...\n")
 	privateRows, err := s.db.Query(privateQuery,
 		userID, userID, userID, userID, searchPattern, limit, offset)
 	if err != nil {
 		// Non-fatal: continue with group messages
-		fmt.Printf("Private query error (non-fatal): %v\n", err)
 	} else {
 		defer privateRows.Close()
 
-		fmt.Printf("Processing private results...\n")
 		for privateRows.Next() {
 			var result models.ConversationSearchResult
 			var participantID uint
@@ -1126,7 +1039,6 @@ func (s *MessageService) SearchMessages(userID uint, query string, limit, offset
 			)
 			if err != nil {
 				// Non-fatal scan issue: skip this row and continue
-				fmt.Printf("Private scan error (skipping row): %v\n", err)
 				continue
 			}
 
@@ -1143,20 +1055,16 @@ func (s *MessageService) SearchMessages(userID uint, query string, limit, offset
 			}
 
 			results = append(results, result)
-			fmt.Printf("Added private result: %+v\n", result)
 		}
 	}
 
 	// Search group messages
-	fmt.Printf("Executing group query...\n")
 	groupRows, err := s.db.Query(groupQuery, userID, searchPattern, limit, offset)
 	if err != nil {
 		// Non-fatal: return whatever private results we have
-		fmt.Printf("Group query error (non-fatal): %v\n", err)
 	} else {
 		defer groupRows.Close()
 
-		fmt.Printf("Processing group results...\n")
 		for groupRows.Next() {
 			var result models.ConversationSearchResult
 			var groupID uint
@@ -1179,7 +1087,6 @@ func (s *MessageService) SearchMessages(userID uint, query string, limit, offset
 			)
 			if err != nil {
 				// Non-fatal scan issue: skip this row and continue
-				fmt.Printf("Group scan error (skipping row): %v\n", err)
 				continue
 			}
 
@@ -1204,10 +1111,8 @@ func (s *MessageService) SearchMessages(userID uint, query string, limit, offset
 			}
 
 			results = append(results, result)
-			fmt.Printf("Added group result: %+v\n", result)
 		}
 	}
 
-	fmt.Printf("SearchMessages returning %d results\n", len(results))
 	return results, nil
 }

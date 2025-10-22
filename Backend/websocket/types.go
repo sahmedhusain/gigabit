@@ -7,7 +7,6 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-// Message types constants
 const (
 	MessageTypePrivateMessage      = "private_message"
 	MessageTypeGroupMessage        = "group_message"
@@ -24,6 +23,7 @@ const (
 	MessageTypeUnfollow            = "unfollow"
 	MessageTypeFollowRequest       = "follow_request"
 	MessageTypeCancelFollowRequest = "cancel_follow_request"
+	MessageTypeFollowStatus        = "follow_status"
 	MessageTypeFollowerCountUpdate = "follower_count_update"
 	MessageTypeGroupUpdate         = "group_update"
 	MessageTypeEventUpdate         = "event_update"
@@ -37,7 +37,6 @@ const (
 	MessageTypePollVoteUpdate      = "poll_vote_update"
 )
 
-// Message represents a websocket message
 type Message struct {
 	Type      string      `json:"type"`
 	From      uint        `json:"from"`
@@ -52,7 +51,6 @@ type Message struct {
 	Timestamp int64       `json:"timestamp"`
 }
 
-// Client represents a websocket client
 type Client struct {
 	ID        uint
 	Hub       *Hub
@@ -61,6 +59,6 @@ type Client struct {
 	Groups    map[uint]bool
 	Following map[uint]bool
 	LastPing  time.Time
-	Closed    bool // Flag to track if the client's send channel is closed
+	Closed    bool
 	mu        sync.RWMutex
 }

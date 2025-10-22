@@ -30,6 +30,7 @@ export interface User {
   avatar: string;
   nickname: string;
   about_me: string;
+  gender: string;
   is_private: boolean;
   status: string;
   last_status_change: string;
@@ -227,6 +228,7 @@ export interface Chat {
   unread: number;
   isOnline: boolean;
   isGroup: boolean;
+  type: 'private' | 'group';
   participantId?: number;
   participantAvatar?: string; // Add participant avatar
   groupId?: number; // Add group ID for group chats
@@ -621,7 +623,17 @@ export class ApiClient {
   }
 
   private delay(ms: number): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, ms));
+    return new Promise(resolve => setTimeout(resolve, ms))
+  }
+
+  private formatTimeAgo(date: Date): string {
+    const now = new Date()
+    const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000)
+    if (diffInSeconds < 60) return 'Just now'
+    if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m ago`
+    if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h ago`
+    if (diffInSeconds < 604800) return `${Math.floor(diffInSeconds / 86400)}d ago`
+    return date.toLocaleDateString()
   }
 
   // Health check with timeout
@@ -1213,7 +1225,7 @@ export class ApiClient {
     });
   }
 
-  async respondToFollowRequest(userId: number, action: 'accept' | 'decline'): Promise<{ message: string; status: string }> {
+  async respondToFollowRequest(userId: number, action: 'accept' | 'decline' | 'remove'): Promise<{ message: string; status: string }> {
     return this.request<{ message: string; status: string }>(`/api/users/${userId}/follow`, {
       method: 'PUT',
       body: JSON.stringify({ action }),
@@ -1226,8 +1238,20 @@ export class ApiClient {
     });
   }
 
+  async getOutgoingFollowRequests(): Promise<{ requests: FollowRequestItem[]; count: number }> {
+    return this.request<{ requests: FollowRequestItem[]; count: number }>(`/api/follow/requests/outgoing`, {
+      method: 'GET',
+    });
+  }
+
   async getGroupInvitations(): Promise<{ invitations: GroupInvitationItem[]; count: number }> {
     return this.request<{ invitations: GroupInvitationItem[]; count: number }>(`/api/groups/invitations`, {
+      method: 'GET',
+    });
+  }
+
+  async getOutgoingGroupJoinRequests(): Promise<{ requests: GroupInvitationItem[]; count: number }> {
+    return this.request<{ requests: GroupInvitationItem[]; count: number }>(`/api/groups/join-requests/outgoing`, {
       method: 'GET',
     });
   }
@@ -1245,9 +1269,40 @@ export class ApiClient {
   }
 
   async getUserPosts(userId: number, limit: number = 20, offset: number = 0): Promise<{ posts: Post[], count: number, limit: number, offset: number }> {
-    return this.request<{ posts: Post[], count: number, limit: number, offset: number }>(`/api/posts/user/${userId}?limit=${limit}&offset=${offset}`, {
+    const response = await this.request<{ posts: PostResponse[], count: number, limit: number, offset: number }>(`/api/posts/user/${userId}?limit=${limit}&offset=${offset}`, {
       method: 'GET',
     });
+
+    // Ensure posts is an array
+    const posts = response.posts || [];
+
+    // Transform PostResponse[] to Post[]
+    const transformedPosts: Post[] = posts.map(postResponse => ({
+      id: postResponse.id,
+      user: {
+        id: postResponse.user.id,
+        name: `${postResponse.user.first_name} ${postResponse.user.last_name}`,
+        username: postResponse.user.nickname || postResponse.user.email.split('@')[0],
+        avatar: postResponse.user.avatar,
+      },
+      content: postResponse.content,
+      image: postResponse.image_url,
+      likes: postResponse.like_count,
+      comments: postResponse.comment_count,
+      shares: postResponse.share_count,
+      timeAgo: this.formatTimeAgo(new Date(postResponse.created_at)),
+      privacy: postResponse.privacy,
+      isLiked: Boolean(postResponse.is_liked),
+      isBookmarked: Boolean(postResponse.is_bookmarked),
+      created_at: postResponse.created_at,
+    }));
+
+    return {
+      posts: transformedPosts,
+      count: response.count || 0,
+      limit: response.limit || limit,
+      offset: response.offset || offset,
+    };
   }
 
   async getUserLikedPosts(limit: number = 20, offset: number = 0): Promise<{ posts: PostResponse[], count: number, limit: number, offset: number }> {
@@ -1266,6 +1321,25 @@ export class ApiClient {
     return this.request<User>('/api/users/status', {
       method: 'PUT',
       body: JSON.stringify({ status }),
+    });
+  }
+  async updateProfile(data: { first_name?: string; last_name?: string; email?: string; nickname?: string; date_of_birth?: string; bio?: string; avatar_url?: string; gender?: string }): Promise<User> {
+    return this.request<User>('/api/profile', {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  // Validation endpoints for uniqueness checks
+  async checkEmailUniqueness(email: string): Promise<{ available: boolean; message?: string }> {
+    return this.request<{ available: boolean; message?: string }>(`/api/validation/email?email=${encodeURIComponent(email)}`, {
+      method: 'GET',
+    });
+  }
+
+  async checkNicknameUniqueness(nickname: string): Promise<{ available: boolean; message?: string }> {
+    return this.request<{ available: boolean; message?: string }>(`/api/validation/nickname?nickname=${encodeURIComponent(nickname)}`, {
+      method: 'GET',
     });
   }
 
@@ -1400,6 +1474,18 @@ export class ApiClient {
 
   async deleteGroup(groupId: number): Promise<{ message: string }> {
     return this.request<{ message: string }>(`/api/groups/${groupId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async getFollowStatus(userId: number): Promise<{ is_following: boolean; is_pending: boolean; is_followed_by: boolean; status: string }> {
+    return this.request<{ is_following: boolean; is_pending: boolean; is_followed_by: boolean; status: string }>(`/api/users/${userId}/follow-status`, {
+      method: 'GET',
+    });
+  }
+
+  async cancelInvitation(groupId: number, invitationId: number): Promise<{ message: string }> {
+    return this.request<{ message: string }>(`/api/groups/${groupId}/cancel-invitation/${invitationId}`, {
       method: 'DELETE',
     });
   }

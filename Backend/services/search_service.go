@@ -15,21 +15,20 @@ type SearchService struct {
 
 // SearchSuggestion represents a generic search result
 type SearchSuggestion struct {
-	Type        string      `json:"type"`        // "user", "event", "group", "post", "tag", "message"
-	ID          interface{} `json:"id"`          // Can be string or int
-	Title       string      `json:"title"`       // Main display text
-	Subtitle    string      `json:"subtitle"`    // Secondary info
-	Image       string      `json:"image"`       // Avatar/image URL
-	Description string      `json:"description"` // Additional context
-	URL         string      `json:"url"`         // Frontend route
-	Metadata    interface{} `json:"metadata"`    // Type-specific data
+	Type        string      `json:"type"`
+	ID          interface{} `json:"id"`
+	Title       string      `json:"title"`
+	Subtitle    string      `json:"subtitle"`
+	Image       string      `json:"image"`
+	Description string      `json:"description"`
+	URL         string      `json:"url"`
+	Metadata    interface{} `json:"metadata"`
 }
 
 func NewSearchService(db *sql.DB) *SearchService {
 	return &SearchService{db: db}
 }
 
-// SearchSuggestions performs a quick search across all categories for real-time suggestions
 func (s *SearchService) SearchSuggestions(userID uint, query string) ([]SearchSuggestion, error) {
 	if len(query) < 2 {
 		return []SearchSuggestion{}, nil
@@ -178,9 +177,9 @@ func (s *SearchService) searchGroups(userID uint, pattern string, limit int) []S
 		url := fmt.Sprintf("/group/%d", id)
 		if isMember {
 			if conversationID.Valid {
-				url = fmt.Sprintf("/chats/all?chat=%d", conversationID.Int64)
+				url = fmt.Sprintf("/chats/all?group=%d", id)
 			} else {
-				url = fmt.Sprintf("/chats/all?chat=%d", id)
+				url = fmt.Sprintf("/chats/all?group=%d", id)
 			}
 		}
 
@@ -232,16 +231,17 @@ func (s *SearchService) searchGroups(userID uint, pattern string, limit int) []S
 
 func (s *SearchService) searchEvents(userID uint, pattern string, limit int) []SearchSuggestion {
 	query := `
-		SELECT e.id, e.title, e.description, e.event_time, e.location, g.name as group_name,
+		SELECT e.id, e.title, e.description, e.event_date, e.location, g.name as group_name, g.id as group_id,
 			   (SELECT COUNT(*) FROM event_responses WHERE event_id = e.id AND response = 'going') as going_count
 		FROM events e
 		JOIN groups g ON e.group_id = g.id
+		JOIN group_members gm ON gm.group_id = g.id AND gm.user_id = ? AND gm.status = 'member'
 		WHERE LOWER(e.title) LIKE ? OR LOWER(e.description) LIKE ? OR LOWER(e.location) LIKE ?
-		ORDER BY e.event_time ASC
+		ORDER BY e.event_date ASC
 		LIMIT ?
 	`
 
-	rows, err := s.db.Query(query, pattern, pattern, pattern, limit)
+	rows, err := s.db.Query(query, userID, pattern, pattern, pattern, limit)
 	if err != nil {
 		return []SearchSuggestion{}
 	}
@@ -250,10 +250,11 @@ func (s *SearchService) searchEvents(userID uint, pattern string, limit int) []S
 	var results []SearchSuggestion
 	for rows.Next() {
 		var id uint
-		var title, description, eventTime, location, groupName string
+		var title, description, eventDate, location, groupName string
+		var groupID uint
 		var goingCount int
 
-		err := rows.Scan(&id, &title, &description, &eventTime, &location, &groupName, &goingCount)
+		err := rows.Scan(&id, &title, &description, &eventDate, &location, &groupName, &groupID, &goingCount)
 		if err != nil {
 			continue
 		}
@@ -268,9 +269,10 @@ func (s *SearchService) searchEvents(userID uint, pattern string, limit int) []S
 			Description: description,
 			URL:         fmt.Sprintf("/events/all#event-%d", id),
 			Metadata: map[string]interface{}{
-				"eventTime":  eventTime,
+				"eventDate":  eventDate,
 				"location":   location,
 				"groupName":  groupName,
+				"group_id":   groupID,
 				"goingCount": goingCount,
 			},
 		})
@@ -281,16 +283,36 @@ func (s *SearchService) searchEvents(userID uint, pattern string, limit int) []S
 
 func (s *SearchService) searchPosts(userID uint, pattern string, limit int) []SearchSuggestion {
 	query := `
-SELECT p.id, p.content, p.created_at, u.first_name, u.last_name, u.avatar,
-   (SELECT COUNT(*) FROM likes WHERE post_id = p.id AND is_like = 1) as like_count
+SELECT p.id, p.content, p.image_url, p.created_at, u.first_name, u.last_name, u.avatar,
+	(SELECT COUNT(*) FROM likes WHERE post_id = p.id AND reaction_type = 'like') as like_count,
+   (SELECT COUNT(*) FROM comments WHERE post_id = p.id) as comment_count
 FROM posts p
 JOIN users u ON p.user_id = u.id
 WHERE LOWER(p.content) LIKE ?
+  AND (
+    p.user_id = ?
+    OR p.privacy = 'public'
+	OR (p.privacy = 'followers' AND EXISTS (
+		SELECT 1 FROM follows f 
+		WHERE f.follower_id = ? AND f.following_id = p.user_id AND f.status = 'accepted'
+	))
+	OR (p.privacy = 'friends' AND EXISTS (
+		SELECT 1 FROM follows f1 
+		WHERE f1.follower_id = ? AND f1.following_id = p.user_id AND f1.status = 'accepted'
+	) AND EXISTS (
+		SELECT 1 FROM follows f2 
+		WHERE f2.follower_id = p.user_id AND f2.following_id = ? AND f2.status = 'accepted'
+	))
+    OR (p.privacy = 'listed' AND EXISTS (
+        SELECT 1 FROM post_privacy pp 
+        WHERE pp.post_id = p.id AND pp.user_id = ?
+    ))
+  )
 ORDER BY p.created_at DESC
 LIMIT ?
 `
 
-	rows, err := s.db.Query(query, pattern, limit)
+	rows, err := s.db.Query(query, pattern, userID, userID, userID, userID, userID, limit)
 	if err != nil {
 		return []SearchSuggestion{}
 	}
@@ -299,10 +321,10 @@ LIMIT ?
 	var results []SearchSuggestion
 	for rows.Next() {
 		var id uint
-		var content, createdAt, firstName, lastName, avatar string
-		var likeCount int
+		var content, imageUrl, createdAt, firstName, lastName, avatar string
+		var likeCount, commentCount int
 
-		err := rows.Scan(&id, &content, &createdAt, &firstName, &lastName, &avatar, &likeCount)
+		err := rows.Scan(&id, &content, &imageUrl, &createdAt, &firstName, &lastName, &avatar, &likeCount, &commentCount)
 		if err != nil {
 			continue
 		}
@@ -320,12 +342,14 @@ LIMIT ?
 			ID:       id,
 			Title:    displayContent,
 			Subtitle: "by " + authorName,
-			Image:    avatar,
+			Image:    avatar, // User avatar for search results
 			URL:      fmt.Sprintf("/post/%d", id),
 			Metadata: map[string]interface{}{
-				"authorName": authorName,
-				"createdAt":  createdAt,
-				"likeCount":  likeCount,
+				"authorName":   authorName,
+				"createdAt":    createdAt,
+				"likeCount":    likeCount,
+				"commentCount": commentCount,
+				"postImage":    imageUrl, // Post image if exists
 			},
 		})
 	}
@@ -361,12 +385,18 @@ func (s *SearchService) searchChats(userID uint, pattern string, limit int) []Se
 		if c.LastMessage != nil {
 			subtitle = *c.LastMessage
 		}
+		url := fmt.Sprintf("/chats/all?chat=%d", c.ConversationID)
+		if c.Type == "group" {
+			if c.GroupID != nil {
+				url = fmt.Sprintf("/chats/all?group=%d", *c.GroupID)
+			}
+		}
 		results = append(results, SearchSuggestion{
 			Type:     "chat",
 			ID:       c.ConversationID,
 			Title:    c.Name,
 			Subtitle: subtitle,
-			URL:      fmt.Sprintf("/chats/all?chat=%d", c.ConversationID),
+			URL:      url,
 			Metadata: map[string]interface{}{
 				"chatType": c.Type,
 				"participantId": func() *uint {

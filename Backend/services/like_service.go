@@ -19,7 +19,6 @@ func NewLikeService(db *sql.DB, hub *websocket.Hub) *LikeService {
 }
 
 func (s *LikeService) LikePost(postID, userID uint) error {
-	// First check if this is a group post
 	var isGroupPost bool
 	err := s.db.QueryRow("SELECT COUNT(*) > 0 FROM group_posts WHERE id = ?", postID).Scan(&isGroupPost)
 	if err != nil {
@@ -27,7 +26,6 @@ func (s *LikeService) LikePost(postID, userID uint) error {
 	}
 
 	if isGroupPost {
-		// Check if user already liked the group post
 		var count int
 		err := s.db.QueryRow("SELECT COUNT(*) FROM likes WHERE entity_type = 'group_post' AND entity_id = ? AND user_id = ?", postID, userID).Scan(&count)
 		if err != nil {
@@ -35,15 +33,13 @@ func (s *LikeService) LikePost(postID, userID uint) error {
 		}
 
 		if count > 0 {
-			return nil // Already liked
+			return nil
 		}
 
-		// Add like for group post
 		query := `INSERT INTO likes (entity_type, entity_id, user_id, created_at) VALUES ('group_post', ?, ?, ?)`
 		_, err = s.db.Exec(query, postID, userID, time.Now())
 
 		if err == nil && s.hub != nil {
-			// Broadcast real-time like update
 			likeData := map[string]interface{}{
 				"post_id": postID,
 				"user_id": userID,
@@ -55,8 +51,6 @@ func (s *LikeService) LikePost(postID, userID uint) error {
 		return err
 	}
 
-	// Regular post handling
-	// Check if user already liked the post
 	var count int
 	err = s.db.QueryRow("SELECT COUNT(*) FROM likes WHERE post_id = ? AND user_id = ?", postID, userID).Scan(&count)
 	if err != nil {
@@ -64,15 +58,13 @@ func (s *LikeService) LikePost(postID, userID uint) error {
 	}
 
 	if count > 0 {
-		return nil // Already liked
+		return nil
 	}
 
-	// Add like
 	query := `INSERT INTO likes (post_id, user_id, created_at) VALUES (?, ?, ?)`
 	_, err = s.db.Exec(query, postID, userID, time.Now())
 
 	if err == nil && s.hub != nil {
-		// Broadcast real-time like update
 		likeData := map[string]interface{}{
 			"post_id": postID,
 			"user_id": userID,
@@ -84,7 +76,6 @@ func (s *LikeService) LikePost(postID, userID uint) error {
 }
 
 func (s *LikeService) UnlikePost(postID, userID uint) error {
-	// First check if this is a group post
 	var isGroupPost bool
 	err := s.db.QueryRow("SELECT COUNT(*) > 0 FROM group_posts WHERE id = ?", postID).Scan(&isGroupPost)
 	if err != nil {
@@ -101,7 +92,6 @@ func (s *LikeService) UnlikePost(postID, userID uint) error {
 	_, err = s.db.Exec(query, postID, userID)
 
 	if err == nil && s.hub != nil {
-		// Broadcast real-time unlike update
 		likeData := map[string]interface{}{
 			"post_id": postID,
 			"user_id": userID,
@@ -116,7 +106,6 @@ func (s *LikeService) UnlikePost(postID, userID uint) error {
 }
 
 func (s *LikeService) IsPostLikedByUser(postID, userID uint) (bool, error) {
-	// First check if this is a group post
 	var isGroupPost bool
 	err := s.db.QueryRow("SELECT COUNT(*) > 0 FROM group_posts WHERE id = ?", postID).Scan(&isGroupPost)
 	if err != nil {
@@ -137,7 +126,6 @@ func (s *LikeService) IsPostLikedByUser(postID, userID uint) (bool, error) {
 }
 
 func (s *LikeService) GetPostLikeCount(postID uint) (int64, error) {
-	// First check if this is a group post
 	var isGroupPost bool
 	err := s.db.QueryRow("SELECT COUNT(*) > 0 FROM group_posts WHERE id = ?", postID).Scan(&isGroupPost)
 	if err != nil {
@@ -154,9 +142,7 @@ func (s *LikeService) GetPostLikeCount(postID uint) (int64, error) {
 	return count, err
 }
 
-// DislikePost adds a dislike to a post (removes any existing like first)
 func (s *LikeService) DislikePost(postID, userID uint) error {
-	// First check if this is a group post
 	var isGroupPost bool
 	err := s.db.QueryRow("SELECT COUNT(*) > 0 FROM group_posts WHERE id = ?", postID).Scan(&isGroupPost)
 	if err != nil {
@@ -164,18 +150,15 @@ func (s *LikeService) DislikePost(postID, userID uint) error {
 	}
 
 	if isGroupPost {
-		// Remove any existing like or dislike first
 		_, err = s.db.Exec("DELETE FROM likes WHERE entity_type = 'group_post' AND entity_id = ? AND user_id = ?", postID, userID)
 		if err != nil {
 			return err
 		}
 
-		// Add dislike for group post
 		query := `INSERT INTO likes (entity_type, entity_id, user_id, reaction_type, created_at) VALUES ('group_post', ?, ?, 'dislike', ?)`
 		_, err = s.db.Exec(query, postID, userID, time.Now())
 
 		if err == nil && s.hub != nil {
-			// Broadcast real-time dislike update
 			dislikeData := map[string]interface{}{
 				"post_id": postID,
 				"user_id": userID,
@@ -187,19 +170,15 @@ func (s *LikeService) DislikePost(postID, userID uint) error {
 		return err
 	}
 
-	// Regular post handling
-	// Remove any existing like or dislike first
 	_, err = s.db.Exec("DELETE FROM likes WHERE post_id = ? AND user_id = ?", postID, userID)
 	if err != nil {
 		return err
 	}
 
-	// Add dislike
 	query := `INSERT INTO likes (post_id, user_id, reaction_type, created_at) VALUES (?, ?, 'dislike', ?)`
 	_, err = s.db.Exec(query, postID, userID, time.Now())
 
 	if err == nil && s.hub != nil {
-		// Broadcast real-time dislike update
 		dislikeData := map[string]interface{}{
 			"post_id": postID,
 			"user_id": userID,
@@ -210,9 +189,7 @@ func (s *LikeService) DislikePost(postID, userID uint) error {
 	return err
 }
 
-// UndislikePost removes a dislike from a post
 func (s *LikeService) UndislikePost(postID, userID uint) error {
-	// First check if this is a group post
 	var isGroupPost bool
 	err := s.db.QueryRow("SELECT COUNT(*) > 0 FROM group_posts WHERE id = ?", postID).Scan(&isGroupPost)
 	if err != nil {
@@ -229,7 +206,6 @@ func (s *LikeService) UndislikePost(postID, userID uint) error {
 	_, err = s.db.Exec(query, postID, userID)
 
 	if err == nil && s.hub != nil {
-		// Broadcast real-time undislike update
 		dislikeData := map[string]interface{}{
 			"post_id": postID,
 			"user_id": userID,

@@ -174,6 +174,38 @@ func (s *FollowService) GetPendingFollowRequests(userID uint) ([]models.FollowRe
 	return requests, nil
 }
 
+func (s *FollowService) GetOutgoingFollowRequests(userID uint) ([]models.FollowRequestResponse, error) {
+	query := `
+		SELECT f.id, u.id, u.first_name, u.last_name, u.avatar, u.nickname, f.created_at
+		FROM follows f
+		JOIN users u ON f.following_id = u.id
+		WHERE f.follower_id = ? AND f.status = 'pending'
+		ORDER BY f.created_at DESC
+	`
+
+	rows, err := s.db.Query(query, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var requests []models.FollowRequestResponse
+	for rows.Next() {
+		var request models.FollowRequestResponse
+		err := rows.Scan(
+			&request.RequestID, &request.User.ID, &request.User.FirstName,
+			&request.User.LastName, &request.User.Avatar, &request.User.Nickname,
+			&request.RequestedAt,
+		)
+		if err != nil {
+			return nil, err
+		}
+		requests = append(requests, request)
+	}
+
+	return requests, nil
+}
+
 func (s *FollowService) GetFollowStatus(followerID, followingID uint) (string, error) {
 	query := `
 		SELECT status FROM follows 
@@ -193,14 +225,12 @@ func (s *FollowService) GetFollowStatus(followerID, followingID uint) (string, e
 }
 
 func (s *FollowService) GetFollowCounts(userID uint) (followers, following int, err error) {
-	// Get followers count
 	followersQuery := `SELECT COUNT(*) FROM follows WHERE following_id = ? AND status = 'accepted'`
 	err = s.db.QueryRow(followersQuery, userID).Scan(&followers)
 	if err != nil {
 		return 0, 0, err
 	}
 
-	// Get following count
 	followingQuery := `SELECT COUNT(*) FROM follows WHERE follower_id = ? AND status = 'accepted'`
 	err = s.db.QueryRow(followingQuery, userID).Scan(&following)
 	if err != nil {

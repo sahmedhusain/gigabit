@@ -22,9 +22,7 @@ func NewPollService(db *sql.DB, hub *websocket.Hub) *PollService {
 	}
 }
 
-// CreatePoll creates a new poll with options
 func (s *PollService) CreatePoll(userID uint, req *models.CreatePollRequest) (*models.PollResponse, error) {
-	// Validate options
 	if len(req.Options) < 2 {
 		return nil, errors.New("poll must have at least 2 options")
 	}
@@ -32,15 +30,12 @@ func (s *PollService) CreatePoll(userID uint, req *models.CreatePollRequest) (*m
 		return nil, errors.New("poll cannot have more than 10 options")
 	}
 
-	// Check group permissions if this is a group poll
 	if req.GroupID != nil {
-		// Get user's role in the group
 		role, err := s.getUserRoleInGroup(*req.GroupID, userID)
 		if err != nil {
 			return nil, errors.New("user is not a member of this group")
 		}
 
-		// Check if user has permission to create polls
 		canCreatePolls, err := s.canUserCreatePolls(*req.GroupID, role)
 		if err != nil {
 			return nil, err
@@ -50,7 +45,6 @@ func (s *PollService) CreatePoll(userID uint, req *models.CreatePollRequest) (*m
 		}
 	}
 
-	// Parse expires_at if provided
 	var expiresAt *time.Time
 	if req.ExpiresAt != nil && *req.ExpiresAt != "" {
 		parsedTime, err := time.Parse(time.RFC3339, *req.ExpiresAt)
@@ -60,14 +54,12 @@ func (s *PollService) CreatePoll(userID uint, req *models.CreatePollRequest) (*m
 		expiresAt = &parsedTime
 	}
 
-	// Start transaction
 	tx, err := s.db.Begin()
 	if err != nil {
 		return nil, err
 	}
 	defer tx.Rollback()
 
-	// Insert poll
 	var description *string
 	if req.Description != "" {
 		description = &req.Description
@@ -86,10 +78,9 @@ func (s *PollService) CreatePoll(userID uint, req *models.CreatePollRequest) (*m
 		return nil, err
 	}
 
-	// Insert options
 	for i, optionText := range req.Options {
 		if optionText == "" {
-			continue // Skip empty options
+			continue
 		}
 		_, err := tx.Exec(`
 			INSERT INTO poll_options (poll_id, option_text, option_order, created_at)
@@ -104,13 +95,11 @@ func (s *PollService) CreatePoll(userID uint, req *models.CreatePollRequest) (*m
 		return nil, err
 	}
 
-	// Return the created poll
 	poll, err := s.GetPollByID(uint(pollID), userID)
 	if err != nil {
 		return nil, err
 	}
 
-	// Broadcast poll creation to group members
 	if s.hub != nil && req.GroupID != nil && *req.GroupID > 0 {
 		s.hub.BroadcastPollUpdate(uint(pollID), *req.GroupID, userID, "created", map[string]interface{}{
 			"poll": poll,
@@ -120,9 +109,7 @@ func (s *PollService) CreatePoll(userID uint, req *models.CreatePollRequest) (*m
 	return poll, nil
 }
 
-// GetPollByID retrieves a poll by ID with all voting data
 func (s *PollService) GetPollByID(pollID, userID uint) (*models.PollResponse, error) {
-	// Get poll basic info
 	poll := &models.Poll{}
 	var description sql.NullString
 	var groupID sql.NullInt64
@@ -161,19 +148,16 @@ func (s *PollService) GetPollByID(pollID, userID uint) (*models.PollResponse, er
 		poll.ExpiresAt = &expiresAt.Time
 	}
 
-	// Get creator info
 	creator, err := s.getUserInfo(poll.UserID)
 	if err != nil {
 		return nil, err
 	}
 
-	// Get options with vote counts
 	options, err := s.getPollOptions(pollID, userID)
 	if err != nil {
 		return nil, err
 	}
 
-	// Get total selections (not unique voters)
 	var totalSelections int64
 	err = s.db.QueryRow(`
 		SELECT COUNT(*) FROM poll_votes WHERE poll_id = ?
@@ -182,20 +166,17 @@ func (s *PollService) GetPollByID(pollID, userID uint) (*models.PollResponse, er
 		return nil, err
 	}
 
-	// Calculate percentages based on total selections
 	for i := range options {
 		if totalSelections > 0 {
 			options[i].Percentage = float64(options[i].VoteCount) / float64(totalSelections) * 100
 		}
 	}
 
-	// Get user's votes
 	userVotes, err := s.getUserVotes(pollID, userID)
 	if err != nil {
 		return nil, err
 	}
 
-	// Check if poll is expired
 	isExpired := false
 	if poll.ExpiresAt != nil && poll.ExpiresAt.Before(time.Now()) {
 		isExpired = true
@@ -220,7 +201,6 @@ func (s *PollService) GetPollByID(pollID, userID uint) (*models.PollResponse, er
 	}, nil
 }
 
-// GetGroupPolls retrieves all polls for a group
 func (s *PollService) GetGroupPolls(groupID, userID uint, limit, offset int) ([]models.PollResponse, error) {
 	rows, err := s.db.Query(`
 		SELECT id FROM polls
@@ -242,7 +222,7 @@ func (s *PollService) GetGroupPolls(groupID, userID uint, limit, offset int) ([]
 
 		poll, err := s.GetPollByID(pollID, userID)
 		if err != nil {
-			continue // Skip polls with errors
+			continue
 		}
 		polls = append(polls, *poll)
 	}
@@ -250,7 +230,6 @@ func (s *PollService) GetGroupPolls(groupID, userID uint, limit, offset int) ([]
 	return polls, nil
 }
 
-// VotePoll allows a user to vote on poll options
 func (s *PollService) VotePoll(pollID, userID uint, optionIDs []uint) error {
 	poll := &models.Poll{}
 	var allowMultiple bool
@@ -268,17 +247,14 @@ func (s *PollService) VotePoll(pollID, userID uint, optionIDs []uint) error {
 		return err
 	}
 
-	// Check if poll is expired
 	if expiresAt.Valid && expiresAt.Time.Before(time.Now()) {
 		return errors.New("poll has expired")
 	}
 
-	// Validate option count
 	if !allowMultiple && len(optionIDs) > 1 {
 		return errors.New("poll does not allow multiple choices")
 	}
 
-	// Verify all options belong to this poll
 	for _, optionID := range optionIDs {
 		var count int
 		err := s.db.QueryRow(`
@@ -289,7 +265,6 @@ func (s *PollService) VotePoll(pollID, userID uint, optionIDs []uint) error {
 		}
 	}
 
-	// Start transaction
 	tx, err := s.db.Begin()
 	if err != nil {
 		return err
@@ -303,7 +278,6 @@ func (s *PollService) VotePoll(pollID, userID uint, optionIDs []uint) error {
 		return err
 	}
 
-	// Add new votes
 	for _, optionID := range optionIDs {
 		_, err := tx.Exec(`
 			INSERT INTO poll_votes (poll_id, option_id, user_id, created_at)
@@ -319,7 +293,6 @@ func (s *PollService) VotePoll(pollID, userID uint, optionIDs []uint) error {
 		return err
 	}
 
-	// Get group ID for broadcasting
 	var groupID sql.NullInt64
 	err = s.db.QueryRow(`
 		SELECT group_id FROM polls WHERE id = ?
@@ -328,7 +301,6 @@ func (s *PollService) VotePoll(pollID, userID uint, optionIDs []uint) error {
 		return err
 	}
 
-	// Broadcast vote update to group members
 	if s.hub != nil && groupID.Valid && groupID.Int64 > 0 {
 		voteData := map[string]interface{}{
 			"poll_id": pollID,
@@ -341,9 +313,7 @@ func (s *PollService) VotePoll(pollID, userID uint, optionIDs []uint) error {
 	return nil
 }
 
-// UnvotePoll removes all user votes from a poll
 func (s *PollService) UnvotePoll(pollID, userID uint) error {
-	// Get poll info for broadcasting
 	var groupID sql.NullInt64
 	err := s.db.QueryRow(`
 		SELECT group_id FROM polls WHERE id = ?
@@ -368,7 +338,6 @@ func (s *PollService) UnvotePoll(pollID, userID uint) error {
 		return errors.New("no votes found to remove")
 	}
 
-	// Broadcast vote update to group members
 	if s.hub != nil && groupID.Valid && groupID.Int64 > 0 {
 		voteData := map[string]interface{}{
 			"poll_id": pollID,
@@ -381,9 +350,7 @@ func (s *PollService) UnvotePoll(pollID, userID uint) error {
 	return nil
 }
 
-// DeletePoll deletes a poll and all its related data
 func (s *PollService) DeletePoll(pollID, userID uint) error {
-	// Check if user is authorized to delete this poll
 	var pollUserID uint
 	var groupID sql.NullInt64
 	err := s.db.QueryRow(`
@@ -396,9 +363,7 @@ func (s *PollService) DeletePoll(pollID, userID uint) error {
 		return err
 	}
 
-	// Check if user is the creator
 	if pollUserID != userID {
-		// If poll belongs to a group, check if user is group admin
 		if groupID.Valid {
 			isAdmin, err := s.isUserGroupAdmin(uint(groupID.Int64), userID)
 			if err != nil || !isAdmin {
@@ -409,25 +374,21 @@ func (s *PollService) DeletePoll(pollID, userID uint) error {
 		}
 	}
 
-	// Delete poll votes first
 	_, err = s.db.Exec("DELETE FROM poll_votes WHERE poll_id = ?", pollID)
 	if err != nil {
 		return err
 	}
 
-	// Delete poll options
 	_, err = s.db.Exec("DELETE FROM poll_options WHERE poll_id = ?", pollID)
 	if err != nil {
 		return err
 	}
 
-	// Delete the poll
 	_, err = s.db.Exec("DELETE FROM polls WHERE id = ?", pollID)
 	if err != nil {
 		return err
 	}
 
-	// Broadcast poll deletion to group members
 	if s.hub != nil && groupID.Valid && groupID.Int64 > 0 {
 		deleteData := map[string]interface{}{
 			"poll_id": pollID,
@@ -439,9 +400,7 @@ func (s *PollService) DeletePoll(pollID, userID uint) error {
 	return nil
 }
 
-// ExpirePoll sets a poll to expired status
 func (s *PollService) ExpirePoll(pollID, userID uint) error {
-	// Check if user is authorized to expire this poll
 	var pollUserID uint
 	var groupID sql.NullInt64
 	var expiresAt sql.NullTime
@@ -455,14 +414,11 @@ func (s *PollService) ExpirePoll(pollID, userID uint) error {
 		return err
 	}
 
-	// Check if poll is already expired
 	if expiresAt.Valid && expiresAt.Time.Before(time.Now()) {
 		return errors.New("poll already expired")
 	}
 
-	// Check if user is the creator
 	if pollUserID != userID {
-		// If poll belongs to a group, check if user is group admin
 		if groupID.Valid {
 			isAdmin, err := s.isUserGroupAdmin(uint(groupID.Int64), userID)
 			if err != nil || !isAdmin {
@@ -473,7 +429,6 @@ func (s *PollService) ExpirePoll(pollID, userID uint) error {
 		}
 	}
 
-	// Set expires_at to current time to expire the poll
 	now := time.Now()
 	_, err = s.db.Exec(`
 		UPDATE polls SET expires_at = ?, updated_at = ? WHERE id = ?
@@ -482,7 +437,6 @@ func (s *PollService) ExpirePoll(pollID, userID uint) error {
 		return err
 	}
 
-	// Broadcast poll expiration to group members
 	if s.hub != nil && groupID.Valid && groupID.Int64 > 0 {
 		expireData := map[string]interface{}{
 			"poll_id":    pollID,
@@ -494,8 +448,6 @@ func (s *PollService) ExpirePoll(pollID, userID uint) error {
 
 	return nil
 }
-
-// Helper functions
 
 func (s *PollService) getUserInfo(userID uint) (*models.UserResponse, error) {
 	user := &models.UserResponse{}
@@ -526,7 +478,6 @@ func (s *PollService) getUserInfo(userID uint) (*models.UserResponse, error) {
 			} else if strings.HasPrefix(processed, "/avatars/") {
 				user.Avatar = &processed
 			} else if strings.HasPrefix(processed, "image:") {
-				// leave nil for invalid avatar marker
 			} else {
 				full := fmt.Sprintf("http://localhost:8080/api/uploads/%s", processed)
 				user.Avatar = &full
@@ -630,25 +581,20 @@ func (s *PollService) getUserVotes(pollID, userID uint) ([]uint, error) {
 }
 
 func (s *PollService) getUserRoleInGroup(groupID, userID uint) (string, error) {
-	// First check if user is the creator of the group
 	var creatorID uint
 	if err := s.db.QueryRow("SELECT creator_id FROM groups WHERE id = ?", groupID).Scan(&creatorID); err != nil {
 		return "", err
 	}
 	if creatorID == userID {
-		// Check if creator has been demoted to member
 		query := `SELECT role FROM group_members WHERE group_id = ? AND user_id = ? AND status = 'member'`
 		var role string
 		err := s.db.QueryRow(query, groupID, userID).Scan(&role)
 		if err == nil && role == "member" {
-			// Creator has been demoted, return member role
 			return "member", nil
 		}
-		// Creator still has admin privileges
 		return "creator", nil
 	}
 
-	// If not creator, get their role from group_members
 	query := `SELECT role FROM group_members WHERE group_id = ? AND user_id = ? AND status = 'member'`
 
 	var role string
@@ -664,37 +610,30 @@ func (s *PollService) getUserRoleInGroup(groupID, userID uint) (string, error) {
 }
 
 func (s *PollService) canUserCreatePolls(groupID uint, userRole string) (bool, error) {
-	// Get group permissions
 	var createPolls string
 	err := s.db.QueryRow("SELECT create_polls FROM groups WHERE id = ?", groupID).Scan(&createPolls)
 	if err != nil {
 		return false, err
 	}
 
-	// Check if user has permission
 	return createPolls == "all_members" || userRole == "admin" || userRole == "creator", nil
 }
 
 func (s *PollService) isUserGroupAdmin(groupID, userID uint) (bool, error) {
-	// Check if user is creator
 	var creatorID uint
 	if err := s.db.QueryRow("SELECT creator_id FROM groups WHERE id = ?", groupID).Scan(&creatorID); err != nil {
 		return false, err
 	}
 	if creatorID == userID {
-		// Check if creator has been demoted to member
 		query := `SELECT role FROM group_members WHERE group_id = ? AND user_id = ? AND status = 'member'`
 		var role string
 		err := s.db.QueryRow(query, groupID, userID).Scan(&role)
 		if err == nil && role == "member" {
-			// Creator has been demoted, no admin privileges
 			return false, nil
 		}
-		// Creator still has admin privileges
 		return true, nil
 	}
 
-	// Check if user is admin
 	query := `
 		SELECT COUNT(*) FROM group_members 
 		WHERE group_id = ? AND user_id = ? AND role = 'admin'

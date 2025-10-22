@@ -1,10 +1,5 @@
 package websocket
 
-import (
-	"log"
-)
-
-// handleMessage processes different types of messages
 func (h *Hub) handleMessage(message Message) {
 	switch message.Type {
 	case MessageTypePrivateMessage:
@@ -41,6 +36,8 @@ func (h *Hub) handleMessage(message Message) {
 		h.handleFollowRequest(message)
 	case MessageTypeCancelFollowRequest:
 		h.handleCancelFollowRequest(message)
+	case MessageTypeFollowStatus:
+		h.handleFollowStatus(message)
 	case MessageTypeGroupUpdate:
 		h.handleGroupUpdate(message)
 	case MessageTypeEventUpdate:
@@ -58,6 +55,6 @@ func (h *Hub) handleMessage(message Message) {
 	case MessageTypePong:
 		h.handlePong(message)
 	default:
-		log.Printf("Unknown message type: %s", message.Type)
+		// log.Printf("Unknown message type: %s", message.Type)
 	}
 }

@@ -93,8 +93,12 @@ func (h *ProfileHandler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
 	if req.Bio != "" {
 		user.AboutMe = &req.Bio
 	}
-	if req.AvatarURL != "" {
-		user.Avatar = &req.AvatarURL
+	if req.AvatarURL != nil {
+		if *req.AvatarURL != "" {
+			user.Avatar = req.AvatarURL
+		} else {
+			user.Avatar = nil
+		}
 	}
 
 	if err := h.userService.UpdateUser(user); err != nil {
@@ -273,4 +277,90 @@ func (h *ProfileHandler) GetPublicStats(w http.ResponseWriter, r *http.Request, 
 	}
 
 	writeJSON(w, http.StatusOK, response)
+}
+
+// CheckEmailUniqueness checks if an email is available for registration or update
+func (h *ProfileHandler) CheckEmailUniqueness(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
+
+	email := r.URL.Query().Get("email")
+	if email == "" {
+		writeError(w, http.StatusBadRequest, "Email parameter is required")
+		return
+	}
+
+	// Check if email exists
+	_, err := h.userService.GetUserByEmail(email)
+	if err != nil {
+		// If user not found, email is available
+		writeJSON(w, http.StatusOK, map[string]interface{}{
+			"available": true,
+		})
+		return
+	}
+
+	// Email exists, check if it's the current user's email
+	userID := r.Context().Value("user_id")
+	if userID != nil {
+		currentUser, err := h.userService.GetUserByID(userID.(uint))
+		if err == nil && currentUser.Email == email {
+			// It's the current user's email, so it's available for them
+			writeJSON(w, http.StatusOK, map[string]interface{}{
+				"available": true,
+			})
+			return
+		}
+	}
+
+	// Email is taken by someone else
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"available": false,
+		"message":   "This email is already used",
+	})
+}
+
+// CheckNicknameUniqueness checks if a nickname is available for registration or update
+func (h *ProfileHandler) CheckNicknameUniqueness(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
+
+	nickname := r.URL.Query().Get("nickname")
+	if nickname == "" {
+		writeError(w, http.StatusBadRequest, "Nickname parameter is required")
+		return
+	}
+
+	// Check if nickname exists
+	_, err := h.userService.GetUserByNickname(nickname)
+	if err != nil {
+		// If user not found, nickname is available
+		writeJSON(w, http.StatusOK, map[string]interface{}{
+			"available": true,
+		})
+		return
+	}
+
+	// Nickname exists, check if it's the current user's nickname
+	userID := r.Context().Value("user_id")
+	if userID != nil {
+		currentUser, err := h.userService.GetUserByID(userID.(uint))
+		if err == nil && currentUser.Nickname != nil && *currentUser.Nickname == nickname {
+			// It's the current user's nickname, so it's available for them
+			writeJSON(w, http.StatusOK, map[string]interface{}{
+				"available": true,
+			})
+			return
+		}
+	}
+
+	// Nickname is taken by someone else
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"available": false,
+		"message":   "This nickname is already used",
+	})
 }

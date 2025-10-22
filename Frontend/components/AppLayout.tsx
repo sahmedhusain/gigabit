@@ -55,6 +55,7 @@ export default function AppLayout({
   // Layout state
   const [activeTab, setActiveTab] = useState(initialActiveTab)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+  const [isMobileRightSidebarOpen, setIsMobileRightSidebarOpen] = useState(false)
   const [isSidebarCollapsed] = useState(false)
   const [postsCount, setPostsCount] = useState(0)
 
@@ -166,6 +167,8 @@ export default function AppLayout({
         onNotificationsClick={handleNotificationsToggle}
         unreadCount={liveUnreadCount || 0}
         onDiscoverClick={handleDiscoverToggle}
+        isMobileRightSidebarOpen={isMobileRightSidebarOpen}
+        setIsMobileRightSidebarOpen={setIsMobileRightSidebarOpen}
       />
 
       {/* Main Content */}
@@ -180,6 +183,22 @@ export default function AppLayout({
         </div>
       </div>
 
+      {/* Mobile Left Sidebar Overlay */}
+      {isMobileMenuOpen && (
+        <div
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 lg:hidden"
+          onClick={() => setIsMobileMenuOpen(false)}
+        />
+      )}
+
+      {/* Mobile Right Sidebar Overlay */}
+      {isMobileRightSidebarOpen && (
+        <div
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 lg:hidden"
+          onClick={() => setIsMobileRightSidebarOpen(false)}
+        />
+      )}
+
       {/* Fixed Right Sidebar */}
       <RightSidebar
         onlineUsers={onlineUsers}
@@ -191,6 +210,8 @@ export default function AppLayout({
         currentUser={currentUser}
         setActiveTab={handleTabChange}
         logout={logout}
+        isMobileOpen={isMobileRightSidebarOpen}
+        setIsMobileOpen={setIsMobileRightSidebarOpen}
       />
     </div>
   )

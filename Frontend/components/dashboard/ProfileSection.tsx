@@ -1,6 +1,6 @@
 'use client'
 import Image from 'next/image'
-import { User, Lock, Globe, MessageSquare, Edit, Heart, MessageCircle, Send, Bookmark, MoreHorizontal, Trash2, EyeOff, UserPlus, UserMinus, X, UserX, Clock, Mail, Calendar, CalendarDays, FileText, Plus, Users, Search } from 'lucide-react'
+import { User, Lock, Globe, MessageSquare, Edit, Heart, MessageCircle, Send, Bookmark, MoreHorizontal, Trash2, EyeOff, UserPlus, UserMinus, X, UserX, Clock, Mail, Calendar, CalendarDays, FileText, Plus, Users, Search, Venus, Mars } from 'lucide-react'
 import { Post, api, CreatePostRequest } from '@/lib/api'
 import { useRealTimePosts, useFollowers, useConnectionStatus, useFollowerCounts } from '@/hooks'
 import { getAvatarUrl } from '@/utils/avatarUtils'
@@ -29,10 +29,14 @@ interface ProfileSectionProps {
     dateOfBirth: string
     nickname: string
     aboutMe: string
+    gender?: string
     memberSince: string
+    genderPrivacy?: string
+    birthdayPrivacy?: string
     is_private?: boolean
     first_name?: string
     last_name?: string
+    is_deleted?: boolean
   } | null
   followers: unknown[]
   following: unknown[]
@@ -465,8 +469,7 @@ export default function ProfileSection({
 
   // Handle edit profile
   const handleEditProfile = () => {
-    // TODO: Implement edit profile functionality later in settings page
-    console.log('Edit profile clicked - will be implemented in settings page')
+    router.push('/settings')
   }
 
   // Handle user follow/unfollow
@@ -573,6 +576,85 @@ export default function ProfileSection({
   // Check if current user can delete a post
   const canDeletePost = (post: Post) => {
     return currentUserAuth && currentUserAuth.id === post.user.id
+  }
+
+  // Check if current user can see the profile owner's gender based on privacy settings
+  const canSeeGender = () => {
+    console.log('canSeeGender called with:', {
+      gender: currentUser?.gender,
+      genderLower: currentUser?.gender?.toLowerCase(),
+      isOwnProfile,
+      followStatus
+    })
+
+    // Always hide "prefer not to say" gender in all profiles, regardless of privacy settings
+    // Make the check more robust by trimming whitespace and checking for variations
+    const genderValue = currentUser?.gender?.toLowerCase()?.trim()
+    const isPreferNotToSay = genderValue === 'prefer_not_to_say' ||
+                            genderValue === '' ||
+                            genderValue === ' '
+
+    console.log('Gender check:', { genderValue, isPreferNotToSay })
+
+    if (isPreferNotToSay) {
+      console.log('Hiding gender - prefer not to say detected')
+      return false
+    }
+
+    // Always show for own profile
+    if (isOwnProfile) {
+      console.log('Showing gender - own profile')
+      return true
+    }
+
+    // Don't show if gender is not set
+    if (!currentUser?.gender) {
+      console.log('Hiding gender - no gender set')
+      return false
+    }
+
+    const privacy = currentUser?.genderPrivacy || 'everyone'
+    console.log('Privacy setting:', privacy)
+
+    switch (privacy) {
+      case 'everyone':
+        console.log('Showing gender - everyone privacy')
+        return true
+      case 'followers only':
+        // Check if current user is following the profile owner
+        const canSee = followStatus.isFollowing
+        console.log('Followers only privacy - can see:', canSee, 'isFollowing:', followStatus.isFollowing)
+        return canSee
+      case 'friends':
+        // For friends privacy, we need to check if they are mutual followers (friends)
+        const canSeeFriends = followStatus.isFollowing && followStatus.isFollowedBy
+        console.log('Friends privacy - can see:', canSeeFriends, 'isFollowing:', followStatus.isFollowing, 'isFollowedBy:', followStatus.isFollowedBy)
+        return canSeeFriends
+      default:
+        console.log('Hiding gender - default case')
+        return false
+    }
+  }
+
+  // Check if current user can see the profile owner's birthday based on privacy settings
+  const canSeeBirthday = () => {
+    // Always show for own profile
+    if (isOwnProfile) return true
+
+    const privacy = currentUser?.birthdayPrivacy || 'everyone'
+
+    switch (privacy) {
+      case 'everyone':
+        return true
+      case 'followers only':
+        // Check if current user is following the profile owner
+        return followStatus.isFollowing
+      case 'friends':
+        // For friends privacy, we need to check if they are mutual followers (friends)
+        return followStatus.isFollowing && followStatus.isFollowedBy
+      default:
+        return false
+    }
   }
 
   // Get privacy icon for post
@@ -1193,7 +1275,7 @@ export default function ProfileSection({
             </div>
 
             {/* Action Buttons */}
-            {!isOwnProfile && currentUser && (
+            {!isOwnProfile && currentUser && !currentUser.is_deleted && (
               <div className="flex flex-col items-center gap-3 w-full">
                 <FollowHandler
                   targetUser={{
@@ -1207,6 +1289,9 @@ export default function ProfileSection({
                     created_at: currentUser.memberSince || '',
                     about_me: currentUser.aboutMe || '',
                     date_of_birth: currentUser.dateOfBirth || '',
+                    gender: currentUser.gender || '',
+                    gender_privacy: currentUser.genderPrivacy || 'everyone',
+                    birthday_privacy: currentUser.birthdayPrivacy || 'everyone',
                     updated_at: new Date().toISOString(),
                     status: 'online',
                     last_status_change: new Date().toISOString()
@@ -1288,11 +1373,13 @@ export default function ProfileSection({
 
             {/* Contact Info */}
             <div className="space-y-2">
-              <div className="flex items-center justify-center lg:justify-start gap-2">
-                <Mail className="w-4 h-4 text-emerald-400 flex-shrink-0" />
-                <p className="text-white/80 text-sm truncate">{currentUser?.email || 'No email'}</p>
-              </div>
-              {!showPrivacyOverlay && (
+              {!currentUser?.is_deleted && (
+                <div className="flex items-center justify-center lg:justify-start gap-2">
+                  <Mail className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+                  <p className="text-white/80 text-sm truncate">{currentUser?.email || 'No email'}</p>
+                </div>
+              )}
+              {!showPrivacyOverlay && !currentUser?.is_deleted && (
                 <div className="flex items-center justify-center lg:justify-start gap-2">
                   <Calendar className="w-4 h-4 text-teal-400 flex-shrink-0" />
                   <p className="text-white/70 text-xs">
@@ -1309,84 +1396,109 @@ export default function ProfileSection({
             </div>
 
             {/* Stats Buttons */}
-            <div className="flex justify-center lg:justify-start space-x-4 lg:space-x-6">
-              <button
-                onClick={() => !showPrivacyOverlay && handleTabChange('posts')}
-                disabled={showPrivacyOverlay}
-                className={`text-center p-3 rounded-3xl transition-all duration-300 hover:scale-110 active:scale-95 min-w-[80px] ${
-                  activeTab === 'posts' && !showPrivacyOverlay
-                    ? 'bg-gradient-to-r from-emerald-500/25 to-teal-500/25 shadow-xl  border border-emerald-400/40'
-                    : 'hover:bg-white/10 hover:shadow-lg hover:shadow-white/20'
-                } ${showPrivacyOverlay ? 'cursor-not-allowed opacity-50' : ''}`}
-              >
-                <div className="text-xl lg:text-2xl font-bold text-white drop-shadow-md">
-                  {displayPosts?.length ?? 0}
-                </div>
-                <div className="text-white/70 text-sm lg:text-base font-medium">Posts</div>
-              </button>
+            {!currentUser?.is_deleted && (
+              <div className="flex justify-center lg:justify-start space-x-4 lg:space-x-6">
+                <button
+                  onClick={() => !showPrivacyOverlay && handleTabChange('posts')}
+                  disabled={showPrivacyOverlay}
+                  className={`text-center p-3 rounded-3xl transition-all duration-300 hover:scale-110 active:scale-95 min-w-[80px] ${
+                    activeTab === 'posts' && !showPrivacyOverlay
+                      ? 'bg-gradient-to-r from-emerald-500/25 to-teal-500/25 shadow-xl  border border-emerald-400/40'
+                      : 'hover:bg-white/10 hover:shadow-lg hover:shadow-white/20'
+                  } ${showPrivacyOverlay ? 'cursor-not-allowed opacity-50' : ''}`}
+                >
+                  <div className="text-xl lg:text-2xl font-bold text-white drop-shadow-md">
+                    {displayPosts?.length ?? 0}
+                  </div>
+                  <div className="text-white/70 text-sm lg:text-base font-medium">Posts</div>
+                </button>
 
-              <button
-                onClick={() => !showPrivacyOverlay && handleTabChange('following')}
-                disabled={showPrivacyOverlay}
-                className={`text-center p-3 rounded-3xl transition-all duration-300 hover:scale-110 active:scale-95 min-w-[80px] ${
-                  activeTab === 'following' && !showPrivacyOverlay
-                    ? 'bg-gradient-to-r from-emerald-500/25 to-teal-500/25 shadow-xl border border-emerald-400/40'
-                    : 'hover:bg-white/10 hover:shadow-lg hover:shadow-white/20'
-                } ${showPrivacyOverlay ? 'cursor-not-allowed opacity-50' : ''}`}
-              >
-                <div className="text-xl lg:text-2xl font-bold text-white drop-shadow-md">
-                  {followingCount}
-                </div>
-                <div className="text-white/70 text-sm lg:text-base font-medium">Following</div>
-              </button>
+                <button
+                  onClick={() => !showPrivacyOverlay && handleTabChange('following')}
+                  disabled={showPrivacyOverlay}
+                  className={`text-center p-3 rounded-3xl transition-all duration-300 hover:scale-110 active:scale-95 min-w-[80px] ${
+                    activeTab === 'following' && !showPrivacyOverlay
+                      ? 'bg-gradient-to-r from-emerald-500/25 to-teal-500/25 shadow-xl border border-emerald-400/40'
+                      : 'hover:bg-white/10 hover:shadow-lg hover:shadow-white/20'
+                  } ${showPrivacyOverlay ? 'cursor-not-allowed opacity-50' : ''}`}
+                >
+                  <div className="text-xl lg:text-2xl font-bold text-white drop-shadow-md">
+                    {followingCount}
+                  </div>
+                  <div className="text-white/70 text-sm lg:text-base font-medium">Following</div>
+                </button>
 
-              <button
-                onClick={() => !showPrivacyOverlay && handleTabChange('followers')}
-                disabled={showPrivacyOverlay}
-                className={`text-center p-3 rounded-3xl transition-all duration-300 hover:scale-110 active:scale-95 min-w-[80px] ${
-                  activeTab === 'followers' && !showPrivacyOverlay
-                    ? 'bg-gradient-to-r from-emerald-500/25 to-teal-500/25 shadow-xl border border-emerald-400/40'
-                    : 'hover:bg-white/10 hover:shadow-lg hover:shadow-white/20'
-                } ${showPrivacyOverlay ? 'cursor-not-allowed opacity-50' : ''}`}
-              >
-                <div className="text-xl lg:text-2xl font-bold text-white drop-shadow-md">
-                  {followersCount}
-                </div>
-                <div className="text-white/70 text-sm lg:text-base font-medium">Followers</div>
-              </button>
-            </div>
+                <button
+                  onClick={() => !showPrivacyOverlay && handleTabChange('followers')}
+                  disabled={showPrivacyOverlay}
+                  className={`text-center p-3 rounded-3xl transition-all duration-300 hover:scale-110 active:scale-95 min-w-[80px] ${
+                    activeTab === 'followers' && !showPrivacyOverlay
+                      ? 'bg-gradient-to-r from-emerald-500/25 to-teal-500/25 shadow-xl border border-emerald-400/40'
+                      : 'hover:bg-white/10 hover:shadow-lg hover:shadow-white/20'
+                  } ${showPrivacyOverlay ? 'cursor-not-allowed opacity-50' : ''}`}
+                >
+                  <div className="text-xl lg:text-2xl font-bold text-white drop-shadow-md">
+                    {followersCount}
+                  </div>
+                  <div className="text-white/70 text-sm lg:text-base font-medium">Followers</div>
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Right Column - Bio and Personal Info */}
           <div className="flex flex-col justify-center space-y-4">
             {/* Bio Section */}
-            <div>
-              <h4 className="text-white font-semibold text-base mb-2 flex items-center gap-2">
-                <FileText className="w-4 h-4 text-emerald-400" />
-                About
-              </h4>
-              <p className="text-white/90 text-sm leading-relaxed">
-                {currentUser?.aboutMe || ''}
-              </p>
-            </div>
-
-            {/* Date of Birth */}
-            {!showPrivacyOverlay && (
+            {!currentUser?.is_deleted && (
               <div>
                 <h4 className="text-white font-semibold text-base mb-2 flex items-center gap-2">
-                  <CalendarDays className="w-4 h-4 text-teal-400" />
-                  Birthday
+                  <FileText className="w-4 h-4 text-emerald-400" />
+                  About
                 </h4>
-                <p className="text-white/90 text-sm">
-                  {currentUser?.dateOfBirth
-                    ? new Date(currentUser.dateOfBirth).toLocaleDateString('en-US', {
-                      year: 'numeric',
-                      month: 'long',
-                      day: 'numeric'
-                    })
-                    : 'Not provided'
-                  }
+                <p className="text-white/90 text-sm leading-relaxed">
+                  {currentUser?.aboutMe || ''}
                 </p>
+              </div>
+            )}
+
+            {/* Date of Birth and Gender */}
+            {!showPrivacyOverlay && !currentUser?.is_deleted && (
+              <div className="flex flex-row gap-6">
+                {canSeeBirthday() && (
+                  <div className="flex-1">
+                    <h4 className="text-white font-semibold text-base mb-2 flex items-center gap-2">
+                      <CalendarDays className="w-4 h-4 text-teal-400" />
+                      Birthday
+                    </h4>
+                    <p className="text-white/90 text-sm">
+                      {currentUser?.dateOfBirth
+                        ? new Date(currentUser.dateOfBirth).toLocaleDateString('en-US', {
+                          year: 'numeric',
+                          month: 'long',
+                          day: 'numeric'
+                        })
+                        : 'Not provided'
+                      }
+                    </p>
+                  </div>
+                )}
+                {canSeeGender() && (
+                  <div className="flex-1">
+                    <h4 className="text-white font-semibold text-base mb-2 flex items-center gap-2">
+                      {currentUser?.gender?.toLowerCase() === 'male' ? (
+                        <Mars className="w-4 h-4 text-blue-400" />
+                      ) : currentUser?.gender?.toLowerCase() === 'female' ? (
+                        <Venus className="w-4 h-4 text-purple-400" />
+                      ) : (
+                        <Venus className="w-4 h-4 text-purple-400" />
+                      )}
+                      Gender
+                    </h4>
+                    <p className="text-white/90 text-sm">
+                      {currentUser!.gender!.charAt(0).toUpperCase() + currentUser!.gender!.slice(1)}
+                    </p>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -1416,7 +1528,7 @@ export default function ProfileSection({
         <div className="grid grid-cols-1 gap-4 lg:gap-6">
           <div className="lg:col-span-3">
             <AnimatePresence mode="wait">
-              {activeTab === 'posts' && !showPrivacyOverlay && (
+              {activeTab === 'posts' && !showPrivacyOverlay && !currentUser?.is_deleted && (
                 <motion.div
                   key="posts"
                   initial={{ opacity: 0, x: -20 }}
@@ -1559,7 +1671,7 @@ export default function ProfileSection({
                 </motion.div>
               )}
 
-              {activeTab === 'following' && !showPrivacyOverlay && (
+              {activeTab === 'following' && !showPrivacyOverlay && !currentUser?.is_deleted && (
                 <motion.div
                   key="following"
                   initial={{ opacity: 0, x: -20 }}
@@ -1711,6 +1823,9 @@ export default function ProfileSection({
                                       created_at: user.created_at || '',
                                       about_me: user.about_me || '',
                                       date_of_birth: user.date_of_birth || '',
+                                      gender: user.gender || '',
+                                      gender_privacy: user.gender_privacy || 'everyone',
+                                      birthday_privacy: user.birthday_privacy || 'everyone',
                                       updated_at: user.updated_at || new Date().toISOString(),
                                       status: 'online',
                                       last_status_change: new Date().toISOString()
@@ -1790,7 +1905,7 @@ export default function ProfileSection({
                 </motion.div>
               )}
 
-              {activeTab === 'followers' && !showPrivacyOverlay && (
+              {activeTab === 'followers' && !showPrivacyOverlay && !currentUser?.is_deleted && (
                 <motion.div
                   key="followers"
                   initial={{ opacity: 0, x: -20 }}
@@ -1962,6 +2077,9 @@ export default function ProfileSection({
                                       created_at: user.created_at || '',
                                       about_me: user.about_me || '',
                                       date_of_birth: user.date_of_birth || '',
+                                      gender: user.gender || '',
+                                      gender_privacy: user.gender_privacy || 'everyone',
+                                      birthday_privacy: user.birthday_privacy || 'everyone',
                                       updated_at: user.updated_at || new Date().toISOString(),
                                       status: 'online',
                                       last_status_change: new Date().toISOString()

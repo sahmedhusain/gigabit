@@ -7,7 +7,7 @@ import { useAuth } from '@/context/AuthContext'
 import { mutate } from 'swr'
 import { useWebSocket } from '@/context/WebSocketContext'
 import { useRealTimeMessages, useTypingIndicator } from '@/hooks'
-import { api, User } from '@/lib/api'
+import { api, User, GroupResponse, Member, ConversationResponse } from '@/lib/api'
 import EmojiPicker from 'emoji-picker-react'
 import { getAvatarUrl } from '@/utils/avatarUtils'
 import { useRouter } from 'next/navigation'
@@ -357,7 +357,7 @@ const SharedPostMessage: React.FC<SharedPostMessageProps> = ({ sharedPost, isCur
             <div className="text-center">
               <Lock className="w-8 h-8 text-white/40 mx-auto mb-2" />
               <p className="text-white/60 text-sm">This post is unavailable</p>
-              <p className="text-white/40 text-xs mt-1">You don't have permission to view this content</p>
+              <p className="text-white/40 text-xs mt-1">You don&apos;t have permission to view this content</p>
             </div>
           </div>
         )}
@@ -416,8 +416,8 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
   const [newMessage, setNewMessage] = useState('')
   const [showEmojiPicker, setShowEmojiPicker] = useState(false)
   const [activeTab, setActiveTab] = useState(initialTab || 'chat') // New state for active tab
-  const [groupData, setGroupData] = useState<any>(null) // Store group data including user role
-  const [groupMembers, setGroupMembers] = useState<any[]>([])
+  const [groupData, setGroupData] = useState<GroupResponse | null>(null) // Store group data including user role
+  const [groupMembers, setGroupMembers] = useState<Member[]>([])
   const [isLoadingMembers, setIsLoadingMembers] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const messagesContainerRef = useRef<HTMLDivElement>(null)
@@ -596,11 +596,11 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
       })
 
     // Chats list: clear unread count optimistically for this conversation
-    mutate('chats', (current: any) => {
+    mutate('chats', (current: ConversationResponse[] | { conversations: ConversationResponse[] } | undefined) => {
       if (!current) return current
       const list = Array.isArray(current) ? current : current.conversations
       if (!Array.isArray(list)) return current
-      const next = list.map((c: any) => c?.id === effectiveConversationId ? { ...c, unread_count: 0 } : c)
+      const next = list.map((c: ConversationResponse) => c?.id === effectiveConversationId ? { ...c, unread_count: 0 } : c)
       return Array.isArray(current) ? next : { ...current, conversations: next }
     }, false)
   }, [effectiveConversationId, messages, user, markAsRead, refreshConversations])

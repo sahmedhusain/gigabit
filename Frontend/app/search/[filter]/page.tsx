@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, use } from 'react'
 import { useRouter, useSearchParams, useParams } from 'next/navigation'
 import ProtectedRoute from '@/components/ProtectedRoute'
 import SearchResults from '@/components/dashboard/SearchResults'
@@ -10,7 +10,7 @@ function FilteredSearchPageRoute() {
   const searchParams = useSearchParams()
   const params = useParams()
 
-  const filter = params.filter as string
+  const filter = (params as { filter: string }).filter
   const [query, setQuery] = useState(searchParams.get('q') || '')
 
   // Sync query state with URL changes

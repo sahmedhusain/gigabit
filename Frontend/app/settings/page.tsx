@@ -7,10 +7,24 @@ import ProfileSettings from '@/components/ProfileSettings';
 import AccountSettings from '@/components/AccountSettings';
 import PrivacySettings from '@/components/PrivacySettings';
 import NotificationSettings from '@/components/NotificationSettings';
-import { Settings, User, Shield, Lock, Bell } from 'lucide-react';
+import DeleteAccountModal from '@/components/DeleteAccountModal';
+import { Settings, User, Shield, Lock, Bell, X } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 
 function SettingsPage() {
   const [activeTab, setActiveTab] = useState('profile');
+  const router = useRouter();
+
+  // Modal state for account settings
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteConfirmation, setDeleteConfirmation] = useState('');
+  const [deletePassword, setDeletePassword] = useState('');
+  const [deleteCountdown, setDeleteCountdown] = useState(5);
+  const [deletePasswordError, setDeletePasswordError] = useState('');
+
+  const handleGoBack = () => {
+    router.back();
+  };
 
   const tabs = [
     {
@@ -48,7 +62,20 @@ function SettingsPage() {
       case 'profile':
         return <ProfileSettings />;
       case 'account':
-        return <AccountSettings />;
+        return (
+          <AccountSettings
+            showDeleteModal={showDeleteModal}
+            setShowDeleteModal={setShowDeleteModal}
+            deleteConfirmation={deleteConfirmation}
+            setDeleteConfirmation={setDeleteConfirmation}
+            deletePassword={deletePassword}
+            setDeletePassword={setDeletePassword}
+            deleteCountdown={deleteCountdown}
+            setDeleteCountdown={setDeleteCountdown}
+            deletePasswordError={deletePasswordError}
+            setDeletePasswordError={setDeletePasswordError}
+          />
+        );
       case 'privacy':
         return <PrivacySettings />;
       case 'notifications':
@@ -64,20 +91,30 @@ function SettingsPage() {
         <div className="backdrop-blur-xl bg-white/10 rounded-2xl border border-white/20 shadow-xl overflow-hidden h-full flex flex-col">
           {/* Header Section */}
           <div className="p-6 border-b border-white/10 flex-shrink-0">
-            <div className="flex items-center space-x-4">
-              <div className="p-3 bg-gradient-to-br from-blue-500 to-cyan-600 rounded-xl">
-                <Settings className="w-8 h-8 text-white" />
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-4">
+                <div>
+                  <h1 className="text-3xl font-bold text-white flex items-center">
+                    <Settings className="w-7 h-7 text-emerald-400 mr-2" />
+                    Settings
+                  </h1>
+                  <p className="text-white/70">Manage your account preferences and privacy</p>
+                </div>
               </div>
-              <div>
-                <h1 className="text-3xl font-bold text-white">Settings</h1>
-                <p className="text-white/70">Manage your account preferences and privacy</p>
-              </div>
+              <button
+                onClick={handleGoBack}
+                className="p-3 text-white/70 hover:text-white hover:bg-white/10 rounded-xl transition-all duration-200 hover:scale-110"
+                title="Go back"
+                aria-label="Go back"
+              >
+                <X className="w-6 h-6" />
+              </button>
             </div>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-4 flex-1 min-h-0">
             {/* Left Sidebar Navigation */}
-            <div className="lg:col-span-1 border-r border-white/10 lg:border-r overflow-y-auto">
+            <div className="lg:col-span-1 border-r border-white/10 lg:border-r overflow-y-auto scrollbar-hide">
               <div className="p-4">
                 <nav className="space-y-2">
                   {tabs.map((tab) => {
@@ -90,7 +127,7 @@ function SettingsPage() {
                         onClick={() => setActiveTab(tab.id)}
                         className={`group w-full relative overflow-hidden rounded-xl transition-all duration-300 p-4 text-left ${
                           isActive
-                            ? 'bg-white/15 backdrop-blur-xl shadow-lg scale-[1.02] border border-white/30'
+                            ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-lg shadow-emerald-500/25 scale-[1.02]'
                             : 'bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20'
                         }`}
                       >
@@ -120,7 +157,7 @@ function SettingsPage() {
 
                         {/* Active indicator */}
                         {isActive && (
-                          <div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-blue-500 to-cyan-600 rounded-r-xl"></div>
+                          <div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-emerald-500 to-teal-500 rounded-r-xl"></div>
                         )}
                       </button>
                     );
@@ -130,7 +167,7 @@ function SettingsPage() {
             </div>
 
             {/* Content Section */}
-            <div className="lg:col-span-3 overflow-y-auto">
+            <div className="lg:col-span-3 overflow-y-auto scrollbar-hide">
               <div className="p-6">
                 {renderTabContent()}
               </div>
@@ -138,6 +175,22 @@ function SettingsPage() {
           </div>
         </div>
       </div>
+
+      {/* Delete Account Modal - Rendered outside scrollable container */}
+      {showDeleteModal && (
+        <DeleteAccountModal
+          showDeleteModal={showDeleteModal}
+          setShowDeleteModal={setShowDeleteModal}
+          deleteConfirmation={deleteConfirmation}
+          setDeleteConfirmation={setDeleteConfirmation}
+          deletePassword={deletePassword}
+          setDeletePassword={setDeletePassword}
+          deleteCountdown={deleteCountdown}
+          setDeleteCountdown={setDeleteCountdown}
+          deletePasswordError={deletePasswordError}
+          setDeletePasswordError={setDeletePasswordError}
+        />
+      )}
     </AppLayout>
   );
 }

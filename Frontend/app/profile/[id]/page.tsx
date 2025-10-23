@@ -1,5 +1,5 @@
 'use client'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState, use } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import ProtectedRoute from '@/components/ProtectedRoute'
 import AppLayout from '@/components/AppLayout'
@@ -13,7 +13,7 @@ function ProfilePage() {
   const router = useRouter()
   const { user: currentUser } = useAuth()
   const { error } = useToast()
-  const userId = params.id as string
+  const userId = (params as { id: string }).id
 
   const [profileUser, setProfileUser] = useState<User | null>(null)
   const [userPosts, setUserPosts] = useState<Post[]>([])
@@ -272,17 +272,24 @@ function ProfilePage() {
       <ProfileSection
         currentUser={profileUser ? {
           id: profileUser.id,
-          name: `${profileUser.first_name} ${profileUser.last_name}`,
-          username: profileUser.nickname || profileUser.email.split('@')[0],
+          name: profileUser.is_deleted ? 'Deleted Account' : `${profileUser.first_name} ${profileUser.last_name}`,
+          username: profileUser.is_deleted ? 'deleted' : (profileUser.nickname || profileUser.email?.split('@')[0] || 'user'),
           avatar: profileUser.avatar,
           isPrivate: profileUser.is_private,
-          email: profileUser.email,
-          firstName: profileUser.first_name,
-          lastName: profileUser.last_name,
+          email: profileUser.is_deleted ? 'deleted@example.com' : profileUser.email,
+          firstName: profileUser.is_deleted ? 'Deleted' : profileUser.first_name,
+          lastName: profileUser.is_deleted ? 'Account' : profileUser.last_name,
           dateOfBirth: profileUser.date_of_birth,
-          nickname: profileUser.nickname,
-          aboutMe: profileUser.about_me,
-          memberSince: profileUser.created_at
+          nickname: profileUser.is_deleted ? 'deleted' : profileUser.nickname,
+          aboutMe: profileUser.is_deleted ? 'This account has been deleted' : profileUser.about_me,
+          gender: profileUser.gender,
+          memberSince: profileUser.created_at,
+          genderPrivacy: profileUser.gender_privacy,
+          birthdayPrivacy: profileUser.birthday_privacy,
+          is_private: profileUser.is_private,
+          first_name: profileUser.is_deleted ? 'Deleted' : profileUser.first_name,
+          last_name: profileUser.is_deleted ? 'Account' : profileUser.last_name,
+          is_deleted: profileUser.is_deleted
         } : null}
         followers={followers}
         following={following}

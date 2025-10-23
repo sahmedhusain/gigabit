@@ -72,7 +72,7 @@ func (s *SearchService) searchUsers(currentUserID uint, pattern string, limit in
 	query := `
 SELECT id, first_name, last_name, email, avatar, nickname
 FROM users
-WHERE id != ? AND (
+WHERE id != ? AND is_deleted = false AND (
 LOWER(first_name) LIKE ? OR
 LOWER(last_name) LIKE ? OR
 LOWER(email) LIKE ? OR

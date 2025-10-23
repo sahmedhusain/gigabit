@@ -160,11 +160,11 @@ func (h *UserHandler) GetAllUsers(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get all users except the current user
+	// Get all users except the current user and deleted users
 	query := `
 		SELECT id, email, first_name, last_name, avatar, nickname, is_private
 		FROM users 
-		WHERE id != ? 
+		WHERE id != ? AND is_deleted = false
 		ORDER BY first_name, last_name
 		LIMIT 50
 		`
@@ -303,8 +303,8 @@ func (h *UserHandler) DeleteAccount(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Delete user (this will cascade delete related data if foreign keys are set)
-	if err := h.userService.DeleteUser(userID); err != nil {
+	// Perform comprehensive account deletion
+	if err := h.userService.DeleteAccount(userID); err != nil {
 		writeError(w, http.StatusInternalServerError, "Failed to delete account")
 		return
 	}
@@ -344,6 +344,98 @@ func (h *UserHandler) TogglePrivacy(w http.ResponseWriter, r *http.Request) {
 	user.IsPrivate = req.IsPrivate
 	if err := h.userService.UpdateUser(user); err != nil {
 		writeError(w, http.StatusInternalServerError, "Failed to update privacy")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, user.ToResponse())
+}
+
+func (h *UserHandler) UpdateBirthdayPrivacy(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPut {
+		writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
+
+	userID, exists := middleware.GetUserID(r)
+	if !exists {
+		writeError(w, http.StatusUnauthorized, "User not authenticated")
+		return
+	}
+
+	var req struct {
+		BirthdayPrivacy string `json:"birthday_privacy"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	// Validate privacy setting
+	validSettings := map[string]bool{
+		"everyone":  true,
+		"friends":   true,
+		"followers": true,
+	}
+	if !validSettings[req.BirthdayPrivacy] {
+		writeError(w, http.StatusBadRequest, "Invalid birthday privacy setting. Must be one of: everyone, friends, followers")
+		return
+	}
+
+	user, err := h.userService.GetUserByID(userID)
+	if err != nil {
+		writeError(w, http.StatusNotFound, "User not found")
+		return
+	}
+
+	user.BirthdayPrivacy = req.BirthdayPrivacy
+	if err := h.userService.UpdateUser(user); err != nil {
+		writeError(w, http.StatusInternalServerError, "Failed to update birthday privacy")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, user.ToResponse())
+}
+
+func (h *UserHandler) UpdateGenderPrivacy(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPut {
+		writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
+
+	userID, exists := middleware.GetUserID(r)
+	if !exists {
+		writeError(w, http.StatusUnauthorized, "User not authenticated")
+		return
+	}
+
+	var req struct {
+		GenderPrivacy string `json:"gender_privacy"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	// Validate privacy setting
+	validSettings := map[string]bool{
+		"everyone":  true,
+		"friends":   true,
+		"followers": true,
+	}
+	if !validSettings[req.GenderPrivacy] {
+		writeError(w, http.StatusBadRequest, "Invalid gender privacy setting. Must be one of: everyone, friends, followers")
+		return
+	}
+
+	user, err := h.userService.GetUserByID(userID)
+	if err != nil {
+		writeError(w, http.StatusNotFound, "User not found")
+		return
+	}
+
+	user.GenderPrivacy = req.GenderPrivacy
+	if err := h.userService.UpdateUser(user); err != nil {
+		writeError(w, http.StatusInternalServerError, "Failed to update gender privacy")
 		return
 	}
 

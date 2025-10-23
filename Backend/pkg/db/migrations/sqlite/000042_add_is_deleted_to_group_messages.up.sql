@@ -1,0 +1,1 @@
+ALTER TABLE group_messages ADD COLUMN is_deleted BOOLEAN DEFAULT FALSE;

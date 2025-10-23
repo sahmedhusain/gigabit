@@ -70,6 +70,13 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 			continue
 		}
 
+		// Check if user is deleted
+		var isDeleted bool
+		err = s.db.QueryRow("SELECT is_deleted FROM users WHERE id = ?", inviteeID).Scan(&isDeleted)
+		if err != nil || isDeleted {
+			continue
+		}
+
 		if _, execErr = tx.Exec(memberQuery, group.ID, inviteeID, "sent", "member", group.CreatorID, nil, inviteTime, inviteTime); execErr != nil {
 			var sqliteErr sqlite3.Error
 			if errors.As(execErr, &sqliteErr) {
@@ -305,6 +312,13 @@ func (s *GroupService) InviteUsers(groupID, inviterID uint, userIDs []uint) erro
 
 	for _, userID := range userIDs {
 		if userID == inviterID {
+			continue
+		}
+
+		// Check if user is deleted
+		var isDeleted bool
+		err = s.db.QueryRow("SELECT is_deleted FROM users WHERE id = ?", userID).Scan(&isDeleted)
+		if err != nil || isDeleted {
 			continue
 		}
 
@@ -1184,6 +1198,7 @@ func (s *GroupService) GetInvitableUsers(groupID uint, currentUserID uint, searc
 SELECT u.id, u.first_name, u.last_name, u.nickname, u.avatar, u.status
 FROM users u
 WHERE u.id != ?
+AND u.is_deleted = false
 AND u.id NOT IN (
     SELECT gm.user_id FROM group_members gm WHERE gm.group_id = ? AND gm.status IN ('member', 'sent', 'requested')
 )

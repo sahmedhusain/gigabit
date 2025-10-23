@@ -1,6 +1,5 @@
-'use client'
-import dynamic from 'next/dynamic'
-import { useState } from 'react'
+"use client"
+import React, { useState } from "react";
 import Link from 'next/link'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
@@ -54,6 +53,12 @@ function LoginPage() {
       setIsLoading(false)
     }
   }
+
+  const [year, setYear] = useState<number | null>(null);
+  // Set year on client only to avoid hydration mismatch
+  React.useEffect(() => {
+    setYear(new Date().getFullYear());
+  }, []);
 
   return (
     <div className="fixed inset-0 h-screen w-screen overflow-hidden bg-gradient-to-br from-emerald-900 via-teal-900 to-cyan-800">
@@ -324,7 +329,7 @@ function LoginPage() {
         <div className="flex items-center space-x-6 text-xs text-white/40">
           <button onClick={() => setShowTerms(true)} className="hover:text-white/60 transition-colors">Terms</button>
           <button onClick={() => setShowPrivacy(true)} className="hover:text-white/60 transition-colors">Privacy</button>
-          <button className="hover:text-white/60 transition-colors">© 2025 Gigabit</button>
+          <button className="hover:text-white/60 transition-colors">© {year ? year : ''} Gigabit</button>
         </div>
       </div>
 
@@ -335,4 +340,4 @@ function LoginPage() {
   )
 }
 
-export default dynamic(() => Promise.resolve(LoginPage), { ssr: false })
+export default LoginPage

@@ -18,8 +18,11 @@ type User struct {
 	AboutMe          *string   `json:"about_me"`
 	Gender           *string   `json:"gender"`
 	IsPrivate        bool      `json:"is_private"`
+	BirthdayPrivacy  string    `json:"birthday_privacy"`
+	GenderPrivacy    string    `json:"gender_privacy"`
 	Status           string    `json:"status"`
 	LastStatusChange time.Time `json:"last_status_change"`
+	IsDeleted        bool      `json:"is_deleted"`
 	CreatedAt        time.Time `json:"created_at"`
 	UpdatedAt        time.Time `json:"updated_at"`
 }
@@ -35,8 +38,11 @@ type UserResponse struct {
 	AboutMe          *string   `json:"about_me"`
 	Gender           *string   `json:"gender"`
 	IsPrivate        bool      `json:"is_private"`
+	BirthdayPrivacy  string    `json:"birthday_privacy"`
+	GenderPrivacy    string    `json:"gender_privacy"`
 	Status           string    `json:"status"`
 	LastStatusChange time.Time `json:"last_status_change"`
+	IsDeleted        bool      `json:"is_deleted"`
 	CreatedAt        time.Time `json:"created_at"`
 	UpdatedAt        time.Time `json:"updated_at"`
 }
@@ -70,8 +76,11 @@ func (u *User) ToResponse() UserResponse {
 		AboutMe:          u.AboutMe,
 		Gender:           u.Gender,
 		IsPrivate:        u.IsPrivate,
+		BirthdayPrivacy:  u.BirthdayPrivacy,
+		GenderPrivacy:    u.GenderPrivacy,
 		Status:           u.Status,
 		LastStatusChange: u.LastStatusChange,
+		IsDeleted:        u.IsDeleted,
 		CreatedAt:        u.CreatedAt,
 		UpdatedAt:        u.UpdatedAt,
 	}

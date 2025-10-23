@@ -41,7 +41,7 @@ export default function ProfilePage() {
     isPrivate: currentUser.is_private,
     followers: followers.length,
     following: following.length,
-    posts: 0, // Add posts count
+    posts: userPosts.length,
     status: 'online',
     lastStatusChange: new Date().toISOString()
   } : null;
@@ -69,7 +69,8 @@ export default function ProfilePage() {
       ]);
 
       if (postsResponse.status === 'fulfilled') {
-        const postsArr = Array.isArray(postsResponse.value) ? postsResponse.value as unknown[] : [];
+        const postsData = postsResponse.value as { posts: unknown[] };
+        const postsArr = Array.isArray(postsData.posts) ? postsData.posts : [];
         const mappedPosts = postsArr.map((post: unknown) => {
           const p = (post as Record<string, unknown>) || {};
           const user = (p.user as Record<string, unknown>) || {};
@@ -232,7 +233,10 @@ export default function ProfilePage() {
                     dateOfBirth: profileUser.date_of_birth,
                     nickname: profileUser.nickname,
                     aboutMe: profileUser.about_me,
-                    memberSince: profileUser.created_at
+                    gender: profileUser.gender,
+                    memberSince: profileUser.created_at,
+                    genderPrivacy: profileUser.gender_privacy,
+                    birthdayPrivacy: profileUser.birthday_privacy
                   } : null}
                   followers={followers}
                   following={following}

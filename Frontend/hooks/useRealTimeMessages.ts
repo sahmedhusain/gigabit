@@ -209,7 +209,13 @@ export function useRealTimeMessages() {
       if (conversationType === 'group' && participantId === undefined) {
         // participantId is not used for group, so we can use it as a signal
         // If conversationId matches a groupId (i.e., no conversation yet), use group endpoint
-        response = await api.getGroupMessages(conversationId, limit, offset)
+        try {
+          response = await api.getGroupMessages(conversationId, limit, offset)
+        } catch (groupError: any) {
+          console.warn('Failed to fetch group messages, user may not have access:', groupError.message)
+          // Return empty response instead of throwing
+          response = { messages: [], count: 0, limit, offset }
+        }
       } else {
         response = await api.getConversationMessages(conversationId, limit, offset)
       }

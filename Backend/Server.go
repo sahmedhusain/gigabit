@@ -156,6 +156,8 @@ func (s *Server) setupRoutes() {
 	s.router.HandleFunc("/api/users/", s.handleUserRoute(followHandler, wsHandler))
 	s.router.HandleFunc("/api/users/invitable/", s.handleInvitableUsersRoute(groupHandler))
 	s.router.HandleFunc("/api/account", s.handleRoute(userHandler.DeleteAccount, true))
+	s.router.HandleFunc("/api/privacy/birthday", s.handleRoute(userHandler.UpdateBirthdayPrivacy, true))
+	s.router.HandleFunc("/api/privacy/gender", s.handleRoute(userHandler.UpdateGenderPrivacy, true))
 
 	// Status routes
 	s.router.HandleFunc("/api/status/me", s.handleRoute(statusHandler.GetMyStatus, true))

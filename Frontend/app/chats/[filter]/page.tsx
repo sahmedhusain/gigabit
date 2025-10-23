@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, use } from 'react'
 import { useRouter, useParams, useSearchParams } from 'next/navigation'
 import ProtectedRoute from '@/components/ProtectedRoute'
 import ChatWindow from '@/components/ChatWindow'
@@ -28,7 +28,7 @@ function ChatsFilterPage() {
   const router = useRouter()
   const params = useParams()
   const searchParams = useSearchParams()
-  const filter = params.filter as string
+  const filter = (params as { filter: string }).filter
   const { user } = useAuth()
   const { isConnected, onlineUsers } = useWebSocket()
   const { success, error } = useToast()

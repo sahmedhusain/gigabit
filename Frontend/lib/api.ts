@@ -36,6 +36,9 @@ export interface User {
   last_status_change: string;
   created_at: string;
   updated_at: string;
+  gender_privacy: string;
+  birthday_privacy: string;
+  is_deleted?: boolean;
 }
 
 export interface Bookmark {
@@ -64,6 +67,8 @@ export interface MessageItem {
   message_type: 'private' | 'group';
   image_url?: string;
   created_at: string;
+  is_read?: boolean;
+  is_deleted?: boolean;
   shared_post?: {
     id: number;
     user_id: number;
@@ -800,15 +805,15 @@ export class ApiClient {
     });
   }
 
-  async getRecentChatsAndGroups(): Promise<{ chats: any[] }> {
-    return this.request<{ chats: any[] }>('/api/share/recent', {
+  async getRecentChatsAndGroups(): Promise<{ chats: ChatItem[] }> {
+    return this.request<{ chats: ChatItem[] }>('/api/share/recent', {
       method: 'GET',
     });
   }
 
-  async searchShareableEntities(query: string): Promise<{ chats: any[] }> {
+  async searchShareableEntities(query: string): Promise<{ chats: ChatItem[] }> {
     const params = new URLSearchParams({ q: query });
-    return this.request<{ chats: any[] }>(`/api/share/search?${params}`, {
+    return this.request<{ chats: ChatItem[] }>(`/api/share/search?${params}`, {
       method: 'GET',
     });
   }
@@ -1367,6 +1372,20 @@ export class ApiClient {
     return this.request<{ message: string; user: User }>(`/api/profile/privacy`, {
       method: 'PUT',
       body: JSON.stringify({ is_private: isPrivate }),
+    });
+  }
+
+  async updateBirthdayPrivacy(birthdayPrivacy: string): Promise<{ message: string; user: User }> {
+    return this.request<{ message: string; user: User }>('/api/privacy/birthday', {
+      method: 'PUT',
+      body: JSON.stringify({ birthday_privacy: birthdayPrivacy }),
+    });
+  }
+
+  async updateGenderPrivacy(genderPrivacy: string): Promise<{ message: string; user: User }> {
+    return this.request<{ message: string; user: User }>('/api/privacy/gender', {
+      method: 'PUT',
+      body: JSON.stringify({ gender_privacy: genderPrivacy }),
     });
   }
 

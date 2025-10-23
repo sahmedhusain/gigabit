@@ -117,6 +117,17 @@ func (h *Hub) saveGroupMessageToDB(message *models.Message) error {
 }
 
 func (h *Hub) canUsersMessage(senderID, receiverID uint) (bool, error) {
+	// Check if either user is deleted
+	var deleted1, deleted2 bool
+	err := h.db.QueryRow("SELECT is_deleted FROM users WHERE id = ?", senderID).Scan(&deleted1)
+	if err != nil || deleted1 {
+		return false, nil
+	}
+	err = h.db.QueryRow("SELECT is_deleted FROM users WHERE id = ?", receiverID).Scan(&deleted2)
+	if err != nil || deleted2 {
+		return false, nil
+	}
+
 	query := `
 		SELECT 1 FROM follows 
 		WHERE (follower_id = ? AND following_id = ? AND status = 'accepted')
@@ -124,7 +135,7 @@ func (h *Hub) canUsersMessage(senderID, receiverID uint) (bool, error) {
 		LIMIT 1
 	`
 	var exists int
-	err := h.db.QueryRow(query, senderID, receiverID, receiverID, senderID).Scan(&exists)
+	err = h.db.QueryRow(query, senderID, receiverID, receiverID, senderID).Scan(&exists)
 	if err == nil {
 		return true, nil
 	}

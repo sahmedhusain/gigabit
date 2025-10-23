@@ -54,8 +54,8 @@ func (s *ChatService) GetUnifiedChats(userID uint) ([]models.UnifiedChatItem, er
 func (s *ChatService) getPrivateChats(userID uint) ([]models.UnifiedChatItem, error) {
 	query := `
 		SELECT c.id, c.participant1_id, c.participant2_id, c.last_message_id, c.updated_at,
-			   u1.id, u1.first_name, u1.last_name, u1.avatar, u1.nickname,
-			   u2.id, u2.first_name, u2.last_name, u2.avatar, u2.nickname,
+			   u1.id, u1.first_name, u1.last_name, u1.avatar, u1.nickname, u1.is_deleted,
+			   u2.id, u2.first_name, u2.last_name, u2.avatar, u2.nickname, u2.is_deleted,
 			   m.id, m.content, m.created_at, m.sender_id,
 			   (
 				   SELECT COUNT(*) FROM private_messages pm 
@@ -86,7 +86,7 @@ func (s *ChatService) getPrivateChats(userID uint) ([]models.UnifiedChatItem, er
 			ORDER BY pm.created_at DESC
 			LIMIT 1
 		)
-		WHERE ((c.participant1_id = ? AND c.participant1_deleted = FALSE) OR (c.participant2_id = ? AND c.participant2_deleted = FALSE))
+		WHERE ((c.participant1_id = ? AND c.participant1_deleted = FALSE AND u2.is_deleted = FALSE) OR (c.participant2_id = ? AND c.participant2_deleted = FALSE AND u1.is_deleted = FALSE))
 		ORDER BY c.updated_at DESC
 	`
 
@@ -111,8 +111,8 @@ func (s *ChatService) getPrivateChats(userID uint) ([]models.UnifiedChatItem, er
 
 		err := rows.Scan(
 			&convID, &participant1ID, &participant2ID, &lastMessageID, &updatedAt,
-			&p1.ID, &p1.FirstName, &p1.LastName, &p1.Avatar, &p1.Nickname,
-			&p2.ID, &p2.FirstName, &p2.LastName, &p2.Avatar, &p2.Nickname,
+			&p1.ID, &p1.FirstName, &p1.LastName, &p1.Avatar, &p1.Nickname, &p1.IsDeleted,
+			&p2.ID, &p2.FirstName, &p2.LastName, &p2.Avatar, &p2.Nickname, &p2.IsDeleted,
 			&msgID, &msgContent, &msgCreatedAt, &msgSenderID, &unreadCount,
 		)
 		if err != nil {
@@ -168,12 +168,12 @@ func (s *ChatService) getGroupChats(userID uint) ([]models.UnifiedChatItem, erro
 	query := `
 	        SELECT g.id, g.name, g.privacy, g.avatar, gm.created_at, gm.role, gc.id as conv_id,
 	               m.content, m.created_at as last_message_time, m.sender_id,
-	               u.id, u.first_name, u.last_name, u.avatar, u.nickname
+	               u.id, u.first_name, u.last_name, u.avatar, u.nickname, u.is_deleted
 	        FROM groups g
 	        JOIN group_members gm ON g.id = gm.group_id
 	        LEFT JOIN group_conversations gc ON g.id = gc.group_id
 	        LEFT JOIN group_messages m ON gc.last_message_id = m.id
-	        LEFT JOIN users u ON m.sender_id = u.id
+	        LEFT JOIN users u ON m.sender_id = u.id AND u.is_deleted = FALSE
 	        WHERE gm.user_id = ? AND gm.status = 'member'
 	        ORDER BY COALESCE(m.created_at, gm.created_at) DESC
 	`
@@ -201,9 +201,10 @@ func (s *ChatService) getGroupChats(userID uint) ([]models.UnifiedChatItem, erro
 		var senderLastName sql.NullString
 		var senderAvatar sql.NullString
 		var senderNickname sql.NullString
+		var senderDeleted sql.NullBool
 
 		err := rows.Scan(&groupID, &groupName, &privacy, &groupAvatar, &createdAt, &memberRole, &convID, &lastMessage, &lastMessageTime, &msgSenderID,
-			&senderID, &senderFirstName, &senderLastName, &senderAvatar, &senderNickname)
+			&senderID, &senderFirstName, &senderLastName, &senderAvatar, &senderNickname, &senderDeleted)
 		if err != nil {
 			return nil, err
 		}
@@ -224,6 +225,7 @@ func (s *ChatService) getGroupChats(userID uint) ([]models.UnifiedChatItem, erro
 				LastName:  senderLastName.String,
 				Avatar:    avatar,
 				Nickname:  nickname,
+				IsDeleted: senderDeleted.Valid && senderDeleted.Bool,
 			}
 		}
 

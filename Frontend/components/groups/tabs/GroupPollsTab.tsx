@@ -48,8 +48,10 @@ const GroupPollsTab: React.FC<GroupPollsTabProps> = ({ groupId }) => {
     try {
       const pollsData = await api.getGroupPolls(groupId)
       setPolls(pollsData)
-    } catch (error) {
-      console.error('Failed to fetch polls:', error)
+    } catch (error: any) {
+      console.warn('Failed to fetch polls, endpoint may not be implemented:', error.message)
+      // Set empty polls array instead of throwing
+      setPolls([])
     } finally {
       setIsLoading(false)
     }

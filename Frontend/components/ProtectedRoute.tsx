@@ -11,6 +11,11 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
   const { isAuthenticated, isLoading } = useAuth()
   const router = useRouter()
   const [hasHydrated, setHasHydrated] = useState(false)
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   useEffect(() => {
     setHasHydrated(true)
@@ -21,6 +26,10 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
       router.push('/login')
     }
   }, [isAuthenticated, isLoading, router, hasHydrated])
+
+  if (!mounted) {
+    return null
+  }
 
   if (!hasHydrated || isLoading) {
     return (

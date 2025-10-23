@@ -13,6 +13,7 @@ type Message struct {
 	ImageURL    *string   `json:"image_url"`
 	MessageType string    `json:"message_type"` // "private", "group"
 	IsRead      bool      `json:"is_read"`
+	IsDeleted   bool      `json:"is_deleted"` // True if sender deleted their account
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
 }
@@ -26,6 +27,7 @@ type MessageResponse struct {
 	ImageURL    *string               `json:"image_url"`
 	MessageType string                `json:"message_type"`
 	IsRead      bool                  `json:"is_read"`
+	IsDeleted   bool                  `json:"is_deleted"`
 	CreatedAt   time.Time             `json:"created_at"`
 	UpdatedAt   time.Time             `json:"updated_at"`
 	Sender      UserResponse          `json:"sender"`

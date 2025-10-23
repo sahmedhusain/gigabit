@@ -73,7 +73,7 @@ function FeedPage() {
         return
       }
 
-      const mappedPosts = response.posts.map((post: any) => {
+      const mappedPosts = response.posts.map((post) => {
         const userObj = post.user
         const imageUrl = typeof post.image_url === 'string' ? String(post.image_url) : undefined
 
@@ -143,7 +143,7 @@ function FeedPage() {
         })
       })
     }
-  }, [currentPage, hasMoreResults, isLoadingMore, fetchFeedPosts])
+  }, [currentPage, hasMoreResults, isLoadingMore, fetchFeedPosts, feedSubTab])
 
   const fetchUsers = async () => {
     try {

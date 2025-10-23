@@ -18,7 +18,7 @@ export default function NotificationSettings() {
         </div>
         <h3 className="text-xl font-semibold text-white mb-3">Coming Soon</h3>
         <p className="text-white/70 max-w-md mx-auto">
-          Notification settings will be available in a future update. You'll be able to customize how and when you receive notifications about posts, comments, follows, and more.
+          Notification settings will be available in a future update. You&apos;ll be able to customize how and when you receive notifications about posts, comments, follows, and more.
         </p>
       </div>
     </div>

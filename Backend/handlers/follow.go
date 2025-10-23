@@ -64,6 +64,12 @@ func (h *FollowHandler) SendFollowRequest(w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	// Check if target user is deleted
+	if targetUser.IsDeleted {
+		writeError(w, http.StatusNotFound, "User not found")
+		return
+	}
+
 	// Check if already following or request exists
 	existingFollow, err := h.followService.GetFollowRelation(currentUserID, uint(targetUserID))
 	if err == nil && existingFollow != nil {

@@ -1,14 +1,14 @@
 'use client'
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, use } from 'react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
-import { User, Heart, MessageSquare, MoreHorizontal, Send, Image as ImageIcon, Bookmark, ZoomIn, ZoomOut, Download, X, Trash2, Lock, ArrowUp, ArrowDown } from 'lucide-react'
+import { User as UserIcon, Heart, MessageSquare, MoreHorizontal, Send, Image as ImageIcon, Bookmark, ZoomIn, ZoomOut, Download, X, Trash2, Lock, ArrowUp, ArrowDown } from 'lucide-react'
 import ProtectedRoute from '@/components/ProtectedRoute'
 import AppLayout from '@/components/AppLayout'
 import { useAuth } from '@/context/AuthContext'
 import { useWebSocket } from '@/context/WebSocketContext'
 import { useToast } from '@/context/ToastContext'
 import { useConnectionStatus, useOptimisticUpdate } from '@/hooks'
-import { api, APIPost, Comment as CommentType, NetworkError } from '@/lib/api'
+import { api, APIPost, Comment as CommentType, NetworkError, User } from '@/lib/api'
 import { getAvatarUrl } from '@/utils/avatarUtils'
 import Image from 'next/image'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -22,7 +22,8 @@ interface CommentWithUser extends CommentType {
 
 function PostDetailPage() {
   const { user: currentUser } = useAuth()
-  const { id } = useParams()
+  const params = useParams() as { id: string }
+  const { id } = params
   const router = useRouter()
   const searchParams = useSearchParams()
   const { user } = useAuth()
@@ -52,7 +53,7 @@ function PostDetailPage() {
   const [commentToDelete, setCommentToDelete] = useState<number | null>(null)
   const [showManagePrivacy, setShowManagePrivacy] = useState(false)
   const [selectedPostForPrivacy, setSelectedPostForPrivacy] = useState<APIPost | null>(null)
-  const [availableUsers, setAvailableUsers] = useState<any[]>([])
+  const [availableUsers, setAvailableUsers] = useState<User[]>([])
   const [loadingUsers, setLoadingUsers] = useState(false)
   const [commentSort, setCommentSort] = useState<'newest' | 'oldest'>('newest')
   const [isSorting, setIsSorting] = useState(false)
@@ -63,7 +64,7 @@ function PostDetailPage() {
     const { performUpdate: performOptimisticUpdate, isLoading: likePending } = useOptimisticUpdate(
         post ? { ...post, is_liked: post.is_liked, like_count: post.like_count } : null,
         {
-            onError: () => error('Failed to update like')
+            onError: (_) => error('Failed to update like')
         }
     )
 
@@ -543,7 +544,7 @@ function PostDetailPage() {
     // Load post on component mount and when sort changes
     useEffect(() => {
         fetchPost()
-    }, [fetchPost, commentSort])
+    }, [fetchPost])
 
   if (isLoadingPost) {
     return (
@@ -987,12 +988,15 @@ function PostDetailPage() {
                               transition={{ type: 'spring', stiffness: 300, damping: 20 }}
                             >
                               <div className="relative inline-block overflow-hidden rounded-2xl border border-white/20 shadow-lg group-hover/image:shadow-emerald-500/20 transition-shadow duration-300">
-                                <img
+                                <Image
                                   src={comment.image_url.startsWith('http') ?
                                     comment.image_url :
                                     `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}${comment.image_url}`
                                   }
                                   alt="Comment image"
+                                  width={400}
+                                  height={300}
+                                  unoptimized={true}
                                   className="max-w-full max-h-72 object-contain hover:scale-105 cursor-pointer transition-transform duration-500 rounded-2xl"
                                   onClick={() => comment.image_url && setImagePopupUrl(comment.image_url.startsWith('http') ?
                                     comment.image_url :
@@ -1332,19 +1336,25 @@ function PostDetailPage() {
 
             {/* Image Container */}
             <div className="relative w-full h-full max-w-[90vw] max-h-[calc(100vh-200px)] flex items-center justify-center">
-              <img
-                src={imagePopupUrl}
-                alt="Full size image"
-                className="max-w-full max-h-full object-contain rounded-2xl shadow-2xl transition-transform duration-300 cursor-grab active:cursor-grabbing select-none"
+              <div
                 style={{
                   transform: `scale(${imageZoom})`,
                   transformOrigin: 'center center'
                 }}
-                onClick={(e) => e.stopPropagation()}
-                onDoubleClick={handleResetZoom}
-                onWheel={handleWheelZoom}
-                draggable={false}
-              />
+              >
+                <Image
+                  src={imagePopupUrl}
+                  alt="Full size image"
+                  width={800}
+                  height={600}
+                  unoptimized={true}
+                  className="max-w-full max-h-full object-contain rounded-2xl shadow-2xl transition-transform duration-300 cursor-grab active:cursor-grabbing select-none"
+                  onClick={(e) => e.stopPropagation()}
+                  onDoubleClick={handleResetZoom}
+                  onWheel={handleWheelZoom}
+                  draggable={false}
+                />
+              </div>
             </div>
           </div>
         )}

@@ -1,5 +1,5 @@
 import { ChatItem as ChatItemType } from '@/types/chat';
-import { Users, Clock, Trash2, Check, Clock3, XCircle, ShieldCheck, Lock, MoreHorizontal, Eye, EyeOff, Info, LogOut, Settings, User as UserIcon, Crown, Shield } from 'lucide-react';
+import { Clock, Trash2, Check, ShieldCheck, MoreHorizontal, Eye, EyeOff, Info, LogOut, Settings, User as UserIcon, Crown, Shield } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Image from 'next/image';
 import { useState, useRef, useEffect, type MouseEvent as ReactMouseEvent } from 'react';
@@ -31,7 +31,6 @@ export default function ChatItem({ item, onClick, onDelete, getUserStatus, typin
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0 });
-  const [groupMembers, setGroupMembers] = useState<any[]>([]);
   const [userRole, setUserRole] = useState<string>('');
   const [nextAdmin, setNextAdmin] = useState<string>('');
   const [hasExistingAdmins, setHasExistingAdmins] = useState(false);
@@ -44,7 +43,6 @@ export default function ChatItem({ item, onClick, onDelete, getUserStatus, typin
     ? (item.groupStatus ?? item.group?.member_status ?? (item.group?.is_member ? 'member' : undefined))
     : undefined;
   const resolvedGroupRole = isGroup ? (item.groupRole ?? item.group?.role ?? undefined) : undefined;
-  const resolvedGroupPrivacy = isGroup ? (item.groupPrivacy ?? item.group?.privacy ?? undefined) : undefined;
 
   // Helper function to calculate smart dropdown position
   const calculateMenuPosition = (buttonElement: HTMLElement) => {
@@ -146,12 +144,6 @@ export default function ChatItem({ item, onClick, onDelete, getUserStatus, typin
     const d = new Date(String(raw))
     if (isNaN(d.getTime())) return new Date(0)
     return d
-  }
-
-  const formatTime = (value: string | number | undefined | null) => {
-    const d = parseDate(value)
-    if (d.getTime() === 0) return 'No messages'
-    return d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true })
   }
 
   const isSameDay = (a: Date, b: Date) =>
@@ -291,7 +283,6 @@ export default function ChatItem({ item, onClick, onDelete, getUserStatus, typin
         api.getUserRole(groupId)
       ]);
       
-      setGroupMembers(membersData.members);
       setUserRole(roleData.role);
       
       // Fetch next admin info for creators and check other admins for admin users
@@ -336,9 +327,7 @@ export default function ChatItem({ item, onClick, onDelete, getUserStatus, typin
     if (groupId && onLeaveGroup) {
       onLeaveGroup(groupId);
     }
-    setShowLeaveConfirm(false);
     setUserRole('');
-    setGroupMembers([]);
     setNextAdmin('');
   };
 
@@ -359,15 +348,6 @@ export default function ChatItem({ item, onClick, onDelete, getUserStatus, typin
       onShowSettings?.(item.conversationId, 'group');
     }
     setShowMenu(false);
-  };
-
-  // Helper: determine if root should block navigation due to menu interactions/state
-  const shouldBlockRootNavigation = (target: EventTarget | null) => {
-    if (!target) return false;
-    // If clicking inside the menu/button area or menu is open, block
-    if (menuRef.current && menuRef.current.contains(target as Node)) return true;
-    if (showMenu) return true;
-    return false;
   };
 
   // Root click guard: if click originated from the menu area or while menu is open, don't open the chat
@@ -807,12 +787,10 @@ export default function ChatItem({ item, onClick, onDelete, getUserStatus, typin
             className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
             onMouseDown={(e) => {
               e.stopPropagation();
-              (e as any).nativeEvent?.stopImmediatePropagation?.();
             }}
             onClick={(e) => {
               e.stopPropagation();
               setShowDeleteConfirm(false);
-              (e as any).nativeEvent?.stopImmediatePropagation?.();
             }}
           >
             <motion.div
@@ -871,12 +849,11 @@ export default function ChatItem({ item, onClick, onDelete, getUserStatus, typin
             className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
             onMouseDown={(e) => {
               e.stopPropagation();
-              (e as any).nativeEvent?.stopImmediatePropagation?.();
+              setShowLeaveConfirm(false);
             }}
             onClick={(e) => {
               e.stopPropagation();
               setShowLeaveConfirm(false);
-              (e as any).nativeEvent?.stopImmediatePropagation?.();
             }}
           >
             <motion.div
@@ -886,11 +863,9 @@ export default function ChatItem({ item, onClick, onDelete, getUserStatus, typin
               className="bg-gradient-to-br from-slate-800/95 to-slate-900/95 backdrop-blur-xl border border-white/20 rounded-2xl p-6 max-w-sm mx-4"
               onMouseDown={(e) => {
                 e.stopPropagation();
-                (e as any).nativeEvent?.stopImmediatePropagation?.();
               }}
               onClick={(e) => {
                 e.stopPropagation();
-                (e as any).nativeEvent?.stopImmediatePropagation?.();
               }}
             >
               <h3 className="text-white text-lg font-semibold mb-4 flex items-center">

@@ -1,5 +1,5 @@
 "use client"
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, use } from 'react'
 import { useRouter, useParams, useSearchParams } from 'next/navigation'
 import ProtectedRoute from '@/components/ProtectedRoute'
 import { useAuth } from '@/context/AuthContext'
@@ -37,7 +37,7 @@ function ActivityFilterPage() {
   const router = useRouter()
   const params = useParams()
   const searchParams = useSearchParams()
-  const filter = params.filter as string
+  const filter = (params as { filter: string }).filter
   const { user } = useAuth()
   const { isConnected, addMessageListener } = useWebSocket()
   const { error } = useToast()

@@ -163,8 +163,8 @@ func (s *MessageService) GetPrivateMessages(userID1, userID2 uint, limit, offset
 	}
 
 	query := `
-	SELECT m.id, m.sender_id, m.content, m.is_read, m.created_at,
-	   u.first_name, u.last_name, u.avatar, u.nickname,
+	SELECT m.id, m.sender_id, m.content, m.is_read, m.created_at, m.is_deleted,
+	   u.first_name, u.last_name, u.avatar, u.nickname, u.is_deleted as sender_deleted,
 	   COALESCE(s.id, 0) as share_id,
 	   COALESCE(p.id, 0) as post_id,
 	   COALESCE(p.user_id, 0) as post_user_id,
@@ -215,10 +215,11 @@ func (s *MessageService) GetPrivateMessages(userID1, userID2 uint, limit, offset
 		var postContent, postImageURL, postPrivacy, postCreatedAt string
 		var postUserFirstName, postUserLastName, postUserAvatar, postUserNickname string
 		var likeCount, commentCount, shareCount int64
+		var senderDeleted bool
 
 		err := rows.Scan(
-			&message.ID, &message.SenderID, &message.Content, &isReadInDB, &message.CreatedAt,
-			&sender.FirstName, &sender.LastName, &sender.Avatar, &sender.Nickname,
+			&message.ID, &message.SenderID, &message.Content, &isReadInDB, &message.CreatedAt, &message.IsDeleted,
+			&sender.FirstName, &sender.LastName, &sender.Avatar, &sender.Nickname, &senderDeleted,
 			&shareID, &postID, &postUserID, &postContent, &postImageURL, &postPrivacy, &postCreatedAt,
 			&postUserFirstName, &postUserLastName, &postUserAvatar, &postUserNickname,
 			&likeCount, &commentCount, &shareCount,
@@ -228,6 +229,7 @@ func (s *MessageService) GetPrivateMessages(userID1, userID2 uint, limit, offset
 		}
 
 		sender.ID = message.SenderID
+		sender.IsDeleted = senderDeleted
 		message.Sender = sender
 		message.MessageType = "private"
 		message.UpdatedAt = message.CreatedAt
@@ -301,8 +303,8 @@ func (s *MessageService) GetGroupMessages(groupID, userID uint, limit, offset in
 	}
 
 	query := `
-	SELECT m.id, m.sender_id, m.content, m.is_read, m.created_at,
-	   u.first_name, u.last_name, u.avatar, u.nickname,
+	SELECT m.id, m.sender_id, m.content, m.is_read, m.created_at, m.is_deleted,
+	   u.first_name, u.last_name, u.avatar, u.nickname, u.is_deleted as sender_deleted,
 	   g.name,
 	   COALESCE(s.id, 0) as share_id,
 	   COALESCE(p.id, 0) as post_id,
@@ -347,10 +349,11 @@ func (s *MessageService) GetGroupMessages(groupID, userID uint, limit, offset in
 		var postContent, postImageURL, postPrivacy, postCreatedAt string
 		var postUserFirstName, postUserLastName, postUserAvatar, postUserNickname string
 		var likeCount, commentCount, shareCount int64
+		var senderDeleted bool
 
 		err := rows.Scan(
-			&message.ID, &message.SenderID, &message.Content, &message.IsRead, &message.CreatedAt,
-			&sender.FirstName, &sender.LastName, &sender.Avatar, &sender.Nickname,
+			&message.ID, &message.SenderID, &message.Content, &message.IsRead, &message.CreatedAt, &message.IsDeleted,
+			&sender.FirstName, &sender.LastName, &sender.Avatar, &sender.Nickname, &senderDeleted,
 			&groupName,
 			&shareID, &postID, &postUserID, &postContent, &postImageURL, &postPrivacy, &postCreatedAt,
 			&postUserFirstName, &postUserLastName, &postUserAvatar, &postUserNickname,
@@ -361,6 +364,7 @@ func (s *MessageService) GetGroupMessages(groupID, userID uint, limit, offset in
 		}
 
 		sender.ID = message.SenderID
+		sender.IsDeleted = senderDeleted
 		message.Sender = sender
 		message.MessageType = "group"
 		message.GroupID = &groupID
@@ -422,6 +426,17 @@ func (s *MessageService) GetGroupMessages(groupID, userID uint, limit, offset in
 }
 
 func (s *MessageService) canUsersMessage(userID1, userID2 uint) (bool, error) {
+	// Check if either user is deleted
+	var deleted1, deleted2 bool
+	err := s.db.QueryRow("SELECT is_deleted FROM users WHERE id = ?", userID1).Scan(&deleted1)
+	if err != nil || deleted1 {
+		return false, nil
+	}
+	err = s.db.QueryRow("SELECT is_deleted FROM users WHERE id = ?", userID2).Scan(&deleted2)
+	if err != nil || deleted2 {
+		return false, nil
+	}
+
 	query := `
 		SELECT 
 			(SELECT COUNT(*) FROM follows 
@@ -432,7 +447,7 @@ func (s *MessageService) canUsersMessage(userID1, userID2 uint) (bool, error) {
 	`
 
 	var followingCount, publicCount int
-	err := s.db.QueryRow(query, userID1, userID2, userID2, userID1, userID1, userID2).Scan(
+	err = s.db.QueryRow(query, userID1, userID2, userID2, userID1, userID1, userID2).Scan(
 		&followingCount, &publicCount)
 	if err != nil {
 		return false, err
@@ -959,7 +974,8 @@ func (s *MessageService) SearchMessages(userID uint, query string, limit, offset
 			pm.created_at as message_time,
 			u.first_name,
 			u.last_name,
-			u.avatar
+			u.avatar,
+			u.is_deleted as participant_deleted
 		FROM private_messages pm
 		JOIN private_conversations pc ON pm.conversation_id = pc.id
 		JOIN users u ON u.id = CASE WHEN pc.participant1_id = ? THEN pc.participant2_id ELSE pc.participant1_id END
@@ -982,7 +998,8 @@ func (s *MessageService) SearchMessages(userID uint, query string, limit, offset
 			gm.created_at as message_time,
 			u.first_name,
 			u.last_name,
-			u.avatar
+			u.avatar,
+			u.is_deleted as sender_deleted
 		FROM group_messages gm
 		JOIN group_conversations gc ON gm.conversation_id = gc.id
 		JOIN groups g ON gc.group_id = g.id
@@ -1025,6 +1042,7 @@ func (s *MessageService) SearchMessages(userID uint, query string, limit, offset
 			var firstName, lastName sql.NullString
 			var avatar sql.NullString
 			var messageTimeStr string
+			var participantDeleted bool
 
 			err := privateRows.Scan(
 				&result.Type,
@@ -1036,6 +1054,7 @@ func (s *MessageService) SearchMessages(userID uint, query string, limit, offset
 				&firstName,
 				&lastName,
 				&avatar,
+				&participantDeleted,
 			)
 			if err != nil {
 				// Non-fatal scan issue: skip this row and continue
@@ -1071,6 +1090,7 @@ func (s *MessageService) SearchMessages(userID uint, query string, limit, offset
 			var groupName, groupAvatar sql.NullString
 			var senderFirstName, senderLastName, senderAvatar sql.NullString
 			var messageTimeStr string
+			var senderDeleted bool
 
 			err := groupRows.Scan(
 				&result.Type,
@@ -1084,6 +1104,7 @@ func (s *MessageService) SearchMessages(userID uint, query string, limit, offset
 				&senderFirstName,
 				&senderLastName,
 				&senderAvatar,
+				&senderDeleted,
 			)
 			if err != nil {
 				// Non-fatal scan issue: skip this row and continue

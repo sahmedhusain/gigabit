@@ -44,6 +44,18 @@ func (h *ProfileHandler) GetProfile(w http.ResponseWriter, r *http.Request, user
 		return
 	}
 
+	// Check if user is deleted
+	if user.IsDeleted {
+		writeJSON(w, http.StatusOK, map[string]interface{}{
+			"id":         user.ID,
+			"is_deleted": true,
+			"message":    "This account has been deleted",
+			"created_at": user.CreatedAt,
+			"updated_at": user.UpdatedAt,
+		})
+		return
+	}
+
 	// check if the requesting user can view this profile (private account)
 	canView, err := h.userService.CanViewProfile(requestingUserID, uint(userID))
 	if err != nil {
@@ -56,7 +68,7 @@ func (h *ProfileHandler) GetProfile(w http.ResponseWriter, r *http.Request, user
 		return
 	}
 
-	writeJSON(w, http.StatusOK, user)
+	writeJSON(w, http.StatusOK, user.ToResponse())
 }
 
 func (h *ProfileHandler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
@@ -258,6 +270,18 @@ func (h *ProfileHandler) GetPublicStats(w http.ResponseWriter, r *http.Request, 
 	user, err := h.userService.GetUserByID(uint(userID))
 	if err != nil {
 		writeError(w, http.StatusNotFound, "User not found")
+		return
+	}
+
+	// Check if user is deleted
+	if user.IsDeleted {
+		writeJSON(w, http.StatusOK, map[string]interface{}{
+			"user_id":         user.ID,
+			"display_name":    "Deleted Account",
+			"follower_count":  0,
+			"following_count": 0,
+			"is_deleted":      true,
+		})
 		return
 	}
 

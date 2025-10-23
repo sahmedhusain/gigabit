@@ -33,16 +33,17 @@ function ChatsPage() {
   const { conversations: liveConversations } = useConversations()
 
   // Get filter from URL params
-  const filterParam = searchParams.get('filter') || 'all'
-  const chatId = searchParams.get('chat')
+  const filterParam = searchParams?.get('filter') || 'all'
+  const chatId = searchParams?.get('chat')
   // Support deep link params from search suggestions (legacy)
-  const groupParam = searchParams.get('group')
-  const userParam = searchParams.get('user')
-  const highlightMessageParam = searchParams.get('message')
+  const groupParam = searchParams?.get('group')
+  const userParam = searchParams?.get('user')
+  const highlightMessageParam = searchParams?.get('message')
   
   const [chatSubTab, setChatSubTab] = useState(filterParam)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
-  const [_isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
+  const [isMobileRightSidebarOpen, setIsMobileRightSidebarOpen] = useState(false)
+  const [_isSidebarCollapsed] = useState(false)
   const [showCreateGroup, setShowCreateGroup] = useState(false)
   const [showCreateDirectMessage, setShowCreateDirectMessage] = useState(false)
 
@@ -122,10 +123,10 @@ function ChatsPage() {
     return date.toLocaleDateString()
   }
 
-  const getUserStatus = (userId: number): string => {
+  const getUserStatus = useCallback((userId: number): string => {
     const matched = onlineUsers.find(u => u.user_id === userId)
     return matched?.status || 'offline'
-  }
+  }, [onlineUsers])
 
   const fetchConversations = useCallback(async () => {
     try {
@@ -321,10 +322,6 @@ function ChatsPage() {
     router.push('/notifications')
   }
 
-  const handleSearchToggle = () => {
-    router.push('/search')
-  }
-
   const handleDiscoverToggle = () => {
     router.push('/discover')
   }
@@ -377,6 +374,8 @@ function ChatsPage() {
         onNotificationsClick={handleNotificationsToggle}
         unreadCount={liveUnreadCount || 0}
         onDiscoverClick={handleDiscoverToggle}
+        isMobileRightSidebarOpen={isMobileRightSidebarOpen}
+        setIsMobileRightSidebarOpen={setIsMobileRightSidebarOpen}
       />
 
       <CreateDirectMessage
@@ -469,6 +468,7 @@ function ChatsPage() {
         currentUser={currentUser}
         setActiveTab={handleTabChange}
         logout={() => router.push('/login')}
+        isMobileOpen={isMobileRightSidebarOpen}
       />
     </div>
   )

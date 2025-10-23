@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { ArrowRight, Users, MessageCircle, Calendar, Star, Globe, Zap, Shield, TrendingUp, Sparkles, CheckCircle } from 'lucide-react';
+import { ArrowRight, Users, MessageCircle, Calendar, Star, Zap, Sparkles } from 'lucide-react';
 import TermsPopup from './TermsPopup';
 import PrivacyPopup from './PrivacyPopup';
 import CookiesPopup from './CookiesPopup';

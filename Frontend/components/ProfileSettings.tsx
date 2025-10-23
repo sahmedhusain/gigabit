@@ -1,68 +1,14 @@
 'use client';
 
+'use client';
+
 import { useState, useEffect, useRef } from 'react';
-import { User as UserIcon, Edit3, Save, X, Check, Camera, Upload, Eye, EyeOff, Mail, Lock, User, Calendar, Sparkles, Shield, Heart } from 'lucide-react';
+import { User as UserIcon, Edit3, Save, X, Check, Camera, Mail, User, Calendar, Sparkles, Shield, Heart } from 'lucide-react';
 import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
-import { User as UserType, api, API_BASE_URL } from '@/lib/api';
-
-interface UserProfile {
-  id: number;
-  email: string;
-  first_name: string;
-  last_name: string;
-  date_of_birth: string;
-  avatar?: string;
-  nickname?: string;
-  about_me?: string;
-  gender?: string;
-  is_private: boolean;
-}
+import { api, API_BASE_URL } from '@/lib/api';
 
 // Validation functions from registration form
-function validatePassword(password: string) {
-  const upper = /[A-Z]/
-  const lower = /[a-z]/
-  const number = /[0-9]/
-  const space = /\s/
-  // Allow only ASCII printable characters (excluding space, but including common symbols)
-  const allowedChars = /^[a-zA-Z0-9!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?`~]+$/
-
-  const errors = []
-
-  if (password.length < 8 || password.length > 32) {
-    errors.push("be between 8 and 32 characters long")
-  }
-
-  if (!upper.test(password)) {
-    errors.push("contain at least one uppercase letter")
-  }
-
-  if (!lower.test(password)) {
-    errors.push("contain at least one lowercase letter")
-  }
-
-  if (!number.test(password)) {
-    errors.push("contain at least one number")
-  }
-
-  if (space.test(password)) {
-    errors.push("not contain any spaces")
-  }
-
-  if (!allowedChars.test(password)) {
-    errors.push("only contain English letters, numbers, and common symbols (no emojis or special characters)")
-  }
-
-  // combine errors into a single message
-  if (errors.length > 0) {
-    const lastError = errors.pop() // for adding 'and' before the last error
-    return "Password must " + (errors.length ? errors.join(", ") + ", and " + lastError : lastError)
-  }
-
-  return null
-}
-
 function validateNickname(nickname: string) {
   if (!nickname) return null // nickname is optional
   
@@ -108,7 +54,6 @@ function validateNickname(nickname: string) {
   };
 
 export default function ProfileSettings() {
-  const [user, setUser] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
@@ -117,7 +62,6 @@ export default function ProfileSettings() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Validation state
-  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [checkingUniqueness, setCheckingUniqueness] = useState<Record<string, boolean>>({});
 
@@ -151,7 +95,6 @@ export default function ProfileSettings() {
     try {
       const userData = await api.getMe();
       console.log('Fetched user data:', userData);
-      setUser(userData);
       const initialData = {
         first_name: userData.first_name || '',
         last_name: userData.last_name || '',
@@ -324,7 +267,6 @@ export default function ProfileSettings() {
 
       const updatedUser = await api.updateProfile(updateData);
       console.log('Updated user:', updatedUser);
-      setUser(updatedUser);
       const newData = {
         first_name: updatedUser.first_name || '',
         last_name: updatedUser.last_name || '',
@@ -696,6 +638,7 @@ export default function ProfileSettings() {
                           alt="Profile avatar"
                           width={112}
                           height={112}
+                          unoptimized={true}
                           className="w-full h-full object-cover"
                         />
                       ) : (

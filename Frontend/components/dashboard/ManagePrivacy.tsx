@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useOptimisticUpdate, useConnectionStatus } from '@/hooks'
 import { useToast } from '@/context/ToastContext'
 import Image from 'next/image'
-import { getAvatarUrl } from '@/utils/avatarUtils'
+import { getAvatarUrl, getUserInitials } from '@/utils/avatarUtils'
 
 interface UserOption {
   id: number
@@ -20,7 +20,6 @@ interface UserOption {
 interface ManagePrivacyProps {
   show: boolean
   onClose: () => void
-  postId: number
   currentPrivacy: 'public' | 'followers' | 'friends' | 'listed'
   currentSelectedUsers: number[]
   availableUsers: UserOption[]
@@ -31,7 +30,6 @@ interface ManagePrivacyProps {
 export default function ManagePrivacy({
   show,
   onClose,
-  postId,
   currentPrivacy,
   currentSelectedUsers,
   availableUsers,
@@ -183,7 +181,7 @@ export default function ManagePrivacy({
                           name="privacy"
                           value={option.value}
                           checked={postPrivacy === option.value}
-                          onChange={(e) => setPostPrivacy(option.value as 'public' | 'followers' | 'friends' | 'listed')}
+                          onChange={() => setPostPrivacy(option.value as 'public' | 'followers' | 'friends' | 'listed')}
                           className="sr-only"
                         />
                         <div className={`w-5 h-5 mt-0.5 rounded-full border-2 flex-shrink-0 transition-all duration-300 ${postPrivacy === option.value
@@ -259,7 +257,7 @@ export default function ManagePrivacy({
                                 />
                               ) : (
                                 <span className="text-white font-bold text-sm">
-                                  {user.first_name[0]}{user.last_name[0]}
+                                  {getUserInitials(user)}
                                 </span>
                               )}
                             </div>

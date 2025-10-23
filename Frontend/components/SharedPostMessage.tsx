@@ -4,7 +4,7 @@ import { Globe, EyeOff, Lock, User as UserIcon, Heart, MessageSquare, Send } fro
 import Image from 'next/image'
 import { motion } from 'framer-motion'
 import { useRouter } from 'next/navigation'
-import { getAvatarUrl } from '@/utils/avatarUtils'
+import { getAvatarUrl, getUserInitials } from '@/utils/avatarUtils'
 
 interface SharedPostMessageProps {
   sharedPost: {
@@ -162,12 +162,13 @@ const SharedPostMessage: React.FC<SharedPostMessageProps> = ({ sharedPost, isCur
                   alt={`${sharedPost.user.first_name} ${sharedPost.user.last_name}`}
                   width={36}
                   height={36}
+                  unoptimized={true}
                   className="w-9 h-9 rounded-full object-cover ring-2 ring-white/20"
                 />
               </div>
             ) : (
               <div className="w-9 h-9 rounded-full bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center text-white text-xs font-semibold ring-2 ring-white/20">
-                {sharedPost.user.first_name[0]}{sharedPost.user.last_name[0]}
+                {getUserInitials(sharedPost.user)}
               </div>
             )}
           </motion.div>
@@ -227,8 +228,8 @@ const SharedPostMessage: React.FC<SharedPostMessageProps> = ({ sharedPost, isCur
                 alt="Shared post image"
                 width={400}
                 height={250}
+                unoptimized={true}
                 className="w-full h-auto max-h-48 object-cover"
-                unoptimized={sharedPost.image_url.includes('/svg')}
               />
             </motion.div>
           </div>

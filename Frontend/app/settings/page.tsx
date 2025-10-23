@@ -7,8 +7,9 @@ import ProfileSettings from '@/components/ProfileSettings';
 import AccountSettings from '@/components/AccountSettings';
 import PrivacySettings from '@/components/PrivacySettings';
 import NotificationSettings from '@/components/NotificationSettings';
+import AppearanceSettings from '@/components/AppearanceSettings';
 import DeleteAccountModal from '@/components/DeleteAccountModal';
-import { Settings, User, Shield, Lock, Bell, X } from 'lucide-react';
+import { Settings, User, Shield, Lock, Bell, Palette, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 function SettingsPage() {
@@ -49,6 +50,13 @@ function SettingsPage() {
       color: 'from-purple-500 to-violet-600'
     },
     {
+      id: 'appearance',
+      label: 'Appearance',
+      icon: Palette,
+      description: 'Customize your visual experience',
+      color: 'from-indigo-500 to-purple-600'
+    },
+    {
       id: 'notifications',
       label: 'Notifications',
       icon: Bell,
@@ -66,18 +74,20 @@ function SettingsPage() {
           <AccountSettings
             showDeleteModal={showDeleteModal}
             setShowDeleteModal={setShowDeleteModal}
+            deleteCountdown={deleteCountdown}
+            setDeleteCountdown={setDeleteCountdown}
+            setDeletePasswordError={setDeletePasswordError}
             deleteConfirmation={deleteConfirmation}
             setDeleteConfirmation={setDeleteConfirmation}
             deletePassword={deletePassword}
             setDeletePassword={setDeletePassword}
-            deleteCountdown={deleteCountdown}
-            setDeleteCountdown={setDeleteCountdown}
             deletePasswordError={deletePasswordError}
-            setDeletePasswordError={setDeletePasswordError}
           />
         );
       case 'privacy':
         return <PrivacySettings />;
+      case 'appearance':
+        return <AppearanceSettings />;
       case 'notifications':
         return <NotificationSettings />;
       default:

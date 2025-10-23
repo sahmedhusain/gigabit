@@ -71,34 +71,42 @@ func (h *FollowHandler) SendFollowRequest(w http.ResponseWriter, r *http.Request
 	}
 
 	// Check if already following or request exists
+	var followRequest *models.Follow
 	existingFollow, err := h.followService.GetFollowRelation(currentUserID, uint(targetUserID))
 	if err == nil && existingFollow != nil {
 		switch existingFollow.Status {
 		case "accepted":
 			writeError(w, http.StatusConflict, "Already following this user")
+			return
 		case "pending":
 			writeError(w, http.StatusConflict, "Follow request already sent")
+			return
 		default:
-			writeError(w, http.StatusConflict, "Follow request exists")
+			// Allow resending any non-accepted, non-pending request (including declined) by updating status to pending
+			existingFollow.Status = "pending"
+			if err := h.followService.UpdateFollowRequest(existingFollow); err != nil {
+				writeError(w, http.StatusInternalServerError, "Failed to resend follow request")
+				return
+			}
+			followRequest = existingFollow
 		}
-		return
-	}
+	} else {
+		// Create follow request
+		followRequest = &models.Follow{
+			FollowerID:  currentUserID,
+			FollowingID: uint(targetUserID),
+			Status:      "pending",
+		}
 
-	// Create follow request
-	followRequest := &models.Follow{
-		FollowerID:  currentUserID,
-		FollowingID: uint(targetUserID),
-		Status:      "pending",
-	}
+		// If target user has public profile, auto-accept
+		if !targetUser.IsPrivate {
+			followRequest.Status = "accepted"
+		}
 
-	// If target user has public profile, auto-accept
-	if !targetUser.IsPrivate {
-		followRequest.Status = "accepted"
-	}
-
-	if err := h.followService.CreateFollowRequest(followRequest); err != nil {
-		writeError(w, http.StatusInternalServerError, "Failed to send follow request")
-		return
+		if err := h.followService.CreateFollowRequest(followRequest); err != nil {
+			writeError(w, http.StatusInternalServerError, "Failed to send follow request")
+			return
+		}
 	}
 
 	// Send notification to the TARGET user (person being followed)

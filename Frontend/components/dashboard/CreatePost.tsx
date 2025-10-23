@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useOptimisticUpdate, useConnectionStatus, useUpload } from '@/hooks'
 import { useToast } from '@/context/ToastContext'
 import Image from 'next/image'
-import { getAvatarUrl } from '@/utils/avatarUtils'
+import { getAvatarUrl, getUserInitials } from '@/utils/avatarUtils'
 
 interface UserOption {
   id: number
@@ -425,12 +425,12 @@ export default function CreatePost({
                                   alt={`${user.first_name} ${user.last_name}'s avatar`}
                                   width={32}
                                   height={32}
+                                  unoptimized={true}
                                   className="w-full h-full object-cover rounded-full"
-                                  unoptimized={getAvatarUrl(user.avatar)!.includes('/svg')}
                                 />
                               ) : (
                                 <span className="text-white font-bold text-sm">
-                                  {user.first_name[0]}{user.last_name[0]}
+                                  {getUserInitials(user)}
                                 </span>
                               )}
                             </div>

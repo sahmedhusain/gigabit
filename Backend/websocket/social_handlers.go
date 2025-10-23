@@ -468,31 +468,48 @@ func (h *Hub) handleFollowRequest(message Message) {
 
 	// Check if already following or request exists
 	var existingStatus string
-	err = h.db.QueryRow("SELECT status FROM follows WHERE follower_id = ? AND following_id = ?", followerID, targetUserID).Scan(&existingStatus)
+	var existingID int
+	err = h.db.QueryRow("SELECT id, status FROM follows WHERE follower_id = ? AND following_id = ?", followerID, targetUserID).Scan(&existingID, &existingStatus)
 	if err == nil {
 		switch existingStatus {
 		case "accepted":
 			h.sendErrorMessage(followerID, "Already following this user")
+			return
 		case "pending":
 			h.sendErrorMessage(followerID, "Follow request already sent")
+			return
+		case "declined":
+			// Allow resending declined requests by updating status to pending
+			now := time.Now()
+			_, err = h.db.Exec("UPDATE follows SET status = 'pending', updated_at = ? WHERE id = ?", now, existingID)
+			if err != nil {
+				h.sendErrorMessage(followerID, "Failed to resend follow request")
+				return
+			}
 		default:
 			h.sendErrorMessage(followerID, "Follow request exists")
+			return
 		}
-		return
 	}
 
-	// Create follow request
+	// Determine status for new requests or resend
 	now := time.Now()
 	status := "pending"
 	if !isPrivate {
 		status = "accepted" // Auto-accept for public users
 	}
 
-	_, err = h.db.Exec("INSERT INTO follows (follower_id, following_id, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
-		followerID, targetUserID, status, now, now)
-	if err != nil {
-		h.sendErrorMessage(followerID, "Failed to send follow request")
-		return
+	// Only insert if this is a new request (not resending declined)
+	if existingStatus != "declined" {
+		_, err = h.db.Exec("INSERT INTO follows (follower_id, following_id, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
+			followerID, targetUserID, status, now, now)
+		if err != nil {
+			h.sendErrorMessage(followerID, "Failed to send follow request")
+			return
+		}
+	} else {
+		// For resend, status is already set to pending above
+		status = "pending"
 	}
 
 	if status == "accepted" {

@@ -138,8 +138,8 @@ func (s *Server) setupRoutes() {
 	s.router.HandleFunc("/api/stats/", s.handlePublicStatsRoute(profileHandler))
 
 	// Validation routes
-	s.router.HandleFunc("/api/validation/email", s.handleRoute(profileHandler.CheckEmailUniqueness, true))
-	s.router.HandleFunc("/api/validation/nickname", s.handleRoute(profileHandler.CheckNicknameUniqueness, true))
+	s.router.HandleFunc("/api/validation/email", s.handleRoute(profileHandler.CheckEmailUniqueness, false))
+	s.router.HandleFunc("/api/validation/nickname", s.handleRoute(profileHandler.CheckNicknameUniqueness, false))
 
 	// Search routes
 	s.router.HandleFunc("/api/search/suggestions", s.handleRoute(searchHandler.UnifiedSearch, true))

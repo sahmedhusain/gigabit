@@ -2,11 +2,12 @@
 import Image from 'next/image'
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { X, Users, Globe, Lock, Search, Loader2, Check } from 'lucide-react'
-import { CreateGroupRequest, api, User, API_BASE_URL } from '@/lib/api'
+import { CreateGroupRequest, api, User } from '@/lib/api'
 import { useConnectionStatus, useUpload } from '@/hooks'
 import { useToast } from '@/context/ToastContext'
 import { useAuth } from '@/context/AuthContext'
 import { motion, AnimatePresence } from 'framer-motion'
+import { getUserInitials, getGroupInitials } from '@/utils/avatarUtils'
 
 interface CreateGroupProps {
   show: boolean
@@ -30,7 +31,7 @@ export default function CreateGroup({
   const [avatarFile, setAvatarFile] = useState<File | null>(null)
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
-  const { success, error: showError } = useToast()
+  const { error: showError } = useToast()
   const { isConnected } = useConnectionStatus()
   const { user: currentUser } = useAuth()
   const currentUserId = currentUser?.id ?? null
@@ -59,20 +60,6 @@ export default function CreateGroup({
       return user.nickname
     }
     return user.email
-  }, [])
-
-  const getUserInitials = useCallback((user: User) => {
-    const initials = [user.first_name, user.last_name]
-      .filter(Boolean)
-      .map((part) => part.charAt(0)?.toUpperCase() ?? '')
-      .join('')
-    if (initials) {
-      return initials
-    }
-    if (user.nickname) {
-      return user.nickname.slice(0, 2).toUpperCase()
-    }
-    return user.email.slice(0, 2).toUpperCase()
   }, [])
 
   useEffect(() => {
@@ -187,7 +174,7 @@ export default function CreateGroup({
         const result = await uploadImage(avatarFile)
         avatar = result.url
         setAvatarUrl(avatar)
-      } catch (err) {
+      } catch {
         showError('Failed to upload avatar')
         setIsCreating(false)
         return
@@ -343,9 +330,11 @@ export default function CreateGroup({
                       />
                       <div className="w-16 h-16 rounded-2xl border border-white/20 bg-white/10 flex items-center justify-center overflow-hidden">
                         {avatarPreview ? (
-                          <Image src={avatarPreview} alt="Avatar Preview" width={64} height={64} className="object-cover w-16 h-16" />
+                          <Image src={avatarPreview} alt="Avatar Preview" width={64} height={64} unoptimized={true} className="object-cover w-16 h-16" />
                         ) : (
-                          <Users className="w-8 h-8 text-white/40" />
+                          <div className="w-full h-full bg-gradient-to-br from-emerald-400 to-teal-500 rounded-2xl flex items-center justify-center text-white font-bold text-lg">
+                            {getGroupInitials(groupTitle || 'New Group')}
+                          </div>
                         )}
                         {isUploadingAvatar && (
                           <div className="absolute inset-0 bg-black/40 flex items-center justify-center">

@@ -1,9 +1,11 @@
 'use client'
-import { Hash, Users, Lock, ExternalLink } from 'lucide-react'
+import { Users, Lock, ExternalLink } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { SearchResult } from '@/hooks/useSearch'
 import { useState, useEffect } from 'react'
 import { api } from '@/lib/api'
+import Image from 'next/image'
+import { getGroupInitials } from '@/utils/avatarUtils'
 
 interface GroupSearchResultProps {
   result: SearchResult
@@ -137,9 +139,9 @@ export default function GroupSearchResult({ result }: GroupSearchResultProps) {
               await api.joinGroup(groupId)
               setJoinedGroups(prev => ({ ...prev, [groupId]: true }))
               // State is already updated optimistically
-            } catch (err: any) {
+            } catch (err: unknown) {
               // Handle "already requested" error gracefully
-              if (err.message?.includes('Already requested or member of this group')) {
+              if (err instanceof Error && err.message?.includes('Already requested or member of this group')) {
                 // Update local state to reflect that request was already made
                 setLocalMemberStatus(prev => ({ ...prev, [groupId]: 'requested' }))
               } else {
@@ -170,15 +172,18 @@ export default function GroupSearchResult({ result }: GroupSearchResultProps) {
           {/* Enhanced Icon with Gradient Border */}
             <div className={`relative group ${isMember ? 'cursor-pointer' : ''}`}>
             {result.image ? (
-              <img 
+              <Image 
                 src={result.image} 
                 alt={result.title}
+                width={56}
+                height={56}
+                unoptimized={true}
                 className="w-14 h-14 bg-gradient-to-br from-green-400 via-emerald-500 to-teal-500 rounded-full object-cover shadow-md group-hover:shadow-green-500/25 transition-all duration-300"
               />
             ) : (
               <div className="w-14 h-14 bg-gradient-to-br from-green-400 via-emerald-500 to-teal-500 rounded-full flex items-center justify-center shadow-md group-hover:shadow-green-500/25 transition-all duration-300">
                 <span className="text-white font-bold text-lg">
-                  {result.title.substring(0, 2).toUpperCase()}
+                  {getGroupInitials(result.title)}
                 </span>
               </div>
             )}

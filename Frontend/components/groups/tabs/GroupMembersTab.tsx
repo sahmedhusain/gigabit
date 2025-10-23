@@ -5,6 +5,8 @@ import { motion } from 'framer-motion'
 import { useAuth } from '@/context/AuthContext'
 import { useOnlineStatus } from '@/hooks'
 import { api, Member } from '@/lib/api'
+import { getAvatarUrl, getUserInitials } from '@/utils/avatarUtils'
+import Image from 'next/image'
 
 interface GroupMembersTabProps {
   groupId: number
@@ -129,14 +131,16 @@ const GroupMembersTab: React.FC<GroupMembersTabProps> = ({ groupId }) => {
                     {/* Avatar */}
                     <div className="relative">
                       {member.user.avatar ? (
-                        <img
+                        <Image
                           src={member.user.avatar}
                           alt={`${member.user.first_name} ${member.user.last_name}`}
+                          width={56}
+                          height={56}
                           className="w-12 h-12 rounded-full object-cover shadow-lg"
                         />
                       ) : (
                         <div className="w-12 h-12 rounded-full bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center text-white font-semibold shadow-lg">
-                          {member.user.first_name[0]}{member.user.last_name[0]}
+                          {getUserInitials(member.user)}
                         </div>
                       )}
                       

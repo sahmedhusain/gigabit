@@ -373,6 +373,7 @@ export default function CreatePollModal({
                       <span>Expiration Date (Optional)</span>
                     </label>
                     <input
+                    title="Set expiration date"
                       type="datetime-local"
                       value={expiresAt}
                       onChange={(e) => setExpiresAt(e.target.value)}

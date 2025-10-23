@@ -2,9 +2,10 @@
 import React, { useState } from 'react'
 import { Users, Clock, CheckCircle, BarChart3, Trash2, StopCircle, AlertTriangle } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { useAuth } from '@/context/AuthContext'
-import { api, PollResponse } from '@/lib/api'
+import { PollResponse } from '@/lib/api'
+import { getUserInitials } from '@/utils/avatarUtils'
 import { useToast } from '@/context/ToastContext'
+import Image from 'next/image'
 
 interface PollCardProps {
   poll: PollResponse
@@ -162,15 +163,17 @@ export default function PollCard({ poll, onVote, onUnvote, onDelete, onExpire, c
         <div className="flex flex-wrap items-center gap-3 text-xs text-white/60">
           <div className="flex items-center space-x-2">
             {poll.creator.avatar ? (
-              <img
+              <Image
                 src={poll.creator.avatar}
                 alt={`${poll.creator.first_name} ${poll.creator.last_name}`}
+                  width={32}
+                  height={32}
                 className="w-8 h-8 rounded-full object-cover border border-white/20"
               />
             ) : (
               <div className="w-8 h-8 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-full flex items-center justify-center">
                 <span className="text-white text-xs font-bold">
-                  {poll.creator.first_name[0]}{poll.creator.last_name[0]}
+                  {getUserInitials(poll.creator)}
                 </span>
               </div>
             )}

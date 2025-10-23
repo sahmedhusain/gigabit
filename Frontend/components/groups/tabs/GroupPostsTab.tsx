@@ -1,13 +1,13 @@
 'use client'
 import React, { useState, useEffect } from 'react'
-import { Plus, MoreHorizontal, User as UserIcon, Newspaper, ThumbsDown, ThumbsUp, Trash2 } from 'lucide-react'
+import { Plus, MoreHorizontal, Newspaper, ThumbsDown, ThumbsUp, Trash2 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useAuth } from '@/context/AuthContext'
 import { api, PostResponse } from '@/lib/api'
 import CreateGroupPost from '../CreateGroupPost'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
-import { getAvatarUrl } from '@/utils/avatarUtils'
+import { getAvatarUrl, getUserInitials } from '@/utils/avatarUtils'
 import { useToast } from '@/context/ToastContext'
 
 interface GroupPostsTabProps {
@@ -279,7 +279,7 @@ const GroupPostsTab: React.FC<GroupPostsTabProps> = ({ groupId, groupTitle }) =>
                         />
                       ) : (
                         <div className="w-full h-full bg-gradient-to-r from-emerald-400 to-teal-500 rounded-full flex items-center justify-center text-white font-bold">
-                          {post.user.first_name[0]?.toUpperCase()}{post.user.last_name[0]?.toUpperCase()}
+                          {getUserInitials(post.user)}
                         </div>
                       )}
                     </div>

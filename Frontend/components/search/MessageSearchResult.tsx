@@ -2,6 +2,8 @@
 import { MessageCircle, Clock, Hash, Users, ExternalLink } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { SearchResult } from '@/hooks/useSearch'
+import Image from 'next/image'
+import { getUserInitials, getGroupInitials } from '@/utils/avatarUtils'
 
 interface MessageSearchResultProps {
   result: SearchResult
@@ -9,6 +11,17 @@ interface MessageSearchResultProps {
 
 export default function MessageSearchResult({ result }: MessageSearchResultProps) {
   const router = useRouter()
+
+  // Helper function to get initials from name
+  const getInitialsFromName = (name: string) => {
+    if (!name || !name.trim()) return 'U'
+    const parts = name.trim().split(/\s+/)
+    if (parts.length >= 2) {
+      return `${parts[0].charAt(0)}${parts[1].charAt(0)}`.toUpperCase()
+    } else {
+      return parts[0].slice(0, 2).toUpperCase()
+    }
+  }
 
   const handleClick = () => {
     // Navigate to chats page with the specific conversation and message highlighted
@@ -55,9 +68,12 @@ export default function MessageSearchResult({ result }: MessageSearchResultProps
                 : 'bg-gradient-to-br from-blue-400 via-indigo-500 to-cyan-500 group-hover:shadow-blue-500/25'
             }`}>
               {result.image ? (
-                <img
+                <Image
                   src={result.image}
                   alt="Sender"
+                  width={56}
+                  height={56}
+                  unoptimized={true}
                   className="w-full h-full object-cover"
                 />
               ) : (
@@ -66,11 +82,9 @@ export default function MessageSearchResult({ result }: MessageSearchResultProps
                     ? 'bg-gradient-to-r from-green-400 to-emerald-500'
                     : 'bg-gradient-to-r from-blue-400 to-indigo-500'
                 }`}>
-                  {isGroupMessage ? (
-                    <Hash className="w-7 h-7 text-white" />
-                  ) : (
-                    <MessageCircle className="w-7 h-7 text-white" />
-                  )}
+                  <span className="text-white font-bold text-lg">
+                    {getInitialsFromName(result.subtitle || 'Unknown')}
+                  </span>
                 </div>
               )}
             </div>

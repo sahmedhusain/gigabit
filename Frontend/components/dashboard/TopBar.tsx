@@ -1,9 +1,10 @@
 'use client'
 
 import { Menu, X, Bell, Search, Users, Calendar, Hash, Filter, FileText, User, ChevronDown, Compass, MessageCircle } from 'lucide-react'
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter, usePathname, useSearchParams } from 'next/navigation'
 import { api, getToken } from '@/lib/api'
+import Image from 'next/image'
 
 interface TopBarProps {
   isMobileMenuOpen: boolean
@@ -47,6 +48,15 @@ export default function TopBar({
   const pathname = usePathname()
   const searchParams = useSearchParams()
   
+  // Helper function to get initials from a name string
+  const getInitialsFromName = (name: string | undefined): string => {
+    if (!name) return '?'
+    const trimmed = name.trim()
+    if (trimmed.length === 0) return '?'
+    if (trimmed.length === 1) return trimmed.toUpperCase()
+    return trimmed.charAt(0).toUpperCase() + trimmed.charAt(1).toUpperCase()
+  }
+  
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedFilter, setSelectedFilter] = useState('all')
   const [showFilterDropdown, setShowFilterDropdown] = useState(false)
@@ -57,7 +67,6 @@ export default function TopBar({
   const [recentSearches, setRecentSearches] = useState<string[]>([])
   const [searchHistory, setSearchHistory] = useState<SearchHistoryItem[]>([])
   const [showRecentSearches, setShowRecentSearches] = useState(false)
-  const [showSearchHistory, setShowSearchHistory] = useState(false)
   const [pendingJoin, setPendingJoin] = useState<Record<number, boolean>>({})
   const [joinedGroups, setJoinedGroups] = useState<Record<number, boolean>>({})
   const [hasUserFocused, setHasUserFocused] = useState(false)
@@ -78,7 +87,7 @@ export default function TopBar({
     if (pathname && pathname.startsWith('/search/')) {
       const pathParts = pathname.split('/')
       const urlFilter = pathParts[2] // e.g., 'groups' from '/search/groups'
-      const urlQuery = searchParams.get('q') || ''
+      const urlQuery = searchParams?.get('q') || ''
       
       // Map URL filter to our filter IDs
       const filterMapping: Record<string, string> = {
@@ -107,7 +116,7 @@ export default function TopBar({
       // Don't reset hasUserFocused here as it prevents suggestions from showing on other pages
       // setHasUserFocused(false)
     }
-  }, [pathname, searchParams, hasUserFocused])
+  }, [pathname, searchParams, hasUserFocused, searchQuery, selectedFilter])
 
   // Load recent searches, search history, and popular searches from localStorage
   useEffect(() => {
@@ -145,31 +154,18 @@ export default function TopBar({
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
-  // Fetch search suggestions with debounce
-  useEffect(() => {
-    if (debounceTimerRef.current) {
-      clearTimeout(debounceTimerRef.current)
+  const addToSearchHistory = useCallback((query: string, resultCount: number) => {
+    const newItem: SearchHistoryItem = {
+      query,
+      timestamp: Date.now(),
+      resultCount
     }
+    const updated = [newItem, ...searchHistory.filter(h => h.query !== query)].slice(0, 20)
+    setSearchHistory(updated)
+    localStorage.setItem('searchHistory', JSON.stringify(updated))
+  }, [searchHistory])
 
-    if (searchQuery.length < 2) {
-      setSuggestions([])
-      setShowSuggestions(false)
-      return
-    }
-
-    setIsSearching(true)
-    debounceTimerRef.current = setTimeout(() => {
-      fetchSuggestions(searchQuery)
-    }, 300)
-
-    return () => {
-      if (debounceTimerRef.current) {
-        clearTimeout(debounceTimerRef.current)
-      }
-    }
-  }, [searchQuery])
-
-  const fetchSuggestions = async (query: string) => {
+  const fetchSuggestions = useCallback(async (query: string) => {
     try {
       const token = getToken()
       if (!token) {
@@ -202,23 +198,36 @@ export default function TopBar({
     } finally {
       setIsSearching(false)
     }
-  }
+  }, [selectedFilter, hasUserFocused, addToSearchHistory])
+
+  // Fetch search suggestions with debounce
+  useEffect(() => {
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current)
+    }
+
+    if (searchQuery.length < 2) {
+      setSuggestions([])
+      setShowSuggestions(false)
+      return
+    }
+
+    setIsSearching(true)
+    debounceTimerRef.current = setTimeout(() => {
+      fetchSuggestions(searchQuery)
+    }, 300)
+
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current)
+      }
+    }
+  }, [searchQuery, fetchSuggestions])
 
   const addToRecentSearches = (query: string) => {
     const updated = [query, ...recentSearches.filter(s => s !== query)].slice(0, 5)
     setRecentSearches(updated)
     localStorage.setItem('recentSearches', JSON.stringify(updated))
-  }
-
-  const addToSearchHistory = (query: string, resultCount: number) => {
-    const newItem: SearchHistoryItem = {
-      query,
-      timestamp: Date.now(),
-      resultCount
-    }
-    const updated = [newItem, ...searchHistory.filter(h => h.query !== query)].slice(0, 20)
-    setSearchHistory(updated)
-    localStorage.setItem('searchHistory', JSON.stringify(updated))
   }
 
   const handleSuggestionClick = (suggestion: SearchSuggestion) => {
@@ -285,8 +294,8 @@ export default function TopBar({
     
     // Check if we're already on a search page with the same query
     const isOnSearchPage = pathname && pathname.startsWith('/search/')
-    const currentUrlQuery = searchParams.get('q') || ''
-    const currentUrlFilter = pathname.split('/')[2] || 'all'
+    const currentUrlQuery = searchParams?.get('q') || ''
+    const currentUrlFilter = pathname?.split('/')[2] || 'all'
     
     if (isOnSearchPage && currentUrlQuery === query && currentUrlFilter === selectedFilter) {
       // Already on the correct search page, just close the UI
@@ -330,8 +339,8 @@ export default function TopBar({
         
         // Check if we're already on a search page with the same query
         const isOnSearchPage = pathname && pathname.startsWith('/search/')
-        const currentUrlQuery = searchParams.get('q') || ''
-        const currentUrlFilter = pathname.split('/')[2] || 'all'
+        const currentUrlQuery = searchParams?.get('q') || ''
+        const currentUrlFilter = pathname?.split('/')[2] || 'all'
         
         if (isOnSearchPage && currentUrlQuery === trimmedQuery && currentUrlFilter === selectedFilter) {
           // Already on the correct search page, just close the UI
@@ -425,8 +434,8 @@ export default function TopBar({
     const filterLabel = currentFilter?.label.toLowerCase() || 'everything'
     
     // If we're on a search page with a query, show that in the placeholder
-    if (pathname && pathname.startsWith('/search/') && searchParams.get('q')) {
-      const query = searchParams.get('q')
+    if (pathname && pathname.startsWith('/search/') && searchParams?.get('q')) {
+      const query = searchParams?.get('q')
       return `"${query}" in ${filterLabel}`
     }
     
@@ -476,10 +485,20 @@ export default function TopBar({
                   }}
                   className="w-full px-4 py-2 pl-10 pr-4 bg-transparent text-white placeholder-white/60 focus:outline-none"
                 />
-                {isSearching && (
-                  <div className="absolute right-24 top-1/2 transform -translate-y-1/2">
-                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                  </div>
+                {searchQuery && (
+                  <button
+                    onClick={() => {
+                      setSearchQuery('')
+                      setSuggestions([])
+                      setShowSuggestions(false)
+                      setShowRecentSearches(false)
+                      setSelectedSuggestionIndex(-1)
+                    }}
+                    className="absolute right-24 top-1/2 transform -translate-y-1/2 p-1 rounded-full text-white/60 hover:text-white hover:bg-white/10 transition-all duration-200"
+                    title="Clear search"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
                 )}
               </div>
               
@@ -525,7 +544,6 @@ export default function TopBar({
                   <div className="space-y-3">
                     {suggestions.map((suggestion, index) => {
                       const IconComponent = getIconForType(suggestion.type)
-                      const iconColor = getColorForType(suggestion.type)
                       const isSelected = selectedSuggestionIndex === index
                       return (
                         <div
@@ -538,9 +556,11 @@ export default function TopBar({
                         >
                           {suggestion.image ? (
                             <div className="relative">
-                              <img 
+                              <Image 
                                 src={suggestion.image} 
                                 alt={suggestion.title}
+                                width={40}
+                                height={40}
                                 className="search-suggestion-avatar w-10 h-10 rounded-xl object-cover flex-shrink-0 border-2 border-white/20 shadow-md group-hover:shadow-emerald-500/25 transition-all duration-300"
                               />
                               <div className={`absolute -bottom-1 -right-1 w-5 h-5 rounded-lg bg-gradient-to-br from-gray-800 to-gray-900 border-2 border-white/30 flex items-center justify-center shadow-lg ${getColorForType(suggestion.type)}`}>
@@ -555,7 +575,7 @@ export default function TopBar({
                                 </span>
                               ) : suggestion.type === 'user' ? (
                                 <span className="text-white font-bold text-sm">
-                                  {suggestion.title?.charAt(0).toUpperCase() || '?'}{suggestion.title?.charAt(1)?.toUpperCase() || ''}
+                                  {getInitialsFromName(suggestion.title)}
                                 </span>
                               ) : (
                                 <IconComponent className="w-4 h-4" />
@@ -638,8 +658,8 @@ export default function TopBar({
                           
                           // Check if we're already on a search page with the same query
                           const isOnSearchPage = pathname && pathname.startsWith('/search/')
-                          const currentUrlQuery = searchParams.get('q') || ''
-                          const currentUrlFilter = pathname.split('/')[2] || 'all'
+                          const currentUrlQuery = searchParams?.get('q') || ''
+                          const currentUrlFilter = pathname?.split('/')[2] || 'all'
                           
                           if (!(isOnSearchPage && currentUrlQuery === searchQuery && currentUrlFilter === selectedFilter)) {
                             router.push(`/search/${selectedFilter}?q=${encodeURIComponent(searchQuery)}`)
@@ -657,7 +677,7 @@ export default function TopBar({
                         className="w-full flex items-center justify-center space-x-3 px-4 py-3 rounded-xl transition-all duration-300 text-emerald-300 hover:bg-gradient-to-r hover:from-emerald-500/10 hover:to-teal-500/10 hover:text-emerald-200 border border-emerald-500/20 hover:border-emerald-400/40 bg-emerald-500/5 hover:shadow-lg hover:shadow-emerald-500/25 group hover:scale-[1.01]"
                       >
                         <Search className="w-4 h-4 group-hover:scale-110 transition-transform duration-300" />
-                        <span className="text-sm font-semibold">View all results for "{searchQuery}"</span>
+                        <span className="text-sm font-semibold">View all results for &ldquo;{searchQuery}&rdquo;</span>
                       </button>
                     </>
                   )}
@@ -672,15 +692,15 @@ export default function TopBar({
                     <Search className="w-8 h-8 text-white/40" />
                   </div>
                   <h4 className="text-white/90 font-bold text-base mb-2">No results found</h4>
-                  <p className="text-white/70 text-sm mb-4 max-w-sm mx-auto">We couldn't find anything matching "{searchQuery}" in the selected filter.</p>
+                  <p className="text-white/70 text-sm mb-4 max-w-sm mx-auto">We couldn&apos;t find anything matching &ldquo;{searchQuery}&rdquo; in the selected filter.</p>
                   <button
                     onClick={() => {
                       addToRecentSearches(searchQuery)
                       
                       // Check if we're already on a search page with the same query
                       const isOnSearchPage = pathname && pathname.startsWith('/search/')
-                      const currentUrlQuery = searchParams.get('q') || ''
-                      const currentUrlFilter = pathname.split('/')[2] || 'all'
+                      const currentUrlQuery = searchParams?.get('q') || ''
+                      const currentUrlFilter = pathname?.split('/')[2] || 'all'
                       
                       if (!(isOnSearchPage && currentUrlQuery === searchQuery && currentUrlFilter === selectedFilter)) {
                         router.push(`/search/${selectedFilter}?q=${encodeURIComponent(searchQuery)}`)

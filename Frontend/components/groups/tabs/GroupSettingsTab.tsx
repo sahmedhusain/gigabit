@@ -1,11 +1,13 @@
 'use client'
 import React, { useState, useEffect } from 'react'
-import { Settings, Users, Crown, Shield, User, UserPlus, Trash2, Lock, Unlock, Eye, EyeOff, AlertTriangle, Search, Check, X, Edit3, Send, Clock, ChevronRight } from 'lucide-react'
+import Image from 'next/image'
+import { Settings, Users, Crown, Shield, User, UserPlus, Trash2, Lock, Unlock, Eye, EyeOff, AlertTriangle, Search, Check, X, Edit3, Send, Clock, ChevronRight, Upload, Loader2 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useConnectionStatus, useUpload } from '@/hooks'
 import { api, Member, User as UserType, GroupResponse } from '@/lib/api'
 import { useToast } from '@/context/ToastContext'
 import { useAuth } from '@/context/AuthContext'
+import { getUserInitials, getGroupInitials } from '@/utils/avatarUtils'
 
 interface GroupSettingsTabProps {
   groupId: number
@@ -18,7 +20,7 @@ const GroupSettingsTab: React.FC<GroupSettingsTabProps> = ({ groupId }) => {
   const [inviteEmail, setInviteEmail] = useState('')
   const [isInviting, setIsInviting] = useState(false)
   const [activeTab, setActiveTab] = useState<'members' | 'privacy' | 'requests' | 'danger'>('members')
-  const [groupInfo, setGroupInfo] = useState<any>(null)
+  const [groupInfo, setGroupInfo] = useState<GroupResponse | null>(null)
   const [userRole, setUserRole] = useState<string>('')
   const [invitableUsers, setInvitableUsers] = useState<UserType[]>([])
   const [allUsers, setAllUsers] = useState<UserType[]>([])
@@ -140,6 +142,7 @@ const GroupSettingsTab: React.FC<GroupSettingsTabProps> = ({ groupId }) => {
         const result = await uploadImage(avatarFile)
         avatar = result.url
         setAvatarUrl(avatar)
+        success('Avatar uploaded successfully!')
       } catch (err) {
         toastError('Failed to upload avatar')
         setIsUpdating(false)
@@ -153,7 +156,7 @@ const GroupSettingsTab: React.FC<GroupSettingsTabProps> = ({ groupId }) => {
         description: editDescription.trim() || undefined,
         avatar: avatar
       })
-      setGroupInfo((prev: GroupResponse | null) => prev ? { ...prev, title: editTitle.trim(), description: editDescription.trim(), avatar: avatar } : null)
+      setGroupInfo((prev: GroupResponse | null) => prev ? { ...prev, title: editTitle.trim(), description: editDescription.trim(), avatar: avatar || undefined } : null)
       setShowEditModal(false)
       success('Group updated successfully!')
     } catch (error) {
@@ -493,7 +496,7 @@ const GroupSettingsTab: React.FC<GroupSettingsTabProps> = ({ groupId }) => {
               return (
                 <motion.button
                   key={tab.id}
-                  onClick={() => setActiveTab(tab.id as any)}
+                  onClick={() => setActiveTab(tab.id as 'members' | 'privacy' | 'requests' | 'danger')}
                   className={`flex items-center space-x-2 px-4 py-2 rounded-2xl text-sm font-medium transition-all duration-200 flex-1 justify-center ${
                     activeTab === tab.id
                       ? 'bg-emerald-500 text-white shadow-lg'
@@ -575,7 +578,7 @@ const GroupSettingsTab: React.FC<GroupSettingsTabProps> = ({ groupId }) => {
                               />
                             ) : (
                               <div className="w-12 h-12 rounded-full bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center text-white font-semibold shadow-lg">
-                                {member.user.first_name[0]}{member.user.last_name[0]}
+                                {getUserInitials(member.user)}
                               </div>
                             )}
                           </div>
@@ -943,7 +946,7 @@ const GroupSettingsTab: React.FC<GroupSettingsTabProps> = ({ groupId }) => {
                                 />
                               ) : (
                                 <div className="w-10 h-10 rounded-full bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center text-white font-semibold">
-                                  {request.user.first_name[0]}
+                                  {getUserInitials(request.user)}
                                 </div>
                               )}
                               <div>
@@ -1001,7 +1004,7 @@ const GroupSettingsTab: React.FC<GroupSettingsTabProps> = ({ groupId }) => {
                                 />
                               ) : (
                                 <div className="w-10 h-10 rounded-full bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center text-white font-semibold">
-                                  {request.user.first_name[0]}
+                                  {getUserInitials(request.user)}
                                 </div>
                               )}
                               <div>
@@ -1301,7 +1304,7 @@ const GroupSettingsTab: React.FC<GroupSettingsTabProps> = ({ groupId }) => {
                               />
                             ) : (
                               <div className="w-full h-full bg-gradient-to-r from-emerald-400 to-teal-500 rounded-full flex items-center justify-center text-white font-bold text-sm">
-                                {user.first_name[0]?.toUpperCase()}
+                                {getUserInitials(user)}
                               </div>
                             )}
                           </div>
@@ -1515,13 +1518,13 @@ const GroupSettingsTab: React.FC<GroupSettingsTabProps> = ({ groupId }) => {
                 <div className="space-y-3">
                   <div>
                     <label className="block text-yellow-200 text-xs font-medium mb-2">
-                      Type <strong className="text-yellow-300">"DELETE"</strong> to confirm:
+                      Type <strong className="text-yellow-300">&quot;DELETE&quot;</strong> to confirm:
                     </label>
                     <input
                       type="text"
                       value={deleteConfirmation}
                       onChange={(e) => setDeleteConfirmation(e.target.value)}
-                      placeholder="Type DELETE here..."
+                      placeholder="Type &quot;DELETE&quot; here..."
                       className="w-full px-3 py-2 bg-slate-800/50 border border-yellow-500/30 rounded-lg text-white placeholder-yellow-200/50 focus:outline-none focus:ring-2 focus:ring-yellow-400/50 focus:border-yellow-400/50 transition-all duration-200 text-sm"
                     />
                   </div>
@@ -1602,7 +1605,7 @@ const GroupSettingsTab: React.FC<GroupSettingsTabProps> = ({ groupId }) => {
                   ) : deleteConfirmation !== 'DELETE' ? (
                     <>
                       <AlertTriangle className="w-5 h-5" />
-                      <span>Type DELETE</span>
+                      <span>Type &quot;DELETE&quot;</span>
                     </>
                   ) : (
                     <>
@@ -1625,6 +1628,297 @@ const GroupSettingsTab: React.FC<GroupSettingsTabProps> = ({ groupId }) => {
                 </p>
               </motion.div>
               </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Edit Group Info Modal */}
+      <AnimatePresence>
+        {showEditModal && (
+          <motion.div
+            className="fixed inset-0 bg-black/50 backdrop-blur-xl z-50 flex items-center justify-center p-4"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.3 }}
+          >
+            <motion.div
+              className="relative w-full max-w-2xl h-[80vh] flex flex-col bg-white/5 backdrop-blur-2xl rounded-3xl border border-white/20 shadow-2xl overflow-hidden"
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              transition={{ duration: 0.3, ease: 'easeOut' }}
+            >
+              {/* Header */}
+              <motion.div
+                className="relative flex-shrink-0 p-6 lg:p-8 pb-4 bg-gradient-to-r from-white/10 to-white/5 border-b border-white/20"
+                initial={{ y: -20, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                transition={{ delay: 0.1, duration: 0.3 }}
+              >
+                <div className="flex items-center justify-between mb-6">
+                  <div className="flex items-center space-x-4">
+                    <motion.div
+                      className="relative"
+                      whileHover={{ scale: 1.05 }}
+                      transition={{ type: 'spring', stiffness: 400, damping: 17 }}
+                    >
+                      <div className="w-12 h-12 bg-gradient-to-br from-emerald-400 via-teal-500 to-cyan-600 rounded-2xl flex items-center justify-center shadow-lg">
+                        <Edit3 className="w-6 h-6 text-white drop-shadow-sm" />
+                      </div>
+                      <motion.div
+                        className="absolute -top-1 -right-1 w-4 h-4 bg-gradient-to-br from-emerald-400 to-teal-500 rounded-full"
+                        animate={{ scale: [1, 1.2, 1] }}
+                      />
+                    </motion.div>
+                    <div>
+                      <motion.h3
+                        className="text-xl lg:text-2xl font-bold text-white mb-1"
+                        initial={{ opacity: 0, x: -10 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: 0.2, duration: 0.3 }}
+                      >
+                        Edit Group Info
+                      </motion.h3>
+                      <motion.p
+                        className="text-white/60 text-sm"
+                        initial={{ opacity: 0, x: -10 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: 0.3, duration: 0.3 }}
+                      >
+                        Update your group&apos;s details and appearance
+                      </motion.p>
+                    </div>
+                  </div>
+                  <motion.button
+                    onClick={() => setShowEditModal(false)}
+                    className="group p-3 text-white/70 hover:text-white hover:bg-white/10 rounded-xl transition-all duration-200"
+                    title="Close"
+                    whileHover={{ scale: 1.1, rotate: 90 }}
+                    whileTap={{ scale: 0.9 }}
+                    initial={{ opacity: 0, x: 10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: 0.4, duration: 0.3 }}
+                  >
+                    <X className="w-5 h-5 group-hover:rotate-90 transition-transform duration-200" />
+                  </motion.button>
+                </div>
+              </motion.div>
+
+              {/* Scrollable Content Area */}
+              <motion.div
+                className="relative flex-1 overflow-y-auto px-6 lg:px-8 py-6"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.2, duration: 0.3 }}
+              >
+                <div className="space-y-6">
+                  {/* Group Avatar Upload */}
+                  <motion.div
+                    className="space-y-3"
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.25, duration: 0.3 }}
+                  >
+                    <motion.label
+                      className="text-white font-semibold text-sm lg:text-base flex items-center space-x-2"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ delay: 0.3, duration: 0.3 }}
+                    >
+                      <div className="w-2 h-2 bg-emerald-400 rounded-full"></div>
+                      <span>Group Avatar</span>
+                    </motion.label>
+                    <div className="flex items-center space-x-4">
+                      <label className="relative cursor-pointer">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={handleAvatarChange}
+                          disabled={isUploadingAvatar}
+                        />
+                        <div className="w-16 h-16 rounded-2xl border border-white/20 bg-white/10 flex items-center justify-center overflow-hidden">
+                          {avatarPreview ? (
+                            <Image src={avatarPreview} alt="Avatar Preview" width={64} height={64} unoptimized={true} className="object-cover w-16 h-16" />
+                          ) : groupInfo?.avatar ? (
+                            <Image src={groupInfo.avatar} alt="Current Avatar" width={64} height={64} unoptimized={true} className="object-cover w-16 h-16" />
+                          ) : (
+                            <div className="w-full h-full bg-gradient-to-br from-emerald-400 to-teal-500 rounded-2xl flex items-center justify-center text-white font-bold text-lg">
+                              {getGroupInitials(editTitle)}
+                            </div>
+                          )}
+                          {isUploadingAvatar && (
+                            <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                              <Loader2 className="w-6 h-6 text-white animate-spin" />
+                            </div>
+                          )}
+                        </div>
+                        <span className="block mt-2 text-xs text-white/60 text-center">Upload</span>
+                      </label>
+                      {(avatarPreview || groupInfo?.avatar) && (
+                        <button
+                          type="button"
+                          className="text-xs text-red-400 hover:underline"
+                          onClick={() => { 
+                            setAvatarFile(null); 
+                            setAvatarPreview(null); 
+                            setAvatarUrl(null);
+                            success('Avatar removed successfully!');
+                          }}
+                        >
+                          Remove
+                        </button>
+                      )}
+                    </div>
+                  </motion.div>
+
+                  {/* Group Title */}
+                  <motion.div
+                    className="space-y-3"
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.3, duration: 0.3 }}
+                  >
+                    <motion.label
+                      className="text-white font-semibold text-sm lg:text-base flex items-center space-x-2"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ delay: 0.4, duration: 0.3 }}
+                    >
+                      <div className="w-2 h-2 bg-emerald-400 rounded-full"></div>
+                      <span>Group Title *</span>
+                    </motion.label>
+                    <div className="relative">
+                      <motion.input
+                        type="text"
+                        value={editTitle}
+                        onChange={(e) => setEditTitle(e.target.value)}
+                        placeholder="Enter a catchy group name..."
+                        className="w-full bg-white/10 border border-white/20 rounded-xl p-4 text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-emerald-400/50 focus:border-emerald-400/50 transition-all duration-300 hover:bg-white/15 text-sm lg:text-base"
+                        maxLength={100}
+                        initial={{ opacity: 0, scale: 0.95 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        transition={{ delay: 0.5, duration: 0.3 }}
+                      />
+                      <motion.div
+                        className="absolute bottom-4 right-4 text-xs text-white/50"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        transition={{ delay: 0.6, duration: 0.3 }}
+                      >
+                        {editTitle.length}/100
+                      </motion.div>
+                    </div>
+                  </motion.div>
+
+                  {/* Group Description */}
+                  <motion.div
+                    className="space-y-3"
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.4, duration: 0.3 }}
+                  >
+                    <motion.label
+                      className="text-white font-semibold text-sm lg:text-base flex items-center space-x-2"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ delay: 0.5, duration: 0.3 }}
+                    >
+                      <div className="w-2 h-2 bg-teal-400 rounded-full"></div>
+                      <span>Description</span>
+                    </motion.label>
+                    <div className="relative">
+                      <motion.textarea
+                        value={editDescription}
+                        onChange={(e) => setEditDescription(e.target.value)}
+                        placeholder="Describe what your group is about, its purpose, and what members can expect..."
+                        className="w-full h-32 lg:h-36 bg-white/10 border border-white/20 rounded-xl p-4 text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-teal-400/50 focus:border-teal-400/50 resize-none text-sm lg:text-base transition-all duration-300 hover:bg-white/15"
+                        maxLength={500}
+                        initial={{ opacity: 0, scale: 0.95 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        transition={{ delay: 0.6, duration: 0.3 }}
+                      />
+                      <motion.div
+                        className="absolute bottom-4 right-4 text-xs text-white/50"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        transition={{ delay: 0.7, duration: 0.3 }}
+                      >
+                        {editDescription.length}/500
+                      </motion.div>
+                    </div>
+                  </motion.div>
+
+                  {/* Connection Status */}
+                  <AnimatePresence>
+                    {!isConnected && (
+                      <motion.div
+                        className="bg-gradient-to-r from-red-500/20 to-pink-500/20 border border-red-400/30 rounded-xl p-4"
+                        initial={{ opacity: 0, y: -10, scale: 0.95 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: -10, scale: 0.95 }}
+                        transition={{ duration: 0.3 }}
+                      >
+                        <p className="text-red-300 text-sm font-medium">You are currently offline. Group will be updated when connection is restored.</p>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+              </motion.div>
+
+              {/* Footer */}
+              <motion.div
+                className="relative flex-shrink-0 p-6 lg:p-8 pt-4 bg-gradient-to-r from-white/5 to-white/10 border-t border-white/20"
+                initial={{ y: 20, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                transition={{ delay: 0.5, duration: 0.3 }}
+              >
+                <div className="flex flex-col sm:flex-row justify-end space-y-3 sm:space-y-0 sm:space-x-4">
+                  <motion.button
+                    onClick={() => setShowEditModal(false)}
+                    className="w-full sm:w-auto px-6 py-3 border border-white/30 rounded-xl text-white hover:bg-white/10 hover:border-white/50 transition-all duration-300 text-sm lg:text-base font-medium"
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    transition={{ type: 'spring', stiffness: 400, damping: 17 }}
+                  >
+                    Cancel
+                  </motion.button>
+                  <motion.button
+                    onClick={handleUpdateGroup}
+                    disabled={isUpdating || !editTitle.trim() || !isConnected}
+                    className={`w-full sm:w-auto px-6 py-3 rounded-xl text-white font-semibold text-sm lg:text-base transition-all duration-300 shadow-lg ${
+                      isUpdating || !editTitle.trim() || !isConnected
+                        ? 'bg-white/20 cursor-not-allowed'
+                        : 'bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 shadow-emerald-500/25'
+                    }`}
+                    whileHover={{ scale: isUpdating || !editTitle.trim() || !isConnected ? 1 : 1.05 }}
+                    whileTap={{ scale: isUpdating || !editTitle.trim() || !isConnected ? 1 : 0.95 }}
+                    transition={{ type: 'spring', stiffness: 400, damping: 17 }}
+                  >
+                    {isUpdating ? (
+                      <div className="flex items-center justify-center space-x-2">
+                        <motion.div
+                          className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full"
+                          animate={{ rotate: 360 }}
+                          transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+                        />
+                        <span>Updating Group...</span>
+                      </div>
+                    ) : !isConnected ? (
+                      <div className="flex items-center justify-center space-x-2">
+                        <div
+                          className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"
+                        />
+                        <span>Offline</span>
+                      </div>
+                    ) : (
+                      'Update Group'
+                    )}
+                  </motion.button>
+                </div>
+              </motion.div>
             </motion.div>
           </motion.div>
         )}

@@ -1,6 +1,6 @@
 'use client'
 import React, { useState, useRef, useEffect } from 'react'
-import { X, Send, Smile, Check, CheckCheck, Clock, ChevronDown, MessageCircle, FileText, Calendar, BarChart3, Users, Settings, Crown, User as UserIcon, Info, Globe, EyeOff, Lock, Heart, MessageSquare } from 'lucide-react'
+import { X, Send, Smile, Check, CheckCheck, Clock, ChevronDown, MessageCircle, FileText, Calendar, BarChart3, Settings, User as UserIcon, Info, Globe, EyeOff, Lock, Heart, MessageSquare } from 'lucide-react'
 import Image from 'next/image'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useAuth } from '@/context/AuthContext'
@@ -9,7 +9,7 @@ import { useWebSocket } from '@/context/WebSocketContext'
 import { useRealTimeMessages, useTypingIndicator } from '@/hooks'
 import { api, User, GroupResponse, Member, ConversationResponse } from '@/lib/api'
 import EmojiPicker from 'emoji-picker-react'
-import { getAvatarUrl } from '@/utils/avatarUtils'
+import { getAvatarUrl, getUserInitials } from '@/utils/avatarUtils'
 import { useRouter } from 'next/navigation'
 import { MessageRounded } from '@mui/icons-material'
 
@@ -253,7 +253,7 @@ const SharedPostMessage: React.FC<SharedPostMessageProps> = ({ sharedPost, isCur
                   </div>
                 ) : (
                   <div className="w-9 h-9 rounded-full bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center text-white text-xs font-semibold ring-2 ring-white/20">
-                    {sharedPost.user.first_name[0]}{sharedPost.user.last_name[0]}
+                    {getUserInitials(sharedPost.user)}
                   </div>
                 )}
               </motion.div>
@@ -418,7 +418,6 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
   const [activeTab, setActiveTab] = useState(initialTab || 'chat') // New state for active tab
   const [groupData, setGroupData] = useState<GroupResponse | null>(null) // Store group data including user role
   const [groupMembers, setGroupMembers] = useState<Member[]>([])
-  const [isLoadingMembers, setIsLoadingMembers] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const messagesContainerRef = useRef<HTMLDivElement>(null)
   const highlightedRef = useRef<HTMLDivElement | null>(null)
@@ -457,7 +456,6 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
 
   // Internal effective conversation ID (can upgrade from placeholder groupId to real conversation ID)
   const [effectiveConversationId, setEffectiveConversationId] = useState<number>(conversationId)
-  const [isNewConversation, setIsNewConversation] = useState<boolean>(false)
 
   // Check if this is a potentially new conversation that needs ID resolution
   useEffect(() => {
@@ -467,14 +465,11 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
       ? !conversations.find(c => c.id === conversationId && c.type === 'private')
       : !!(conversationType === 'group' && groupId && conversationId === groupId)
 
-    setIsNewConversation(needsResolution)
-
     // Register callback for conversation ID resolution if needed
     if (needsResolution) {
       registerConversationIdCallback(conversationId, (newId: number) => {
         console.log(`ChatWindow: Conversation ID resolved from ${conversationId} to ${newId}`)
         setEffectiveConversationId(newId)
-        setIsNewConversation(false)
         onConversationResolved?.(newId)
       })
     }
@@ -496,7 +491,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
     } else {
       setEffectiveConversationId(conversationId)
     }
-  }, [conversationId, conversationType])
+  }, [conversationId, conversationType, effectiveConversationId])
 
   // Typing indicator integration
   // For groups, pass the groupId; for private chats, pass the participantId (not conversationId)
@@ -668,14 +663,11 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
   useEffect(() => {
     if (effectiveChatType === 'group' && groupId) {
       const fetchGroupMembers = async () => {
-        setIsLoadingMembers(true)
         try {
           const members = await api.getGroupMembers(groupId)
           setGroupMembers(members.members)
         } catch (error) {
           console.error('Failed to fetch group members:', error)
-        } finally {
-          setIsLoadingMembers(false)
         }
       }
       fetchGroupMembers()
@@ -1000,7 +992,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
                   />
                 ) : (
                   <div className="w-8 h-8 rounded-full bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center text-white text-sm font-semibold shadow-lg ring-2 ring-white/10 hover:ring-emerald-400/50 transition-all duration-200">
-                    {message.sender.first_name[0]}{message.sender.last_name[0]}
+                    {getUserInitials(message.sender)}
                   </div>
                 );
               })()}
@@ -1323,7 +1315,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
                 <div className={`w-14 h-14 rounded-full bg-gradient-to-br from-emerald-400 via-teal-500 to-cyan-600 flex items-center justify-center text-white text-xl font-bold shadow-2xl ring-2 ring-white/30 ${
                   conversationType === 'private' && participantId ? 'hover:ring-emerald-400/60 hover:shadow-emerald-400/20' : ''
                 } transition-all duration-300 hover:shadow-2xl hover:scale-105`}>
-                  {conversationType === 'private' ? participantName[0].toUpperCase() : '#'}
+                  {conversationType === 'private' ? (participantData ? getUserInitials(participantData) : participantName[0].toUpperCase()) : '#'}
                 </div>
               )}
             </motion.div>

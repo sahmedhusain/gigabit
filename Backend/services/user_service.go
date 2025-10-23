@@ -477,15 +477,6 @@ func (s *UserService) markPrivateMessagesDeleted(tx *sql.Tx, userID uint) error 
 func (s *UserService) softDeleteUser(tx *sql.Tx, userID uint) error {
 	query := `
 		UPDATE users SET 
-			email = NULL,
-			first_name = NULL,
-			last_name = NULL,
-			date_of_birth = NULL,
-			avatar = NULL,
-			nickname = NULL,
-			about_me = NULL,
-			gender = NULL,
-			status = 'offline',
 			is_deleted = true,
 			updated_at = ?
 		WHERE id = ?

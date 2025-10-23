@@ -7,6 +7,7 @@ import { api, Event, EventResponse, CreateEventRequest, UpdateEventRequest, Grou
 import { useToast } from '@/context/ToastContext';
 import { useAuth } from '@/context/AuthContext';
 import { useRealTimeEvents, useConnectionStatus } from '@/hooks';
+import { getUserInitials } from '@/utils/avatarUtils';
 
 interface EventsSectionProps {
   events: Event[];
@@ -491,7 +492,7 @@ const EventDetailsModal: React.FC<EventDetailsModalProps> = ({
                     {responses.responses.going.map((response: EventResponseItem) => (
                       <div key={response.id} className="flex items-center space-x-3 p-2 bg-white/5 rounded-lg">
                         <div className="w-8 h-8 bg-emerald-500 rounded-full flex items-center justify-center text-white text-sm font-medium">
-                          {response.user.first_name[0]}{response.user.last_name[0]}
+                          {getUserInitials(response.user)}
                         </div>
                         <span className="text-gray-300">{response.user.first_name} {response.user.last_name}</span>
                       </div>
@@ -507,7 +508,7 @@ const EventDetailsModal: React.FC<EventDetailsModalProps> = ({
                     {responses.responses.not_going.map((response: EventResponseItem) => (
                       <div key={response.id} className="flex items-center space-x-3 p-2 bg-white/5 rounded-lg">
                         <div className="w-8 h-8 bg-red-500 rounded-full flex items-center justify-center text-white text-sm font-medium">
-                          {response.user.first_name[0]}{response.user.last_name[0]}
+                          {getUserInitials(response.user)}
                         </div>
                         <span className="text-gray-300">{response.user.first_name} {response.user.last_name}</span>
                       </div>
@@ -543,7 +544,7 @@ export const EventsSection: React.FC<EventsSectionProps> = ({ events, onEventsUp
 
   // Handle event highlighting from URL params
   useEffect(() => {
-    const eventId = searchParams.get('eventId')
+    const eventId = searchParams?.get('eventId')
     if (eventId && events.length > 0) {
       const targetEventId = parseInt(eventId)
       const targetEvent = events.find(event => event.id === targetEventId)

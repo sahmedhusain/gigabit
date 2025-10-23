@@ -15,12 +15,57 @@ export function getAvatarUrl(avatar: string | null | undefined): string | null {
     'female1': '/avatars/FM1.png',
     'female2': '/avatars/FM2.png',
     'female3': '/avatars/FM3.png',
-    'defaultM': '/avatars/defaultM.png',
-    'defaultFM': '/avatars/defaultFM.png'
   };
   
   // Return mapped path or null if not found
   return avatarMap[avatar] || null;
+}
+
+// Get user initials for avatar placeholders (first + last name first letters)
+export function getUserInitials(user: { first_name?: string; last_name?: string; nickname?: string; email?: string }): string {
+  const firstName = user.first_name?.trim();
+  const lastName = user.last_name?.trim();
+  
+  // Try first and last name first
+  if (firstName && lastName) {
+    return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase();
+  }
+  
+  // Try first name only
+  if (firstName) {
+    return firstName.slice(0, 2).toUpperCase();
+  }
+  
+  // Try nickname
+  if (user.nickname) {
+    return user.nickname.slice(0, 2).toUpperCase();
+  }
+  
+  // Fallback to email
+  if (user.email) {
+    return user.email.slice(0, 2).toUpperCase();
+  }
+  
+  // Ultimate fallback
+  return 'U';
+}
+
+// Get group initials for avatar placeholders (first two letters of first word)
+export function getGroupInitials(groupName: string): string {
+  if (!groupName || !groupName.trim()) {
+    return 'G';
+  }
+  
+  const trimmedName = groupName.trim();
+  const firstWord = trimmedName.split(/\s+/)[0];
+  
+  if (firstWord.length >= 2) {
+    return firstWord.slice(0, 2).toUpperCase();
+  } else if (firstWord.length === 1) {
+    return firstWord.charAt(0).toUpperCase() + firstWord.charAt(0).toUpperCase();
+  }
+  
+  return 'G';
 }
 
 // Get avatar options for registration page

@@ -91,7 +91,7 @@ export default function Sidebar({
     {
       id: 'chats' as const,
       title: 'Chats',
-      icon: <MessageCircle className="w-4 h-4" />,
+      icon: <MessageCircle className="w-4 h-4 text-white" />,
       description: 'Messages and groups',
       items: [
         {
@@ -136,7 +136,7 @@ export default function Sidebar({
     {
       id: 'feed' as const,
       title: 'Feed',
-      icon: <Home className="w-4 h-4" />,
+      icon: <Home className="w-4 h-4 text-white" />,
       description: 'Your personalized content',
       items: [
         ...(tempPostSubTab ? [{
@@ -194,7 +194,7 @@ export default function Sidebar({
     {
       id: 'activity' as const,
       title: 'Your Activity',
-      icon: <Activity className="w-4 h-4" />,
+      icon: <Activity className="w-4 h-4 text-white" />,
       description: 'Track your engagement',
       items: [
         {
@@ -238,7 +238,7 @@ export default function Sidebar({
     {
       id: 'events' as const,
       title: 'Events',
-      icon: <Calendar className="w-4 h-4" />,
+      icon: <Calendar className="w-4 h-4 text-white" />,
       description: 'Upcoming events',
       items: [
         {

@@ -28,7 +28,7 @@ function EventsGoingPage() {
   } = useRealTimeEvents()
 
   // Get event ID from URL params for deep linking
-  const eventId = searchParams.get('event')
+  const eventId = searchParams?.get('event')
   
   const [showCreateEvent, setShowCreateEvent] = useState(false)
 

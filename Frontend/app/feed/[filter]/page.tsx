@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect, useCallback, useRef, use } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter, useParams, useSearchParams } from 'next/navigation'
 import ProtectedRoute from '@/components/ProtectedRoute'
 import AppLayout from '@/components/AppLayout'
@@ -31,7 +31,7 @@ function FeedFilterPage() {
   const { success, error } = useToast()
 
   const [feedSubTab, setFeedSubTab] = useState(filter || 'all')
-  const [sortOrder, setSortOrder] = useState<'newest' | 'oldest'>((searchParams.get('sort') as 'newest' | 'oldest') || 'newest')
+  const [sortOrder, setSortOrder] = useState<'newest' | 'oldest'>((searchParams?.get('sort') as 'newest' | 'oldest') || 'newest')
   const [showCreatePost, setShowCreatePost] = useState(false)
 
   // Post Creation State
@@ -68,7 +68,7 @@ function FeedFilterPage() {
   }, [feedSubTab, filter, router])
 
   // Fetch available users (followers) for listed privacy
-  const fetchAvailableUsers = async () => {
+  const fetchAvailableUsers = useCallback(async () => {
     if (availableUsers.length > 0) return // Already fetched
 
     try {
@@ -81,14 +81,14 @@ function FeedFilterPage() {
     } finally {
       setLoadingUsers(false)
     }
-  }
+  }, [user?.id, error, availableUsers.length])
 
   // Fetch users when privacy changes to 'listed' or when create post modal opens
   useEffect(() => {
     if (showCreatePost && postPrivacy === 'listed') {
       fetchAvailableUsers()
     }
-  }, [showCreatePost, postPrivacy])
+  }, [showCreatePost, postPrivacy, fetchAvailableUsers])
 
   const fetchFeedPosts = useCallback(async (page: number = 0, append: boolean = false) => {
     try {

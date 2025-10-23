@@ -211,7 +211,6 @@ export default function AppLayout({
         setActiveTab={handleTabChange}
         logout={logout}
         isMobileOpen={isMobileRightSidebarOpen}
-        setIsMobileOpen={setIsMobileRightSidebarOpen}
       />
     </div>
   )

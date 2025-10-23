@@ -4,6 +4,7 @@ import Image from 'next/image'
 import { X, Search, MessageSquarePlus, MessageCircle } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ConversationResponse } from '@/lib/api'
+import { getUserInitials } from '@/utils/avatarUtils'
 
 interface Follower {
   id: number
@@ -226,9 +227,9 @@ export default function CreateDirectMessage({
                             transition={{ type: 'spring', stiffness: 400, damping: 17 }}
                           >
                             {follower.avatar ? (
-                              <Image src={follower.avatar} alt={follower.first_name} width={48} height={48} unoptimized={follower.avatar.includes('/svg')} className="w-full h-full rounded-xl object-cover" />
+                              <Image src={follower.avatar} alt={follower.first_name} width={48} height={48} unoptimized={true} className="w-full h-full rounded-xl object-cover" />
                             ) : (
-                              follower.first_name[0]?.toUpperCase()
+                              getUserInitials(follower)
                             )}
                           </motion.div>
                           <motion.div

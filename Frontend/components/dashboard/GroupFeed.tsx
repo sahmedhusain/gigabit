@@ -3,9 +3,10 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { useToast } from '../../context/ToastContext'
 import { Heart, MessageCircle, MoreHorizontal } from 'lucide-react'
-import { useConnectionStatus, useOnlineStatus } from '@/hooks'
+import { useConnectionStatus } from '@/hooks'
 import { api, type PostResponse } from '@/lib/api'
 import Image from 'next/image'
+import { getUserInitials } from '@/utils/avatarUtils'
 
 type Props = {
   groupId: string
@@ -19,7 +20,6 @@ export default function GroupFeed({ groupId }: Props) {
   
   // Real-time hooks
   const { isConnected } = useConnectionStatus()
-  const { onlineUsers } = useOnlineStatus()
 
   // Listen for real-time group post updates
   useEffect(() => {
@@ -148,9 +148,6 @@ export default function GroupFeed({ groupId }: Props) {
       )}
       
       {posts.map(post => {
-        // Check if post author is online
-        const isAuthorOnline = onlineUsers.some(u => u.user_id === post.user.id && u.status === 'online')
-        
         return (
           <div key={post.id} className="bg-white/5 backdrop-blur-xl rounded-2xl p-6 border border-white/10">
             {/* Post Header */}
@@ -163,11 +160,12 @@ export default function GroupFeed({ groupId }: Props) {
                       alt={`${post.user.first_name} ${post.user.last_name}`}
                       width={48}
                       height={48}
+                      unoptimized={true}
                       className="w-full h-full rounded-full object-cover"
                     />
                   ) : (
                     <span className="text-white font-semibold">
-                      {post.user.first_name[0]}{post.user.last_name[0]}
+                      {getUserInitials(post.user)}
                     </span>
                   )}
                 </div>
@@ -198,7 +196,7 @@ export default function GroupFeed({ groupId }: Props) {
                     alt="Post image"
                 width={640}
                 height={256}
-                unoptimized={post.image_url?.includes('/svg')}
+                unoptimized={true}
                     className="w-full h-auto max-h-96 object-cover"
                   />
                 </div>

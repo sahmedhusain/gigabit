@@ -1,7 +1,9 @@
 'use client'
 import { User, UserCheck } from 'lucide-react'
 import { useRouter } from 'next/navigation'
+import Image from 'next/image'
 import { SearchResult } from '@/hooks/useSearch'
+import { getUserInitials } from '@/utils/avatarUtils'
 
 interface UserSearchResultProps {
   result: SearchResult
@@ -9,6 +11,15 @@ interface UserSearchResultProps {
 
 export default function UserSearchResult({ result }: UserSearchResultProps) {
   const router = useRouter()
+
+  // Helper function to get initials from a name string
+  const getInitialsFromName = (name: string | undefined): string => {
+    if (!name) return '?'
+    const trimmed = name.trim()
+    if (trimmed.length === 0) return '?'
+    if (trimmed.length === 1) return trimmed.toUpperCase()
+    return trimmed.charAt(0).toUpperCase() + trimmed.charAt(1).toUpperCase()
+  }
 
   const handleClick = () => {
     router.push(result.url)
@@ -25,15 +36,18 @@ export default function UserSearchResult({ result }: UserSearchResultProps) {
           <div className="relative group cursor-pointer">
             <div className="w-14 h-14 bg-gradient-to-br from-emerald-400 via-teal-500 to-cyan-600 rounded-full flex items-center justify-center overflow-hidden ring-2 ring-white/20 group-hover:ring-emerald-400/50 transition-all duration-300">
               {result.image ? (
-                <img
+                <Image
                   src={result.image}
                   alt={result.title}
+                  width={56}
+                  height={56}
+                  unoptimized={true}
                   className="w-full h-full object-cover"
                 />
               ) : (
                 <div className="w-full h-full bg-gradient-to-r from-emerald-400 to-teal-500 rounded-full flex items-center justify-center">
                   <span className="text-white font-bold text-lg">
-                    {result.title?.charAt(0).toUpperCase() || '?'}{result.title?.charAt(1)?.toUpperCase() || ''}
+                    {getInitialsFromName(result.title)}
                   </span>
                 </div>
               )}

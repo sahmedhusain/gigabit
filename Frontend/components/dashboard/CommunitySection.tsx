@@ -1,17 +1,10 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
-import { Calendar, MapPin, Users, Bell, Activity, Heart, MessageCircle, Plus, Check, X, ArrowUpDown, Trash2, MoreVertical, Edit, EyeOff, ArrowDown, ArrowUp } from 'lucide-react'
+import { Calendar, MapPin, Users, Bell, Activity, Heart, MessageCircle, Plus, Check, X, Trash2, MoreVertical, Edit, EyeOff, ArrowDown, ArrowUp } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Event, type Notification as NotificationType, api } from '@/lib/api'
 import { useAuth } from '@/context/AuthContext'
 import { useToast } from '@/context/ToastContext'
-import { useRealTimeEvents } from '@/hooks'
-
-interface EventRespondResult {
-  message: string
-  response: string
-  removed: boolean
-}
 
 interface CommunitySectionProps {
   notifications: NotificationType[]
@@ -21,10 +14,10 @@ interface CommunitySectionProps {
   eventsSubTab?: string
   events?: Event[]
   eventsLoading: boolean
-  respondToEvent: (eventId: number, option: 'going' | 'not_going') => Promise<any>
-  updateEvent: (eventId: number, eventData: { title?: string; description?: string; event_time?: string }) => Promise<any>
-  cancelEvent: (eventId: number, cancelReason: string) => Promise<any>
-  deleteEvent: (eventId: number) => Promise<any>
+  respondToEvent: (eventId: number, option: 'going' | 'not_going') => Promise<{ message: string; response: string; removed: boolean }>
+  updateEvent: (eventId: number, eventData: { title?: string; description?: string; event_time?: string }) => Promise<{ message: string }>
+  cancelEvent: (eventId: number, cancelReason: string) => Promise<{ message: string }>
+  deleteEvent: (eventId: number) => Promise<{ message: string }>
   highlightedEventId?: number | null
 }
 
@@ -193,7 +186,7 @@ export default function CommunitySection({
   const handleEditEvent = async (eventId: number) => {
     try {
       const eventDateTime = new Date(`${editDate}T${editTime}`);
-      const eventData: any = {
+      const eventData: { event_time: string; location: string } = {
         event_time: eventDateTime.toISOString(),
         location: editLocation.trim()
       };
@@ -798,7 +791,7 @@ export default function CommunitySection({
       </motion.div>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-scroll scrollbar-hide" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+  <div className="flex-1 overflow-y-scroll scrollbar-hide custom-scrollbar-hide">
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -831,7 +824,7 @@ export default function CommunitySection({
                 </div>
                 <div>
                   <h3 className="text-white font-bold text-lg">Cancel Event</h3>
-                  <p className="text-white/60 text-sm">Cancel "{selectedEvent.title}"</p>
+                  <p className="text-white/60 text-sm">Cancel &quot;{selectedEvent.title}&quot;</p>
                 </div>
               </div>
 
@@ -886,7 +879,7 @@ export default function CommunitySection({
                       setShowCancelModal(false);
                       setSelectedEvent(null);
                       setCancelReason('');
-                    } catch (err) {
+                    } catch {
                       // Error already handled in handleCancelEvent
                     }
                   }}
@@ -924,7 +917,7 @@ export default function CommunitySection({
                 </div>
                 <div>
                   <h3 className="text-white font-bold text-lg">Delete Event</h3>
-                  <p className="text-white/60 text-sm">Delete "{selectedEvent.title}"</p>
+                  <p className="text-white/60 text-sm">Delete &quot;{selectedEvent.title}&quot;</p>
                 </div>
               </div>
 
@@ -950,7 +943,7 @@ export default function CommunitySection({
                       await handleDeleteEvent(selectedEvent.id);
                       setShowDeleteModal(false);
                       setSelectedEvent(null);
-                    } catch (err) {
+                    } catch {
                       // Error already handled in handleDeleteEvent
                     }
                   }}
@@ -987,7 +980,7 @@ export default function CommunitySection({
                 </div>
                 <div>
                   <h3 className="text-white font-bold text-lg">Edit Event</h3>
-                  <p className="text-white/60 text-sm">Edit "{selectedEvent.title}"</p>
+                  <p className="text-white/60 text-sm">Edit &quot;{selectedEvent.title}&quot;</p>
                 </div>
               </div>
 
@@ -1063,7 +1056,7 @@ export default function CommunitySection({
                     }
                     try {
                       await handleEditEvent(selectedEvent.id);
-                    } catch (err) {
+                    } catch {
                       // Error already handled in handleEditEvent
                     }
                   }}

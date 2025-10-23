@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { X, Heart, MessageCircle, UserPlus, Users, Calendar, Mail, Bell } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
@@ -31,12 +31,21 @@ const NotificationToast: React.FC<NotificationToastProps> = ({
   const [isExiting, setIsExiting] = useState(false)
   const [progress, setProgress] = useState(100)
 
-  const handleClose = () => {
+  // Helper function to get initials from actor name
+  const getInitialsFromName = (name: string | undefined): string => {
+    if (!name) return '?'
+    const trimmed = name.trim()
+    if (trimmed.length === 0) return '?'
+    if (trimmed.length === 1) return trimmed.toUpperCase()
+    return trimmed.charAt(0).toUpperCase() + trimmed.charAt(1).toUpperCase()
+  }
+
+  const handleClose = useCallback(() => {
     setIsExiting(true)
     setTimeout(() => {
       onClose(notification.id)
     }, 300)
-  }
+  }, [onClose, notification.id])
 
   useEffect(() => {
     // Progress bar animation
@@ -139,7 +148,9 @@ const NotificationToast: React.FC<NotificationToastProps> = ({
               />
             ) : (
               <div className="w-10 h-10 rounded-full bg-gradient-to-br from-emerald-500/30 to-teal-500/30 flex items-center justify-center border-2 border-white/20">
-                {getIcon()}
+                <span className="text-white font-bold text-sm">
+                  {getInitialsFromName(notification.actorName)}
+                </span>
               </div>
             )}
           </div>

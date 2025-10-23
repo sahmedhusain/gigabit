@@ -31,7 +31,6 @@ export default function DeleteAccountModal({
   setDeletePasswordError,
 }: DeleteAccountModalProps) {
   const [deleting, setDeleting] = useState(false);
-  const [message, setMessage] = useState('');
 
   // Countdown timer effect
   useEffect(() => {
@@ -52,7 +51,6 @@ export default function DeleteAccountModal({
     }
 
     setDeleting(true);
-    setMessage('');
 
     const token = localStorage.getItem('token');
 
@@ -67,7 +65,6 @@ export default function DeleteAccountModal({
       });
 
       if (deleteResponse.ok) {
-        setMessage('Account deleted successfully. You will be logged out.');
         // Clear local storage and redirect
         localStorage.removeItem('token');
         setTimeout(() => {
@@ -79,7 +76,6 @@ export default function DeleteAccountModal({
         if ((deleteResponse.status === 401 && error.error?.toLowerCase().includes('password')) || error.error?.toLowerCase().includes('invalid password') || error.error?.toLowerCase().includes('wrong password')) {
           setDeletePasswordError('Password is incorrect');
         } else {
-          setMessage(error.error || 'Failed to delete account');
           setShowDeleteModal(false);
           setDeleteConfirmation('');
           setDeleteCountdown(5);
@@ -88,7 +84,6 @@ export default function DeleteAccountModal({
       }
     } catch (error) {
       console.error('Failed to delete account:', error);
-      setMessage('Failed to delete account');
       setShowDeleteModal(false);
       setDeleteConfirmation('');
       setDeleteCountdown(5);
@@ -310,6 +305,7 @@ export default function DeleteAccountModal({
                 whileTap={{
                   scale: (deleting || deleteConfirmation !== 'DELETE' || deleteCountdown > 0 || !deletePassword.trim()) ? 1 : 0.98
                 }}
+                type="button"
               >
                 {deleting ? (
                   <>

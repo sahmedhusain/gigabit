@@ -1,5 +1,5 @@
 'use client'
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { Plus, BarChart3 } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { useWebSocket } from '@/context/WebSocketContext'
@@ -21,43 +21,23 @@ const GroupPollsTab: React.FC<GroupPollsTabProps> = ({ groupId }) => {
   const { user } = useAuth()
   const { addMessageListener } = useWebSocket()
 
-  useEffect(() => {
-    if (groupId) {
-      fetchPolls()
-      fetchUserRole()
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [groupId])
-
-  // WebSocket listener for real-time poll updates
-  useEffect(() => {
-    const cleanup = addMessageListener((message) => {
-      if ((message.type === 'poll_update' || message.type === 'poll_vote_update') && message.GroupID === groupId) {
-        console.log('Received poll update via WebSocket:', message)
-        // Refresh polls to show the latest data
-        fetchPolls()
-      }
-    })
-
-    return cleanup
-  }, [groupId, addMessageListener])
-
-  const fetchPolls = async () => {
+  const fetchPolls = useCallback(async () => {
     if (!groupId)return
     setIsLoading(true)
     try {
       const pollsData = await api.getGroupPolls(groupId)
       setPolls(pollsData)
-    } catch (error: any) {
-      console.warn('Failed to fetch polls, endpoint may not be implemented:', error.message)
+    } catch (error: unknown) {
+      const err = error as Error;
+      console.warn('Failed to fetch polls, endpoint may not be implemented:', err.message)
       // Set empty polls array instead of throwing
       setPolls([])
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [groupId])
 
-  const fetchUserRole = async () => {
+  const fetchUserRole = useCallback(async () => {
     if (!groupId) return
     try {
       const roleData = await api.getUserRole(groupId)
@@ -71,7 +51,27 @@ const GroupPollsTab: React.FC<GroupPollsTabProps> = ({ groupId }) => {
     } catch (error) {
       console.error('Failed to fetch user role:', error)
     }
-  }
+  }, [groupId])
+
+  useEffect(() => {
+    if (groupId) {
+      fetchPolls()
+      fetchUserRole()
+    }
+  }, [groupId, fetchPolls, fetchUserRole])
+
+  // WebSocket listener for real-time poll updates
+  useEffect(() => {
+    const cleanup = addMessageListener((message) => {
+      if ((message.type === 'poll_update' || message.type === 'poll_vote_update') && message.GroupID === groupId) {
+        console.log('Received poll update via WebSocket:', message)
+        // Refresh polls to show the latest data
+        fetchPolls()
+      }
+    })
+
+    return cleanup
+  }, [groupId, addMessageListener, fetchPolls])
 
   const handleCreatePoll = async (pollData: {
     title: string

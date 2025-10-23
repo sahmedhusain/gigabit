@@ -3,9 +3,6 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
-}
-
-@theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
@@ -66,6 +63,14 @@ body {
   }
 }
 
+.custom-scrollbar-hide {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE and Edge */
+}
+.custom-scrollbar-hide::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, Opera */
+}
+
 .animate-float {
   animation: float 3s ease-in-out infinite;
 }
@@ -106,6 +111,7 @@ body {
   max-width: 600px;
   max-height: 500px;
   box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+  -webkit-backdrop-filter: blur(20px);
   backdrop-filter: blur(20px);
   z-index: 1000;
 }

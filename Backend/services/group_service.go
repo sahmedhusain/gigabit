@@ -358,6 +358,16 @@ func (s *GroupService) RequestToJoin(groupID, userID uint) error {
 		return sql.ErrNoRows
 	}
 
+	// If previously rejected, update the existing record
+	if status == "rejected" {
+		query := `
+			UPDATE group_members SET status = 'requested', updated_at = ?
+			WHERE group_id = ? AND user_id = ?
+		`
+		_, err = s.db.Exec(query, now, groupID, userID)
+		return err
+	}
+
 	query := `
 		INSERT INTO group_members (group_id, user_id, status, role, invited_by, requestor_id, created_at, updated_at)
 		VALUES (?, ?, 'requested', 'member', NULL, ?, ?, ?)

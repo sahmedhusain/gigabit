@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect, use } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter, useParams, useSearchParams } from 'next/navigation'
 import ProtectedRoute from '@/components/ProtectedRoute'
 import ChatWindow from '@/components/ChatWindow'
@@ -7,7 +7,6 @@ import { useAuth } from '@/context/AuthContext'
 import { useWebSocket } from '@/context/WebSocketContext'
 import { useToast } from '@/context/ToastContext'
 import { useNotifications, useConversations } from '@/hooks'
-import { X } from 'lucide-react'
 import {
   api,
   Group,
@@ -36,10 +35,10 @@ function ChatsFilterPage() {
   const { conversations: _liveConversations } = useConversations()
 
   // Get URL parameters
-  const chatId = searchParams.get('chat')
-  const groupId = searchParams.get('group')
-  const userParam = searchParams.get('user')
-  const highlightMessageParam = searchParams.get('message')
+  const chatId = searchParams?.get('chat')
+  const groupId = searchParams?.get('group')
+  const userParam = searchParams?.get('user')
+  const highlightMessageParam = searchParams?.get('message')
 
   const [chatSubTab, setChatSubTab] = useState(filter === 'groups' ? 'group' : filter || 'all')
   const [showCreateGroup, setShowCreateGroup] = useState(false)
@@ -296,7 +295,7 @@ function ChatsFilterPage() {
 
     try {
       setIsLoadingFollowers(true)
-      const [followersData, followingData] = await Promise.all([
+      const [, followingData] = await Promise.all([
         api.getFollowers(user.id),
         api.getFollowing(user.id)
       ])

@@ -15,7 +15,7 @@ function DiscoverPageRoute() {
   const searchParams = useSearchParams()
   const { user } = useAuth()
 
-  const category = searchParams.get('category') || 'trending'
+  const category = searchParams?.get('category') || 'trending'
 
   // Update URL when category changes
   useEffect(() => {

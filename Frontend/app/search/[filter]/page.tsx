@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect, use } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter, useSearchParams, useParams } from 'next/navigation'
 import ProtectedRoute from '@/components/ProtectedRoute'
 import SearchResults from '@/components/dashboard/SearchResults'
@@ -11,11 +11,11 @@ function FilteredSearchPageRoute() {
   const params = useParams()
 
   const filter = (params as { filter: string }).filter
-  const [query, setQuery] = useState(searchParams.get('q') || '')
+  const [query, setQuery] = useState(searchParams?.get('q') || '')
 
   // Sync query state with URL changes
   useEffect(() => {
-    const urlQuery = searchParams.get('q') || ''
+    const urlQuery = searchParams?.get('q') || ''
     if (urlQuery !== query) {
       setQuery(urlQuery)
     }
@@ -29,21 +29,11 @@ function FilteredSearchPageRoute() {
     }
   }, [query, router, filter])
 
-  const handleClose = () => {
-    router.back()
-  }
-
-  const handleSearch = (newQuery: string) => {
-    setQuery(newQuery)
-  }
-
   return (
     <AppLayout activeTab="search">
       <SearchResults 
         filter={filter}
         query={query}
-        onSearch={handleSearch}
-        onClose={handleClose}
       />
     </AppLayout>
   )

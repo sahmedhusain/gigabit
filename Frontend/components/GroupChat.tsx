@@ -6,9 +6,8 @@ import ChatWindow from '@/components/ChatWindow'
 import CreateGroupPost from '@/components/groups/CreateGroupPost'
 import CreateGroupEvent from '@/components/groups/CreateGroupEvent'
 import { MessageCircle, Users, Hash, FileText, Calendar } from 'lucide-react'
-import { useRealTimeMessages, useOnlineStatus, useConnectionStatus } from '@/hooks'
-import { getAvatarUrl } from '@/utils/avatarUtils'
-import { useAuth } from '@/context/AuthContext'
+import { useRealTimeMessages, useConnectionStatus } from '@/hooks'
+import { getAvatarUrl, getUserInitials } from '@/utils/avatarUtils'
 import Image from 'next/image'
 
 interface GroupChatProps {
@@ -18,13 +17,10 @@ interface GroupChatProps {
 
 const GroupChat: React.FC<GroupChatProps> = ({ groupId, groupTitle }) => {
   const { isConnected: connectionStatus } = useConnectionStatus()
-  const { onlineUsers: liveOnlineUsers } = useOnlineStatus()
   const { getUnreadCount } = useRealTimeMessages()
-  const { user } = useAuth()
   
   const [showChat, setShowChat] = useState(false)
   const [memberCount, setMemberCount] = useState(0)
-  const [groupMembers, setGroupMembers] = useState<number[]>([])
   const [recentMessages, setRecentMessages] = useState<unknown[]>([])
   const [conversationId, setConversationId] = useState<number | null>(null)
   const [isResolvingConversation, setIsResolvingConversation] = useState(false)
@@ -37,7 +33,7 @@ const GroupChat: React.FC<GroupChatProps> = ({ groupId, groupTitle }) => {
   const onlineMemberCount = 0 // Temporarily force to 0 for debugging
   const unreadCount = getUnreadCount(groupId)
 
-  const fetchMemberCount = async () => {
+  const fetchMemberCount = useCallback(async () => {
     try {
       const response = await fetch(`${API_BASE_URL}/api/groups/${groupId}/members`, {
         credentials: 'include'
@@ -45,18 +41,16 @@ const GroupChat: React.FC<GroupChatProps> = ({ groupId, groupTitle }) => {
       if (response.ok) {
         const data = await response.json()
         setMemberCount(data.members?.length || 0)
-        // Store member user IDs for online filtering
-        setGroupMembers(data.members?.map((member: { user: { id: number } }) => member.user.id) || [])
       }
     } catch (error) {
       console.error('Error fetching member count:', error)
     }
-  }
+  }, [groupId])
 
   useEffect(() => {
     // Fetch member count
     fetchMemberCount()
-  }, [groupId])
+  }, [groupId, fetchMemberCount])
 
   useEffect(() => {
     // Fetch recent messages when chat is not open
@@ -247,9 +241,6 @@ const GroupChat: React.FC<GroupChatProps> = ({ groupId, groupTitle }) => {
                         {recentMessages.slice(0, 3).map((message, index) => {
                           const m = (message as Record<string, unknown>) || {};
                           const sender = (m.sender as Record<string, unknown>) || {};
-                          const senderInitial = typeof sender.first_name === 'string' && sender.first_name.length > 0
-                            ? (sender.first_name as string)[0]
-                            : (typeof sender.nickname === 'string' && sender.nickname.length > 0 ? (sender.nickname as string)[0] : 'U');
 
                           const senderName = (typeof sender.first_name === 'string' && typeof sender.last_name === 'string')
                             ? `${sender.first_name} ${sender.last_name}`
@@ -275,7 +266,7 @@ const GroupChat: React.FC<GroupChatProps> = ({ groupId, groupTitle }) => {
                                     />
                                   ) : (
                                     <div className="w-6 h-6 bg-gradient-to-r from-emerald-500 to-teal-600 rounded-full flex items-center justify-center">
-                                      <span className="text-white text-xs font-semibold">{senderInitial}</span>
+                                      <span className="text-white text-xs font-semibold">{getUserInitials(sender)}</span>
                                     </div>
                                   );
                                 })()}

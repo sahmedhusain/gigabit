@@ -8,6 +8,9 @@ import { useRealTimeMessages, useTypingIndicator } from '@/hooks'
 import EmojiPicker from 'emoji-picker-react'
 import { MessageRounded } from '@mui/icons-material'
 import { api } from '@/lib/api'
+import type { Message } from '@/hooks/useRealTimeMessages'
+import { getAvatarUrl, getUserInitials } from '@/utils/avatarUtils'
+import Image from 'next/image'
 
 // Import SharedPostMessage component
 import SharedPostMessage from '../../SharedPostMessage'
@@ -62,7 +65,7 @@ const GroupChatTab: React.FC<GroupChatTabProps> = ({
   // Typing indicator integration - for groups, pass groupId to typing hook
   // The hook will send it as message.group_id which the backend uses to broadcast to group members
   const typingConversationId = groupId || effectiveConversationId
-  const { typingUsers, startTyping } = useTypingIndicator(typingConversationId, 'group')
+  const { startTyping } = useTypingIndicator(typingConversationId, 'group')
 
   // Connection status monitoring
   const { isConnected } = useWebSocket()
@@ -272,7 +275,7 @@ const GroupChatTab: React.FC<GroupChatTabProps> = ({
     return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true })
   }
 
-  const shouldShowDateSeparator = (message: any, index: number): boolean => {
+  const shouldShowDateSeparator = (message: Message, index: number): boolean => {
     if (index === 0) return true
     const prevMessage = Array.from(messages.get(effectiveConversationId) || [])[index - 1]
     if (!prevMessage) return true
@@ -313,7 +316,7 @@ const GroupChatTab: React.FC<GroupChatTabProps> = ({
     return userRole?.is_admin_or_creator || groupPermissions.send_messages === 'all_members'
   }
 
-  const renderMessage = (message: any, index: number) => {
+  const renderMessage = (message: Message, index: number) => {
     const isCurrentUser = message.sender_id === user?.id
     const showAvatar = !isCurrentUser
     const showSenderName = !isCurrentUser
@@ -353,14 +356,16 @@ const GroupChatTab: React.FC<GroupChatTabProps> = ({
               transition={{ type: 'spring', stiffness: 400, damping: 17 }}
             >
               {message.sender.avatar ? (
-                <img
+                <Image
                   src={message.sender.avatar}
                   alt={`${message.sender.first_name} ${message.sender.last_name}`}
+                  width={32}
+                  height={32}
                   className="w-8 h-8 rounded-full object-cover shadow-lg ring-2 ring-white/10 hover:ring-emerald-400/50 transition-all duration-200"
                 />
               ) : (
                 <div className="w-8 h-8 rounded-full bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center text-white text-sm font-semibold shadow-lg ring-2 ring-white/10 hover:ring-emerald-400/50 transition-all duration-200">
-                  {message.sender.first_name[0]}{message.sender.last_name[0]}
+                  {getUserInitials(message.sender)}
                 </div>
               )}
             </motion.div>

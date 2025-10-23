@@ -1,11 +1,11 @@
 'use client'
 import Image from 'next/image'
-import { User, Lock, Globe, MessageSquare, Edit, Heart, MessageCircle, Send, Bookmark, MoreHorizontal, Trash2, EyeOff, UserPlus, UserMinus, X, UserX, Clock, Mail, Calendar, CalendarDays, FileText, Plus, Users, Search, Venus, Mars } from 'lucide-react'
-import { Post, api, CreatePostRequest } from '@/lib/api'
+import { User, Lock, Globe, MessageSquare, Edit, Heart, MessageCircle, Send, Bookmark, MoreHorizontal, Trash2, EyeOff, UserPlus, UserMinus, X, UserX, Mail, Calendar, CalendarDays, FileText, Plus, Users, Search, Venus, Mars } from 'lucide-react'
+import { Post, api, CreatePostRequest, User as ApiUser } from '@/lib/api'
 import { useRealTimePosts, useFollowers, useConnectionStatus, useFollowerCounts } from '@/hooks'
-import { getAvatarUrl } from '@/utils/avatarUtils'
+import { getAvatarUrl, getUserInitials } from '@/utils/avatarUtils'
 import { useRouter } from 'next/navigation'
-import { useState, useEffect, useRef, useMemo } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useToast } from '@/context/ToastContext'
 import { useAuth } from '@/context/AuthContext'
 import { useWebSocket } from '@/context/WebSocketContext'
@@ -14,7 +14,43 @@ import FollowHandler, { FollowStatus, getFollowStatusFromAPI } from './FollowHan
 import ManagePrivacy from './ManagePrivacy'
 import SharePopup from '../SharePopup'
 import CreatePost from './CreatePost'
+
+interface UserOption {
+  id: number
+  display_name?: string
+  first_name: string
+  last_name: string
+  nickname?: string
+  email: string
+  avatar?: string
+}
 import { motion, AnimatePresence } from 'framer-motion'
+
+interface FollowWebSocketData {
+  user_id: number;
+  first_name?: string;
+  last_name?: string;
+  nickname?: string;
+  email?: string;
+  avatar?: string;
+  is_private?: boolean;
+  created_at?: string;
+  about_me?: string;
+  date_of_birth?: string;
+  follower_id: number;
+  follower_first_name?: string;
+  follower_last_name?: string;
+  follower_nickname?: string;
+  follower_email?: string;
+  follower_avatar?: string;
+  follower_is_private?: boolean;
+  follower_created_at?: string;
+  follower_about_me?: string;
+  follower_date_of_birth?: string;
+  is_followed_by?: boolean;
+  is_following_back?: boolean;
+  action: 'follow' | 'unfollow' | 'accept';
+}
 
 interface ProfileSectionProps {
   currentUser: {
@@ -64,7 +100,7 @@ export default function ProfileSection({
   onPostPrivacyUpdate
 }: ProfileSectionProps) {
   const router = useRouter()
-  const { posts: realTimePosts, isConnected } = useRealTimePosts()
+  const { isConnected } = useRealTimePosts()
   const { followers: liveFollowers, following: liveFollowing } = useFollowers()
   const { isConnected: connectionStatus } = useConnectionStatus()
   const { followerCounts, isConnected: countsConnected } = useFollowerCounts(
@@ -96,7 +132,7 @@ export default function ProfileSection({
   
   // Tab navigation state
   const [activeTab, setActiveTab] = useState<'posts' | 'following' | 'followers'>('posts')
-  const [tabData, setTabData] = useState<{ following: any[], followers: any[] }>({ following: [], followers: [] })
+  const [tabData, setTabData] = useState<{ following: ApiUser[], followers: ApiUser[] }>({ following: [], followers: [] })
   const [isLoadingTabData, setIsLoadingTabData] = useState(false)
 
   // Follow relationships state
@@ -109,7 +145,7 @@ export default function ProfileSection({
   const [isDeleting, setIsDeleting] = useState<{[postId: number]: boolean}>({})
   const [showManagePrivacy, setShowManagePrivacy] = useState<{[postId: number]: boolean}>({})
   const [currentSelectedUsers, setCurrentSelectedUsers] = useState<{[postId: number]: number[]}>({})
-  const [isUpdatingPostPrivacy, setIsUpdatingPostPrivacy] = useState<{[postId: number]: boolean}>({})
+
 
   // Local state for posts when callbacks are not provided
   const [localPosts, setLocalPosts] = useState<Post[]>(posts)
@@ -137,7 +173,7 @@ export default function ProfileSection({
   const [newPostImage, setNewPostImage] = useState<File | null>(null)
   const [postPrivacy, setPostPrivacy] = useState<'public' | 'followers' | 'friends' | 'listed'>('public')
   const [selectedUsers, setSelectedUsers] = useState<number[]>([])
-  const [availableUsers, setAvailableUsers] = useState<any[]>([])
+  const [availableUsers, ] = useState<UserOption[]>([])
   const [loadingUsers, setLoadingUsers] = useState(false)
 
   // Chat functionality
@@ -166,12 +202,12 @@ export default function ProfileSection({
 
     const removeListener = addMessageListener((message: WebSocketMessage) => {
       if (message.type === 'follow_update' && message.data) {
-        const data = message.data
+        const data = message.data as FollowWebSocketData
 
         // Update following list if someone the current user follows/unfollows
         if (data.action === 'follow' && data.follower_id === currentUser.id) {
           // Current user followed someone - add to following list
-          const newUser = {
+          const newUser: ApiUser = {
             id: data.user_id,
             first_name: data.first_name || '',
             last_name: data.last_name || '',
@@ -182,7 +218,12 @@ export default function ProfileSection({
             created_at: data.created_at || '',
             about_me: data.about_me || '',
             date_of_birth: data.date_of_birth || '',
-            updated_at: new Date().toISOString()
+            updated_at: new Date().toISOString(),
+            gender: '', // Default empty
+            status: 'online', // Default
+            last_status_change: new Date().toISOString(),
+            gender_privacy: 'everyone', // Default
+            birthday_privacy: 'everyone' // Default
           }
           setTabData(prev => ({
             ...prev,
@@ -200,7 +241,7 @@ export default function ProfileSection({
           // Current user unfollowed someone - remove from following list
           setTabData(prev => ({
             ...prev,
-            following: prev.following.filter((user: any) => user.id !== data.user_id)
+            following: prev.following.filter((user: Partial<ApiUser>) => user.id !== data.user_id)
           }))
           setFollowRelationships(prev => {
             const newRelationships = { ...prev }
@@ -212,8 +253,8 @@ export default function ProfileSection({
         // Update followers list if someone follows/unfollows the current user
         if (data.action === 'follow' && data.user_id === currentUser.id) {
           // Someone followed current user - add to followers list
-          const newUser = {
-            id: data.follower_id,
+          const newUser: ApiUser = {
+            id: data.follower_id!,
             first_name: data.follower_first_name || '',
             last_name: data.follower_last_name || '',
             nickname: data.follower_nickname || '',
@@ -223,7 +264,12 @@ export default function ProfileSection({
             created_at: data.follower_created_at || '',
             about_me: data.follower_about_me || '',
             date_of_birth: data.follower_date_of_birth || '',
-            updated_at: new Date().toISOString()
+            updated_at: new Date().toISOString(),
+            gender: '', // Default empty
+            status: 'online', // Default
+            last_status_change: new Date().toISOString(),
+            gender_privacy: 'everyone', // Default
+            birthday_privacy: 'everyone' // Default
           }
           setTabData(prev => ({
             ...prev,
@@ -241,7 +287,7 @@ export default function ProfileSection({
           // Someone unfollowed current user - remove from followers list
           setTabData(prev => ({
             ...prev,
-            followers: prev.followers.filter((user: any) => user.id !== data.follower_id)
+            followers: prev.followers.filter((user: Partial<ApiUser>) => user.id !== data.follower_id)
           }))
           setFollowRelationships(prev => {
             const newRelationships = { ...prev }
@@ -377,7 +423,7 @@ export default function ProfileSection({
         if (response.followers && response.followers.length > 0) {
           if (isOwnProfile) {
             // For own profile: check follow status for follow-back logic
-            const followStatusPromises = response.followers.map(async (user: any) => {
+            const followStatusPromises = response.followers.map(async (user: ApiUser) => {
               try {
                 const followStatus = await api.getFollowStatus(user.id)
                 return { userId: user.id, isFollowing: followStatus.is_following, isFollowedBy: followStatus.is_followed_by, isPending: followStatus.is_pending }
@@ -393,7 +439,7 @@ export default function ProfileSection({
             })
           } else {
             // For other profiles: check if current user follows these followers
-            const followStatusPromises = response.followers.map(async (user: any) => {
+            const followStatusPromises = response.followers.map(async (user: ApiUser) => {
               try {
                 const followStatus = await api.getFollowStatus(user.id)
                 return { userId: user.id, isFollowing: followStatus.is_following, isFollowedBy: followStatus.is_followed_by, isPending: followStatus.is_pending }
@@ -419,7 +465,7 @@ export default function ProfileSection({
         if (response.following && response.following.length > 0) {
           if (isOwnProfile) {
             // For own profile: check actual follow status for each user (including pending requests)
-            const followStatusPromises = response.following.map(async (user: any) => {
+            const followStatusPromises = response.following.map(async (user: ApiUser) => {
               try {
                 const followStatus = await api.getFollowStatus(user.id)
                 return { userId: user.id, isFollowing: followStatus.is_following, isFollowedBy: followStatus.is_followed_by, isPending: followStatus.is_pending }
@@ -435,7 +481,7 @@ export default function ProfileSection({
             })
           } else {
             // For other profiles: check if current user follows these users they're following
-            const followStatusPromises = response.following.map(async (user: any) => {
+            const followStatusPromises = response.following.map(async (user: ApiUser) => {
               try {
                 const followStatus = await api.getFollowStatus(user.id)
                 return { userId: user.id, isFollowing: followStatus.is_following, isFollowedBy: followStatus.is_followed_by, isPending: followStatus.is_pending }
@@ -513,11 +559,11 @@ export default function ProfileSection({
           success(`Now following user`)
         }
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error updating follow status:', err)
       
       // Handle ValidationError specifically
-      if (err.name === 'ValidationError' || err.constructor?.name === 'ValidationError') {
+      if (err instanceof Error && (err.name === 'ValidationError' || err.constructor?.name === 'ValidationError')) {
         error(err.message || 'Validation failed')
       } else {
         error('Failed to update follow status')
@@ -550,15 +596,15 @@ export default function ProfileSection({
       // Remove from followers list locally
       setTabData(prev => ({
         ...prev,
-        followers: prev.followers.filter((user: any) => user.id !== numericUserId)
+        followers: prev.followers.filter((user: Partial<ApiUser>) => user.id !== numericUserId)
       }))
       
       success('Follower removed')
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error removing follower:', err)
       
       // Handle ValidationError specifically
-      if (err.name === 'ValidationError' || err.constructor?.name === 'ValidationError') {
+      if (err instanceof Error && (err.name === 'ValidationError' || err.constructor?.name === 'ValidationError')) {
         error(err.message || 'Validation failed')
       } else {
         error('Failed to remove follower. Please try again.')
@@ -569,9 +615,7 @@ export default function ProfileSection({
   }
 
   // Check if current user is following a specific user
-  const isFollowingUser = (userId: number) => {
-    return followRelationships[userId]?.isFollowing || false
-  }
+
 
   // Check if current user can delete a post
   const canDeletePost = (post: Post) => {
@@ -715,9 +759,7 @@ export default function ProfileSection({
     setOpenMenu(prev => ({ ...prev, [postId]: false }))
   }
 
-  // Handle update privacy
   const handleUpdatePrivacy = async (postId: number, privacy: 'public' | 'followers' | 'friends' | 'listed', selectedUsers: number[]) => {
-    setIsUpdatingPostPrivacy(prev => ({ ...prev, [postId]: true }))
     try {
       // Get the current post to preserve its content
       const currentPost = displayPosts.find(p => p.id === postId)
@@ -744,9 +786,6 @@ export default function ProfileSection({
     } catch (err) {
       console.error('Failed to update privacy:', err)
       error('Failed to update privacy. Please try again.')
-    } finally {
-      setIsUpdatingPostPrivacy(prev => ({ ...prev, [postId]: false }))
-      setShowManagePrivacy(prev => ({ ...prev, [postId]: false }))
     }
   }
 
@@ -872,7 +911,7 @@ export default function ProfileSection({
     setSharePost(post)
   }
 
-  const handleUserClick = (user: any) => {
+  const handleUserClick = (user: Partial<ApiUser>) => {
     // Navigate to user's profile
     router.push(`/profile/${user.id}`)
   }
@@ -1051,14 +1090,17 @@ export default function ProfileSection({
                 {getAvatarUrl(post.user.avatar) ? (
                   <Image
                     src={getAvatarUrl(post.user.avatar)!}
-                    alt={`${post.user.name}'s avatar`}
+                    alt={`${post.user.name}&apos;s avatar`}
                     width={48}
                     height={48}
                     className="w-full h-full object-cover"
                   />
                 ) : (
                   <div className="w-full h-full bg-gradient-to-r from-emerald-400 to-teal-500 rounded-full flex items-center justify-center text-white font-bold">
-                    {post.user.name[0]?.toUpperCase()}
+                    {getUserInitials({
+                      first_name: post.user.name?.split(' ')[0],
+                      last_name: post.user.name?.split(' ')[1] || post.user.name?.split(' ')[0]
+                    })}
                   </div>
                 )}
               </div>
@@ -1268,8 +1310,12 @@ export default function ProfileSection({
                 </>
               ) : (
                 <span className="text-white font-bold text-xl lg:text-2xl drop-shadow-xl transition-all duration-300 group-hover:scale-110">
-                  {currentUser?.firstName?.[0] || currentUser?.first_name?.[0] || currentUser?.name?.[0] || '?'}
-                  {currentUser?.lastName?.[0] || currentUser?.last_name?.[0] || currentUser?.name?.[1] || ''}
+                  {getUserInitials({
+                    first_name: currentUser?.firstName || currentUser?.first_name,
+                    last_name: currentUser?.lastName || currentUser?.last_name,
+                    nickname: currentUser?.nickname,
+                    email: currentUser?.email
+                  })}
                 </span>
               )}
             </div>
@@ -1495,7 +1541,10 @@ export default function ProfileSection({
                       Gender
                     </h4>
                     <p className="text-white/90 text-sm">
-                      {currentUser!.gender!.charAt(0).toUpperCase() + currentUser!.gender!.slice(1)}
+                      {currentUser?.gender
+                        ? currentUser.gender.charAt(0).toUpperCase() + currentUser.gender.slice(1)
+                        : 'Not specified'
+                      }
                     </p>
                   </div>
                 )}
@@ -1654,7 +1703,7 @@ export default function ProfileSection({
                                 </div>
                                 <h3 className="text-xl font-bold text-white mb-3">No Posts Yet</h3>
                                 <p className="text-white/70 text-sm leading-relaxed">
-                                  {currentUser?.name} hasn't shared any posts yet. Check back later for updates!
+                                  {currentUser?.name} hasn&apos;t shared any posts yet. Check back later for updates!
                                 </p>
                               </motion.div>
                             )}
@@ -1731,7 +1780,8 @@ export default function ProfileSection({
                             ))}
                           </div>
                         ) : sortedFollowing.length > 0 ? (
-                          sortedFollowing.map((user: any) => (
+                          sortedFollowing.map((user: Partial<ApiUser>) => (
+                            user.id ? (
                             <div
                               key={user.id}
                               className="flex items-center space-x-3 p-3 hover:bg-white/10 rounded-lg transition-colors"
@@ -1751,7 +1801,7 @@ export default function ProfileSection({
                                     />
                                   ) : (
                                     <span className="text-white font-bold text-sm">
-                                      {user.first_name[0]}{user.last_name[0]}
+                                      {getUserInitials(user)}
                                     </span>
                                   )}
                                 </div>
@@ -1760,7 +1810,7 @@ export default function ProfileSection({
                                     {user.first_name} {user.last_name}
                                   </p>
                                   <p className="text-white/60 text-sm truncate">
-                                    @{user.nickname || user.email.split('@')[0]}
+                                    @{user.nickname || user.email?.split('@')[0]}
                                   </p>
                                 </div>
                               </div>
@@ -1771,7 +1821,7 @@ export default function ProfileSection({
                                   <button
                                     onClick={(e) => {
                                       e.stopPropagation()
-                                      handleUserFollowAction(user.id, false) // This will cancel the pending request
+                                      handleUserFollowAction(user.id!, false) // This will cancel the pending request
                                     }}
                                     disabled={isUpdatingFollow[user.id]}
                                     className="flex items-center px-4 py-2.5 bg-gradient-to-r from-yellow-500 to-orange-600 hover:from-yellow-600 hover:to-orange-700 text-white font-semibold text-xs rounded-xl transition-all duration-300 shadow-lg shadow-yellow-500/25 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -1791,7 +1841,7 @@ export default function ProfileSection({
                                     onClick={(e) => {
                                       e.stopPropagation()
                                       setShowUnfollowConfirm({ 
-                                        userId: user.id, 
+                                        userId: user.id!, 
                                         userName: `${user.first_name} ${user.last_name}` 
                                       })
                                     }}
@@ -1839,7 +1889,7 @@ export default function ProfileSection({
                                       // Update local follow relationships
                                       setFollowRelationships(prev => ({
                                         ...prev,
-                                        [user.id]: { 
+                                        [user.id!]: { 
                                           isFollowing: newStatus.isFollowing, 
                                           isFollowedBy: newStatus.isFollowedBy,
                                           isPending: newStatus.isPending
@@ -1854,6 +1904,7 @@ export default function ProfileSection({
                                 )
                               )}
                             </div>
+                            ) : null
                           ))
                         ) : (
                           <div className="text-center py-12 px-6">
@@ -1893,7 +1944,7 @@ export default function ProfileSection({
                                 </div>
                                 <h3 className="text-xl font-bold text-white mb-3">No Following Yet</h3>
                                 <p className="text-white/70 text-sm leading-relaxed">
-                                  {currentUser?.name} hasn't followed anyone yet. Their following list will appear here when they start connecting with others.
+                                  {currentUser?.name} hasn&apos;t followed anyone yet. Their following list will appear here when they start connecting with others.
                                 </p>
                               </motion.div>
                             )}
@@ -1965,9 +2016,9 @@ export default function ProfileSection({
                             ))}
                           </div>
                         ) : sortedFollowers.length > 0 ? (
-                          sortedFollowers.map((user: any) => (
+                          sortedFollowers.filter(user => user.id).map((user: Partial<ApiUser>) => (
                             <div
-                              key={user.id}
+                              key={user.id!}
                               className="flex items-center space-x-3 p-3 hover:bg-white/10 rounded-lg transition-colors"
                             >
                               <div
@@ -1985,16 +2036,16 @@ export default function ProfileSection({
                                     />
                                   ) : (
                                     <span className="text-white font-bold text-sm">
-                                      {user.first_name[0]}{user.last_name[0]}
+                                      {getUserInitials(user)}
                                     </span>
                                   )}
                                 </div>
                                 <div className="flex-1 min-w-0">
                                   <p className="text-white font-medium truncate">
-                                    {user.first_name} {user.last_name}
+                                    {user.first_name || ''} {user.last_name || ''}
                                   </p>
                                   <p className="text-white/60 text-sm truncate">
-                                    @{user.nickname || user.email.split('@')[0]}
+                                    @{user.nickname || (user.email ? user.email.split('@')[0] : '')}
                                   </p>
                                 </div>
                               </div>
@@ -2002,16 +2053,16 @@ export default function ProfileSection({
                               {isOwnProfile ? (
                                 <div className="flex space-x-2 flex-nowrap">
                                   {/* Follow Back button - only show if current user is not following back and not pending */}
-                                  {!(followRelationships[user.id]?.isFollowing) && !(followRelationships[user.id]?.isPending) && (
+                                  {!(followRelationships[user.id!]?.isFollowing) && !(followRelationships[user.id!]?.isPending) && (
                                     <button
                                       onClick={(e) => {
                                         e.stopPropagation()
-                                        handleUserFollowAction(user.id, false)
+                                        handleUserFollowAction(user.id!, false)
                                       }}
-                                      disabled={isUpdatingFollow[user.id]}
+                                      disabled={isUpdatingFollow[user.id!]}
                                       className="flex items-center px-4 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-semibold text-xs rounded-xl transition-all duration-300 shadow-lg shadow-emerald-500/25 disabled:opacity-50 disabled:cursor-not-allowed"
                                     >
-                                      {isUpdatingFollow[user.id] ? (
+                                      {isUpdatingFollow[user.id!] ? (
                                         <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
                                       ) : (
                                         <>
@@ -2022,16 +2073,16 @@ export default function ProfileSection({
                                     </button>
                                   )}
                                   {/* Pending request - show cancel button */}
-                                  {followRelationships[user.id]?.isPending && (
+                                  {followRelationships[user.id!]?.isPending && (
                                     <button
                                       onClick={(e) => {
                                         e.stopPropagation()
-                                        handleUserFollowAction(user.id, false) // This will cancel the pending request
+                                        handleUserFollowAction(user.id!, false) // This will cancel the pending request
                                       }}
-                                      disabled={isUpdatingFollow[user.id]}
+                                      disabled={isUpdatingFollow[user.id!]}
                                       className="flex items-center px-4 py-2.5 bg-gradient-to-r from-yellow-500 to-orange-600 hover:from-yellow-600 hover:to-orange-700 text-white font-semibold text-xs rounded-xl transition-all duration-300 shadow-lg shadow-yellow-500/25 disabled:opacity-50 disabled:cursor-not-allowed"
                                     >
-                                      {isUpdatingFollow[user.id] ? (
+                                      {isUpdatingFollow[user.id!] ? (
                                         <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
                                       ) : (
                                         <>
@@ -2045,14 +2096,14 @@ export default function ProfileSection({
                                     onClick={(e) => {
                                       e.stopPropagation()
                                       setShowRemoveConfirm({ 
-                                        userId: user.id, 
-                                        userName: `${user.first_name} ${user.last_name}` 
+                                        userId: user.id!, 
+                                        userName: `${user.first_name || ''} ${user.last_name || ''}` 
                                       })
                                     }}
-                                    disabled={isUpdatingFollow[user.id]}
+                                    disabled={isUpdatingFollow[user.id!]}
                                     className="flex items-center px-4 py-2.5 bg-gradient-to-r from-red-500 to-pink-600 hover:from-red-600 hover:to-pink-700 text-white font-semibold text-xs rounded-xl transition-all duration-300 shadow-lg shadow-red-500/25 disabled:opacity-50 disabled:cursor-not-allowed"
                                   >
-                                    {isUpdatingFollow[user.id] ? (
+                                    {isUpdatingFollow[user.id!] ? (
                                       <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
                                     ) : (
                                       <>
@@ -2067,7 +2118,7 @@ export default function ProfileSection({
                                 user.id !== currentUserAuth?.id && (
                                   <FollowHandler
                                     targetUser={{
-                                      id: user.id,
+                                      id: user.id!,
                                       first_name: user.first_name || '',
                                       last_name: user.last_name || '',
                                       nickname: user.nickname || '',
@@ -2085,15 +2136,15 @@ export default function ProfileSection({
                                       last_status_change: new Date().toISOString()
                                     }}
                                     currentFollowStatus={getFollowStatusFromAPI(
-                                      followRelationships[user.id]?.isFollowing || false,
-                                      followRelationships[user.id]?.isPending ? 'pending' : undefined,
-                                      followRelationships[user.id]?.isFollowedBy || false
+                                      followRelationships[user.id!]?.isFollowing || false,
+                                      followRelationships[user.id!]?.isPending ? 'pending' : undefined,
+                                      followRelationships[user.id!]?.isFollowedBy || false
                                     )}
                                     onStatusChange={(newStatus) => {
                                       // Update local follow relationships
                                       setFollowRelationships(prev => ({
                                         ...prev,
-                                        [user.id]: { 
+                                        [user.id!]: { 
                                           isFollowing: newStatus.isFollowing, 
                                           isFollowedBy: newStatus.isFollowedBy,
                                           isPending: newStatus.isPending
@@ -2138,7 +2189,7 @@ export default function ProfileSection({
                                 </div>
                                 <h3 className="text-xl font-bold text-white mb-3">No Followers Yet</h3>
                                 <p className="text-white/70 text-sm leading-relaxed">
-                                  {currentUser?.name} hasn't gained any followers yet. Be the first to follow them and show your support!
+                                  {currentUser?.name} hasn&apos;t gained any followers yet. Be the first to follow them and show your support!
                                 </p>
                               </motion.div>
                             )}
@@ -2258,7 +2309,7 @@ export default function ProfileSection({
 
       {/* Delete Confirmation Modal */}
       <AnimatePresence>
-        {Object.entries(showDeleteConfirm).some(([_, show]) => show) && (
+        {Object.entries(showDeleteConfirm).some(([, show]) => show) && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -2314,7 +2365,6 @@ export default function ProfileSection({
           key={`privacy-${post.id}`}
           show={showManagePrivacy[post.id] || false}
           onClose={() => setShowManagePrivacy(prev => ({ ...prev, [post.id]: false }))}
-          postId={post.id}
           currentPrivacy={post.privacy as 'public' | 'followers' | 'friends' | 'listed'}
           currentSelectedUsers={currentSelectedUsers[post.id] || []}
           availableUsers={[]} // TODO: Fetch available users for privacy management
@@ -2424,7 +2474,7 @@ export default function ProfileSection({
                   Are you sure you want to unfollow <span className="text-white font-medium">{showUnfollowConfirm.userName}</span>? 
                   {(() => {
                     // Find the user in the following list to check if they have a private profile
-                    const userInFollowing = tabData.following.find((user: any) => user.id === showUnfollowConfirm.userId)
+                    const userInFollowing = tabData.following.find((user: Partial<ApiUser>) => user.id === showUnfollowConfirm.userId)
                     return userInFollowing?.is_private ? 
                       ' This user has a private profile, so you will no longer be able to see their posts.' : 
                       ' You will no longer see their posts in your feed.'

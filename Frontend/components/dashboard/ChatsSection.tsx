@@ -3,7 +3,8 @@ import { useState, useEffect } from 'react'
 import useSWR from 'swr'
 import { MessageCircle, Plus, Search, MessageSquarePlus, Filter, User, X, Users, UserCheck, MessageSquare } from 'lucide-react'
 import { api, ConversationSearchResult } from '@/lib/api'
-import ChatItem from '@/components/chat/ChatItem'
+import type { ChatItem } from '@/types/chat'
+import ChatItemComponent from '@/components/chat/ChatItem'
 import ChatSkeleton from '@/components/chat/ChatSkeleton'
 import { User as UserType } from '@/lib/api'
 import { useWebSocket } from '@/context/WebSocketContext'
@@ -39,7 +40,6 @@ export default function ChatsSection({
   const { addMessageListener } = useWebSocket()
   const [typingChats, setTypingChats] = useState<Record<string, string[]>>({})
   const [searchResults, setSearchResults] = useState<ConversationSearchResult[]>([])
-  const [isSearching, setIsSearching] = useState(false)
   const [searchMode, setSearchMode] = useState<'normal' | 'messages'>('normal')
 
   // Handle search functionality
@@ -47,28 +47,23 @@ export default function ChatsSection({
     const performSearch = async () => {
       if (!searchQuery.trim()) {
         setSearchResults([])
-        setIsSearching(false)
         return
       }
 
       // Only perform comprehensive message search if in messages mode
       if (searchMode === 'messages') {
-        setIsSearching(true)
         try {
           const response = await api.searchMessages(searchQuery, 50, 0)
           console.log('🔍 [Search] API Response:', response)
           console.log('🔍 [Search] Search results:', response.results)
-          setSearchResults(response.results)
+          setSearchResults(response.results || [])
         } catch (error) {
           console.error('Search failed:', error)
           setSearchResults([])
-        } finally {
-          setIsSearching(false)
         }
       } else {
         // For normal search, just clear search results (filtering happens in filteredChats)
         setSearchResults([])
-        setIsSearching(false)
       }
     }
 
@@ -105,12 +100,19 @@ export default function ChatsSection({
       await api.markConversationAsRead(actualConversationId, conversationType);
 
       // Optimistically update the UI
-      mutate('chats', (current: any) => {
+      mutate('chats', (current: ChatItem[] | { conversations: ChatItem[] } | undefined) => {
         if (!current) return current
         const updated = Array.isArray(current) ? current : current.conversations
         if (!Array.isArray(updated)) return current
-        const next = updated.map((c: any) => {
-          const cIdNum = c?.id ? (typeof c.id === 'string' ? parseInt(c.id.replace(/\D/g, '')) : c.id) : 0;
+        const next = updated.map((c: ChatItem) => {
+          let cIdNum = 0;
+          if (c?.id) {
+            if (typeof c.id === 'string') {
+              cIdNum = parseInt(String(c.id).replace(/\D/g, ''));
+            } else if (typeof c.id === 'number') {
+              cIdNum = c.id;
+            }
+          }
           return cIdNum === conversationId ? { ...c, unread_count: 0 } : c;
         });
         return Array.isArray(current) ? next : { ...current, conversations: next }
@@ -143,12 +145,19 @@ export default function ChatsSection({
       await api.markConversationAsUnread(actualConversationId, conversationType);
 
       // Optimistically update the UI - show unread indicator without specific count
-      mutate('chats', (current: any) => {
+      mutate('chats', (current: ChatItem[] | { conversations: ChatItem[] } | undefined) => {
         if (!current) return current
         const updated = Array.isArray(current) ? current : current.conversations
         if (!Array.isArray(updated)) return current
-        const next = updated.map((c: any) => {
-          const cIdNum = c?.id ? (typeof c.id === 'string' ? parseInt(c.id.replace(/\D/g, '')) : c.id) : 0;
+        const next = updated.map((c: ChatItem) => {
+          let cIdNum = 0;
+          if (c?.id) {
+            if (typeof c.id === 'string') {
+              cIdNum = parseInt(String(c.id).replace(/\D/g, ''));
+            } else if (typeof c.id === 'number') {
+              cIdNum = c.id;
+            }
+          }
           return cIdNum === conversationId ? { ...c, unread_count: 1, has_unread: true } : c;
         });
         return Array.isArray(current) ? next : { ...current, conversations: next }
@@ -251,7 +260,7 @@ export default function ChatsSection({
             const current = prev[conversationKey!] || []
             const filtered = current.filter(u => u !== username)
             if (filtered.length === 0) {
-              const { [conversationKey!]: _, ...rest } = prev
+              const { ...rest } = prev
               console.log(`📝 [Typing] Removed ${username} from ${conversationKey} (now empty)`)
               return rest
             }
@@ -269,7 +278,7 @@ export default function ChatsSection({
     })
 
     return cleanup
-  }, [addMessageListener, currentUser?.id])
+  }, [addMessageListener, currentUser?.id, typingChats])
 
   // Normalize chats for consistent preview formatting
   const normalizedChats = (chats || []).map(chat => normalizeConversation(chat))
@@ -547,7 +556,7 @@ export default function ChatsSection({
                   layout
                   exit="exit"
                 >
-                  <ChatItem
+                  <ChatItemComponent
                     item={{
                       ...chatItem,
                       conversationId: result.conversation_id,
@@ -690,11 +699,18 @@ export default function ChatsSection({
               }
               const handleOpenChat = () => {
                 // Optimistically clear unread in cache for snappy UX
-                mutate('chats', (current: any) => {
+                mutate('chats', (current: ChatItem[] | { conversations: ChatItem[] } | undefined) => {
                   if (!current) return current
                   const updated = Array.isArray(current) ? current : current.conversations
                   if (!Array.isArray(updated)) return current
-                  const next = updated.map((c: any) => c?.id === chatIdNum ? { ...c, unread_count: 0 } : c)
+                  const next = updated.map((c: ChatItem) => {
+                    if (typeof c?.id === 'number') {
+                      return c.id === chatIdNum ? { ...c, unread_count: 0 } : c;
+                    } else if (typeof c?.id === 'string') {
+                      return parseInt(String(c.id).replace(/\D/g, '')) === chatIdNum ? { ...c, unread_count: 0 } : c;
+                    }
+                    return c;
+                  })
                   // Preserve original shape if needed
                   return Array.isArray(current) ? next : { ...current, conversations: next }
                 }, false)
@@ -714,7 +730,7 @@ export default function ChatsSection({
                   layout
                   exit="exit"
                 >
-                  <ChatItem
+                  <ChatItemComponent
                     item={{
                       ...chat,
                       id: chatIdNum,
@@ -1031,7 +1047,7 @@ export default function ChatsSection({
                           <>
                             <span className="font-medium">
                               Found <span className="text-emerald-300 font-bold">{searchResults.length}</span>{' '}
-                              {searchResults.length === 1 ? 'conversation' : 'conversations'} matching "<span className="text-emerald-300 font-bold">{searchQuery}</span>"
+                              {searchResults.length === 1 ? 'conversation' : 'conversations'} matching &quot;<span className="text-emerald-300 font-bold">{searchQuery}</span>&quot;
                             </span>
                             <span className="text-white/40">•</span>
                             <span className="text-white/60">Deep message search</span>

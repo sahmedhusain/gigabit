@@ -13,15 +13,10 @@ import {
   Clock,
   Check,
   X,
-  MessageCircle,
   Eye,
-  Filter,
   Grid3X3,
   List,
-  UserX,
-  ArrowRightLeft,
   Bell,
-  Send,
   Inbox,
   UserMinus,
   ChevronDown,
@@ -30,43 +25,25 @@ import {
   Lock,
   Heart
 } from 'lucide-react'
-import { useRealTimePosts, useFollowers, useConnectionStatus, useFollowerCounts } from '@/hooks'
-import { getAvatarUrl } from '@/utils/avatarUtils'
+import { useConnectionStatus } from '@/hooks'
+
 import { useToast } from '@/context/ToastContext'
 import { useAuth } from '@/context/AuthContext'
 import { useWebSocket } from '@/context/WebSocketContext'
 import { FollowStatus } from './FollowHandler'
-import { User, api, GroupResponse, FollowRequestItem } from '@/lib/api'
+import { User, api, GroupResponse, FollowRequestItem, GroupInvitationItem } from '@/lib/api'
 import FollowHandler from './FollowHandler'
+import { getUserInitials, getGroupInitials } from '@/utils/avatarUtils'
 
 // Letter Avatar Component with Chat Style
 function LetterAvatar({
   name,
-  size = 64,
   className = ''
 }: {
   name: string
-  size?: number
   className?: string
 }) {
   const firstTwoLetters = name.substring(0, 2).toUpperCase()
-  const colors = [
-    'bg-blue-500',
-    'bg-green-500',
-    'bg-yellow-500',
-    'bg-red-500',
-    'bg-purple-500',
-    'bg-pink-500',
-    'bg-indigo-500',
-    'bg-teal-500'
-  ]
-  const colorIndex = name.length % colors.length
-  const bgColor = colors[colorIndex]
-
-  const sizeClasses = {
-    48: 'w-12 h-12 text-sm',
-    64: 'w-16 h-16 text-lg'
-  }
 
   return (
     <motion.div
@@ -97,6 +74,8 @@ interface GroupJoinRequest {
   requested_at: string
   status: 'pending' | 'accepted' | 'declined'
 }
+
+
 
 type RequestItem = {
   request_id: number
@@ -189,7 +168,7 @@ export default function DiscoverPage() {
 
   // Initialize active tab from URL parameter
   useEffect(() => {
-    const tabParam = searchParams.get('tab')
+    const tabParam = searchParams?.get('tab')
     if (tabParam === 'groups') {
       setActiveTab('groups')
     } else if (tabParam === 'requests') {
@@ -317,23 +296,23 @@ export default function DiscoverPage() {
 
       // Process outgoing group join requests
       const outgoingGroupRequests: GroupJoinRequest[] = (outgoingGroupJoinRequestsResponse.requests || [])
-        .filter((request: any) => request.group) // Filter out requests with no group
-        .map((request: any) => ({
+        .filter((request: GroupInvitationItem) => request.group) // Filter out requests with no group
+        .map((request: GroupInvitationItem) => ({
           id: request.id,
           group: request.group,
-          user: request.user || { id: currentUser.id, first_name: currentUser.first_name, last_name: currentUser.last_name, avatar: currentUser.avatar, nickname: currentUser.nickname },
+          user: request.inviter || { id: currentUser.id, first_name: currentUser.first_name, last_name: currentUser.last_name, avatar: currentUser.avatar, nickname: currentUser.nickname },
           requested_at: request.created_at,
           status: 'pending'
         }))
 
       // Process group invitations
       const incomingGroupInvitations: GroupJoinRequest[] = (groupInvitationsResponse.invitations || [])
-        .filter((invitation: any) => invitation.invited_by || invitation.user) // Filter out invitations with no user
-        .map((invitation: any) => ({
+        .filter((invitation: GroupInvitationItem) => invitation.inviter) // Filter out invitations with no user
+        .map((invitation: GroupInvitationItem) => ({
           id: invitation.id,
           group: invitation.group,
-          user: invitation.invited_by || invitation.user, // The user who sent the invitation
-          requested_at: invitation.invited_at || invitation.requested_at,
+          user: invitation.inviter, // The user who sent the invitation
+          requested_at: invitation.created_at,
           status: 'pending'
         }))
 
@@ -629,30 +608,8 @@ export default function DiscoverPage() {
         )
       )
       success('Join request sent! Waiting for approval.')
-    } catch (err) {
+    } catch {
       error('Failed to send join request')
-    }
-  }
-
-  // Handle group leave
-  const handleLeaveGroup = async (groupId: number) => {
-    if (!isConnected) {
-      warning('Connection required to leave groups')
-      return
-    }
-
-    try {
-      await api.leaveGroup(groupId)
-      setGroups(prevGroups =>
-        prevGroups.map(group =>
-          group.id === groupId
-            ? { ...group, joinStatus: 'none' }
-            : group
-        )
-      )
-      success('Successfully left the group!')
-    } catch (err) {
-      error('Failed to leave group')
     }
   }
 
@@ -678,7 +635,7 @@ export default function DiscoverPage() {
         )
       )
       success('Join request cancelled!')
-    } catch (err) {
+    } catch {
       error('Failed to cancel join request')
     }
   }
@@ -692,7 +649,7 @@ export default function DiscoverPage() {
         incoming: prev.incoming.filter(r => r.user.id !== userId)
       }))
       success(`Follow request ${action}ed`)
-    } catch (err) {
+    } catch {
       error('Failed to respond to follow request')
     }
   }
@@ -724,7 +681,7 @@ export default function DiscoverPage() {
         incoming: prev.incoming.filter(r => r.group.id !== groupId)
       }))
       success(`Group invitation ${action}ed`)
-    } catch (err) {
+    } catch {
       error('Failed to respond to group invitation')
     }
   }
@@ -738,7 +695,7 @@ export default function DiscoverPage() {
         incoming: prev.incoming.filter(r => r.group.id !== groupId || r.user.id !== userId)
       }))
       success(`Join request ${action}ed`)
-    } catch (err) {
+    } catch {
       error('Failed to respond to group join request')
     }
   }
@@ -761,11 +718,16 @@ export default function DiscoverPage() {
         outgoing: prev.outgoing.filter(r => r.user.id !== userId)
       }))
       success('Follow request cancelled!')
-    } catch (err) {
+    } catch (_err) {
       // If unfollow returned 404/not found, some servers expect a PUT remove action where the follower id
       // is in the URL and the authenticated user is the target (remove follower). Try the alternate path.
-      console.debug('unfollowUser failed, attempting fallback respondToFollowRequest remove. error=', err)
-  const status = (err as any)?.status || (err as any)?.statusCode || (err instanceof Error && (err as any).status)
+      console.debug('unfollowUser failed, attempting fallback respondToFollowRequest remove. error=', _err)
+      interface ApiError {
+        status?: number;
+        statusCode?: number;
+      }
+      const apiError = _err as ApiError;
+      const status = apiError?.status || apiError?.statusCode || (_err instanceof Error && (_err as ApiError).status)
       if (status === 404) {
         try {
           await api.respondToFollowRequest(userId, 'remove')
@@ -806,7 +768,7 @@ export default function DiscoverPage() {
         )
       )
       success('Join request cancelled!')
-    } catch (err) {
+    } catch {
       error('Failed to cancel join request')
     }
   }
@@ -825,7 +787,7 @@ export default function DiscoverPage() {
         outgoing: prev.outgoing.filter(r => r.group.id !== groupId && r.user.id !== userId)
       }))
       success('Invitation cancelled!')
-    } catch (err) {
+    } catch {
       error('Failed to cancel invitation')
     }
   }
@@ -1047,14 +1009,12 @@ export default function DiscoverPage() {
               onUserClick={handleUserClick}
               onFollowStatusChange={handleFollowStatusChange}
               onUnfollowConfirm={handleUnfollowConfirm}
-              isConnected={isConnected}
             />
           ) : activeTab === 'groups' ? (
             <GroupsSection
               groups={filteredGroups}
               viewMode={viewMode}
               onJoinGroup={handleJoinGroup}
-              onLeaveGroup={handleLeaveGroup}
               onOpenGroup={handleOpenGroup}
               onCancelJoinRequest={handleCancelJoinRequest}
               onGroupInvitationResponse={handleGroupInvitationResponse}
@@ -1134,15 +1094,13 @@ function UsersSection({
   viewMode,
   onUserClick,
   onFollowStatusChange,
-  onUnfollowConfirm,
-  isConnected
+  onUnfollowConfirm
 }: {
   users: DiscoverUser[]
   viewMode: ViewMode
   onUserClick: (userId: number) => void
   onFollowStatusChange: (userId: number, status: FollowStatus) => void
   onUnfollowConfirm: (userId: number, userName: string) => void
-  isConnected: boolean
 }) {
   if (users.length === 0) {
     return (
@@ -1222,6 +1180,7 @@ function UsersSection({
                     alt={`${user.first_name} ${user.last_name}`}
                     width={viewMode === 'list' ? 56 : 64}
                     height={viewMode === 'list' ? 56 : 64}
+                    unoptimized={true}
                     className="w-full h-full object-cover"
                     onError={(e) => {
                       const target = e.target as HTMLImageElement
@@ -1230,7 +1189,7 @@ function UsersSection({
                       if (parent) {
                         const letterAvatar = document.createElement('div')
                         letterAvatar.className = `flex items-center justify-center bg-gradient-to-br from-emerald-400 to-teal-600 text-white font-bold rounded-full w-full h-full text-xl`
-                        letterAvatar.textContent = `${user.first_name.charAt(0)}${user.last_name.charAt(0)}`.toUpperCase()
+                        letterAvatar.textContent = getUserInitials(user)
                         parent.appendChild(letterAvatar)
                       }
                     }}
@@ -1244,7 +1203,6 @@ function UsersSection({
                 >
                   <LetterAvatar
                     name={`${user.first_name} ${user.last_name}`}
-                    size={viewMode === 'list' ? 56 : 64}
                     className="ring-2 ring-white/20 group-hover:ring-white/40 transition-all duration-300"
                   />
                 </motion.div>
@@ -1339,7 +1297,6 @@ function GroupsSection({
   groups,
   viewMode,
   onJoinGroup,
-  onLeaveGroup,
   onOpenGroup,
   onCancelJoinRequest,
   onGroupInvitationResponse,
@@ -1348,7 +1305,6 @@ function GroupsSection({
   groups: DiscoverGroup[]
   viewMode: ViewMode
   onJoinGroup: (groupId: number) => void
-  onLeaveGroup: (groupId: number) => void
   onOpenGroup: (groupId: number) => void
   onCancelJoinRequest: (groupId: number) => void
   onGroupInvitationResponse: (groupId: number, action: 'accept' | 'decline') => void
@@ -1472,7 +1428,7 @@ function GroupsSection({
                       if (parent) {
                         const letterAvatar = document.createElement('div')
                         letterAvatar.className = `flex items-center justify-center bg-gradient-to-br from-emerald-400 to-teal-600 text-white font-bold rounded-full w-full h-full text-xl`
-                        letterAvatar.textContent = group.title.substring(0, 2).toUpperCase()
+                        letterAvatar.textContent = getGroupInitials(group.title)
                         parent.appendChild(letterAvatar)
                       }
                     }}
@@ -1486,7 +1442,6 @@ function GroupsSection({
                 >
                   <LetterAvatar
                     name={group.title}
-                    size={viewMode === 'list' ? 56 : 64}
                     className="ring-2 ring-white/20 group-hover:ring-white/40 transition-all duration-300"
                   />
                 </motion.div>
@@ -1753,6 +1708,7 @@ function RequestsSection({
                           alt={request.group.title}
                           width={48}
                           height={48}
+                          unoptimized={true}
                           className="w-full h-full object-cover"
                           onError={(e) => {
                             const target = e.target as HTMLImageElement
@@ -1761,7 +1717,7 @@ function RequestsSection({
                             if (parent) {
                               const letterAvatar = document.createElement('div')
                               letterAvatar.className = `flex items-center justify-center bg-gradient-to-br from-emerald-400 to-teal-600 text-white font-bold rounded-full w-full h-full text-xl`
-                              letterAvatar.textContent = request.group.title.substring(0, 2).toUpperCase()
+                              letterAvatar.textContent = getGroupInitials(request.group.title)
                               parent.appendChild(letterAvatar)
                             }
                           }}
@@ -1777,7 +1733,6 @@ function RequestsSection({
                   >
                     <LetterAvatar
                       name={request.group.title}
-                      size={56}
                       className="ring-2 ring-white/20 group-hover:ring-white/40 transition-all duration-300"
                     />
                   </motion.div>
@@ -1795,6 +1750,7 @@ function RequestsSection({
                         alt={`${request.user?.first_name || 'User'} ${request.user?.last_name || ''}`}
                         width={48}
                         height={48}
+                        unoptimized={true}
                         className="w-full h-full object-cover"
                         onError={(e) => {
                           const target = e.target as HTMLImageElement
@@ -1803,7 +1759,7 @@ function RequestsSection({
                           if (parent) {
                             const letterAvatar = document.createElement('div')
                             letterAvatar.className = `flex items-center justify-center bg-gradient-to-br from-emerald-400 to-teal-600 text-white font-bold rounded-full w-full h-full text-xl`
-                            letterAvatar.textContent = `${(request.user?.first_name || 'U').charAt(0)}${(request.user?.last_name || '').charAt(0) || (request.user?.first_name || 'U').charAt(1) || 'U'}`.toUpperCase()
+                            letterAvatar.textContent = getUserInitials(request.user)
                             parent.appendChild(letterAvatar)
                           }
                         }}
@@ -1819,7 +1775,6 @@ function RequestsSection({
                 >
                   <LetterAvatar
                     name={`${request.user?.first_name || 'Unknown'} ${request.user?.last_name || 'User'}`}
-                    size={56}
                     className="ring-2 ring-white/20 group-hover:ring-white/40 transition-all duration-300"
                   />
                 </motion.div>

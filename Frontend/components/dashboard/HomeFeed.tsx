@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { Heart, Globe, Lock, EyeOff, MessageSquare, Sparkles, Bookmark, Send, MoreHorizontal, User, Image as ImageIcon, Trash2, ArrowUp, ArrowDown } from 'lucide-react'
 import CreatePost from './CreatePost'
 import ManagePrivacy from './ManagePrivacy'
@@ -7,11 +7,10 @@ import { Post } from '@/lib/api'
 import { Plus } from 'lucide-react'
 import { useRealTimePosts } from '@/hooks/useRealTimePosts'
 import { useDocumentTitle } from '@/hooks/useDocumentTitle'
-import { useConnectionStatus } from '@/hooks/useConnectionStatus'
 import { useRouter } from 'next/navigation'
 import { useToast } from '@/context/ToastContext'
 import Image from 'next/image'
-import { getAvatarUrl } from '@/utils/avatarUtils'
+import { getAvatarUrl, getUserInitials } from '@/utils/avatarUtils'
 import { useAuth } from '@/context/AuthContext'
 import { api } from '@/lib/api'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -89,7 +88,6 @@ export default function HomeFeed({
     markAsRead
   } = useRealTimePosts()
 
-  const { isConnected } = useConnectionStatus()
   const { success, error } = useToast()
   const { user } = useAuth()
 
@@ -100,7 +98,6 @@ export default function HomeFeed({
 
   // Privacy management state
   const [showManagePrivacy, setShowManagePrivacy] = useState<{[key: number]: boolean}>({})
-  const [isUpdatingPrivacy, setIsUpdatingPrivacy] = useState<{[key: number]: boolean}>({})
   const [currentSelectedUsers, setCurrentSelectedUsers] = useState<{[key: number]: number[]}>({})
 
   // Update document title with unread count
@@ -201,7 +198,6 @@ export default function HomeFeed({
   }
 
   const handleUpdatePrivacy = async (postId: number, privacy: 'public' | 'followers' | 'friends' | 'listed', selectedUsers: number[]) => {
-    setIsUpdatingPrivacy(prev => ({ ...prev, [postId]: true }))
     try {
       await api.updatePost(postId, {
         privacy: privacy,
@@ -213,9 +209,6 @@ export default function HomeFeed({
     } catch (err) {
       console.error('Failed to update privacy:', err)
       error('Failed to update privacy. Please try again.')
-    } finally {
-      setIsUpdatingPrivacy(prev => ({ ...prev, [postId]: false }))
-      setShowManagePrivacy(prev => ({ ...prev, [postId]: false }))
     }
   }
 
@@ -353,11 +346,12 @@ export default function HomeFeed({
                   alt={`${post.user.name}'s avatar`}
                   width={48}
                   height={48}
+                  unoptimized={true}
                   className="w-full h-full object-cover"
                 />
               ) : (
                 <div className="w-full h-full bg-gradient-to-r from-emerald-400 to-teal-500 rounded-full flex items-center justify-center text-white font-bold">
-                  {post.user.name[0]?.toUpperCase()}
+                  {getUserInitials({first_name: post.user.name?.split(' ')[0], last_name: post.user.name?.split(' ')[1] || post.user.name?.split(' ')[0]})}
                 </div>
               )}
             </div>
@@ -470,7 +464,7 @@ export default function HomeFeed({
                   alt="Post image"
                   width={640}
                   height={256}
-                  unoptimized={post.image.includes('/svg')}
+                  unoptimized={true}
                   className="max-h-64 sm:max-h-80 md:max-h-96 object-contain hover:scale-105 transition-transform duration-500 rounded-2xl"
                 />
               </div>
@@ -706,7 +700,6 @@ export default function HomeFeed({
           key={`privacy-${post.id}`}
           show={showManagePrivacy[post.id] || false}
           onClose={() => setShowManagePrivacy(prev => ({ ...prev, [post.id]: false }))}
-          postId={post.id}
           currentPrivacy={post.privacy as 'public' | 'followers' | 'friends' | 'listed'}
           currentSelectedUsers={currentSelectedUsers[post.id] || []}
           availableUsers={availableUsers}
@@ -870,7 +863,7 @@ export default function HomeFeed({
 
       {/* Delete Confirmation Modal */}
       <AnimatePresence>
-        {Object.entries(showDeleteConfirm).some(([_, show]) => show) && (
+        {Object.entries(showDeleteConfirm).some(([, show]) => show) && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}

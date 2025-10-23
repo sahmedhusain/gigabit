@@ -6,7 +6,8 @@ import { useRouter } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
 import { useWebSocket } from '@/context/WebSocketContext'
 import { api, GroupResponse, Member } from '@/lib/api'
-import { getAvatarUrl } from '@/utils/avatarUtils'
+import { getAvatarUrl, getUserInitials, getGroupInitials } from '@/utils/avatarUtils'
+import Image from 'next/image'
 
 interface GroupInfoTabProps {
   groupId: number
@@ -27,16 +28,6 @@ const GroupInfoTab: React.FC<GroupInfoTabProps> = ({ groupId, onLeaveGroup, onMa
   const { user } = useAuth()
   const router = useRouter()
   const { onlineUsers, isConnected } = useWebSocket()
-
-  // Helper function to get group initials
-  const getGroupInitials = (groupName: string): string => {
-    if (!groupName) return '??'
-    const words = groupName.trim().split(/\s+/)
-    if (words.length === 1) {
-      return words[0].substring(0, 2).toUpperCase()
-    }
-    return (words[0][0] + words[1][0]).toUpperCase()
-  }
 
   useEffect(() => {
     const fetchGroupData = async () => {
@@ -260,9 +251,11 @@ const GroupInfoTab: React.FC<GroupInfoTabProps> = ({ groupId, onLeaveGroup, onMa
           <div className="flex flex-col items-center text-center">
             <div className="w-32 h-32 mx-auto mb-6 rounded-full bg-gradient-to-br from-emerald-400 via-teal-500 to-cyan-600 flex items-center justify-center text-white text-4xl font-bold shadow-2xl ring-4 ring-white/20 overflow-hidden">
               {groupInfo.avatar && getAvatarUrl(groupInfo.avatar) ? (
-                <img
+                <Image
                   src={getAvatarUrl(groupInfo.avatar)!}
                   alt={groupInfo.title}
+                  width={56}
+                  height={56}
                   className="w-full h-full object-cover rounded-full"
                 />
               ) : (
@@ -334,14 +327,16 @@ const GroupInfoTab: React.FC<GroupInfoTabProps> = ({ groupId, onLeaveGroup, onMa
             >
               <div className="relative">
                 {groupInfo.creator.avatar ? (
-                  <img
+                  <Image
                     src={groupInfo.creator.avatar}
                     alt={`${groupInfo.creator.first_name} ${groupInfo.creator.last_name}`}
+                    width={56}
+                      height={56}
                     className="w-16 h-16 rounded-full object-cover shadow-lg ring-2 ring-white/20 group-hover:ring-emerald-400/50 transition-all duration-300"
                   />
                 ) : (
                   <div className="w-16 h-16 rounded-full bg-gradient-to-br from-yellow-400 to-orange-500 flex items-center justify-center text-white font-bold text-xl shadow-lg ring-2 ring-white/20 group-hover:ring-emerald-400/50 transition-all duration-300">
-                    {groupInfo.creator.first_name[0]}{groupInfo.creator.last_name[0]}
+                    {getUserInitials(groupInfo.creator)}
                   </div>
                 )}
                 
@@ -407,14 +402,16 @@ const GroupInfoTab: React.FC<GroupInfoTabProps> = ({ groupId, onLeaveGroup, onMa
                     {/* Avatar */}
                     <div className="relative">
                       {member.user.avatar ? (
-                        <img
+                        <Image
                           src={member.user.avatar}
                           alt={`${member.user.first_name} ${member.user.last_name}`}
+                          width={56}
+                          height={56}
                           className="w-12 h-12 rounded-full object-cover shadow-lg ring-2 ring-white/20 group-hover:ring-emerald-400/50 transition-all duration-300"
                         />
                       ) : (
                         <div className="w-12 h-12 rounded-full bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center text-white font-semibold shadow-lg ring-2 ring-white/20 group-hover:ring-emerald-400/50 transition-all duration-300">
-                          {member.user.first_name[0]}{member.user.last_name[0]}
+                          {getUserInitials(member.user)}
                         </div>
                       )}
                       
@@ -543,7 +540,7 @@ const GroupInfoTab: React.FC<GroupInfoTabProps> = ({ groupId, onLeaveGroup, onMa
                 {userRole === 'admin' && (
                   <div className="mb-6">
                     <p className="text-white/70 text-sm mb-3">
-                      Are you sure you want to leave "{groupInfo?.title}"? As an admin, you will lose your administrative privileges.
+                      Are you sure you want to leave &quot;{groupInfo?.title}&quot;? As an admin, you will lose your administrative privileges.
                     </p>
                     {hasOtherAdmins ? (
                       <p className="text-white/60 text-xs">
@@ -562,7 +559,7 @@ const GroupInfoTab: React.FC<GroupInfoTabProps> = ({ groupId, onLeaveGroup, onMa
                 
                 {userRole === 'member' && (
                   <p className="text-white/70 text-sm mb-6">
-                    Are you sure you want to leave "{groupInfo?.title}"? You will no longer receive messages from this group and will need to be re-invited to rejoin.
+                    Are you sure you want to leave &quot;{groupInfo?.title}&quot;? You will no longer receive messages from this group and will need to be re-invited to rejoin.
                   </p>
                 )}
 

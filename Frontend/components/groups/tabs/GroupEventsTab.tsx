@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useConnectionStatus, useRealTimeEvents } from '@/hooks'
 import { useToast } from '@/context/ToastContext'
 import { useAuth } from '@/context/AuthContext'
-import { api, EventResponse } from '@/lib/api'
+import { api, EventResponse, UpdateEventRequest } from '@/lib/api'
 import CreateGroupEvent from '../CreateGroupEvent'
 
 interface GroupEventsTabProps {
@@ -121,7 +121,7 @@ const GroupEventsTab: React.FC<GroupEventsTabProps> = ({ groupId, groupTitle }) 
   const handleEditEvent = async (eventId: number) => {
     try {
       const eventDateTime = new Date(`${editDate}T${editTime}`);
-      const eventData: any = {
+      const eventData: UpdateEventRequest = {
         event_time: eventDateTime.toISOString(),
         location: editLocation.trim()
       };
@@ -593,7 +593,7 @@ const GroupEventsTab: React.FC<GroupEventsTabProps> = ({ groupId, groupTitle }) 
                 </div>
                 <div>
                   <h3 className="text-white font-bold text-lg">Cancel Event</h3>
-                  <p className="text-white/60 text-sm">Cancel "{selectedEvent.title}"</p>
+                  <p className="text-white/60 text-sm">Cancel &quot;{selectedEvent.title}&quot;</p>
                 </div>
               </div>
 
@@ -648,7 +648,7 @@ const GroupEventsTab: React.FC<GroupEventsTabProps> = ({ groupId, groupTitle }) 
                       setShowCancelModal(false);
                       setSelectedEvent(null);
                       setCancelReason('');
-                    } catch (error) {
+                    } catch {
                       // Error already handled in handleCancelEvent
                     }
                   }}
@@ -686,7 +686,7 @@ const GroupEventsTab: React.FC<GroupEventsTabProps> = ({ groupId, groupTitle }) 
                 </div>
                 <div>
                   <h3 className="text-white font-bold text-lg">Delete Event</h3>
-                  <p className="text-white/60 text-sm">Delete "{selectedEvent.title}"</p>
+                  <p className="text-white/60 text-sm">Delete &quot;{selectedEvent.title}&quot;</p>
                 </div>
               </div>
 
@@ -712,7 +712,7 @@ const GroupEventsTab: React.FC<GroupEventsTabProps> = ({ groupId, groupTitle }) 
                       await handleDeleteEvent(selectedEvent.id);
                       setShowDeleteModal(false);
                       setSelectedEvent(null);
-                    } catch (error) {
+                    } catch {
                       // Error already handled in handleDeleteEvent
                     }
                   }}
@@ -749,7 +749,7 @@ const GroupEventsTab: React.FC<GroupEventsTabProps> = ({ groupId, groupTitle }) 
                 </div>
                 <div>
                   <h3 className="text-white font-bold text-lg">Edit Event</h3>
-                  <p className="text-white/60 text-sm">Edit "{selectedEvent.title}"</p>
+                  <p className="text-white/60 text-sm">Edit &quot;{selectedEvent.title}&quot;</p>
                 </div>
               </div>
 
@@ -825,7 +825,7 @@ const GroupEventsTab: React.FC<GroupEventsTabProps> = ({ groupId, groupTitle }) 
                     }
                     try {
                       await handleEditEvent(selectedEvent.id);
-                    } catch (error) {
+                    } catch {
                       // Error already handled in handleEditEvent
                     }
                   }}

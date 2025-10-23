@@ -10,7 +10,6 @@ import {
   MapPin,
   Settings,
   LogOut,
-  Shield,
   Zap,
   Dot,
   User,
@@ -24,7 +23,7 @@ import {
 import { useWebSocket } from '@/context/WebSocketContext'
 import { api, Event } from '@/lib/api'
 import { useToast } from '@/context/ToastContext'
-import { getAvatarUrl } from '@/utils/avatarUtils'
+import { getAvatarUrl, getUserInitials, getGroupInitials } from '@/utils/avatarUtils'
 
 interface User {
   id?: number
@@ -110,7 +109,6 @@ interface RightSidebarProps {
   setActiveTab: (tab: string) => void
   logout: () => void
   isMobileOpen: boolean
-  setIsMobileOpen: (open: boolean) => void
 }
 
 interface StatusOption {
@@ -128,8 +126,7 @@ export default function RightSidebar({
   currentUser,
   setActiveTab,
   logout,
-  isMobileOpen,
-  setIsMobileOpen
+  isMobileOpen
 }: RightSidebarProps) {
   const router = useRouter()
   const { sendMessage } = useWebSocket()
@@ -398,17 +395,16 @@ export default function RightSidebar({
                           alt={currentUser?.name || 'User'}
                           width={48}
                           height={48}
-                          unoptimized={avatarUrl.includes('/svg')}
+                          unoptimized={true}
                           className="w-full h-full rounded-full object-cover"
                         />
                       ) : (
                         <div className="w-full h-full rounded-full bg-gradient-to-r from-emerald-400 to-teal-500 flex items-center justify-center text-white font-bold">
-                          {(() => {
-                            const nameParts = currentUser?.name?.split(' ') || [];
-                            const firstName = nameParts[0] || '';
-                            const lastName = nameParts[nameParts.length - 1] || '';
-                            return (firstName[0]?.toUpperCase() || '?') + (lastName[0]?.toUpperCase() || '');
-                          })()}
+                          {getUserInitials({
+                            first_name: currentUser?.name?.split(' ')[0],
+                            last_name: currentUser?.name?.split(' ').slice(1).join(' '),
+                            nickname: currentUser?.username
+                          })}
                         </div>
                       );
                     })()}
@@ -994,12 +990,12 @@ export default function RightSidebar({
                                             alt={followingUser.username || 'User'}
                                             width={44}
                                             height={44}
-                                            unoptimized={getAvatarUrl(followingUser.avatar || followingUser.profile_image)!.includes('/svg')}
+                                            unoptimized={true}
                                             className="w-11 h-11 rounded-full border-2 border-green-400/50 group-hover:border-green-400 group-hover:scale-105 transition-all duration-300"
                                           />
                                         ) : (
                                           <div className="w-11 h-11 rounded-full bg-gradient-to-r from-emerald-400 to-teal-500 flex items-center justify-center text-white font-bold border-2 border-green-400/50 group-hover:border-green-400 group-hover:scale-105 transition-all duration-300">
-                                            {followingUser.first_name?.[0] || followingUser.name?.[0] || followingUser.username?.[0] || '?'}{followingUser.last_name?.[0] || followingUser.name?.[1] || followingUser.username?.[1] || ''}
+                                            {getUserInitials(followingUser)}
                                           </div>
                                         )}
                                         <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-green-500 rounded-full border-2 border-white animate-pulse"></div>
@@ -1059,12 +1055,12 @@ export default function RightSidebar({
                                             alt={followingUser.username || 'User'}
                                             width={44}
                                             height={44}
-                                            unoptimized={getAvatarUrl(followingUser.avatar || followingUser.profile_image)!.includes('/svg')}
+                                            unoptimized={true}
                                             className="w-11 h-11 rounded-full border-2 border-red-400/50 group-hover:border-red-400 group-hover:scale-105 transition-all duration-300"
                                           />
                                         ) : (
                                           <div className="w-11 h-11 rounded-full bg-gradient-to-r from-emerald-400 to-teal-500 flex items-center justify-center text-white font-bold border-2 border-red-400/50 group-hover:border-red-400 group-hover:scale-105 transition-all duration-300">
-                                            {followingUser.first_name?.[0] || followingUser.name?.[0] || followingUser.username?.[0] || '?'}{followingUser.last_name?.[0] || followingUser.name?.[1] || followingUser.username?.[1] || ''}
+                                            {getUserInitials(followingUser)}
                                           </div>
                                         )}
                                         <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-red-500 rounded-full border-2 border-white"></div>
@@ -1124,12 +1120,12 @@ export default function RightSidebar({
                                             alt={followingUser.username || 'User'}
                                             width={44}
                                             height={44}
-                                            unoptimized={getAvatarUrl(followingUser.avatar || followingUser.profile_image)!.includes('/svg')}
+                                            unoptimized={true}
                                             className="w-11 h-11 rounded-full border-2 border-yellow-400/50 group-hover:border-yellow-400 group-hover:scale-105 transition-all duration-300"
                                           />
                                         ) : (
                                           <div className="w-11 h-11 rounded-full bg-gradient-to-r from-emerald-400 to-teal-500 flex items-center justify-center text-white font-bold border-2 border-yellow-400/50 group-hover:border-yellow-400 group-hover:scale-105 transition-all duration-300">
-                                            {followingUser.first_name?.[0] || followingUser.name?.[0] || followingUser.username?.[0] || '?'}{followingUser.last_name?.[0] || followingUser.name?.[1] || followingUser.username?.[1] || ''}
+                                            {getUserInitials(followingUser)}
                                           </div>
                                         )}
                                         <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-yellow-500 rounded-full border-2 border-white"></div>
@@ -1189,12 +1185,12 @@ export default function RightSidebar({
                                             alt={followingUser.username || 'User'}
                                             width={44}
                                             height={44}
-                                            unoptimized={getAvatarUrl(followingUser.avatar || followingUser.profile_image)!.includes('/svg')}
+                                            unoptimized={true}
                                             className="w-11 h-11 rounded-full border-2 border-gray-400/50 group-hover:border-gray-400 group-hover:scale-105 transition-all duration-300"
                                           />
                                         ) : (
                                           <div className="w-11 h-11 rounded-full bg-gradient-to-r from-emerald-400 to-teal-500 flex items-center justify-center text-white font-bold border-2 border-gray-400/50 group-hover:border-gray-400 group-hover:scale-105 transition-all duration-300">
-                                            {followingUser.first_name?.[0] || followingUser.name?.[0] || followingUser.username?.[0] || '?'}{followingUser.last_name?.[0] || followingUser.name?.[1] || followingUser.username?.[1] || ''}
+                                            {getUserInitials(followingUser)}
                                           </div>
                                         )}
                                         <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-gray-500 rounded-full border-2 border-white"></div>
@@ -1300,12 +1296,12 @@ export default function RightSidebar({
                                             alt={request.user?.first_name + ' ' + request.user?.last_name}
                                             width={40}
                                             height={40}
-                                            unoptimized={getAvatarUrl(request.user?.avatar)!.includes('/svg')}
+                                            unoptimized={true}
                                             className="w-10 h-10 rounded-full border-2 border-blue-400/50 group-hover:border-blue-400 group-hover:scale-105 transition-all duration-300 shadow-lg"
                                           />
                                         ) : (
                                           <div className="w-10 h-10 rounded-full bg-gradient-to-r from-blue-400 to-purple-500 flex items-center justify-center text-white font-bold border-2 border-blue-400/50 group-hover:border-blue-400 group-hover:scale-105 transition-all duration-300 shadow-lg">
-                                            {request.user?.first_name?.[0] || request.user?.nickname?.[0] || '?'}{request.user?.last_name?.[0] || request.user?.nickname?.[1] || ''}
+                                            {getUserInitials(request.user)}
                                           </div>
                                         )}
                                         <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full border-2 border-white flex items-center justify-center shadow-md">
@@ -1416,12 +1412,12 @@ export default function RightSidebar({
                                             alt={invitation.group?.title || 'Group'}
                                             width={40}
                                             height={40}
-                                            unoptimized={getAvatarUrl(invitation.group?.avatar)!.includes('/svg')}
+                                            unoptimized={true}
                                             className="w-10 h-10 rounded-full border-2 border-orange-400/50 group-hover:border-orange-400 group-hover:scale-105 transition-all duration-300 shadow-lg"
                                           />
                                         ) : (
                                           <div className="w-10 h-10 rounded-full bg-gradient-to-r from-orange-400 to-red-500 flex items-center justify-center text-white font-bold border-2 border-orange-400/50 group-hover:border-orange-400 group-hover:scale-105 transition-all duration-300 shadow-lg">
-                                            {invitation.group?.title?.substring(0, 2).toUpperCase() || '??'}
+                                            {getGroupInitials(invitation.group?.title || '')}
                                           </div>
                                         )}
                                         <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-gradient-to-r from-orange-500 to-red-500 rounded-full border-2 border-white flex items-center justify-center shadow-md">

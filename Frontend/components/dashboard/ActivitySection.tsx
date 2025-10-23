@@ -1,11 +1,11 @@
 'use client'
-import { useState, useEffect, useRef } from 'react'
-import { Heart, MessageSquare, Bookmark, Send, Sparkles, User, Image as ImageIcon, X, MoreHorizontal, Trash2, ArrowUp, ArrowDown, Globe, Lock, EyeOff } from 'lucide-react'
+import { useState, useEffect, useCallback } from 'react'
+import { Heart, MessageSquare, Bookmark, Send, User, Image as ImageIcon, MoreHorizontal, Trash2, ArrowUp, ArrowDown, Globe, Lock, EyeOff } from 'lucide-react'
 import { Post, Comment } from '@/lib/api'
 import { useRouter } from 'next/navigation'
 import { useToast } from '@/context/ToastContext'
 import Image from 'next/image'
-import { getAvatarUrl } from '@/utils/avatarUtils'
+import { getAvatarUrl, getUserInitials } from '@/utils/avatarUtils'
 import { useAuth } from '@/context/AuthContext'
 import { api } from '@/lib/api'
 import { AnimatePresence, motion } from 'framer-motion'
@@ -229,7 +229,7 @@ export default function ActivitySection({
     }
   }
 
-  const fetchAvailableUsers = async () => {
+  const fetchAvailableUsers = useCallback(async () => {
     if (availableUsers.length > 0) return // Already fetched
 
     try {
@@ -242,17 +242,23 @@ export default function ActivitySection({
     } finally {
       setLoadingUsers(false)
     }
-  }
+  }, [user, availableUsers.length, error])
 
   // Fetch users when Manage Privacy modal opens
   useEffect(() => {
     if (showManagePrivacy) {
       fetchAvailableUsers()
     }
-  }, [showManagePrivacy])
+  }, [showManagePrivacy, fetchAvailableUsers])
+
+
+  // Mock data for demonstration - in real app, this would come from API
+  const likedPosts = posts.filter(post => post.isLiked)
+  const commentedPosts = posts.slice(0, 3) // Mock commented posts
+  const savedPosts = posts.slice(0, 2) // Mock saved posts
 
   // Fetch comments for commented posts
-  const fetchCommentsForCommentedPosts = async () => {
+  const fetchCommentsForCommentedPosts = useCallback(async () => {
     if (activitySubTab !== 'commented') return
 
     try {
@@ -264,7 +270,7 @@ export default function ActivitySection({
           const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/api/posts/${post.id}/comments?limit=50&offset=0`, {
             method: 'GET',
             headers: {
-              ...(localStorage.getItem('token') ? { Authorization: `Bearer ${localStorage.getItem('token')}` } : {})
+              ...(localStorage.getItem('token') ? { Authorization: `localStorage.getItem('token')` } : {})
             },
             credentials: 'include'
           })
@@ -291,18 +297,14 @@ export default function ActivitySection({
     } catch (error) {
       console.error('Error fetching comments:', error)
     }
-  }
+  }, [activitySubTab, commentedPosts, user])
 
-  // Fetch comments when activitySubTab changes to 'commented'
+  // Fetch comments for commented posts when tab is active
   useEffect(() => {
     if (activitySubTab === 'commented') {
       fetchCommentsForCommentedPosts()
     }
-  }, [activitySubTab, posts])
-  // Mock data for demonstration - in real app, this would come from API
-  const likedPosts = posts.filter(post => post.isLiked)
-  const commentedPosts = posts.slice(0, 3) // Mock commented posts
-  const savedPosts = posts.slice(0, 2) // Mock saved posts
+  }, [activitySubTab, fetchCommentsForCommentedPosts])
 
   const renderPostCard = (post: Post, activityType: string, index: number) => {
     const animationDelay = index < 6 ? `animation-delay-${index * 100}` : 'animation-delay-500'
@@ -335,7 +337,7 @@ export default function ActivitySection({
                 />
               ) : (
                 <div className="w-full h-full bg-gradient-to-r from-emerald-400 to-teal-500 rounded-full flex items-center justify-center text-white font-bold">
-                  {post.user.name[0]?.toUpperCase()}
+                  {getUserInitials({first_name: post.user.name?.split(' ')[0], last_name: post.user.name?.split(' ')[1] || post.user.name?.split(' ')[0]})}
                 </div>
               )}
             </div>
@@ -533,7 +535,7 @@ export default function ActivitySection({
                 />
               ) : (
                 <div className="w-full h-full bg-gradient-to-r from-blue-400 to-teal-500 rounded-full flex items-center justify-center text-white font-bold text-sm">
-                  {postComments[post.id][0].user.first_name[0]?.toUpperCase()}
+                  {getUserInitials(postComments[post.id][0].user)}
                 </div>
               )}
             </div>
@@ -876,7 +878,7 @@ export default function ActivitySection({
 
       {/* Delete Confirmation Modal */}
       <AnimatePresence>
-        {Object.entries(showDeleteConfirm).some(([_, show]) => show) && (
+        {Object.entries(showDeleteConfirm).some(([, show]) => show) && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -934,7 +936,6 @@ export default function ActivitySection({
           setSelectedPostForPrivacy(null)
           setCurrentSelectedUsers([])
         }}
-        postId={selectedPostForPrivacy?.id || 0}
         currentPrivacy={selectedPostForPrivacy?.privacy as 'public' | 'followers' | 'friends' | 'listed' || 'public'}
         currentSelectedUsers={currentSelectedUsers}
         availableUsers={availableUsers}

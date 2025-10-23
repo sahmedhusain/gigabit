@@ -10,7 +10,7 @@ function SearchPageRoute() {
   const router = useRouter()
   const searchParams = useSearchParams()
 
-  const [query] = useState(searchParams.get('q') || '')
+  const [query] = useState(searchParams?.get('q') || '')
 
   // Update URL when search query changes
   useEffect(() => {

@@ -38,6 +38,7 @@ interface Message {
     share_count: number
   }
 }
+export type { Message }
 
 export function useRealTimeMessages() {
   const { user } = useAuth()

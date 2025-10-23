@@ -28,7 +28,7 @@ function EventsAllPage() {
   } = useRealTimeEvents()
 
   // Get event ID from URL params for deep linking
-  const eventId = searchParams.get('event')
+  const eventId = searchParams?.get('event')
   const [highlightedEventId, setHighlightedEventId] = useState<number | null>(null)
   
   const [showCreateEvent, setShowCreateEvent] = useState(false)

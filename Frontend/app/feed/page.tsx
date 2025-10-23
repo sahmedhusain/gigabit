@@ -18,8 +18,8 @@ function FeedPage() {
   const { success, error } = useToast()
 
   // Get filter from URL params
-  const filterParam = searchParams.get('filter') || 'all'
-  const sortParam = searchParams.get('sort') || 'newest'
+  const filterParam = searchParams?.get('filter') || 'all'
+  const sortParam = searchParams?.get('sort') || 'newest'
   const [feedSubTab, setFeedSubTab] = useState(filterParam)
   const [sortOrder, setSortOrder] = useState<'newest' | 'oldest'>(sortParam as 'newest' | 'oldest')
   const [showCreatePost, setShowCreatePost] = useState(false)
@@ -119,7 +119,7 @@ function FeedPage() {
     } finally {
       setIsLoadingMore(false)
     }
-  }, [error])
+  }, [error, feedSubTab])
 
   // Fetch data when component loads or filter changes
   useEffect(() => {
@@ -143,7 +143,7 @@ function FeedPage() {
         })
       })
     }
-  }, [currentPage, hasMoreResults, isLoadingMore, fetchFeedPosts, feedSubTab])
+  }, [currentPage, hasMoreResults, isLoadingMore, fetchFeedPosts])
 
   const fetchUsers = async () => {
     try {

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Shield, Trash2, Eye, EyeOff, Lock, Check, X, AlertTriangle } from 'lucide-react';
+import { Shield, Trash2, Eye, EyeOff, Lock, Check, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { API_BASE_URL } from '@/lib/api';
 
@@ -52,27 +52,27 @@ function validatePassword(password: string) {
 interface AccountSettingsProps {
   showDeleteModal?: boolean;
   setShowDeleteModal?: (show: boolean) => void;
+  deleteCountdown?: number;
+  setDeleteCountdown?: (countdown: number) => void;
+  setDeletePasswordError?: (error: string) => void;
   deleteConfirmation?: string;
   setDeleteConfirmation?: (confirmation: string) => void;
   deletePassword?: string;
   setDeletePassword?: (password: string) => void;
-  deleteCountdown?: number;
-  setDeleteCountdown?: (countdown: number) => void;
   deletePasswordError?: string;
-  setDeletePasswordError?: (error: string) => void;
 }
 
 export default function AccountSettings({
   showDeleteModal,
   setShowDeleteModal,
+  deleteCountdown,
+  setDeleteCountdown,
+  setDeletePasswordError,
   deleteConfirmation,
   setDeleteConfirmation,
   deletePassword,
   setDeletePassword,
-  deleteCountdown,
-  setDeleteCountdown,
   deletePasswordError,
-  setDeletePasswordError,
 }: AccountSettingsProps) {
   const [changePasswordData, setChangePasswordData] = useState({
     current_password: '',
@@ -83,9 +83,7 @@ export default function AccountSettings({
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [deleting, setDeleting] = useState(false);
   const [message, setMessage] = useState('');
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [passwordErrors, setPasswordErrors] = useState({
     current: '',
     new: '',
@@ -103,7 +101,7 @@ export default function AccountSettings({
     let interval: NodeJS.Timeout;
     if (showDeleteModal && deleteCountdown && deleteCountdown > 0) {
       interval = setInterval(() => {
-        setDeleteCountdown && setDeleteCountdown(deleteCountdown - 1);
+        setDeleteCountdown?.(deleteCountdown - 1);
       }, 1000);
     }
     return () => {
@@ -179,6 +177,9 @@ export default function AccountSettings({
         setPasswordValidations(prev => ({ ...prev, new: !validation }));
         if (validation) {
           setPasswordErrors(prev => ({ ...prev, new: validation }));
+        } else {
+          // Clear error if password is now valid
+          setPasswordErrors(prev => ({ ...prev, new: '' }));
         }
       } else {
         setPasswordValidations(prev => ({ ...prev, new: false }));
@@ -302,58 +303,6 @@ export default function AccountSettings({
       setMessage('Failed to change password');
     } finally {
       setSaving(false);
-    }
-  };
-
-  const handleDeleteAccount = async () => {
-    if (deleteConfirmation !== 'DELETE' || deleteCountdown && deleteCountdown > 0) {
-      return;
-    }
-
-    setDeleting(true);
-    setMessage('');
-    setDeletePasswordError && setDeletePasswordError('');
-
-    try {
-      const token = localStorage.getItem('token');
-      const deleteResponse = await fetch(`${API_BASE_URL}/api/account`, {
-        method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token && { Authorization: `Bearer ${token}` }),
-        },
-        body: JSON.stringify({ password: deletePassword }),
-      });
-
-      if (deleteResponse.ok) {
-        setMessage('Account deleted successfully. You will be logged out.');
-        // Clear local storage and redirect
-        localStorage.removeItem('token');
-        setTimeout(() => {
-          window.location.href = '/login';
-        }, 2000);
-      } else {
-        const error = await deleteResponse.json();
-        // Check if it's a password error
-        if ((deleteResponse.status === 401 && error.error?.toLowerCase().includes('password')) || error.error?.toLowerCase().includes('invalid password') || error.error?.toLowerCase().includes('wrong password')) {
-          setDeletePasswordError && setDeletePasswordError('Password is incorrect');
-        } else {
-          setMessage(error.error || 'Failed to delete account');
-          setShowDeleteModal && setShowDeleteModal(false);
-          setDeleteConfirmation && setDeleteConfirmation('');
-          setDeleteCountdown && setDeleteCountdown(5);
-          setDeletePasswordError && setDeletePasswordError('');
-        }
-      }
-    } catch (error) {
-      console.error('Failed to delete account:', error);
-      setMessage('Failed to delete account');
-      setShowDeleteModal && setShowDeleteModal(false);
-      setDeleteConfirmation && setDeleteConfirmation('');
-      setDeleteCountdown && setDeleteCountdown(5);
-      setDeletePasswordError && setDeletePasswordError('');
-    } finally {
-      setDeleting(false);
     }
   };
 
@@ -754,9 +703,11 @@ export default function AccountSettings({
               whileHover={{ scale: 1.02, y: -2 }}
               whileTap={{ scale: 0.98 }}
               onClick={() => {
-                setShowDeleteModal && setShowDeleteModal(true);
-                setDeleteCountdown && setDeleteCountdown(5);
-                setDeletePasswordError && setDeletePasswordError('');
+                setShowDeleteModal?.(true);
+                setDeleteCountdown?.(5);
+                setDeletePasswordError?.('');
+                setDeleteConfirmation?.('');
+                setDeletePassword?.('');
               }}
               className="px-8 py-4 bg-gradient-to-r from-red-500 via-rose-500 to-pink-500 text-white font-bold rounded-2xl hover:from-red-400 hover:via-rose-400 hover:to-pink-400 focus:outline-none focus:ring-4 focus:ring-red-400/30 focus:ring-offset-2 focus:ring-offset-transparent transition-all duration-500 transform shadow-xl hover:shadow-red-500/25"
             >

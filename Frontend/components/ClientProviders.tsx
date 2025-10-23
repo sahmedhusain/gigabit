@@ -4,7 +4,7 @@ import { useServerInsertedHTML } from 'next/navigation';
 import { CacheProvider } from "@emotion/react";
 import { ThemeProvider as MUIThemeProvider, createTheme } from '@mui/material/styles';
 // import CssBaseline from '@mui/material/CssBaseline';
-import { ReactNode, useState } from "react";
+import { ReactNode } from "react";
 import { useEffect } from 'react';
 import createEmotionCache from "@/lib/createEmotionCache";
 import { AuthProvider } from "@/context/AuthContext";
@@ -14,6 +14,7 @@ import { NotificationToastProvider } from "@/context/NotificationToastContext";
 import { SidebarDataProvider } from "@/context/SidebarDataContext";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import NotificationToastContainer from "@/components/NotificationToastContainer";
+import type { EmotionCache } from '@emotion/cache';
 
 // Create a client-side emotion cache
 const clientSideEmotionCache = createEmotionCache();
@@ -55,17 +56,15 @@ const theme = createTheme({
 
 interface ClientProvidersProps {
   children: ReactNode;
-  emotionCache?: any;
+  emotionCache?: EmotionCache;
 }
 
 export default function ClientProviders({
   children,
   emotionCache = clientSideEmotionCache,
 }: ClientProvidersProps) {
-  const [mounted, setMounted] = useState(false);
-
   useEffect(() => {
-    setMounted(true);
+    // Component mounted
   }, []);
 
   // Use useServerInsertedHTML to inject Emotion styles on the server

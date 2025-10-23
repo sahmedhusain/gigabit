@@ -5,14 +5,13 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useAuth } from '@/context/AuthContext'
 import { useToast } from '@/context/ToastContext'
 import { useGroups } from '@/hooks/useGroups'
-import { useRealTimeEvents } from '@/hooks'
 import { api } from '@/lib/api'
 
 interface CreateGeneralEventProps {
   show: boolean
   onClose: () => void
   onEventCreated?: () => void
-  createEvent?: (eventGroupId: number, eventData: { title: string; description: string; event_time: string }) => Promise<any>
+  createEvent?: (eventGroupId: number, eventData: { title: string; description: string; event_time: string }) => Promise<{ message: string }>
 }
 
 export default function CreateGeneralEvent({
@@ -269,7 +268,7 @@ export default function CreateGeneralEvent({
                   ) : eligibleGroups.length === 0 ? (
                     <div className="bg-gradient-to-r from-yellow-500/20 to-orange-500/20 border border-yellow-400/30 rounded-xl p-4">
                       <p className="text-yellow-300 text-sm font-medium">
-                        You don't have permission to create events in any of your groups.
+                        You don&apos;t have permission to create events in any of your groups.
                       </p>
                     </div>
                   ) : (

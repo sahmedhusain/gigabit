@@ -360,7 +360,7 @@ func (h *ProfileHandler) CheckNicknameUniqueness(w http.ResponseWriter, r *http.
 	}
 
 	// Check if nickname exists
-	_, err := h.userService.GetUserByNickname(nickname)
+	existingUser, err := h.userService.GetUserByNickname(nickname)
 	if err != nil {
 		// If user not found, nickname is available
 		writeJSON(w, http.StatusOK, map[string]interface{}{
@@ -369,7 +369,15 @@ func (h *ProfileHandler) CheckNicknameUniqueness(w http.ResponseWriter, r *http.
 		return
 	}
 
-	// Nickname exists, check if it's the current user's nickname
+	// Check if the existing user is deleted - if so, nickname is available
+	if existingUser.IsDeleted {
+		writeJSON(w, http.StatusOK, map[string]interface{}{
+			"available": true,
+		})
+		return
+	}
+
+	// Nickname exists and user is not deleted, check if it's the current user's nickname (only if authenticated)
 	userID := r.Context().Value("user_id")
 	if userID != nil {
 		currentUser, err := h.userService.GetUserByID(userID.(uint))

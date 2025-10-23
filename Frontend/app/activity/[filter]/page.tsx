@@ -1,5 +1,5 @@
 "use client"
-import { useState, useEffect, useCallback, useRef, use } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter, useParams, useSearchParams } from 'next/navigation'
 import ProtectedRoute from '@/components/ProtectedRoute'
 import { useAuth } from '@/context/AuthContext'
@@ -43,7 +43,9 @@ function ActivityFilterPage() {
   const { error } = useToast()
 
   const [activitySubTab, setActivitySubTab] = useState(filter || 'liked')
-  const [sortOrder, setSortOrder] = useState<'newest' | 'oldest'>((searchParams.get('sort') as 'newest' | 'oldest') || 'newest')
+  const [sortOrder, setSortOrder] = useState<'newest' | 'oldest'>(
+    (searchParams?.get('sort') === 'oldest' ? 'oldest' : 'newest')
+  )
 
   // Data State
   const [posts, setPosts] = useState<Post[]>([])
@@ -72,7 +74,7 @@ function ActivityFilterPage() {
 
   // Update URL when sort changes
   useEffect(() => {
-    const params = new URLSearchParams(searchParams.toString())
+    const params = new URLSearchParams(searchParams?.toString() || '')
     if (sortOrder !== 'newest') {
       params.set('sort', sortOrder)
     } else {

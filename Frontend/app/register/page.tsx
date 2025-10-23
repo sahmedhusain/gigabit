@@ -9,7 +9,7 @@ import { getAvatarOptions } from '@/utils/avatarUtils'
 import Image from 'next/image'
 import { motion, AnimatePresence } from 'framer-motion'
 
-import { Eye, EyeOff, Mail, Lock, User, Calendar, Camera, Edit3, ArrowRight, Sparkles, ChevronDown, ChevronUp, X, Palette, Check } from 'lucide-react'
+import { Eye, EyeOff, Mail, Lock, User, Calendar, Camera, Edit3, ArrowRight, Sparkles, X, Palette } from 'lucide-react'
 import TermsPopup from '@/components/TermsPopup'
 import PrivacyPopup from '@/components/PrivacyPopup'
 
@@ -102,12 +102,30 @@ function RegisterPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [showOptionalFields, setShowOptionalFields] = useState(false)
   const [showAvatarPopup, setShowAvatarPopup] = useState(false)
   const [nicknameError, setNicknameError] = useState<string | null>(null)
+  const [nicknameChecking, setNicknameChecking] = useState(false)
   const [passwordError, setPasswordError] = useState<string | null>(null)
   const [showTerms, setShowTerms] = useState(false)
   const [showPrivacy, setShowPrivacy] = useState(false)
+
+  const checkNicknameUniqueness = async (nickname: string) => {
+    setNicknameChecking(true)
+    try {
+      const response = await fetch(`/api/validation/nickname?nickname=${encodeURIComponent(nickname)}`)
+      const data = await response.json()
+      if (!data.available) {
+        setNicknameError(data.message || "This nickname is already taken")
+      } else {
+        setNicknameError(null)
+      }
+    } catch (error) {
+      console.error('Error checking nickname uniqueness:', error)
+      // Don't set error on network failure, let format validation handle it
+    } finally {
+      setNicknameChecking(false)
+    }
+  }
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target
@@ -126,6 +144,11 @@ function RegisterPage() {
     if (name === 'nickname') {
       const validation = validateNickname(value)
       setNicknameError(validation)
+      
+      // Check uniqueness if format is valid and nickname is not empty
+      if (!validation && value.trim()) {
+        checkNicknameUniqueness(value.trim())
+      }
     }
   }
 
@@ -223,6 +246,15 @@ function RegisterPage() {
       const nicknameValidation = validateNickname(formData.nickname)
       if (nicknameValidation) {
         throw new Error(nicknameValidation)
+      }
+
+      // Check if nickname uniqueness check is still in progress or has errors
+      if (nicknameChecking) {
+        throw new Error("Please wait while we check nickname availability")
+      }
+
+      if (nicknameError) {
+        throw new Error(nicknameError)
       }
 
       // Validate date of birth
@@ -575,7 +607,7 @@ function RegisterPage() {
                           <div className="w-28 h-28 rounded-full bg-white/10 border-2 border-emerald-400/50 shadow-lg shadow-emerald-400/20 flex items-center justify-center overflow-hidden backdrop-blur-sm mx-auto hover:border-emerald-400 hover:shadow-emerald-400/40 transition-all duration-300">
                             {avatarPreview ? (
                               avatarPreview.startsWith('/') || avatarPreview.startsWith('data:') ? (
-                                <Image src={avatarPreview} alt="Selected Avatar" width={112} height={112} className="w-full h-full object-cover rounded-full" />
+                                <Image src={avatarPreview} alt="Selected Avatar" width={112} height={112} unoptimized={true} className="w-full h-full object-cover rounded-full" />
                               ) : (
                                 // Show gradient for selected avatar ID
                                 (() => {
@@ -640,19 +672,6 @@ function RegisterPage() {
                               <X className="w-3 h-3 text-red-400" />
                             </div>
                             <p className="text-red-300/90 text-xs leading-relaxed">{nicknameError}</p>
-                          </motion.div>
-                        )}
-                        {!nicknameError && formData.nickname && (
-                          <motion.div
-                            className="mt-2 flex items-start space-x-2 bg-gradient-to-r from-emerald-500/10 to-teal-500/10 backdrop-blur-sm rounded-xl p-3 border border-emerald-400/20"
-                            initial={{ opacity: 0, y: -5, scale: 0.95 }}
-                            animate={{ opacity: 1, y: 0, scale: 1 }}
-                            transition={{ type: 'spring', stiffness: 400, damping: 17 }}
-                          >
-                            <div className="w-4 h-4 rounded-full bg-emerald-400/20 flex items-center justify-center flex-shrink-0 mt-0.5">
-                              <Check className="w-3 h-3 text-emerald-400" />
-                            </div>
-                            <p className="text-emerald-300/90 text-xs leading-relaxed">Valid nickname</p>
                           </motion.div>
                         )}
                       </div>
@@ -798,7 +817,7 @@ function RegisterPage() {
                                   <div className="relative w-32 h-32 rounded-full bg-gradient-to-br from-white/20 via-white/15 to-white/10 border-4 border-white/30 flex items-center justify-center overflow-hidden backdrop-blur-md transition-all duration-500">
                                     {avatarPreview ? (
                                       avatarPreview.startsWith('/') || avatarPreview.startsWith('data:') ? (
-                                        <Image src={avatarPreview} alt="Selected Avatar" width={112} height={112} className="w-full h-full object-cover rounded-full" />
+                                        <Image src={avatarPreview} alt="Selected Avatar" width={112} height={112} unoptimized={true} className="w-full h-full object-cover rounded-full" />
                                       ) : (
                                         // Show gradient for selected avatar ID
                                         (() => {
@@ -1124,7 +1143,7 @@ function RegisterPage() {
                 <div className="mb-3">
                   <button
                     type="submit"
-                    disabled={isLoading}
+                    disabled={isLoading || nicknameChecking}
                     onClick={(e) => { e.preventDefault(); handleSubmit(); }}
                     className="group relative w-full flex justify-center items-center py-4 px-6 text-lg font-semibold rounded-2xl text-white bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 hover:from-emerald-600 hover:via-teal-600 hover:to-cyan-600 focus:outline-none focus:ring-2 focus:ring-teal-400/50 transition-all duration-300 transform hover:scale-[1.02] hover:shadow-2xl hover:shadow-teal-500/25 disabled:opacity-70 disabled:cursor-not-allowed disabled:transform-none"
                   >
@@ -1134,6 +1153,11 @@ function RegisterPage() {
                         <>
                           <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
                           Creating your account...
+                        </>
+                      ) : nicknameChecking ? (
+                        <>
+                          <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+                          Checking nickname...
                         </>
                       ) : (
                         <>

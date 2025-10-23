@@ -2,7 +2,6 @@
 import { useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import ProtectedRoute from '@/components/ProtectedRoute'
-import { useAuth } from '@/context/AuthContext'
 import { useToast } from '@/context/ToastContext'
 import { useRealTimeEvents } from '@/hooks'
 
@@ -14,11 +13,10 @@ import AppLayout from '@/components/AppLayout'
 function EventsPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const { user } = useAuth()
   const { success } = useToast()
 
   // Get event ID from URL params for deep linking
-  const eventId = searchParams.get('event')
+  const eventId = searchParams?.get('event')
   
   const [showCreateEvent, setShowCreateEvent] = useState(false)
   const [eventsSubTab, setEventsSubTab] = useState('all')

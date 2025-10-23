@@ -6,7 +6,7 @@ import { useState, useRef, useEffect, type MouseEvent as ReactMouseEvent } from 
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
 import { User } from '@/lib/api';
-import { getAvatarUrl } from '@/utils/avatarUtils';
+import { getAvatarUrl, getGroupInitials } from '@/utils/avatarUtils';
 
 interface ChatItemProps {
   item: ChatItemType;
@@ -43,6 +43,11 @@ export default function ChatItem({ item, onClick, onDelete, getUserStatus, typin
     ? (item.groupStatus ?? item.group?.member_status ?? (item.group?.is_member ? 'member' : undefined))
     : undefined;
   const resolvedGroupRole = isGroup ? (item.groupRole ?? item.group?.role ?? undefined) : undefined;
+
+  // Helper function to get initials for private chat avatars
+  const getPrivateChatInitials = (name: string | undefined): string => {
+    return (name || 'User').slice(0, 2).toUpperCase();
+  }
 
   // Helper function to calculate smart dropdown position
   const calculateMenuPosition = (buttonElement: HTMLElement) => {
@@ -164,16 +169,6 @@ export default function ChatItem({ item, onClick, onDelete, getUserStatus, typin
     return d.toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' })
   }
 
-  // Helper function to get group initials (first two letters)
-  const getGroupInitials = (name: string): string => {
-    if (!name) return 'GR'
-    const words = name.trim().split(/\s+/)
-    if (words.length >= 2) {
-      return (words[0].charAt(0) + words[1].charAt(0)).toUpperCase()
-    }
-    return (name.charAt(0) + (name.charAt(1) || name.charAt(0))).toUpperCase()
-  }
-
   const gradient = isGroup
     ? 'from-emerald-400 via-teal-500 to-cyan-600'
     : 'from-emerald-400 via-teal-500 to-cyan-600';
@@ -278,7 +273,7 @@ export default function ChatItem({ item, onClick, onDelete, getUserStatus, typin
 
   const fetchGroupInfo = async (groupId: number) => {
     try {
-      const [membersData, roleData] = await Promise.all([
+      const [, roleData] = await Promise.all([
         api.getGroupMembers(groupId),
         api.getUserRole(groupId)
       ]);
@@ -415,7 +410,7 @@ export default function ChatItem({ item, onClick, onDelete, getUserStatus, typin
                   />
               ) : (
                 <span className="text-white font-bold text-xl">
-                  {item.name?.charAt(0).toUpperCase() || '?'}
+                  {getPrivateChatInitials(item.name)}
                 </span>
               )}
               </motion.div>
@@ -798,13 +793,13 @@ export default function ChatItem({ item, onClick, onDelete, getUserStatus, typin
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
               className="bg-gradient-to-br from-slate-800/95 to-slate-900/95 backdrop-blur-xl border border-white/20 rounded-2xl p-6 max-w-sm mx-4"
-              onMouseDown={(e) => {
+              onMouseDown={(e: React.MouseEvent<HTMLDivElement>) => {
                 e.stopPropagation();
-                (e as any).nativeEvent?.stopImmediatePropagation?.();
+                (e.nativeEvent as Event)?.stopImmediatePropagation?.();
               }}
-              onClick={(e) => {
+              onClick={(e: React.MouseEvent<HTMLDivElement>) => {
                 e.stopPropagation();
-                (e as any).nativeEvent?.stopImmediatePropagation?.();
+                (e.nativeEvent as Event)?.stopImmediatePropagation?.();
               }}
             >
               <div className="text-center">
@@ -921,7 +916,7 @@ export default function ChatItem({ item, onClick, onDelete, getUserStatus, typin
               {userRole === 'admin' && (
                 <div className="mb-6">
                   <p className="text-white/70 mb-3">
-                    Are you sure you want to leave "{item.name}"? As an admin, you will lose your administrative privileges.
+                    Are you sure you want to leave &quot;{item.name}&quot;? As an admin, you will lose your administrative privileges.
                   </p>
                   {hasOtherAdmins ? (
                     <p className="text-white/60 text-sm">
@@ -940,7 +935,7 @@ export default function ChatItem({ item, onClick, onDelete, getUserStatus, typin
               
               {userRole === 'member' && (
                 <p className="text-white/70 mb-6">
-                  Are you sure you want to leave "{item.name}"? You will no longer receive messages from this group and will need to be re-invited to rejoin.
+                  Are you sure you want to leave &quot;{item.name}&quot;? You will no longer receive messages from this group and will need to be re-invited to rejoin.
                 </p>
               )}
 

@@ -24,6 +24,7 @@ export default function ProfilePage() {
 
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isSidebarCollapsed] = useState(false);
+  const [isMobileRightSidebarOpen, setIsMobileRightSidebarOpen] = useState(false);
 
   // Profile data state
   const [profileUser, setProfileUser] = useState<User | null>(null);
@@ -208,6 +209,8 @@ export default function ProfilePage() {
         <TopBar
           isMobileMenuOpen={isMobileMenuOpen}
           setIsMobileMenuOpen={setIsMobileMenuOpen}
+          isMobileRightSidebarOpen={isMobileRightSidebarOpen}
+          setIsMobileRightSidebarOpen={setIsMobileRightSidebarOpen}
           activeTab="profile"
           onNotificationsClick={handleNotificationsToggle}
           unreadCount={liveUnreadCount || 0}
@@ -243,7 +246,6 @@ export default function ProfilePage() {
                   posts={userPosts}
                   isOwnProfile={true}
                   showPrivacyOverlay={false}
-                  isFollowing={false}
                 />
               </div>
             </div>
@@ -261,6 +263,7 @@ export default function ProfilePage() {
           currentUser={currentUserData}
           setActiveTab={handleTabChange}
           logout={logout}
+          isMobileOpen={isMobileRightSidebarOpen}
         />
       </div>
     </ProtectedRoute>

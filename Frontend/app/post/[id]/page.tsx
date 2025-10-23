@@ -1,7 +1,7 @@
 'use client'
-import { useState, useEffect, useCallback, use } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
-import { User as UserIcon, Heart, MessageSquare, MoreHorizontal, Send, Image as ImageIcon, Bookmark, ZoomIn, ZoomOut, Download, X, Trash2, Lock, ArrowUp, ArrowDown } from 'lucide-react'
+import { Heart, MessageSquare, MoreHorizontal, Send, Image as ImageIcon, Bookmark, ZoomIn, ZoomOut, Download, X, Trash2, Lock, ArrowUp, ArrowDown } from 'lucide-react'
 import ProtectedRoute from '@/components/ProtectedRoute'
 import AppLayout from '@/components/AppLayout'
 import { useAuth } from '@/context/AuthContext'
@@ -9,7 +9,7 @@ import { useWebSocket } from '@/context/WebSocketContext'
 import { useToast } from '@/context/ToastContext'
 import { useConnectionStatus, useOptimisticUpdate } from '@/hooks'
 import { api, APIPost, Comment as CommentType, NetworkError, User } from '@/lib/api'
-import { getAvatarUrl } from '@/utils/avatarUtils'
+import { getAvatarUrl, getUserInitials } from '@/utils/avatarUtils'
 import Image from 'next/image'
 import { motion, AnimatePresence } from 'framer-motion'
 import ManagePrivacy from '@/components/dashboard/ManagePrivacy'
@@ -32,8 +32,8 @@ function PostDetailPage() {
   const { isConnected: connectionStatus } = useConnectionStatus()
 
   // Get navigation context from URL params
-  const from = searchParams.get('from')
-  const subTab = searchParams.get('subTab')
+  const from = searchParams?.get('from')
+  const subTab = searchParams?.get('subTab')
 
   // State
   const [post, setPost] = useState<APIPost | null>(null)
@@ -64,7 +64,7 @@ function PostDetailPage() {
     const { performUpdate: performOptimisticUpdate, isLoading: likePending } = useOptimisticUpdate(
         post ? { ...post, is_liked: post.is_liked, like_count: post.like_count } : null,
         {
-            onError: (_) => error('Failed to update like')
+            onError: () => error('Failed to update like')
         }
     )
 
@@ -109,8 +109,8 @@ function PostDetailPage() {
                   router.push(`/feed/${subTab}`)
                 } else if (from === 'activity' && subTab) {
                   router.push(`/activity/${subTab}`)
-                } else if (from === 'profile' && searchParams.get('userId')) {
-                  router.push(`/profile/${searchParams.get('userId')}`)
+                } else if (from === 'profile' && searchParams?.get('userId')) {
+                  router.push(`/profile/${searchParams?.get('userId')}`)
                 } else {
                   router.push('/feed/all')
                 }
@@ -133,7 +133,7 @@ function PostDetailPage() {
         }
 
         // Use optimistic update hook
-        await performOptimisticUpdate((current) => optimisticPost, async () => {
+        await performOptimisticUpdate(() => optimisticPost, async () => {
             try {
                 if (wasLiked) {
                     await api.unlikePost(post.id)
@@ -216,8 +216,8 @@ function PostDetailPage() {
                 router.push(`/feed/${subTab}`)
             } else if (from === 'activity' && subTab) {
                 router.push(`/activity/${subTab}`)
-            } else if (from === 'profile' && searchParams.get('userId')) {
-                router.push(`/profile/${searchParams.get('userId')}`)
+            } else if (from === 'profile' && searchParams?.get('userId')) {
+                router.push(`/profile/${searchParams?.get('userId')}`)
             } else {
                 router.push('/feed/all')
             }
@@ -539,12 +539,12 @@ function PostDetailPage() {
         })
 
         return removeListener
-    }, [isConnected, addMessageListener, post])
+    }, [isConnected, addMessageListener, post, commentSort])
 
     // Load post on component mount and when sort changes
     useEffect(() => {
         fetchPost()
-    }, [fetchPost])
+    }, [fetchPost, commentSort])
 
   if (isLoadingPost) {
     return (
@@ -571,8 +571,8 @@ function PostDetailPage() {
                   router.push(`/feed/${subTab}`)
                 } else if (from === 'activity' && subTab) {
                   router.push(`/activity/${subTab}`)
-                } else if (from === 'profile' && searchParams.get('userId')) {
-                  router.push(`/profile/${searchParams.get('userId')}`)
+                } else if (from === 'profile' && searchParams?.get('userId')) {
+                  router.push(`/profile/${searchParams?.get('userId')}`)
                 } else {
                   router.push('/feed/all')
                 }
@@ -596,8 +596,8 @@ function PostDetailPage() {
           router.push(`/feed/${subTab}`)
         } else if (from === 'activity' && subTab) {
           router.push(`/activity/${subTab}`)
-        } else if (from === 'profile' && searchParams.get('userId')) {
-          router.push(`/profile/${searchParams.get('userId')}`)
+        } else if (from === 'profile' && searchParams?.get('userId')) {
+          router.push(`/profile/${searchParams?.get('userId')}`)
         } else {
           router.push('/feed/all')
         }
@@ -626,7 +626,7 @@ function PostDetailPage() {
                   />
                   ) : (
                     <span className="text-white font-bold text-lg">
-                      {post.user.first_name[0]}{post.user.last_name[0]}
+                      {getUserInitials(post.user)}
                     </span>
                   )}
                 </div>
@@ -902,7 +902,7 @@ function PostDetailPage() {
                                 />
                               ) : (
                                 <span className="text-white font-bold text-lg">
-                                  {comment.user.first_name[0]}{comment.user.last_name[0]}
+                                  {getUserInitials(comment.user)}
                                 </span>
                               )}
                             </div>
@@ -1460,7 +1460,6 @@ function PostDetailPage() {
             setShowManagePrivacy(false)
             setSelectedPostForPrivacy(null)
           }}
-          postId={selectedPostForPrivacy?.id || 0}
           currentPrivacy={selectedPostForPrivacy?.privacy as 'public' | 'followers' | 'friends' | 'listed' || 'public'}
           currentSelectedUsers={selectedPostForPrivacy?.specific_user_ids || []}
           availableUsers={availableUsers}

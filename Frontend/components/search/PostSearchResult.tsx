@@ -1,14 +1,26 @@
 'use client'
-import { FileText, Heart, MessageCircle, Clock, ExternalLink } from 'lucide-react'
+import { FileText, Clock, ExternalLink } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { SearchResult } from '@/hooks/useSearch'
-
+import Image from 'next/image'
+import { getUserInitials } from '@/utils/avatarUtils'
 interface PostSearchResultProps {
   result: SearchResult
 }
 
 export default function PostSearchResult({ result }: PostSearchResultProps) {
   const router = useRouter()
+
+  // Helper function to get initials from name
+  const getInitialsFromName = (name: string) => {
+    if (!name || !name.trim()) return 'U'
+    const parts = name.trim().split(/\s+/)
+    if (parts.length >= 2) {
+      return `${parts[0].charAt(0)}${parts[1].charAt(0)}`.toUpperCase()
+    } else {
+      return parts[0].slice(0, 2).toUpperCase()
+    }
+  }
 
   const handleClick = () => {
     // Navigate to individual post page
@@ -38,14 +50,19 @@ export default function PostSearchResult({ result }: PostSearchResultProps) {
           <div className="relative group cursor-pointer">
             <div className="w-14 h-14 bg-gradient-to-br from-green-400 via-emerald-500 to-teal-500 rounded-full flex items-center justify-center overflow-hidden shadow-md group-hover:shadow-green-500/25 transition-all duration-300">
               {result.image ? (
-                <img
+                <Image
                   src={result.image}
                   alt={result.metadata?.authorName || 'Author'}
+                  width={56}
+                  height={56}
+                  unoptimized={true}
                   className="w-full h-full object-cover"
                 />
               ) : (
                 <div className="w-full h-full bg-gradient-to-r from-green-400 to-emerald-500 rounded-full flex items-center justify-center">
-                  <FileText className="w-7 h-7 text-white" />
+                  <span className="text-white font-bold text-lg">
+                    {getInitialsFromName(result.subtitle || result.metadata?.authorName || 'Unknown')}
+                  </span>
                 </div>
               )}
             </div>
@@ -78,12 +95,15 @@ export default function PostSearchResult({ result }: PostSearchResultProps) {
             {result.metadata?.postImage && (
               <div className="mt-3 flex justify-start">
                 <div className="relative inline-block overflow-hidden rounded-xl border border-white/20 shadow-lg group-hover:shadow-emerald-500/20 transition-shadow duration-300">
-                  <img
+                  <Image
                     src={result.metadata.postImage.startsWith('http') ?
                       result.metadata.postImage :
                       `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}${result.metadata.postImage}`
                     }
+                    width={200}
+                    height={128}
                     alt="Post image"
+                    unoptimized={true}
                     className="max-w-full max-h-32 object-cover hover:scale-105 transition-transform duration-300 rounded-xl"
                     onError={(e) => {
                       const target = e.target as HTMLImageElement;

@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log"
 	"net/http"
 	"regexp"
@@ -14,12 +15,14 @@ import (
 )
 
 type AuthHandler struct {
+	db             *sql.DB
 	userService    *services.UserService
 	sessionService *services.SessionService
 }
 
 func NewAuthHandler(db *sql.DB) *AuthHandler {
 	return &AuthHandler{
+		db:             db,
 		userService:    services.NewUserService(db),
 		sessionService: services.NewSessionService(db),
 	}
@@ -73,7 +76,7 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 
 	// Check if email already exists
 	existingUser, err := h.userService.GetUserByEmail(req.Email)
-	if err == nil && existingUser != nil {
+	if err == nil && existingUser != nil && !existingUser.IsDeleted {
 		writeError(w, http.StatusConflict, "User with this email already exists")
 		return
 	}
@@ -127,10 +130,23 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 
 		// Check if nickname already exists (only if user provided one)
 		existingUser, err = h.userService.GetUserByNickname(nickname)
-		if err == nil && existingUser != nil {
+		if err == nil && existingUser != nil && !existingUser.IsDeleted {
 			writeError(w, http.StatusConflict, "User with this nickname already exists")
 			return
 		}
+	}
+
+	// Clean up old deleted accounts with the same email or nickname before creating new user
+	cleanupQuery := "DELETE FROM users WHERE is_deleted = true AND (email = ?"
+	cleanupArgs := []interface{}{req.Email}
+	if nickname != "" {
+		cleanupQuery += " OR nickname = ?"
+		cleanupArgs = append(cleanupArgs, nickname)
+	}
+	cleanupQuery += ")"
+	_, err = h.db.Exec(cleanupQuery, cleanupArgs...)
+	if err != nil {
+		log.Printf("Failed to clean up old deleted accounts: %v", err)
 	}
 
 	// Create user
@@ -159,8 +175,23 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.userService.CreateUser(user); err != nil {
-		writeError(w, http.StatusInternalServerError, "Failed to create user")
+		log.Printf("Failed to create user: %v", err)
+		writeError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to create user: %v", err))
 		return
+	}
+
+	// Clean up old deleted accounts with the same email or nickname (in case any were created during registration)
+	query := "DELETE FROM users WHERE is_deleted = true AND (email = ?"
+	args := []interface{}{req.Email}
+	if nickname != "" {
+		query += " OR nickname = ?"
+		args = append(args, nickname)
+	}
+	query += ")"
+	_, err = h.db.Exec(query, args...)
+	if err != nil {
+		// Log error but don't fail registration
+		log.Printf("Failed to clean up old deleted accounts: %v", err)
 	}
 
 	// Generate secure random token

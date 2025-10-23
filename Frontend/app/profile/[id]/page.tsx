@@ -1,5 +1,5 @@
 'use client'
-import { useCallback, useEffect, useState, use } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import ProtectedRoute from '@/components/ProtectedRoute'
 import AppLayout from '@/components/AppLayout'
@@ -21,7 +21,6 @@ function ProfilePage() {
   const [following, setFollowing] = useState<unknown[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isOwnProfile, setIsOwnProfile] = useState(false)
-  const [isFollowing, setIsFollowing] = useState<boolean>(false)
   const [showPrivacyOverlay, setShowPrivacyOverlay] = useState<boolean>(false)
   const handleLikePost = async (postId: number) => {
     const post = userPosts.find((p) => p.id === postId)
@@ -111,18 +110,15 @@ function ProfilePage() {
         if (currentUser && currentUser.id !== userIdNum) {
           try {
             const followStatusData = await api.getFollowStatus(userIdNum)
-            setIsFollowing(followStatusData.is_following)
             // Determine if privacy overlay should be shown
             setShowPrivacyOverlay(profileData.is_private && !followStatusData.is_following)
           } catch (followError) {
             console.warn('Failed to get follow status:', followError)
             // If we can't get follow status, assume not following for privacy overlay
-            setIsFollowing(false)
             setShowPrivacyOverlay(profileData.is_private)
           }
         } else {
           // Own profile or no current user
-          setIsFollowing(false)
           setShowPrivacyOverlay(false)
         }
 
@@ -162,7 +158,6 @@ function ProfilePage() {
         }
 
         // Remove the incorrect follow status logic - let FollowHandler handle it
-        setIsFollowing(false) // Reset to false, FollowHandler will set correct status
       } catch (profileError: unknown) {
         console.error('Profile fetch failed:', profileError)
 
@@ -187,7 +182,6 @@ function ProfilePage() {
               }
               setProfileUser(basicUser)
 
-              setIsFollowing(false)
               setShowPrivacyOverlay(true) // Always show overlay for private profiles when we can't access full data
 
               // Don't try to fetch posts for private profiles

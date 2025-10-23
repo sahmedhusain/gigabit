@@ -1,9 +1,9 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Send, X, Users, MessageCircle, Check } from 'lucide-react'
 import { api } from '@/lib/api'
 import { useToast } from '@/context/ToastContext'
-import { getAvatarUrl } from '@/utils/avatarUtils'
+import { getAvatarUrl, getUserInitials, getGroupInitials } from '@/utils/avatarUtils'
 import Image from 'next/image'
 import { motion, AnimatePresence } from 'framer-motion'
 
@@ -17,7 +17,7 @@ interface SharePopupProps {
 interface ChatItem {
   id: number | string
   type: 'private' | 'group' | 'following'
-  name: string
+  name?: string
   avatar?: string | null
   lastMessage?: string
   lastMessageTime?: string
@@ -44,17 +44,17 @@ export default function SharePopup({ postId, isOpen, onClose, onShareSuccess }: 
   const [isSearching, setIsSearching] = useState(false)
   const [searchTimeout, setSearchTimeout] = useState<NodeJS.Timeout | null>(null)
 
-  useEffect(() => {
-    if (isOpen) {
-      if (searchQuery.trim().length >= 2) {
-        performSearch(searchQuery)
-      } else {
-        fetchRecentChats()
-      }
+  // Helper function to get initials based on chat type
+  const getChatInitials = (chat: ChatItem): string => {
+    if (chat.type === 'group') {
+      return getGroupInitials(chat.name || 'Group')
+    } else {
+      // For private chats and following users, use first two letters of name
+      return (chat.name || 'User').slice(0, 2).toUpperCase()
     }
-  }, [isOpen])
+  }
 
-  const fetchRecentChats = async () => {
+  const fetchRecentChats = useCallback(async () => {
     try {
       setFetchingChats(true)
       setIsSearching(false)
@@ -66,9 +66,9 @@ export default function SharePopup({ postId, isOpen, onClose, onShareSuccess }: 
     } finally {
       setFetchingChats(false)
     }
-  }
+  }, [error])
 
-  const performSearch = async (query: string) => {
+  const performSearch = useCallback(async (query: string) => {
     if (query.trim().length < 2) {
       fetchRecentChats()
       return
@@ -85,7 +85,17 @@ export default function SharePopup({ postId, isOpen, onClose, onShareSuccess }: 
     } finally {
       setFetchingChats(false)
     }
-  }
+  }, [error, fetchRecentChats])
+
+  useEffect(() => {
+    if (isOpen) {
+      if (searchQuery.trim().length >= 2) {
+        performSearch(searchQuery)
+      } else {
+        fetchRecentChats()
+      }
+    }
+  }, [isOpen, searchQuery, performSearch, fetchRecentChats])
 
   const handleSearchChange = (query: string) => {
     setSearchQuery(query)
@@ -357,14 +367,15 @@ export default function SharePopup({ postId, isOpen, onClose, onShareSuccess }: 
                           {getAvatarUrl(chat.avatar) ? (
                             <Image
                               src={getAvatarUrl(chat.avatar)!}
-                              alt={`${chat.name}'s avatar`}
+                              alt={`${chat.name || 'User'}'s avatar`}
                               width={40}
                               height={40}
+                              unoptimized={true}
                               className="w-full h-full object-cover"
                             />
                           ) : (
                             <div className="w-full h-full bg-gradient-to-r from-emerald-400 to-teal-500 rounded-full flex items-center justify-center text-white font-bold text-sm">
-                              {chat.name[0]?.toUpperCase()}
+                              {getChatInitials(chat)}
                             </div>
                           )}
                         </div>
@@ -382,7 +393,7 @@ export default function SharePopup({ postId, isOpen, onClose, onShareSuccess }: 
 
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center space-x-2">
-                          <p className="text-white font-medium text-sm truncate">{chat.name}</p>
+                          <p className="text-white font-medium text-sm truncate">{chat.name || 'Unknown'}</p>
                           {chat.type === 'group' && (
                             <span className="text-white/50 text-xs">Group</span>
                           )}

@@ -5,6 +5,66 @@ import { Lock, Eye, EyeOff, Shield, Check, Users, Globe, X } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion';
 import { api } from '../lib/api';
 
+// Public Profile Confirmation Modal
+const PublicConfirmModal = ({ show, onClose, onConfirm, isUpdating }: {
+  show: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+  isUpdating: boolean;
+}) => {
+  return (
+    <AnimatePresence>
+      {show && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          onClick={onClose}
+        >
+          <motion.div
+            initial={{ scale: 0.95, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0.95, opacity: 0 }}
+            className="bg-gradient-to-br from-slate-800/95 to-slate-900/95 backdrop-blur-xl border border-white/20 rounded-2xl p-6 max-w-sm w-full mx-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="text-center">
+              <div className="w-12 h-12 bg-emerald-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Globe className="w-6 h-6 text-emerald-400" />
+              </div>
+              <h3 className="text-white font-semibold text-lg mb-2">Make Profile Public?</h3>
+              <p className="text-white/70 text-sm mb-6">
+                Are you sure you want to make your account public? Anyone will be able to see your profile and posts.
+              </p>
+              <div className="flex space-x-3">
+                <button
+                  onClick={onClose}
+                  className="flex-1 px-6 py-3 border border-white/30 rounded-xl text-white hover:bg-white/10 hover:border-white/50 transition-all duration-300 text-sm lg:text-base font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled={isUpdating}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={onConfirm}
+                  disabled={isUpdating}
+                  className={`flex-1 px-6 py-3 rounded-xl text-white font-semibold text-sm lg:text-base transition-all duration-300 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed ${
+                    isUpdating
+                      ? 'bg-white/20 cursor-not-allowed'
+                      : 'bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 shadow-emerald-500/25'
+                  }`}
+                >
+                  {isUpdating ? 'Updating...' : 'Make Public'}
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+};
+
 export default function PrivacySettings() {
   const [isPrivate, setIsPrivate] = useState(false);
   const [birthdayPrivacy, setBirthdayPrivacy] = useState('everyone');
@@ -12,6 +72,7 @@ export default function PrivacySettings() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
+  const [showPublicConfirm, setShowPublicConfirm] = useState(false);
 
   useEffect(() => {
     fetchPrivacySettings();
@@ -30,12 +91,23 @@ export default function PrivacySettings() {
     }
   };
 
-  const handleTogglePrivacy = async () => {
+  const handleTogglePrivacy = () => {
+    if (isPrivate) {
+      // If currently private, show confirmation to make public
+      setShowPublicConfirm(true);
+    } else {
+      // If currently public, directly make private (no confirmation needed)
+      updatePrivacySetting(true);
+    }
+  };
+
+  const updatePrivacySetting = async (makePrivate: boolean) => {
     setSaving(true);
     setMessage('');
+    setShowPublicConfirm(false);
 
     try {
-      const result = await api.updateUserPrivacy(0, !isPrivate); // userId not needed, will use authenticated user
+      const result = await api.updateUserPrivacy(0, makePrivate); // userId not needed, will use authenticated user
       setIsPrivate(result.user.is_private);
       setMessage('Privacy settings updated successfully!');
     } catch (error) {
@@ -95,6 +167,7 @@ export default function PrivacySettings() {
   }
 
   return (
+    <>
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
@@ -407,5 +480,14 @@ export default function PrivacySettings() {
         </motion.div>
       </div>
     </motion.div>
+
+    {/* Public Profile Confirmation Modal */}
+    <PublicConfirmModal
+      show={showPublicConfirm}
+      onClose={() => setShowPublicConfirm(false)}
+      onConfirm={() => updatePrivacySetting(false)}
+      isUpdating={saving}
+    />
+    </>
   );
 }

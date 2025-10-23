@@ -1,8 +1,9 @@
 'use client'
 import { useState, useEffect, useRef } from 'react'
-import { ChevronDown, Users, Hash, Calendar, MessageCircle, FileText, User, Filter } from 'lucide-react'
-import { useSearchResults } from '@/hooks/useSearch'
+import { ChevronDown, Users, Calendar, MessageCircle, FileText, User, Filter } from 'lucide-react'
+import { useSearchResults, SearchResult } from '@/hooks/useSearch'
 import { api } from '@/lib/api'
+import { useAuth } from '@/context/AuthContext'
 import UserSearchResult from '@/components/search/UserSearchResult'
 import GroupSearchResult from '@/components/search/GroupSearchResult'
 import EventSearchResult from '@/components/search/EventSearchResult'
@@ -12,8 +13,6 @@ import MessageSearchResult from '@/components/search/MessageSearchResult'
 interface SearchResultsProps {
   filter: string
   query: string
-  onSearch: (query: string) => void
-  onClose: () => void
 }
 
 const filterOptions = [
@@ -25,9 +24,9 @@ const filterOptions = [
   { key: 'messages', label: 'Messages', icon: MessageCircle }
 ]
 
-export default function SearchResults({ filter, query, onSearch, onClose }: SearchResultsProps) {
+export default function SearchResults({ filter, query }: SearchResultsProps) {
     // Get current user
-    const { user } = require('@/context/AuthContext').useAuth();
+    const { user } = useAuth();
 
   const [activeFilter, setActiveFilter] = useState(filter)
   const [showFilterDropdown, setShowFilterDropdown] = useState(false)
@@ -51,7 +50,10 @@ export default function SearchResults({ filter, query, onSearch, onClose }: Sear
   useEffect(() => {
     if (user) {
       api.getUserGroups(user.id).then(data => {
-        setUserGroups(data.groups.map((g: any) => g.id))
+        interface GroupData {
+          id: number;
+        }
+        setUserGroups(data.groups.map((g: GroupData) => g.id))
       }).catch(err => {
         console.error('Failed to fetch user groups:', err)
       })
@@ -59,10 +61,11 @@ export default function SearchResults({ filter, query, onSearch, onClose }: Sear
   }, [user])
 
   // Filter out events for groups where user is not a member
-  const filteredResults = results.filter((result: any) => {
+  const filteredResults = results.filter((result: SearchResult) => {
     if (result.type === 'event') {
       // Check if event has a group and user is member
-      const groupId = result.metadata?.group_id || result.metadata?.group?.id || result.metadata?.event?.group_id || result.group_id
+      const metadata = result.metadata as { group_id?: number | string; group?: { id?: number }; event?: { group_id?: number } }
+      const groupId = metadata?.group_id || metadata?.group?.id || metadata?.event?.group_id
       const numGroupId = groupId ? Number(groupId) : null
       if (numGroupId && !userGroups.includes(numGroupId)) {
         return false
@@ -142,7 +145,7 @@ export default function SearchResults({ filter, query, onSearch, onClose }: Sear
     }
   }
 
-  const renderSearchResult = (result: any) => {
+  const renderSearchResult = (result: SearchResult) => {
       switch (result.type) {
         case 'user':
           return <UserSearchResult key={`user-${result.id}`} result={result} />
@@ -269,7 +272,7 @@ export default function SearchResults({ filter, query, onSearch, onClose }: Sear
                       <div className="flex items-center space-x-3 bg-cyan-500/10 border border-cyan-500/20 rounded-xl px-4 py-2">
                         <div className="h-2 w-2 bg-cyan-400 rounded-full"></div>
                         <span className="text-cyan-200 text-sm font-medium">
-                          Search term: <span className="font-bold text-cyan-300">"{query}"</span>
+                          Search term: <span className="font-bold text-cyan-300">&ldquo;{query}&rdquo;</span>
                         </span>
                       </div>
                     )}
@@ -326,7 +329,7 @@ export default function SearchResults({ filter, query, onSearch, onClose }: Sear
               </div>
               <h3 className="text-xl font-semibold text-white mb-2">No Results Found</h3>
               <p className="text-white/60 max-w-md mx-auto mb-4">
-                We couldn't find any {activeOption.label.toLowerCase()} matching "{query}".
+                We couldn&apos;t find any {activeOption.label.toLowerCase()} matching &ldquo;{query}&rdquo;.
               </p>
               <div className="text-white/50 text-sm space-y-1">
                 <p>• Try different keywords</p>

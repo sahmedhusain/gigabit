@@ -1,7 +1,7 @@
 "use client"
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter, useParams, useSearchParams } from 'next/navigation'
-import ProtectedRoute from '@/components/ProtectedRoute'
+import ProtectedRoute from '@/components/auth/ProtectedRoute'
 import { useAuth } from '@/context/AuthContext'
 import { useWebSocket } from '@/context/WebSocketContext'
 import { useToast } from '@/context/ToastContext'
@@ -16,8 +16,8 @@ import {
 } from '@/lib/api'
 
 // Import dashboard components
-import ActivitySection from '@/components/dashboard/ActivitySection'
-import AppLayout from '@/components/AppLayout'
+import ActivitySection from '@/components/profile/ActivitySection'
+import AppLayout from '@/components/layout/AppLayout'
 
 // Helper: format relative time
 const formatTimeAgo = (dateString: string) => {

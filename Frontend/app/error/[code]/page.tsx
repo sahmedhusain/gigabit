@@ -1,7 +1,7 @@
 'use client';
 
 import { useParams, useSearchParams } from 'next/navigation';
-import ErrorPage from '@/components/ErrorPage';
+import ErrorPage from '@/components/ui/ErrorPage';
 
 export default function DynamicErrorPage() {
   const params = useParams()

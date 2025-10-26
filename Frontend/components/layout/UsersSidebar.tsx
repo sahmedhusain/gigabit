@@ -6,7 +6,7 @@ import { useAuth } from '@/context/AuthContext'
 import { useToast } from '@/context/ToastContext'
 import { useConnectionStatus } from '@/hooks'
 import { useWebSocket } from '@/context/WebSocketContext'
-import FollowHandler, { FollowStatus, getFollowStatusFromAPI } from './FollowHandler'
+import FollowHandler, { FollowStatus, getFollowStatusFromAPI } from '../profile/FollowHandler'
 import Image from 'next/image'
 
 interface UserWithFollowStatus extends UserType {

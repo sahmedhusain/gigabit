@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react'
 import { API_BASE_URL, api } from '@/lib/api'
-import ChatWindow from '@/components/ChatWindow'
+import ChatWindow from '@/components/chat/ChatWindow'
 import CreateGroupPost from '@/components/groups/CreateGroupPost'
 import CreateGroupEvent from '@/components/groups/CreateGroupEvent'
 import { MessageCircle, Users, Hash, FileText, Calendar } from 'lucide-react'

@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { Palette, Home, Check, Monitor, Moon, Sun, Globe, Users, Heart, Calendar, Search, User, UserPlus, Bell, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useBackgroundTheme } from '@/components/BackgroundThemeProvider';
+import { useBackgroundTheme } from '@/components/ui/BackgroundThemeProvider';
 
 export default function AppearanceSettings() {
   const { setTheme: setBackgroundTheme } = useBackgroundTheme();

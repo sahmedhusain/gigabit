@@ -3,8 +3,8 @@
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import Homepage from '@/components/Homepage';
-import AnimatedBackground from '@/components/AnimatedBackground';
+import Homepage from '@/components/homepage/Homepage';
+import AnimatedBackground from '@/components/ui/AnimatedBackground';
 import { Zap, Loader2 } from 'lucide-react';
 import Image from 'next/image';
 

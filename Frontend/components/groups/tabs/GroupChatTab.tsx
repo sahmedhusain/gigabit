@@ -13,8 +13,8 @@ import { getUserInitials } from '@/utils/avatarUtils'
 import Image from 'next/image'
 
 // Import SharedPostMessage component
-import SharedPostMessage from '../../SharedPostMessage'
-import ImagePreviewModal from '../../ImagePreviewModal'
+import SharedPostMessage from '../../posts/SharedPostMessage'
+import ImagePreviewModal from '../../ui/ImagePreviewModal'
 
 interface EmojiData {
   emoji: string

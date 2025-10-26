@@ -3,7 +3,7 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react'
 import { useWebSocket } from './WebSocketContext'
 import { useAuth } from './AuthContext'
-import { ToastNotification } from '@/components/NotificationToast'
+import { ToastNotification } from '@/components/notifications/NotificationToast'
 
 interface NotificationToastContextType {
   notifications: ToastNotification[]
@@ -31,7 +31,6 @@ export const NotificationToastProvider: React.FC<{ children: React.ReactNode }> 
 
     setNotifications((prev) => [...prev, newNotification])
 
-    // Auto-remove after 6 seconds if not manually closed
     setTimeout(() => {
       setNotifications((prev) => prev.filter((n) => n.id !== newNotification.id))
     }, 6000)
@@ -45,7 +44,6 @@ export const NotificationToastProvider: React.FC<{ children: React.ReactNode }> 
     setNotifications([])
   }, [])
 
-  // Track route changes to determine if user is inside chats
   useEffect(() => {
     const update = () => {
       try {
@@ -64,17 +62,14 @@ export const NotificationToastProvider: React.FC<{ children: React.ReactNode }> 
     }
   }, [])
 
-  // Listen to WebSocket messages for real-time notifications
   useEffect(() => {
     if (!isConnected || !user) return
 
     const removeListener = addMessageListener((message) => {
-      // Don't show notification for own actions
       if (message.from === user.id) return
 
       switch (message.type) {
         case 'notification':
-          // Handle structured notification messages (support both persisted and transient)
           if (message.data) {
             const { type, message: msg, actor, entity_id, entity_type } = message.data
             

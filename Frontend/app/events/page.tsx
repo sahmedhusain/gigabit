@@ -1,14 +1,14 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import ProtectedRoute from '@/components/ProtectedRoute'
+import ProtectedRoute from '@/components/auth/ProtectedRoute'
 import { useToast } from '@/context/ToastContext'
 import { useRealTimeEvents } from '@/hooks'
 
 // Import dashboard components
-import CommunitySection from '@/components/dashboard/CommunitySection'
-import CreateGeneralEvent from '@/components/dashboard/CreateGeneralEvent'
-import AppLayout from '@/components/AppLayout'
+import CommunitySection from '@/components/groups/CommunitySection'
+import CreateGeneralEvent from '@/components/events/CreateGeneralEvent'
+import AppLayout from '@/components/layout/AppLayout'
 
 function EventsPage() {
   const router = useRouter()

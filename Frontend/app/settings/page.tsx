@@ -1,14 +1,14 @@
 'use client';
 
 import { useState } from 'react';
-import ProtectedRoute from '@/components/ProtectedRoute';
-import AppLayout from '@/components/AppLayout';
-import ProfileSettings from '@/components/ProfileSettings';
-import AccountSettings from '@/components/AccountSettings';
-import PrivacySettings from '@/components/PrivacySettings';
-import NotificationSettings from '@/components/NotificationSettings';
-import AppearanceSettings from '@/components/AppearanceSettings';
-import DeleteAccountModal from '@/components/DeleteAccountModal';
+import ProtectedRoute from '@/components/auth/ProtectedRoute';
+import AppLayout from '@/components/layout/AppLayout';
+import ProfileSettings from '@/components/profile/ProfileSettings';
+import AccountSettings from '@/components/profile/AccountSettings';
+import PrivacySettings from '@/components/profile/PrivacySettings';
+import NotificationSettings from '@/components/notifications/NotificationSettings';
+import AppearanceSettings from '@/components/profile/AppearanceSettings';
+import DeleteAccountModal from '@/components/profile/DeleteAccountModal';
 import { Settings, User, Shield, Lock, Bell, Palette, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 

@@ -12,9 +12,9 @@ import { useWebSocket } from '@/context/WebSocketContext'
 import type { WebSocketMessage } from '@/context/WebSocketContext'
 import FollowHandler, { FollowStatus, getFollowStatusFromAPI } from './FollowHandler'
 import ManagePrivacy from './ManagePrivacy'
-import SharePopup from '../SharePopup'
-import CreatePost from './CreatePost'
-import ImagePreviewModal from '../ImagePreviewModal'
+import SharePopup from '../ui/SharePopup'
+import CreatePost from '../posts/CreatePost'
+import ImagePreviewModal from '../ui/ImagePreviewModal'
 
 interface UserOption {
   id: number

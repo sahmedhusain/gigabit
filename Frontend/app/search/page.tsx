@@ -1,10 +1,10 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import ProtectedRoute from '@/components/ProtectedRoute'
+import ProtectedRoute from '@/components/auth/ProtectedRoute'
 // Import dashboard components
-import SearchPage from '@/components/dashboard/SearchPage'
-import AppLayout from '@/components/AppLayout'
+import SearchPage from '@/components/search/SearchPage'
+import AppLayout from '@/components/layout/AppLayout'
 
 function SearchPageRoute() {
   const router = useRouter()

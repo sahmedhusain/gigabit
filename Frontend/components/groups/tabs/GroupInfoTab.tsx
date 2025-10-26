@@ -8,7 +8,7 @@ import { useWebSocket } from '@/context/WebSocketContext'
 import { api, GroupResponse, Member } from '@/lib/api'
 import { getAvatarUrl, getUserInitials, getGroupInitials } from '@/utils/avatarUtils'
 import Image from 'next/image'
-import ImagePreviewModal from '@/components/ImagePreviewModal'
+import ImagePreviewModal from '@/components/ui/ImagePreviewModal'
 
 interface GroupInfoTabProps {
   groupId: number

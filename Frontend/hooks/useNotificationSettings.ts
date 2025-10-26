@@ -93,17 +93,15 @@ export function useNotificationSettings() {
           icon: icon || '/favicon.ico',
           tag: 'social-network-notification',
           requireInteraction: false,
-          silent: true // We handle sound separately
+          silent: true
         })
 
-        // Auto-close after 5 seconds
         setTimeout(() => {
           notification.close()
         }, 5000)
 
         return notification
       } else if (Notification.permission !== 'denied') {
-        // Request permission if not already denied
         const permission = await Notification.requestPermission()
         if (permission === 'granted') {
           return showBrowserNotification(title, body, icon)
@@ -113,7 +111,6 @@ export function useNotificationSettings() {
   }, [shouldShowBrowserNotification])
 
   const playNotification = useCallback(async (conversationId?: number, title?: string, body?: string, icon?: string) => {
-    // Play sound if enabled
     if (shouldPlaySound(conversationId)) {
       try {
         await playNotificationSound(settings.sound_theme, 0.7)

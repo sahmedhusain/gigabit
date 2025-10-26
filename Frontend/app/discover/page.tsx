@@ -1,14 +1,14 @@
 'use client'
 import { useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import ProtectedRoute from '@/components/ProtectedRoute'
+import ProtectedRoute from '@/components/auth/ProtectedRoute'
 import { useAuth } from '@/context/AuthContext'
 
 // Import AppLayout instead of individual components
-import AppLayout from '@/components/AppLayout'
+import AppLayout from '@/components/layout/AppLayout'
 
 // Import dashboard components
-import DiscoverPage from '@/components/dashboard/DiscoverPage'
+import DiscoverPage from '@/components/search/DiscoverPage'
 
 function DiscoverPageRoute() {
   const router = useRouter()

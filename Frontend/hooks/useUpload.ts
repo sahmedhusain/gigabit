@@ -51,7 +51,6 @@ export function useUpload(options: UseUploadOptions = {}) {
       const form = new FormData()
       form.append('image', file)
 
-      // Use XMLHttpRequest to report progress reliably
       const token = getToken()
       const url = `${API_BASE_URL}/api/uploads`
       

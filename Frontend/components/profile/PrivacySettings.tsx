@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Lock, Eye, EyeOff, Shield, Check, Users, Globe, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { api } from '../lib/api';
+import { api } from '../../lib/api';
 
 // Public Profile Confirmation Modal
 const PublicConfirmModal = ({ show, onClose, onConfirm, isUpdating }: {

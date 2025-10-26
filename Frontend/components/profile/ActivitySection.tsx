@@ -1,75 +1,57 @@
 'use client'
-import { useState, useEffect } from 'react'
-import { Heart, Globe, Lock, EyeOff, MessageSquare, Sparkles, Bookmark, Send, MoreHorizontal, User, Image as ImageIcon, Trash2, ArrowUp, ArrowDown } from 'lucide-react'
-import CreatePost from './CreatePost'
-import ManagePrivacy from './ManagePrivacy'
-import { Post } from '@/lib/api'
-import { Plus } from 'lucide-react'
-import { useRealTimePosts } from '@/hooks/useRealTimePosts'
-import { useDocumentTitle } from '@/hooks/useDocumentTitle'
+import { useState, useEffect, useCallback } from 'react'
+import { Heart, MessageSquare, Bookmark, Send, User, Image as ImageIcon, MoreHorizontal, Trash2, ArrowUp, ArrowDown, Globe, Lock, EyeOff } from 'lucide-react'
+import { Post, Comment } from '@/lib/api'
 import { useRouter } from 'next/navigation'
 import { useToast } from '@/context/ToastContext'
 import Image from 'next/image'
 import { getAvatarUrl, getUserInitials } from '@/utils/avatarUtils'
 import { useAuth } from '@/context/AuthContext'
 import { api } from '@/lib/api'
-import { motion, AnimatePresence } from 'framer-motion'
-import SharePopup from '../SharePopup'
+import { AnimatePresence, motion } from 'framer-motion'
+import ManagePrivacy from './ManagePrivacy'
+import SharePopup from '../ui/SharePopup'
 
-interface HomeFeedProps {
+interface ActivitySectionProps {
+  activitySubTab: string
   posts: Post[]
   onPostLike: (postId: number) => void
   onPostBookmark?: (postId: number) => void
-  showCreatePost: boolean
-  setShowCreatePost: (show: boolean) => void
-  newPostContent: string
-  setNewPostContent: (content: string) => void
-  newPostImage: File | null
-  setNewPostImage: (image: File | null) => void
-  postPrivacy: 'public' | 'followers' | 'friends' | 'listed'
-  setPostPrivacy: (privacy: 'public' | 'followers' | 'friends' | 'listed') => void
-  selectedUsers: number[]
-  setSelectedUsers: (users: number[]) => void
-  availableUsers: { id: number; email: string; first_name: string; last_name: string; avatar?: string; nickname?: string; display_name?: string; }[]
-  loadingUsers: boolean
-  onCreatePost: () => Promise<void>
-  feedSubTab: string
-  sortOrder: 'newest' | 'oldest'
-  setSortOrder: (sort: 'newest' | 'oldest') => void
+  sortOrder?: 'newest' | 'oldest'
+  setSortOrder?: (sort: 'newest' | 'oldest') => void
   hasMoreResults?: boolean
   isLoadingMore?: boolean
   onLoadMore?: () => void
   resultsContainerRef?: React.RefObject<HTMLDivElement | null>
 }
 
-export default function HomeFeed({
+export default function ActivitySection({
+  activitySubTab,
   posts,
   onPostLike,
   onPostBookmark,
-  showCreatePost,
-  setShowCreatePost,
-  newPostContent,
-  setNewPostContent,
-  newPostImage,
-  setNewPostImage,
-  postPrivacy,
-  setPostPrivacy,
-  selectedUsers,
-  setSelectedUsers,
-  availableUsers,
-  loadingUsers,
-  onCreatePost,
-  feedSubTab,
-  sortOrder,
+  sortOrder = 'newest',
   setSortOrder,
   hasMoreResults = false,
   isLoadingMore = false,
   onLoadMore,
   resultsContainerRef
-}: HomeFeedProps) {
+}: ActivitySectionProps) {
   const router = useRouter()
-  // Feed filter state
-  const [isLoadingPosts] = useState(false)
+  const { success, error } = useToast()
+  const { user } = useAuth()
+
+  // Three-dot menu state
+  const [openMenu, setOpenMenu] = useState<{[key: number]: boolean}>({})
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState<{[key: number]: boolean}>({})
+  const [isDeleting, setIsDeleting] = useState<{[key: number]: boolean}>({})
+
+  // Manage Privacy state
+  const [showManagePrivacy, setShowManagePrivacy] = useState(false)
+  const [selectedPostForPrivacy, setSelectedPostForPrivacy] = useState<Post | null>(null)
+  const [currentSelectedUsers, setCurrentSelectedUsers] = useState<number[]>([])
+  const [availableUsers, setAvailableUsers] = useState<{ id: number; email: string; first_name: string; last_name: string; avatar?: string; nickname?: string; display_name?: string; }[]>([])
+  const [loadingUsers, setLoadingUsers] = useState(false)
 
   // Comment modal state
   const [isCommentModalOpen, setIsCommentModalOpen] = useState(false)
@@ -82,61 +64,16 @@ export default function HomeFeed({
   const [isSharePopupOpen, setIsSharePopupOpen] = useState(false)
   const [selectedPostForShare, setSelectedPostForShare] = useState<Post | null>(null)
 
-  // Use real-time posts hook
-  const {
-    unreadCount,
-    markAsRead
-  } = useRealTimePosts()
-
-  const { success, error } = useToast()
-  const { user } = useAuth()
-
-  // Three-dot menu state
-  const [openMenu, setOpenMenu] = useState<{[key: number]: boolean}>({})
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState<{[key: number]: boolean}>({})
-  const [isDeleting, setIsDeleting] = useState<{[key: number]: boolean}>({})
-
-  // Privacy management state
-  const [showManagePrivacy, setShowManagePrivacy] = useState<{[key: number]: boolean}>({})
-  const [currentSelectedUsers, setCurrentSelectedUsers] = useState<{[key: number]: number[]}>({})
-
-  // Update document title with unread count
-  const { setUnread, setPageTitle } = useDocumentTitle()
-
-  useEffect(() => {
-    setPageTitle('Home')
-    setUnread(unreadCount)
-  }, [unreadCount, setPageTitle, setUnread])
-
-  // Mark posts as read when user scrolls or interacts
-  useEffect(() => {
-    const handleScroll = () => {
-      if (unreadCount > 0) {
-        markAsRead()
-      }
-    }
-
-    const handleFocus = () => {
-      if (unreadCount > 0) {
-        markAsRead()
-      }
-    }
-
-    window.addEventListener('scroll', handleScroll, { passive: true })
-    window.addEventListener('focus', handleFocus)
-
-    return () => {
-      window.removeEventListener('scroll', handleScroll)
-      window.removeEventListener('focus', handleFocus)
-    }
-  }, [unreadCount, markAsRead])
+  // Comments state for displaying recent comments
+  const [postComments, setPostComments] = useState<{ [postId: number]: Comment[] }>({})
+  const [userCommentCounts, setUserCommentCounts] = useState<{ [postId: number]: number }>({})
 
   const handlePostClick = (postId: number, e: React.MouseEvent) => {
     // Don't navigate if clicking on interactive elements
     if ((e.target as HTMLElement).closest('button')) {
       return
     }
-    const url = `/post/${postId}?from=feed&subTab=${feedSubTab}`
+    const url = `/post/${postId}?from=activity&subTab=${activitySubTab}`
     router.push(url)
   }
 
@@ -174,41 +111,6 @@ export default function HomeFeed({
       setIsDeleting(prev => ({ ...prev, [postId]: false }))
       setShowDeleteConfirm(prev => ({ ...prev, [postId]: false }))
       setOpenMenu(prev => ({ ...prev, [postId]: false }))
-    }
-  }
-
-  const handleManagePrivacy = async (postId: number) => {
-    try {
-      // Fetch the post details to get current selected users
-      const postDetails = await api.getPost(postId)
-      setCurrentSelectedUsers(prev => ({
-        ...prev,
-        [postId]: postDetails.specific_user_ids || []
-      }))
-    } catch (err) {
-      console.error('Failed to fetch post details:', err)
-      // Set empty array as fallback
-      setCurrentSelectedUsers(prev => ({
-        ...prev,
-        [postId]: []
-      }))
-    }
-    setShowManagePrivacy(prev => ({ ...prev, [postId]: true }))
-    setOpenMenu(prev => ({ ...prev, [postId]: false }))
-  }
-
-  const handleUpdatePrivacy = async (postId: number, privacy: 'public' | 'followers' | 'friends' | 'listed', selectedUsers: number[]) => {
-    try {
-      await api.updatePost(postId, {
-        privacy: privacy,
-        specific_user_ids: selectedUsers
-      })
-      success('Post privacy updated successfully')
-      // Refresh the page to show updated privacy
-      window.location.reload()
-    } catch (err) {
-      console.error('Failed to update privacy:', err)
-      error('Failed to update privacy. Please try again.')
     }
   }
 
@@ -289,37 +191,122 @@ export default function HomeFeed({
     }
   }
 
-  // Filter and sort posts based on active filter and sort order
-  const filteredPosts = () => {
-    let filtered = posts
+  const handleManagePrivacy = async (post: Post) => {
+    setSelectedPostForPrivacy(post)
+    setShowManagePrivacy(true)
+    setOpenMenu(prev => ({ ...prev, [post.id]: false }))
 
-    // Apply filter
-    switch (feedSubTab) {
-      case 'following':
-        filtered = posts // Filter posts from users the current user follows
-        break
-      case 'friends':
-        filtered = posts // Filter posts from mutual followers
-        break
-      default:
-        filtered = posts // All posts
-        break
-    }
-
-    // Apply sorting
-    return filtered.sort((a, b) => {
-      const dateA = new Date(a.created_at).getTime()
-      const dateB = new Date(b.created_at).getTime()
-
-      if (sortOrder === 'newest') {
-        return dateB - dateA // Newest first
-      } else {
-        return dateA - dateB // Oldest first
+    // Fetch post details to get selected users for listed privacy
+    if (post.privacy === 'listed') {
+      try {
+        const postDetails = await api.getPost(post.id)
+        setCurrentSelectedUsers(postDetails.specific_user_ids || [])
+      } catch (err) {
+        console.error('Failed to fetch post details:', err)
+        setCurrentSelectedUsers([])
       }
-    })
+    } else {
+      setCurrentSelectedUsers([])
+    }
   }
 
-  const renderPost = (post: Post, index: number) => {
+  const handleUpdatePrivacy = async (privacy: 'public' | 'followers' | 'friends' | 'listed', selectedUsers: number[]) => {
+    if (!selectedPostForPrivacy) return
+
+    try {
+      await api.updatePost(selectedPostForPrivacy.id, {
+        privacy,
+        specific_user_ids: selectedUsers
+      })
+      success('Privacy settings updated successfully!')
+      setShowManagePrivacy(false)
+      setSelectedPostForPrivacy(null)
+      // Optionally refresh posts or update local state
+      window.location.reload() // Simple refresh for now
+    } catch (err) {
+      console.error('Failed to update privacy:', err)
+      error('Failed to update privacy settings. Please try again.')
+    }
+  }
+
+  const fetchAvailableUsers = useCallback(async () => {
+    if (availableUsers.length > 0) return // Already fetched
+
+    try {
+      setLoadingUsers(true)
+      const response = await api.getFollowers(user?.id || 0)
+      setAvailableUsers(response.followers || [])
+    } catch (err) {
+      console.error('Failed to fetch followers:', err)
+      error('Failed to load followers for privacy settings.')
+    } finally {
+      setLoadingUsers(false)
+    }
+  }, [user, availableUsers.length, error])
+
+  // Fetch users when Manage Privacy modal opens
+  useEffect(() => {
+    if (showManagePrivacy) {
+      fetchAvailableUsers()
+    }
+  }, [showManagePrivacy, fetchAvailableUsers])
+
+
+  // Mock data for demonstration - in real app, this would come from API
+  const likedPosts = posts.filter(post => post.isLiked)
+  const commentedPosts = posts.slice(0, 3) // Mock commented posts
+  const savedPosts = posts.slice(0, 2) // Mock saved posts
+
+  // Fetch comments for commented posts
+  const fetchCommentsForCommentedPosts = useCallback(async () => {
+    if (activitySubTab !== 'commented') return
+
+    try {
+      const commentsMap: { [postId: number]: Comment[] } = {}
+      const userCommentCountsMap: { [postId: number]: number } = {}
+
+      for (const post of commentedPosts) {
+        try {
+          const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/api/posts/${post.id}/comments?limit=50&offset=0`, {
+            method: 'GET',
+            headers: {
+              ...(localStorage.getItem('token') ? { Authorization: `localStorage.getItem('token')` } : {})
+            },
+            credentials: 'include'
+          })
+
+          if (response.ok) {
+            const data = await response.json()
+            // Filter to only current user's comments and sort by created_at descending to get most recent first
+            const userComments = (data.comments || []).filter((comment: Comment) => comment.user.id === user?.id)
+            const sortedUserComments = userComments.sort((a: Comment, b: Comment) => 
+              new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+            )
+            commentsMap[post.id] = sortedUserComments
+
+            // Count user's comments on this post
+            userCommentCountsMap[post.id] = sortedUserComments.length
+          }
+        } catch (error) {
+          console.error(`Error fetching comments for post ${post.id}:`, error)
+        }
+      }
+
+      setPostComments(commentsMap)
+      setUserCommentCounts(userCommentCountsMap)
+    } catch (error) {
+      console.error('Error fetching comments:', error)
+    }
+  }, [activitySubTab, commentedPosts, user])
+
+  // Fetch comments for commented posts when tab is active
+  useEffect(() => {
+    if (activitySubTab === 'commented') {
+      fetchCommentsForCommentedPosts()
+    }
+  }, [activitySubTab, fetchCommentsForCommentedPosts])
+
+  const renderPostCard = (post: Post, activityType: string, index: number) => {
     const animationDelay = index < 6 ? `animation-delay-${index * 100}` : 'animation-delay-500'
     return (
       <div
@@ -346,7 +333,6 @@ export default function HomeFeed({
                   alt={`${post.user.name}'s avatar`}
                   width={48}
                   height={48}
-                  unoptimized={true}
                   className="w-full h-full object-cover"
                 />
               ) : (
@@ -381,9 +367,9 @@ export default function HomeFeed({
               </span>
             </div>
 
-            {/* Clickable Username and Time */}
+            {/* Clickable Username and Time with Activity Icon */}
             <p
-              className="text-white/70 text-sm cursor-pointer hover:text-white/90 transition-colors duration-200"
+              className="text-white/70 text-sm cursor-pointer hover:text-white/90 transition-colors duration-200 flex items-center space-x-2"
               onClick={(e) => {
                 e.stopPropagation()
                 if (post.user.id && post.user.id !== 0) {
@@ -391,7 +377,14 @@ export default function HomeFeed({
                 }
               }}
             >
-              @{post.user.username} • {post.timeAgo}
+              <span>@{post.user.username}</span>
+              <span>•</span>
+              <span className="flex items-center space-x-1">
+                {activityType === 'liked' && <Heart className="w-3 h-3 text-red-400" />}
+                {activityType === 'commented' && <MessageSquare className="w-3 h-3 text-blue-400" />}
+                {activityType === 'saved' && <Bookmark className="w-3 h-3 text-yellow-400" />}
+                <span>{post.timeAgo}</span>
+              </span>
             </p>
           </div>
         </div>
@@ -428,8 +421,8 @@ export default function HomeFeed({
                   onClick={(e) => e.stopPropagation()}
                 >
                   <button
-                    onClick={() => handleManagePrivacy(post.id)}
-                    className="w-full flex items-center space-x-3 px-4 py-3 text-blue-400 hover:bg-blue-500/10 transition-all duration-200"
+                    onClick={() => handleManagePrivacy(post)}
+                    className="w-full flex items-center space-x-3 px-4 py-3 text-white/70 hover:text-white hover:bg-white/10 transition-all duration-200"
                   >
                     <Lock className="w-4 h-4" />
                     <span className="text-sm font-medium">Manage Privacy</span>
@@ -448,132 +441,200 @@ export default function HomeFeed({
         )}
       </div>
 
-          {/* Post Content */}
-          <div className="mb-4">
-            <p className="text-white text-lg leading-relaxed whitespace-pre-wrap">
-              {post.content}
-            </p>
-          </div>
+      {/* Post Content */}
+      <div className="mb-4">
+        <p className="text-white text-lg leading-relaxed whitespace-pre-wrap">
+          {post.content}
+        </p>
+      </div>
 
-          {/* Post Image */}
-          {post.image && (
-            <div className="mb-4 flex justify-center">
-              <div className="inline-block border border-white/20 rounded-2xl overflow-hidden">
+      {/* Post Image */}
+      {post.image && (
+        <div className="mb-4 flex justify-center">
+          <div className="inline-block border border-white/20 rounded-2xl overflow-hidden">
+            <Image
+              src={post.image}
+              alt="Post image"
+              width={640}
+              height={256}
+              unoptimized={post.image.includes('/svg')}
+              className="max-h-64 sm:max-h-80 md:max-h-96 object-contain hover:scale-105 transition-transform duration-500 rounded-2xl"
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Post Actions */}
+      <div className="flex items-center justify-between pt-4 border-t border-white/10">
+        <div className="flex items-center space-x-4">
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              onPostLike(post.id)
+            }}
+            className={`flex items-center justify-center space-x-2 px-4 py-2 rounded-2xl transition-all duration-300 hover:scale-105 ${
+              post.isLiked
+                ? 'text-red-400 bg-gradient-to-r from-red-500/20 to-pink-500/20 border border-red-400/30'
+                : 'text-white/70 hover:text-white hover:bg-gradient-to-r from-white/10 to-white/5 border border-white/10'
+            }`}
+            title="Like"
+          >
+            <Heart className={`w-5 h-5 ${post.isLiked ? 'fill-current animate-pulse' : ''}`} />
+            <span className="text-sm font-medium">{post.likes}</span>
+          </button>
+
+          <button
+            onClick={(e) => handleCommentClick(post, e)}
+            className="flex items-center justify-center space-x-2 px-4 py-2 text-white/70 hover:text-white hover:bg-gradient-to-r from-white/10 to-white/5 border border-white/10 rounded-2xl transition-all duration-300 hover:scale-105 cursor-pointer"
+            title="Comment"
+          >
+            <MessageSquare className="w-5 h-5" />
+            <span className="text-sm font-medium">{post.comments}</span>
+          </button>
+
+          <button
+            onClick={(e) => handleShareClick(post, e)}
+            className="flex items-center justify-center space-x-2 px-4 py-2 text-white/70 hover:text-white hover:bg-gradient-to-r from-white/10 to-white/5 border border-white/10 rounded-2xl transition-all duration-300 hover:scale-105"
+            title="Share"
+          >
+            <Send className="w-5 h-5" />
+            <span className="text-sm font-medium">{post.shares}</span>
+          </button>
+        </div>
+
+        {onPostBookmark && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              onPostBookmark(post.id)
+            }}
+            className={`flex items-center justify-center px-4 py-2 rounded-2xl transition-all duration-300 hover:scale-105 ${
+              post.isBookmarked
+                ? 'text-yellow-400 bg-gradient-to-r from-yellow-500/20 to-orange-500/20 border border-yellow-400/30'
+                : 'text-white/70 hover:text-white hover:bg-gradient-to-r from-white/10 to-white/5 border border-white/10'
+            }`}
+            title="Bookmark"
+          >
+            <Bookmark className={`w-5 h-5 ${post.isBookmarked ? 'fill-current' : ''}`} />
+          </button>
+        )}
+      </div>
+
+      {/* Display recent comment for commented posts */}
+      {activityType === 'commented' && postComments[post.id] && postComments[post.id].length > 0 && (
+        <div className="mt-4 p-4 bg-white/5 rounded-2xl border border-white/10">
+          <div className="flex items-start space-x-3">
+            <div className="w-8 h-8 bg-gradient-to-br from-blue-400 via-teal-500 to-cyan-600 rounded-full flex items-center justify-center overflow-hidden flex-shrink-0">
+              {getAvatarUrl(postComments[post.id][0].user.avatar) ? (
                 <Image
-                  src={post.image}
-                  alt="Post image"
-                  width={640}
-                  height={256}
-                  unoptimized={true}
-                  className="max-h-64 sm:max-h-80 md:max-h-96 object-contain hover:scale-105 transition-transform duration-500 rounded-2xl"
+                  src={getAvatarUrl(postComments[post.id][0].user.avatar)!}
+                  alt={`${postComments[post.id][0].user.first_name}'s avatar`}
+                  width={32}
+                  height={32}
+                  className="w-full h-full object-cover"
                 />
+              ) : (
+                <div className="w-full h-full bg-gradient-to-r from-blue-400 to-teal-500 rounded-full flex items-center justify-center text-white font-bold text-sm">
+                  {getUserInitials(postComments[post.id][0].user)}
+                </div>
+              )}
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center space-x-2 mb-1">
+                <span className="text-white font-semibold text-sm">
+                  {postComments[post.id][0].user.first_name} {postComments[post.id][0].user.last_name}
+                </span>
+                <span className="text-white/60 text-xs">
+                  {new Date(postComments[post.id][0].created_at).toLocaleDateString()}
+                </span>
               </div>
+              <p className="text-white/90 text-sm leading-relaxed whitespace-pre-wrap">
+                {postComments[post.id][0].content}
+              </p>
+              {postComments[post.id][0].image_url && (
+                <div className="mt-2 overflow-hidden max-w-xs border border-white/20 rounded-2xl inline-block">
+                  <Image
+                    src={postComments[post.id][0].image_url!.startsWith('http') ?
+                      postComments[post.id][0].image_url! :
+                      `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}${postComments[post.id][0].image_url!}`
+                    }
+                    alt="Comment image"
+                    width={200}
+                    height={150}
+                    unoptimized={postComments[post.id][0].image_url!.includes('/svg')}
+                    className="w-full h-auto max-h-32 object-contain"
+                  />
+                </div>
+              )}
+              {userCommentCounts[post.id] > 1 && (
+                <div className="mt-2 text-white/60 text-xs">
+                  + {userCommentCounts[post.id] - 1} more comment{userCommentCounts[post.id] - 1 !== 1 ? 's' : ''}
+                </div>
+              )}
             </div>
-          )}
-
-          {/* Post Actions */}
-          <div className="flex items-center justify-between pt-4 border-t border-white/10">
-            <div className="flex items-center space-x-4">
-              <button
-                onClick={(e) => {
-                  e.stopPropagation()
-                  onPostLike(post.id)
-                }}
-                className={`flex items-center justify-center space-x-2 px-4 py-2 rounded-2xl transition-all duration-300 hover:scale-105 ${
-                  post.isLiked
-                    ? 'text-red-400 bg-gradient-to-r from-red-500/20 to-pink-500/20 border border-red-400/30'
-                    : 'text-white/70 hover:text-white hover:bg-gradient-to-r from-white/10 to-white/5 border border-white/10'
-                }`}
-                title="Like"
-              >
-                <Heart className={`w-5 h-5 ${post.isLiked ? 'fill-current animate-pulse' : ''}`} />
-                <span className="text-sm font-medium">{post.likes}</span>
-              </button>
-
-              <button
-                onClick={(e) => handleCommentClick(post, e)}
-                className="flex items-center justify-center space-x-2 px-4 py-2 text-white/70 hover:text-white hover:bg-gradient-to-r from-white/10 to-white/5 border border-white/10 rounded-2xl transition-all duration-300 hover:scale-105 cursor-pointer"
-                title="Comment"
-              >
-                <MessageSquare className="w-5 h-5" />
-                <span className="text-sm font-medium">{post.comments}</span>
-              </button>
-
-              <button
-                onClick={(e) => handleShareClick(post, e)}
-                className="flex items-center justify-center space-x-2 px-4 py-2 text-white/70 hover:text-white hover:bg-gradient-to-r from-white/10 to-white/5 border border-white/10 rounded-2xl transition-all duration-300 hover:scale-105"
-                title="Share"
-              >
-                <Send className="w-5 h-5" />
-                <span className="text-sm font-medium">{post.shares}</span>
-              </button>
-            </div>
-
-            {onPostBookmark && (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation()
-                  onPostBookmark(post.id)
-                }}
-                className={`flex items-center justify-center px-4 py-2 rounded-2xl transition-all duration-300 hover:scale-105 ${
-                  post.isBookmarked
-                    ? 'text-yellow-400 bg-gradient-to-r from-yellow-500/20 to-orange-500/20 border border-yellow-400/30'
-                    : 'text-white/70 hover:text-white hover:bg-gradient-to-r from-white/10 to-white/5 border border-white/10'
-                }`}
-                title="Bookmark"
-              >
-                <Bookmark className={`w-5 h-5 ${post.isBookmarked ? 'fill-current' : ''}`} />
-              </button>
-            )}
           </div>
+        </div>
+      )}
     </div>
     )
   }
 
   const renderContent = () => {
-    const postsToShow = filteredPosts()
+    let postsToShow: Post[] = []
+    let emptyMessage = ''
+    let emptyIcon = <Heart className="w-16 h-16 text-white/30 mx-auto mb-4" />
 
-    if (isLoadingPosts) {
-      return (
-        <div className="flex items-center justify-center py-12">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
-        </div>
-      )
+    switch (activitySubTab) {
+      case 'liked': {
+        postsToShow = likedPosts
+        emptyMessage = 'No liked posts yet'
+        emptyIcon = <Heart className="w-16 h-16 text-white/30 mx-auto mb-4" />
+        break
+      }
+      case 'commented': {
+        postsToShow = commentedPosts
+        emptyMessage = 'No commented posts yet'
+        emptyIcon = <MessageSquare className="w-16 h-16 text-white/30 mx-auto mb-4" />
+        break
+      }
+      case 'saved': {
+        postsToShow = savedPosts
+        emptyMessage = 'No saved posts yet'
+        emptyIcon = <Bookmark className="w-16 h-16 text-white/30 mx-auto mb-4" />
+        break
+      }
+      default: {
+        postsToShow = likedPosts
+        emptyMessage = 'No activity yet'
+        break
+      }
     }
+
+    // Apply sorting
+    postsToShow = postsToShow.sort((a, b) => {
+      const dateA = new Date(a.created_at).getTime()
+      const dateB = new Date(b.created_at).getTime()
+
+      if (sortOrder === 'newest') {
+        return dateB - dateA // Newest first
+      } else {
+        return dateA - dateB // Oldest first
+      }
+    })
 
     if (postsToShow.length === 0) {
       return (
         <div className="text-center py-16">
-          <Sparkles className="w-16 h-16 text-white/30 mx-auto mb-4" />
-          <p className="text-white/60 mb-2">
-            {feedSubTab === 'following' && 'No posts from following'}
-            {feedSubTab === 'friends' && 'No posts from friends'}
-            {feedSubTab === 'all' && 'No posts found'}
-          </p>
-            <p className="text-white/40 text-sm mb-6">
-            {feedSubTab === 'following' && 'Start following users to see their posts here'}
-            {feedSubTab === 'friends' && 'Connect with friends to see their posts here'}
-            {feedSubTab === 'all' && 'Be the first to share something!'}
-            </p>
-
-            {feedSubTab === 'following' && (
-              <motion.button
-                onClick={() => window.location.href = '/discover'}
-                className="px-6 py-3 bg-gradient-to-r from-blue-500/20 to-cyan-500/20 hover:from-blue-500/30 hover:to-cyan-500/30 text-blue-300 rounded-xl border border-blue-400/30 hover:border-blue-400/50 transition-all duration-300 flex items-center space-x-2 mx-auto"
-                whileHover={{ scale: 1.05, y: -1 }}
-                whileTap={{ scale: 0.95 }}
-              >
-                <User className="w-4 h-4" />
-                <span>Discover People</span>
-              </motion.button>
-            )}
+          {emptyIcon}
+          <p className="text-white/60">{emptyMessage}</p>
+          <p className="text-white/40 text-sm mt-2">Start engaging with posts to see your activity here</p>
         </div>
       )
     }
 
     return (
       <div className="space-y-6">
-        {postsToShow.map((post, index) => renderPost(post, index))}
+        {postsToShow.map((post, index) => renderPostCard(post, activitySubTab, index))}
         {hasMoreResults && onLoadMore && (
           <div className="flex justify-center py-6">
             <button
@@ -606,9 +667,9 @@ export default function HomeFeed({
               {/* Header Icon */}
               <div className="relative">
                 <div className="w-10 h-10 bg-gradient-to-br from-emerald-400 via-teal-500 to-cyan-600 rounded-lg flex items-center justify-center shadow-md group-hover:shadow-emerald-500/25 transition-all duration-300">
-                  {feedSubTab === 'all' && <Sparkles className="w-5 h-5 text-white drop-shadow-sm" />}
-                  {feedSubTab === 'following' && <Heart className="w-5 h-5 text-white drop-shadow-sm" />}
-                  {feedSubTab === 'friends' && <User className="w-5 h-5 text-white drop-shadow-sm" />}
+                  {activitySubTab === 'liked' && <Heart className="w-5 h-5 text-white drop-shadow-sm" />}
+                  {activitySubTab === 'commented' && <MessageSquare className="w-5 h-5 text-white drop-shadow-sm" />}
+                  {activitySubTab === 'saved' && <Bookmark className="w-5 h-5 text-white drop-shadow-sm" />}
                 </div>
                 <div className="absolute -top-0.5 -right-0.5 w-3 h-3 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-full animate-pulse"></div>
               </div>
@@ -616,25 +677,24 @@ export default function HomeFeed({
               {/* Title and Description */}
               <div className="flex-1">
                 <h1 className="text-xl lg:text-2xl font-bold text-white mb-1 group-hover:text-emerald-300 transition-colors duration-300">
-                  {feedSubTab === 'all' && 'All Posts'}
-                  {feedSubTab === 'following' && 'Following'}
-                  {feedSubTab === 'friends' && 'Friends'}
+                  {activitySubTab === 'liked' ? 'Liked Posts' :
+                   activitySubTab === 'commented' ? 'Commented Posts' :
+                   activitySubTab === 'saved' ? 'Saved Posts' : 'Activity'}
                 </h1>
                 <p className="text-white/80 text-sm leading-relaxed">
-                  {feedSubTab === 'all' && 'Stay connected with your network and discover amazing content'}
-                  {feedSubTab === 'following' && 'Posts from people you follow and care about'}
-                  {feedSubTab === 'friends' && 'Content shared by your closest friends and connections'}
+                  {activitySubTab === 'liked' ? 'Posts you\'ve liked and enjoyed' :
+                   activitySubTab === 'commented' ? 'Posts you\'ve commented on and discussed' :
+                   activitySubTab === 'saved' ? 'Your bookmarked posts for later' : 'Your activity across the platform'}
                 </p>
               </div>
             </div>
 
-            {/* Sort Toggle and Create Post Button */}
-            <div className="flex items-center space-x-3">
-              {/* Sort Toggle */}
+            {/* Sort Toggle */}
+            {setSortOrder && (
               <div className="flex items-center bg-white/10 rounded-xl p-1 border border-white/20">
                 <button
                   onClick={() => setSortOrder('newest')}
-                  className={`flex items-center space-x-1 px-3 py-1 rounded-lg text-sm font-medium transition-all duration-200 ${
+                  className={`flex items-center space-x-2 px-3 py-1 rounded-lg text-sm font-medium transition-all duration-200 ${
                     sortOrder === 'newest'
                       ? 'bg-emerald-500 text-white shadow-md'
                       : 'text-white/70 hover:text-white hover:bg-white/5'
@@ -645,7 +705,7 @@ export default function HomeFeed({
                 </button>
                 <button
                   onClick={() => setSortOrder('oldest')}
-                  className={`flex items-center space-x-1 px-3 py-1 rounded-lg text-sm font-medium transition-all duration-200 ${
+                  className={`flex items-center space-x-2 px-3 py-1 rounded-lg text-sm font-medium transition-all duration-200 ${
                     sortOrder === 'oldest'
                       ? 'bg-emerald-500 text-white shadow-md'
                       : 'text-white/70 hover:text-white hover:bg-white/5'
@@ -655,58 +715,13 @@ export default function HomeFeed({
                   <span>Oldest</span>
                 </button>
               </div>
-
-              {/* Enhanced Create Post Button */}
-              <motion.button
-                whileHover={{ scale: 1.02, y: -1 }}
-                whileTap={{ scale: 0.98 }}
-                onClick={() => setShowCreatePost(true)}
-                className="group relative overflow-hidden bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white px-6 py-3 rounded-2xl transition-all duration-300 flex items-center space-x-3 shadow-lg hover:shadow-xl"
-              >
-                <div className="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-20 transition-opacity duration-300"></div>
-                <Plus className="w-5 h-5 relative z-10" />
-                <span className="font-semibold relative z-10">Create Post</span>
-              </motion.button>
-            </div>
+            )}
           </div>
         </div>
       </div>
-
-      {/* Content */}
       <div ref={resultsContainerRef} className="flex-1 overflow-y-scroll scrollbar-hide" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
         {renderContent()}
       </div>
-
-      {/* Create Post Modal */}
-      <CreatePost
-        show={showCreatePost}
-        onClose={() => setShowCreatePost(false)}
-        newPostContent={newPostContent}
-        setNewPostContent={setNewPostContent}
-        newPostImage={newPostImage}
-        setNewPostImage={setNewPostImage}
-        postPrivacy={postPrivacy}
-        setPostPrivacy={setPostPrivacy}
-        selectedUsers={selectedUsers}
-        setSelectedUsers={setSelectedUsers}
-        availableUsers={availableUsers}
-        loadingUsers={loadingUsers}
-        onCreatePost={onCreatePost}
-      />
-
-      {/* Manage Privacy Modals */}
-      {posts.map((post) => (
-        <ManagePrivacy
-          key={`privacy-${post.id}`}
-          show={showManagePrivacy[post.id] || false}
-          onClose={() => setShowManagePrivacy(prev => ({ ...prev, [post.id]: false }))}
-          currentPrivacy={post.privacy as 'public' | 'followers' | 'friends' | 'listed'}
-          currentSelectedUsers={currentSelectedUsers[post.id] || []}
-          availableUsers={availableUsers}
-          loadingUsers={loadingUsers}
-          onUpdatePrivacy={(privacy, selectedUsers) => handleUpdatePrivacy(post.id, privacy, selectedUsers)}
-        />
-      ))}
 
       {/* Comment Modal */}
       {isCommentModalOpen && selectedPostForComment && (
@@ -776,16 +791,16 @@ export default function HomeFeed({
                     <span>Media (Optional)</span>
                   </label>
                   <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-3 sm:space-y-0 sm:space-x-4">
-                    <label htmlFor="feed-comment-image-input" className="sr-only">Upload image</label>
+                    <label htmlFor="activity-comment-image-input" className="sr-only">Upload image</label>
                     <input
-                      id="feed-comment-image-input"
+                      id="activity-comment-image-input"
                       type="file"
                       accept="image/*"
                       onChange={e => setNewCommentImage(e.target.files?.[0] || null)}
                       className="hidden"
                     />
                     <button
-                      onClick={() => document.getElementById('feed-comment-image-input')?.click()}
+                      onClick={() => document.getElementById('activity-comment-image-input')?.click()}
                       title="Add Image or GIF"
                       className="flex items-center px-4 py-3 bg-white/10 hover:bg-white/15 border border-white/20 rounded-2xl text-white transition-all duration-300 hover:scale-105 text-sm lg:text-base font-medium"
                     >
@@ -813,9 +828,9 @@ export default function HomeFeed({
                         <ImageIcon className="w-7 h-7 text-white/70" />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-white text-sm font-medium truncate">{newCommentImage?.name}</p>
+                        <p className="text-white text-sm font-medium truncate">{newCommentImage.name}</p>
                         <p className="text-white/60 text-xs">
-                          {(newCommentImage?.size / 1024 / 1024).toFixed(2)} MB
+                          {(newCommentImage.size / 1024 / 1024).toFixed(2)} MB
                         </p>
                       </div>
                     </div>
@@ -913,6 +928,21 @@ export default function HomeFeed({
         )}
       </AnimatePresence>
 
+      {/* Manage Privacy Modal */}
+      <ManagePrivacy
+        show={showManagePrivacy}
+        onClose={() => {
+          setShowManagePrivacy(false)
+          setSelectedPostForPrivacy(null)
+          setCurrentSelectedUsers([])
+        }}
+        currentPrivacy={selectedPostForPrivacy?.privacy as 'public' | 'followers' | 'friends' | 'listed' || 'public'}
+        currentSelectedUsers={currentSelectedUsers}
+        availableUsers={availableUsers}
+        loadingUsers={loadingUsers}
+        onUpdatePrivacy={handleUpdatePrivacy}
+      />
+
       {/* Share Popup */}
       {isSharePopupOpen && selectedPostForShare && (
         <SharePopup
@@ -923,11 +953,8 @@ export default function HomeFeed({
             setSelectedPostForShare(null)
           }}
           onShareSuccess={() => {
-            // Optionally refresh posts or update share count locally
-            // For now, we'll just close the popup
           }}
         />
       )}
     </div>
-  )
-}
+  )}

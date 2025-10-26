@@ -10,11 +10,11 @@ export interface TypingUser {
 }
 
 export interface TypingIndicatorOptions {
-  intervalMs?: number // interval to re-emit typing status (default 5000ms = 5s)
-  stopDelayMs?: number // delay before stopping typing after last keystroke (default 3000ms = 3s)
-  debounceMs?: number // debounce typing events (default 300ms)
-  maxDisplayUsers?: number // maximum number of typing users to display (default 3)
-  includeOwnTyping?: boolean // whether to include the current user's own typing (default false)
+  intervalMs?: number
+  stopDelayMs?: number
+  debounceMs?: number
+  maxDisplayUsers?: number
+  includeOwnTyping?: boolean
 }
 
 export function useTypingIndicator(
@@ -79,7 +79,6 @@ export function useTypingIndicator(
     }
   })
 
-  // Clean up typing indicators that are stale (not updated for stopDelayMs)
   const cleanupStaleTyping = useCallback(() => {
     const now = Date.now()
     setTypingUsers(prev => {

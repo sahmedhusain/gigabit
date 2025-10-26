@@ -8,11 +8,11 @@ import { useAuth } from '@/context/AuthContext'
 import { getAvatarOptions } from '@/utils/avatarUtils'
 import Image from 'next/image'
 import { motion, AnimatePresence } from 'framer-motion'
-import AnimatedBackground from '@/components/AnimatedBackground'
+import AnimatedBackground from '@/components/ui/AnimatedBackground'
 
 import { Eye, EyeOff, Mail, Lock, User, Calendar, Camera, Edit3, ArrowRight, Sparkles, X, Palette } from 'lucide-react'
-import TermsPopup from '@/components/TermsPopup'
-import PrivacyPopup from '@/components/PrivacyPopup'
+import TermsPopup from '@/components/ui/TermsPopup'
+import PrivacyPopup from '@/components/ui/PrivacyPopup'
 
 function validatePassword(password: string) {
 

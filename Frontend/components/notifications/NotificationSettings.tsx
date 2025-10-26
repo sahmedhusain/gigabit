@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Bell, Volume2, VolumeX, Smartphone, Clock, Moon, MessageSquare, Save, TestTube, Check, X, VolumeOff } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../../context/AuthContext';
 import { useConnectionStatus } from '@/hooks';
 import { playNotificationSound, SoundTheme } from '@/lib/notificationSounds';
 import { api } from '@/lib/api';

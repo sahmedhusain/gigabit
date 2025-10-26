@@ -4,11 +4,11 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
-import AnimatedBackground from '@/components/AnimatedBackground'
+import AnimatedBackground from '@/components/ui/AnimatedBackground'
 import { Eye, EyeOff, Mail, Lock, ArrowRight, X } from 'lucide-react'
 import { motion } from 'framer-motion'
-import TermsPopup from '@/components/TermsPopup'
-import PrivacyPopup from '@/components/PrivacyPopup'
+import TermsPopup from '@/components/ui/TermsPopup'
+import PrivacyPopup from '@/components/ui/PrivacyPopup'
 
 function LoginPage() {
   const router = useRouter()

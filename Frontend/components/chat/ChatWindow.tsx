@@ -13,15 +13,15 @@ import { getAvatarUrl, getUserInitials } from '@/utils/avatarUtils'
 import { useRouter } from 'next/navigation'
 import { MessageRounded } from '@mui/icons-material'
 import { useUpload } from '@/hooks/useUpload'
-import ImagePreviewModal from './ImagePreviewModal'
+import ImagePreviewModal from '../ui/ImagePreviewModal'
 
 // Import tab components
-import GroupChatTab from './groups/tabs/GroupChatTab'
-import GroupPostsTab from './groups/tabs/GroupPostsTab'
-import GroupEventsTab from './groups/tabs/GroupEventsTab'
-import GroupPollsTab from './groups/tabs/GroupPollsTab'
-import GroupSettingsTab from './groups/tabs/GroupSettingsTab'
-import GroupInfoTab from './groups/tabs/GroupInfoTab'
+import GroupChatTab from '../groups/tabs/GroupChatTab'
+import GroupPostsTab from '../groups/tabs/GroupPostsTab'
+import GroupEventsTab from '../groups/tabs/GroupEventsTab'
+import GroupPollsTab from '../groups/tabs/GroupPollsTab'
+import GroupSettingsTab from '../groups/tabs/GroupSettingsTab'
+import GroupInfoTab from '../groups/tabs/GroupInfoTab'
 
 interface EmojiData {
   emoji: string
@@ -1229,7 +1229,6 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
     )
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const renderMessage = (message: Message, index: number) => {
     console.log('🎨 [renderMessage] Rendering message:', { id: message.id, content: message.content.substring(0, 50), isDeleted: message.content === "XdeletedbyuserX" })
     const isCurrentUser = message.sender_id === user?.id

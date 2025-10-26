@@ -2,8 +2,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { Heart, MessageSquare, MoreHorizontal, Send, Image as ImageIcon, Bookmark, X, Trash2, Lock, ArrowUp, ArrowDown } from 'lucide-react'
-import ProtectedRoute from '@/components/ProtectedRoute'
-import AppLayout from '@/components/AppLayout'
+import ProtectedRoute from '@/components/auth/ProtectedRoute'
+import AppLayout from '@/components/layout/AppLayout'
 import { useAuth } from '@/context/AuthContext'
 import { useWebSocket } from '@/context/WebSocketContext'
 import { useToast } from '@/context/ToastContext'
@@ -12,9 +12,9 @@ import { api, APIPost, Comment as CommentType, NetworkError, User } from '@/lib/
 import { getAvatarUrl, getUserInitials } from '@/utils/avatarUtils'
 import Image from 'next/image'
 import { motion, AnimatePresence } from 'framer-motion'
-import ManagePrivacy from '@/components/dashboard/ManagePrivacy'
-import SharePopup from '@/components/SharePopup'
-import ImagePreviewModal from '@/components/ImagePreviewModal'
+import ManagePrivacy from '@/components/profile/ManagePrivacy'
+import SharePopup from '@/components/ui/SharePopup'
+import ImagePreviewModal from '@/components/ui/ImagePreviewModal'
 
 interface CommentWithUser extends CommentType {
     timeAgo: string

@@ -30,9 +30,9 @@ import { useConnectionStatus } from '@/hooks'
 import { useToast } from '@/context/ToastContext'
 import { useAuth } from '@/context/AuthContext'
 import { useWebSocket } from '@/context/WebSocketContext'
-import { FollowStatus } from './FollowHandler'
+import { FollowStatus } from '../profile/FollowHandler'
 import { User, api, GroupResponse, FollowRequestItem, GroupInvitationItem } from '@/lib/api'
-import FollowHandler from './FollowHandler'
+import FollowHandler from '../profile/FollowHandler'
 import { getUserInitials, getGroupInitials } from '@/utils/avatarUtils'
 
 // Letter Avatar Component with Chat Style

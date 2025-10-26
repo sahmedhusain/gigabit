@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation'
-import ProtectedRoute from '@/components/ProtectedRoute'
+import ProtectedRoute from '@/components/auth/ProtectedRoute'
 
 function ActivityPage() {
   redirect('/activity/liked')

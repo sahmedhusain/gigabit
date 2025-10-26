@@ -13,12 +13,12 @@ export interface WebSocketMessage {
   from?: number
   to?: number
   group_id?: number
-  GroupID?: number  // Backend sends GroupID (capital G)
+  GroupID?: NumberConstructor
   post_id?: number
   event_id?: number
-  EventID?: number  // Backend sends EventID (capital E)
+  EventID?: number
   poll_id?: number
-  PollID?: number  // Backend sends PollID (capital P)
+  PollID?: number
   content?: string
   action?: string
   data?: any

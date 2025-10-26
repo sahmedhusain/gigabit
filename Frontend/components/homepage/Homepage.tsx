@@ -4,10 +4,10 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { ArrowRight, Users, MessageCircle, Calendar, Star, Zap, Sparkles } from 'lucide-react';
-import TermsPopup from './TermsPopup';
-import PrivacyPopup from './PrivacyPopup';
-import CookiesPopup from './CookiesPopup';
-import SupportPopup from './SupportPopup';
+import TermsPopup from '../ui/TermsPopup';
+import PrivacyPopup from '../ui/PrivacyPopup';
+import CookiesPopup from '../ui/CookiesPopup';
+import SupportPopup from '../ui/SupportPopup';
 
 interface FloatingElementProps {
   children: React.ReactNode;

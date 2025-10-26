@@ -1,17 +1,17 @@
 'use client';
 
 import { useEffect } from 'react';
-import ProtectedRoute from '@/components/ProtectedRoute';
+import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import { useAuth } from '@/context/AuthContext';
 import { useWebSocket } from '@/context/WebSocketContext';
 import { useToast } from '@/context/ToastContext';
 import { useNotifications } from '@/hooks';
 
 // Import AppLayout instead of individual components
-import AppLayout from '@/components/AppLayout';
+import AppLayout from '@/components/layout/AppLayout';
 
 // Import dashboard components
-import NotificationsPage from '@/components/dashboard/NotificationsPage';
+import NotificationsPage from '@/components/notifications/NotificationsPage';
 
 function NotificationsPageComponent() {
   const { user } = useAuth();

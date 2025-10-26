@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import ProtectedRoute from '@/components/ProtectedRoute';
+import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import { useAuth } from '@/context/AuthContext';
 import { useWebSocket } from '@/context/WebSocketContext';
 import { useToast } from '@/context/ToastContext';
@@ -10,10 +10,10 @@ import { useNotifications } from '@/hooks';
 import { api, User, Post } from '@/lib/api';
 
 // Import dashboard components
-import TopBar from '@/components/dashboard/TopBar';
-import Sidebar from '@/components/dashboard/Sidebar';
-import RightSidebar from '@/components/dashboard/RightSidebar';
-import ProfileSection from '@/components/dashboard/ProfileSection';
+import TopBar from '@/components/layout/TopBar';
+import Sidebar from '@/components/layout/Sidebar';
+import RightSidebar from '@/components/layout/RightSidebar';
+import ProfileSection from '@/components/profile/ProfileSection';
 
 export default function ProfilePage() {
   const router = useRouter();

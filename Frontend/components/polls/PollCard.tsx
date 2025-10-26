@@ -14,9 +14,10 @@ interface PollCardProps {
   onDelete?: (pollId: number) => Promise<void>
   onExpire?: (pollId: number) => Promise<void>
   canManage?: boolean // Whether current user can delete/expire this poll
+  hideCounts?: boolean // Whether to hide vote counts
 }
 
-export default function PollCard({ poll, onVote, onUnvote, onDelete, onExpire, canManage = false }: PollCardProps) {
+export default function PollCard({ poll, onVote, onUnvote, onDelete, onExpire, canManage = false, hideCounts = false }: PollCardProps) {
   const [selectedOptions, setSelectedOptions] = useState<number[]>(poll.user_votes || [])
   const [isVoting, setIsVoting] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
@@ -264,15 +265,19 @@ export default function PollCard({ poll, onVote, onUnvote, onDelete, onExpire, c
                     </span>
                   </div>
                   <div className="flex items-center space-x-3 flex-shrink-0 ml-4">
-                    <div className="flex items-center space-x-1">
-                      <BarChart3 className="w-4 h-4 text-white/60" />
-                      <span className="text-white/90 font-semibold text-sm">
-                        {option.vote_count}
-                      </span>
-                    </div>
-                    <span className="text-white/70 text-sm font-medium min-w-[45px] text-right">
-                      {percentage.toFixed(1)}%
-                    </span>
+                    {!hideCounts && (
+                      <>
+                        <div className="flex items-center space-x-1">
+                          <BarChart3 className="w-4 h-4 text-white/60" />
+                          <span className="text-white/90 font-semibold text-sm">
+                            {option.vote_count}
+                          </span>
+                        </div>
+                        <span className="text-white/70 text-sm font-medium min-w-[45px] text-right">
+                          {percentage.toFixed(1)}%
+                        </span>
+                      </>
+                    )}
                   </div>
                 </div>
 
@@ -296,12 +301,14 @@ export default function PollCard({ poll, onVote, onUnvote, onDelete, onExpire, c
 
       {/* Poll Stats */}
       <div className="relative flex items-center justify-between text-sm pt-4 border-t border-white/10">
-        <div className="flex items-center space-x-2 text-white/70 bg-white/5 rounded-2xl px-3 py-2 border border-white/10">
-          <Users className="w-4 h-4" />
-          <span className="font-medium">
-            {poll.total_votes} {poll.total_votes === 1 ? 'vote' : 'votes'}
-          </span>
-        </div>
+        {!hideCounts && (
+          <div className="flex items-center space-x-2 text-white/70 bg-white/5 rounded-2xl px-3 py-2 border border-white/10">
+            <Users className="w-4 h-4" />
+            <span className="font-medium">
+              {poll.total_votes} {poll.total_votes === 1 ? 'vote' : 'votes'}
+            </span>
+          </div>
+        )}
         {poll.user_voted && (
           <motion.div
             className="flex items-center space-x-1 text-emerald-300 font-semibold bg-emerald-500/10 rounded-2xl px-3 py-2 border border-emerald-400/20"

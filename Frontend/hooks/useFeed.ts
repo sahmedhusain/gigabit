@@ -101,7 +101,6 @@ export function useFeed(options: { pageSize?: number; autoRefresh?: boolean } = 
   // Initial load
   useEffect(() => {
     fetchPage(true)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   return useMemo(() => ({

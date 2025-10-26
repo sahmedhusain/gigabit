@@ -12,9 +12,9 @@ import { WebSocketProvider } from "@/context/WebSocketContext";
 import { ToastProvider } from "@/context/ToastContext";
 import { NotificationToastProvider } from "@/context/NotificationToastContext";
 import { SidebarDataProvider } from "@/context/SidebarDataContext";
-import ErrorBoundary from "@/components/ErrorBoundary";
-import NotificationToastContainer from "@/components/NotificationToastContainer";
-import BackgroundThemeProvider from "@/components/BackgroundThemeProvider";
+import ErrorBoundary from "@/components/ui/ErrorBoundary";
+import NotificationToastContainer from "@/components/notifications/NotificationToastContainer";
+import BackgroundThemeProvider from "@/components/ui/BackgroundThemeProvider";
 import type { EmotionCache } from '@emotion/cache';
 
 // Create a client-side emotion cache

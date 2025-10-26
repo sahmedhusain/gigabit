@@ -1,8 +1,8 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import ProtectedRoute from '@/components/ProtectedRoute'
-import ChatWindow from '@/components/ChatWindow'
+import ProtectedRoute from '@/components/auth/ProtectedRoute'
+import ChatWindow from '@/components/chat/ChatWindow'
 import { useAuth } from '@/context/AuthContext'
 import { useWebSocket } from '@/context/WebSocketContext'
 import { useToast } from '@/context/ToastContext'
@@ -16,12 +16,12 @@ import {
 import { formatConversationPreview } from '@/utils/chatUtils'
 
 // Import dashboard components
-import TopBar from '@/components/dashboard/TopBar'
-import Sidebar from '@/components/dashboard/Sidebar'
-import RightSidebar from '@/components/dashboard/RightSidebar'
-import ChatsSection from '@/components/dashboard/ChatsSection'
-import CreateGroup from '@/components/dashboard/CreateGroup'
-import CreateDirectMessage from '@/components/dashboard/CreateDirectMessage'
+import TopBar from '@/components/layout/TopBar'
+import Sidebar from '@/components/layout/Sidebar'
+import RightSidebar from '@/components/layout/RightSidebar'
+import ChatsSection from '@/components/chat/ChatsSection'
+import CreateGroup from '@/components/groups/CreateGroup'
+import CreateDirectMessage from '@/components/chat/CreateDirectMessage'
 
 function ChatsPage() {
   const router = useRouter()

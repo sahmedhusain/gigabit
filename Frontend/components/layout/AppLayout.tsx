@@ -8,10 +8,10 @@ import { useNotifications } from '@/hooks'
 import { api } from '@/lib/api'
 
 // Import layout components
-import TopBar from '@/components/dashboard/TopBar'
-import Sidebar from '@/components/dashboard/Sidebar'
-import RightSidebar from '@/components/dashboard/RightSidebar'
-import AnimatedBackground from './AnimatedBackground'
+import TopBar from '@/components/layout/TopBar'
+import Sidebar from '@/components/layout/Sidebar'
+import RightSidebar from '@/components/layout/RightSidebar'
+import AnimatedBackground from '@/components/ui/AnimatedBackground'
 
 interface AppLayoutProps {
   children: ReactNode

@@ -1,8 +1,8 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter, useParams, useSearchParams } from 'next/navigation'
-import ProtectedRoute from '@/components/ProtectedRoute'
-import ChatWindow from '@/components/ChatWindow'
+import ProtectedRoute from '@/components/auth/ProtectedRoute'
+import ChatWindow from '@/components/chat/ChatWindow'
 import { useAuth } from '@/context/AuthContext'
 import { useWebSocket } from '@/context/WebSocketContext'
 import { useToast } from '@/context/ToastContext'
@@ -16,12 +16,12 @@ import {
 } from '@/lib/api'
 
 // Import AppLayout instead of individual components
-import AppLayout from '@/components/AppLayout'
+import AppLayout from '@/components/layout/AppLayout'
 
 // Import dashboard components
-import ChatsSection from '@/components/dashboard/ChatsSection'
-import CreateGroup from '@/components/dashboard/CreateGroup'
-import CreateDirectMessage from '@/components/dashboard/CreateDirectMessage'
+import ChatsSection from '@/components/chat/ChatsSection'
+import CreateGroup from '@/components/groups/CreateGroup'
+import CreateDirectMessage from '@/components/chat/CreateDirectMessage'
 
 function ChatsFilterPage() {
   const router = useRouter()
@@ -90,6 +90,128 @@ function ChatsFilterPage() {
     '#React', '#TypeScript', '#NodeJS', '#Python', '#DevOps'
   ]
 
+  const formatTimeAgo = (dateString: string) => {
+    const date = new Date(dateString)
+    const now = new Date()
+    const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000)
+
+    if (diffInSeconds < 60) return 'Just now'
+    if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m ago`
+    if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h ago`
+    if (diffInSeconds < 604800) return `${Math.floor(diffInSeconds / 86400)}d ago`
+
+    return date.toLocaleDateString()
+  }
+
+  const fetchConversations = useCallback(async () => {
+    try {
+      setIsLoadingChats(true)
+      const data = await api.getConversations()
+      const conversationsData = data.conversations || []
+      setConversations(conversationsData)
+
+      const convsRaw: unknown[] = conversationsData as unknown[]
+
+      setChats(convsRaw.map((convRaw) => {
+        const conv = convRaw as Record<string, unknown>
+        const type = String(conv['type'] ?? '')
+        const participant = conv['participant'] as Record<string, unknown> | undefined
+        const group = conv['group'] as Record<string, unknown> | undefined
+        const last_message = conv['last_message'] as Record<string, unknown> | undefined
+        const id = Number(conv['id'] ?? 0)
+        const participantId = participant?.['id'] ? Number(participant['id']) : undefined
+
+        const participantName = type === 'private'
+          ? `${String(participant?.['first_name'] ?? '')} ${String(participant?.['last_name'] ?? '')}`.trim() || 'Unknown User'
+          : String(group?.['title'] ?? group?.['name'] ?? 'Unknown Group')
+
+        const isOnline = type === 'private' && participantId
+          ? onlineUsers.some(u => u.user_id === participantId && u.status === 'online')
+          : false
+
+        return {
+          id,
+          name: participantName,
+          lastMessage: String(last_message?.['content'] ?? ''),
+          time: formatTimeAgo(String(conv['updated_at'] ?? new Date().toISOString())),
+          timestamp: String(conv['updated_at'] ?? new Date().toISOString()),
+          unread: Number(conv['unread_count'] ?? 0),
+          isOnline,
+          isGroup: Boolean(group?.['id']),
+          participantId,
+          participantAvatar: String(participant?.['avatar'] ?? ''),
+          lastMessageSenderId: Number(last_message?.['sender_id'] ?? 0),
+          actualId: group?.['id'] ?? participant?.['id'],
+          groupId: group?.['id'] ? Number(group['id']) : undefined,
+          type: type as 'private' | 'group'
+        }
+      }))
+    } catch (err) {
+      console.error('Error fetching conversations:', err)
+      if (err instanceof NetworkError) {
+        error('Failed to load conversations.')
+      } else {
+        error('Unable to load conversations right now.')
+      }
+    } finally {
+      setIsLoadingChats(false)
+    }
+  }, [onlineUsers, error])
+
+  const fetchGroups = useCallback(async () => {
+    try {
+      setIsLoadingGroups(true)
+      const data = await api.getUserGroups(user?.id || 0)
+      const dataObj = data as unknown as Record<string, unknown> | undefined
+      let groupsArrRaw: unknown[] = []
+      if (dataObj) {
+        if (Array.isArray(dataObj['groups'])) groupsArrRaw = dataObj['groups'] as unknown[]
+        else if (Array.isArray(dataObj['data'])) groupsArrRaw = dataObj['data'] as unknown[]
+      }
+
+      type PartialGroup = { [k: string]: unknown }
+      setGroups(groupsArrRaw.map((g) => {
+        const group = g as PartialGroup
+        return {
+          id: Number(group['id'] ?? 0),
+          name: String(group['title'] ?? group['name'] ?? ''),
+          description: String(group['description'] ?? ''),
+          members: Number(group['member_count'] ?? 0),
+          isJoined: Boolean(group['is_member'] ?? group['isMember'] ?? false),
+          lastActivity: formatTimeAgo(String(group['updated_at'] ?? group['updatedAt'] ?? new Date().toISOString())),
+          timestamp: String(group['updated_at'] ?? group['updatedAt'] ?? new Date().toISOString())
+        }
+      }))
+    } catch (err) {
+      console.error('Error fetching groups:', err)
+      if (err instanceof NetworkError) {
+        error('Failed to load groups.')
+      } else {
+        error('Unable to load groups right now.')
+      }
+    } finally {
+      setIsLoadingGroups(false)
+    }
+  }, [user, error])
+
+  const fetchFollowers = useCallback(async () => {
+    if (!user) return
+
+    try {
+      setIsLoadingFollowers(true)
+      const [, followingData] = await Promise.all([
+        api.getFollowers(user.id),
+        api.getFollowing(user.id)
+      ])
+
+      setFollowing(Array.isArray(followingData?.following) ? followingData.following : [])
+    } catch (err) {
+      console.error('Error fetching followers:', err)
+    } finally {
+      setIsLoadingFollowers(false)
+    }
+  }, [user])
+
   // Update URL when filter changes - allow private/groups tabs, redirect others to /chats/all
   useEffect(() => {
     if (filter !== 'all' && filter !== 'private' && filter !== 'groups') {
@@ -125,9 +247,7 @@ function ChatsFilterPage() {
       fetchGroups()
       fetchFollowers()
     }
-  // fetch* functions are stable for this effect; intentionally only run when `user` changes
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user])
+  }, [user, fetchConversations, fetchFollowers, fetchGroups])
 
   // Update chat online status when online users change
   useEffect(() => {
@@ -199,127 +319,7 @@ function ChatsFilterPage() {
     }
   }, [chatId, groupId, chats, userParam, highlightMessageParam])
 
-  const fetchConversations = async () => {
-    try {
-      setIsLoadingChats(true)
-      const data = await api.getConversations()
-      const conversationsData = data.conversations || []
-      setConversations(conversationsData)
 
-      const convsRaw: unknown[] = conversationsData as unknown[]
-
-      setChats(convsRaw.map((convRaw) => {
-        const conv = convRaw as Record<string, unknown>
-        const type = String(conv['type'] ?? '')
-        const participant = conv['participant'] as Record<string, unknown> | undefined
-        const group = conv['group'] as Record<string, unknown> | undefined
-        const last_message = conv['last_message'] as Record<string, unknown> | undefined
-        const id = Number(conv['id'] ?? 0)
-        const participantId = participant?.['id'] ? Number(participant['id']) : undefined
-
-        const participantName = type === 'private'
-          ? `${String(participant?.['first_name'] ?? '')} ${String(participant?.['last_name'] ?? '')}`.trim() || 'Unknown User'
-          : String(group?.['title'] ?? group?.['name'] ?? 'Unknown Group')
-
-        const isOnline = type === 'private' && participantId
-          ? onlineUsers.some(u => u.user_id === participantId && u.status === 'online')
-          : false
-
-        return {
-          id,
-          name: participantName,
-          lastMessage: String(last_message?.['content'] ?? ''),
-          time: formatTimeAgo(String(conv['updated_at'] ?? new Date().toISOString())),
-          timestamp: String(conv['updated_at'] ?? new Date().toISOString()),
-          unread: Number(conv['unread_count'] ?? 0),
-          isOnline,
-          isGroup: Boolean(group?.['id']),
-          participantId,
-          participantAvatar: String(participant?.['avatar'] ?? ''),
-          lastMessageSenderId: Number(last_message?.['sender_id'] ?? 0),
-          actualId: group?.['id'] ?? participant?.['id'],
-          groupId: group?.['id'] ? Number(group['id']) : undefined,
-          type: type as 'private' | 'group'
-        }
-      }))
-    } catch (err) {
-      console.error('Error fetching conversations:', err)
-      if (err instanceof NetworkError) {
-        error('Failed to load conversations.')
-      } else {
-        error('Unable to load conversations right now.')
-      }
-    } finally {
-      setIsLoadingChats(false)
-    }
-  }
-
-  const fetchGroups = async () => {
-    try {
-      setIsLoadingGroups(true)
-      const data = await api.getUserGroups(user?.id || 0)
-      const dataObj = data as unknown as Record<string, unknown> | undefined
-      let groupsArrRaw: unknown[] = []
-      if (dataObj) {
-        if (Array.isArray(dataObj['groups'])) groupsArrRaw = dataObj['groups'] as unknown[]
-        else if (Array.isArray(dataObj['data'])) groupsArrRaw = dataObj['data'] as unknown[]
-      }
-
-      type PartialGroup = { [k: string]: unknown }
-      setGroups(groupsArrRaw.map((g) => {
-        const group = g as PartialGroup
-        return {
-          id: Number(group['id'] ?? 0),
-          name: String(group['title'] ?? group['name'] ?? ''),
-          description: String(group['description'] ?? ''),
-          members: Number(group['member_count'] ?? 0),
-          isJoined: Boolean(group['is_member'] ?? group['isMember'] ?? false),
-          lastActivity: formatTimeAgo(String(group['updated_at'] ?? group['updatedAt'] ?? new Date().toISOString())),
-          timestamp: String(group['updated_at'] ?? group['updatedAt'] ?? new Date().toISOString())
-        }
-      }))
-    } catch (err) {
-      console.error('Error fetching groups:', err)
-      if (err instanceof NetworkError) {
-        error('Failed to load groups.')
-      } else {
-        error('Unable to load groups right now.')
-      }
-    } finally {
-      setIsLoadingGroups(false)
-    }
-  }
-
-  const fetchFollowers = async () => {
-    if (!user) return
-
-    try {
-      setIsLoadingFollowers(true)
-      const [, followingData] = await Promise.all([
-        api.getFollowers(user.id),
-        api.getFollowing(user.id)
-      ])
-
-      setFollowing(Array.isArray(followingData?.following) ? followingData.following : [])
-    } catch (err) {
-      console.error('Error fetching followers:', err)
-    } finally {
-      setIsLoadingFollowers(false)
-    }
-  }
-
-  const formatTimeAgo = (dateString: string) => {
-    const date = new Date(dateString)
-    const now = new Date()
-    const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000)
-
-    if (diffInSeconds < 60) return 'Just now'
-    if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m ago`
-    if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h ago`
-    if (diffInSeconds < 604800) return `${Math.floor(diffInSeconds / 86400)}d ago`
-
-    return date.toLocaleDateString()
-  }
 
   const getUserStatus = (userId: number): string => {
     const onlineUser = onlineUsers.find(u => u.user_id === userId)

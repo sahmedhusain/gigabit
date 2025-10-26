@@ -8,6 +8,7 @@ type UnifiedChatItem struct {
 	Name              string         `json:"name"`
 	Avatar            *string        `json:"avatar,omitempty"`
 	LastMessage       *string        `json:"lastMessage,omitempty"`
+	LastMessageType   *string        `json:"lastMessageType,omitempty"`
 	LastMessageTime   *time.Time     `json:"lastMessageTime,omitempty"`
 	LastMessageSender *UserResponse  `json:"lastMessageSender,omitempty"`
 	HasUnread         bool           `json:"hasUnread"`

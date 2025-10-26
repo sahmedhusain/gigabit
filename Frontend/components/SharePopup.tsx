@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { Send, X, Users, MessageCircle, Check } from 'lucide-react'
 import { api } from '@/lib/api'
 import { useToast } from '@/context/ToastContext'
-import { getAvatarUrl, getUserInitials, getGroupInitials } from '@/utils/avatarUtils'
+import { getAvatarUrl, getGroupInitials } from '@/utils/avatarUtils'
 import Image from 'next/image'
 import { motion, AnimatePresence } from 'framer-motion'
 
@@ -380,7 +380,7 @@ export default function SharePopup({ postId, isOpen, onClose, onShareSuccess }: 
                           )}
                         </div>
                         {chat.type === 'group' && (
-                          <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-gradient-to-br from-blue-400 to-purple-500 rounded-full flex items-center justify-center">
+                          <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-gradient-to-br from-blue-400 to-cyan-500 rounded-full flex items-center justify-center">
                             <Users className="w-3 h-3 text-white" />
                           </div>
                         )}

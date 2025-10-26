@@ -48,7 +48,7 @@ const ERROR_DETAILS = {
     title: "Bad Gateway",
     message: "The server received an invalid response from an upstream server.",
     icon: "🌐",
-    color: "from-purple-500 to-violet-600"
+    color: "from-blue-500 to-cyan-600"
   },
   503: {
     title: "Service Unavailable",

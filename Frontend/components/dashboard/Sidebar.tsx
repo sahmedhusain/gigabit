@@ -246,7 +246,7 @@ export default function Sidebar({
           label: 'All Events',
           icon: Calendar,
           description: 'Browse all events',
-          color: 'from-purple-500 to-violet-600',
+          color: 'from-blue-500 to-cyan-600',
           count: '5',
           onClick: () => {
             router.push('/events/all')
@@ -258,7 +258,7 @@ export default function Sidebar({
           label: 'Going',
           icon: CheckCircle,
           description: 'Events you\'re attending',
-          color: 'from-purple-500 to-violet-600',
+          color: 'from-blue-500 to-cyan-600',
           count: undefined,
           onClick: () => {
             router.push('/events/going')
@@ -270,7 +270,7 @@ export default function Sidebar({
           label: 'Not Going',
           icon: XCircle,
           description: 'Events you\'re not attending',
-          color: 'from-purple-500 to-violet-600',
+          color: 'from-blue-500 to-cyan-600',
           count: undefined,
           onClick: () => {
             router.push('/events/not-going')
@@ -336,8 +336,8 @@ export default function Sidebar({
                   : section.id === 'activity'
                   ? 'bg-gradient-to-br from-rose-500/10 via-white/10 to-white/5 border-rose-400/20'
                   : section.id === 'events'
-                  ? 'bg-gradient-to-br from-purple-500/10 via-white/10 to-white/5 border-purple-400/20'
-                  : 'bg-gradient-to-br from-indigo-500/10 via-white/10 to-white/5 border-indigo-400/20'
+                  ? 'bg-gradient-to-br from-blue-500/10 via-white/10 to-white/5 border-blue-400/20'
+                  : 'bg-gradient-to-br from-blue-500/10 via-white/10 to-white/5 border-blue-400/20'
                 return (
                   <div
                     key={section.title}

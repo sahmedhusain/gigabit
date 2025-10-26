@@ -4,7 +4,8 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
-import { Eye, EyeOff, Mail, Lock, ArrowRight, Sparkles, X } from 'lucide-react'
+import AnimatedBackground from '@/components/AnimatedBackground'
+import { Eye, EyeOff, Mail, Lock, ArrowRight, X } from 'lucide-react'
 import { motion } from 'framer-motion'
 import TermsPopup from '@/components/TermsPopup'
 import PrivacyPopup from '@/components/PrivacyPopup'
@@ -44,8 +45,9 @@ function LoginPage() {
       // Call login function from auth context
       await login(formData.email, formData.password)
 
-      // Redirect to feed on success
-      router.push('/feed/all')
+      // Redirect to user's preferred default route on success
+      const defaultRoute = localStorage.getItem('defaultRoute') || '/feed/all';
+      router.push(defaultRoute)
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       setError(msg || 'Login failed. Please try again.')
@@ -61,39 +63,8 @@ function LoginPage() {
   }, []);
 
   return (
-    <div className="fixed inset-0 h-screen w-screen overflow-hidden bg-gradient-to-br from-emerald-900 via-teal-900 to-cyan-800">
-      {/* Animated Background Elements */}
-      <div className="absolute inset-0">
-        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-emerald-500/20 rounded-full blur-3xl animate-pulse"></div>
-        <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-teal-500/20 rounded-full blur-3xl animate-pulse delay-1000"></div>
-        <div className="absolute top-3/4 left-1/2 w-64 h-64 bg-cyan-500/20 rounded-full blur-3xl animate-pulse delay-2000"></div>
-      </div>
-
-      {/* Floating Particles */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        {[...Array(15)].map((_, i) => {
-          const left = (i * 23 + 17) % 100;
-          const top = (i * 31 + 41) % 100;
-          const delay = (i * 0.3) % 3;
-          const duration = 3 + (i * 0.2) % 2;
-
-          return (
-            <div
-              key={i}
-              className={`absolute animate-bounce`}
-              style={{
-                left: `${left}%`,
-                top: `${top}%`,
-                animationDelay: `${delay}s`,
-                animationDuration: `${duration}s`
-              }}
-            >
-              <Sparkles className="w-2 h-2 text-white/30" />
-            </div>
-          );
-        })}
-      </div>
-
+    <div className="fixed inset-0 h-screen w-screen overflow-hidden">
+      <AnimatedBackground />
       {/* Main Container - Horizontal Layout */}
       <div className="relative h-full flex">
         {/* Left Side - Welcome Content */}
@@ -143,9 +114,9 @@ function LoginPage() {
                 </div>
                 <p className="text-white/60 text-xs">Organize and discover events</p>
               </div>
-              <div className="group p-4 bg-white/5 backdrop-blur-sm rounded-xl border border-white/10 hover:bg-white/10 hover:border-purple-400/30 transition-all duration-300">
+              <div className="group p-4 bg-white/5 backdrop-blur-sm rounded-xl border border-white/10 hover:bg-white/10 hover:border-blue-400/30 transition-all duration-300">
                 <div className="flex items-center space-x-3 mb-2">
-                  <div className="w-2 h-2 bg-purple-400 rounded-full group-hover:animate-bounce delay-300"></div>
+                  <div className="w-2 h-2 bg-blue-400 rounded-full group-hover:animate-bounce delay-300"></div>
                   <span className="text-white/80 text-sm font-medium">Privacy first</span>
                 </div>
                 <p className="text-white/60 text-xs">Your data stays secure</p>

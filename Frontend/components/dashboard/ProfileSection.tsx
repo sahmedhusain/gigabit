@@ -14,6 +14,7 @@ import FollowHandler, { FollowStatus, getFollowStatusFromAPI } from './FollowHan
 import ManagePrivacy from './ManagePrivacy'
 import SharePopup from '../SharePopup'
 import CreatePost from './CreatePost'
+import ImagePreviewModal from '../ImagePreviewModal'
 
 interface UserOption {
   id: number
@@ -175,6 +176,17 @@ export default function ProfileSection({
   const [selectedUsers, setSelectedUsers] = useState<number[]>([])
   const [availableUsers, ] = useState<UserOption[]>([])
   const [loadingUsers, setLoadingUsers] = useState(false)
+
+  // Image preview modal state
+  const [imagePreviewState, setImagePreviewState] = useState<{
+    isOpen: boolean;
+    imageUrl: string;
+    alt: string;
+  }>({
+    isOpen: false,
+    imageUrl: '',
+    alt: ''
+  })
 
   // Chat functionality
   const { user: currentUserAuth } = useAuth()
@@ -916,6 +928,27 @@ export default function ProfileSection({
     router.push(`/profile/${user.id}`)
   }
 
+  // Handle avatar click for image preview
+  const handleUserAvatarClick = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (currentUser?.avatar && getAvatarUrl(currentUser.avatar)) {
+      setImagePreviewState({
+        isOpen: true,
+        imageUrl: getAvatarUrl(currentUser.avatar)!,
+        alt: `${currentUser.name}'s avatar`
+      })
+    }
+  }
+
+  // Handle image preview close
+  const handleImagePreviewClose = () => {
+    setImagePreviewState({
+      isOpen: false,
+      imageUrl: '',
+      alt: ''
+    })
+  }
+
   // Handle privacy toggle
   const handlePrivacyToggle = () => {
     if (currentPrivacySetting) {
@@ -1282,14 +1315,17 @@ export default function ProfileSection({
         {/* Enhanced background effects */}
         <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/5 via-transparent to-teal-500/5 rounded-2xl"></div>
         <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-emerald-400/8 to-teal-400/8 rounded-full blur-2xl group-hover:blur-3xl transition-all duration-1000"></div>
-        <div className="absolute bottom-0 left-0 w-20 h-20 bg-gradient-to-tr from-purple-400/8 to-pink-400/8 rounded-full blur-xl group-hover:blur-2xl transition-all duration-1000"></div>
+        <div className="absolute bottom-0 left-0 w-20 h-20 bg-gradient-to-tr from-blue-400/8 to-cyan-400/8 rounded-full blur-xl group-hover:blur-2xl transition-all duration-1000"></div>
         <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-32 h-32 bg-gradient-to-r from-cyan-400/3 to-blue-400/3 rounded-full blur-3xl group-hover:blur-4xl transition-all duration-1500"></div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8 relative z-10">
           {/* Left Column - Avatar and Action Buttons */}
           <div className="flex flex-col items-center space-y-4">
             {/* Avatar */}
-            <div className="w-20 h-20 lg:w-28 lg:h-28 bg-gradient-to-br from-emerald-400 via-teal-500 to-cyan-600 rounded-full flex items-center justify-center overflow-hidden shadow-2xl shadow-emerald-500/40 ring-3 ring-white/30 ring-offset-3 ring-offset-slate-900/90 hover:ring-emerald-400/60 hover:shadow-emerald-500/60 transition-all duration-500 group-hover:scale-110 group-hover:rotate-1">
+            <div className="w-20 h-20 lg:w-28 lg:h-28 bg-gradient-to-br from-emerald-400 via-teal-500 to-cyan-600 rounded-full flex items-center justify-center overflow-hidden shadow-2xl shadow-emerald-500/40 ring-3 ring-white/30 ring-offset-3 ring-offset-slate-900/90 hover:ring-emerald-400/60 hover:shadow-emerald-500/60 transition-all duration-500 group-hover:scale-110 group-hover:rotate-1 cursor-pointer hover:scale-105"
+              onClick={handleUserAvatarClick}
+              title="Click to view full-size avatar"
+            >
               {getAvatarUrl(currentUser?.avatar) ? (
                 <>
                   <Image
@@ -1536,7 +1572,7 @@ export default function ProfileSection({
                       ) : currentUser?.gender?.toLowerCase() === 'female' ? (
                         <Venus className="w-4 h-4 text-purple-400" />
                       ) : (
-                        <Venus className="w-4 h-4 text-purple-400" />
+                        <Venus className="w-4 h-4 text-blue-400" />
                       )}
                       Gender
                     </h4>
@@ -1915,7 +1951,7 @@ export default function ProfileSection({
                                 transition={{ duration: 0.5 }}
                                 className="max-w-md mx-auto"
                               >
-                                <div className="w-20 h-20 bg-gradient-to-br from-blue-500/20 to-purple-600/20 rounded-full flex items-center justify-center mx-auto mb-6 border border-blue-400/30">
+                                <div className="w-20 h-20 bg-gradient-to-br from-blue-500/20 to-cyan-600/20 rounded-full flex items-center justify-center mx-auto mb-6 border border-blue-400/30">
                                   <Users className="w-10 h-10 text-blue-400" />
                                 </div>
                                 <h3 className="text-xl font-bold text-white mb-3">Discover People</h3>
@@ -1924,7 +1960,7 @@ export default function ProfileSection({
                                 </p>
                                 <motion.button
                                   onClick={() => router.push('/discover')}
-                                  className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white font-semibold rounded-xl transition-all duration-300 shadow-lg shadow-blue-500/25 hover:scale-105 active:scale-95"
+                                  className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-blue-500 to-cyan-600 hover:from-blue-600 hover:to-cyan-700 text-white font-semibold rounded-xl transition-all duration-300 shadow-lg shadow-blue-500/25 hover:scale-105 active:scale-95"
                                   whileHover={{ scale: 1.05 }}
                                   whileTap={{ scale: 0.95 }}
                                 >
@@ -2619,6 +2655,14 @@ export default function ProfileSection({
         availableUsers={availableUsers}
         loadingUsers={loadingUsers}
         onCreatePost={handleCreatePost}
+      />
+
+      {/* Image Preview Modal */}
+      <ImagePreviewModal
+        isOpen={imagePreviewState.isOpen}
+        imageUrl={imagePreviewState.imageUrl}
+        alt={imagePreviewState.alt}
+        onClose={handleImagePreviewClose}
       />
     </div>
   )

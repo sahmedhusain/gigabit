@@ -5,7 +5,7 @@ import { motion } from 'framer-motion'
 import { useAuth } from '@/context/AuthContext'
 import { useOnlineStatus } from '@/hooks'
 import { api, Member } from '@/lib/api'
-import { getAvatarUrl, getUserInitials } from '@/utils/avatarUtils'
+import { getUserInitials } from '@/utils/avatarUtils'
 import Image from 'next/image'
 
 interface GroupMembersTabProps {

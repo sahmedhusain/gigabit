@@ -409,7 +409,7 @@ export default function TopBar({
   const getColorForType = (type: string) => {
     switch (type) {
       case 'user': return 'text-blue-400'
-      case 'event': return 'text-purple-400'
+      case 'event': return 'text-blue-400'
       case 'group': return 'text-green-400'
       case 'post': return 'text-orange-400'
       case 'tag': return 'text-pink-400'
@@ -596,7 +596,7 @@ export default function TopBar({
                                   <span className={`search-suggestion-type text-xs px-3 py-1.5 rounded-xl font-semibold uppercase tracking-wide border shadow-sm ${
                                     suggestion.type === 'user' ? 'bg-blue-500/20 text-blue-300 border-blue-500/30' :
                                     suggestion.type === 'group' ? 'bg-green-500/20 text-green-300 border-green-500/30' :
-                                    suggestion.type === 'event' ? 'bg-purple-500/20 text-purple-300 border-purple-500/30' :
+                                    suggestion.type === 'event' ? 'bg-blue-500/20 text-blue-300 border-blue-500/30' :
                                     suggestion.type === 'post' ? 'bg-orange-500/20 text-orange-300 border-orange-500/30' :
                                     suggestion.type === 'message' ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/30' :
                                     'bg-gray-500/20 text-gray-300 border-gray-500/30'

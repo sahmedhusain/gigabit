@@ -461,8 +461,8 @@ export default function CommunitySection({
 
                   {/* Group */}
                   <div className="flex items-center space-x-3 bg-white/5 rounded-2xl p-3 border border-white/10">
-                    <div className="w-8 h-8 bg-purple-500/20 rounded-full flex items-center justify-center">
-                      <Users className="w-4 h-4 text-purple-400" />
+                    <div className="w-8 h-8 bg-blue-500/20 rounded-full flex items-center justify-center">
+                      <Users className="w-4 h-4 text-blue-400" />
                     </div>
                     <div>
                       <p className="text-white/90 text-sm font-medium">Group</p>
@@ -561,7 +561,7 @@ export default function CommunitySection({
       case 'follow':
         return <Users className="w-4 h-4 text-emerald-400" />
       case 'event':
-        return <Calendar className="w-4 h-4 text-purple-400" />
+        return <Calendar className="w-4 h-4 text-blue-400" />
       default:
         return <Bell className="w-4 h-4 text-gray-400" />
     }

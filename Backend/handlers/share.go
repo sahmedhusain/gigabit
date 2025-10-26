@@ -11,12 +11,14 @@ import (
 )
 
 type ShareHandler struct {
-	shareService *services.ShareService
+	shareService        *services.ShareService
+	notificationService *services.NotificationService
 }
 
 func NewShareHandler(db *sql.DB, hub *websocket.Hub) *ShareHandler {
 	return &ShareHandler{
-		shareService: services.NewShareService(db, hub),
+		shareService:        services.NewShareService(db, hub),
+		notificationService: services.NewNotificationService(db, hub),
 	}
 }
 

@@ -745,3 +745,14 @@ func (h *Hub) sendSearchResults(userID uint, results []interface{}, query string
 	default:
 	}
 }
+
+func (h *Hub) handleSharedPost(message Message) {
+	// Shared posts are sent to specific recipients like private/group messages
+	if message.GroupID > 0 {
+		// Group shared post - broadcast to all group members except sender
+		h.SendToGroup(message.GroupID, message, message.From)
+	} else if message.To > 0 {
+		// Private shared post - send to specific user
+		h.SendToUser(message.To, message)
+	}
+}

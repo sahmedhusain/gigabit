@@ -264,6 +264,32 @@ export interface NotificationResponse {
   actor: User;
   is_read: boolean;
   created_at: string;
+  redirect_url?: string;
+  redirect_type?: string;
+}
+
+export interface NotificationSettings {
+  id: number;
+  user_id: number;
+  sound_enabled: boolean;
+  sound_theme: string;
+  browser_push_enabled: boolean;
+  quiet_hours_enabled: boolean;
+  quiet_hours_start: string;
+  quiet_hours_end: string;
+  muted_conversations: Array<{id: number, type: 'private' | 'group'}>;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface NotificationSettingsRequest {
+  sound_enabled: boolean;
+  sound_theme: string;
+  browser_push_enabled: boolean;
+  quiet_hours_enabled: boolean;
+  quiet_hours_start: string;
+  quiet_hours_end: string;
+  muted_conversations: Array<{id: number, type: 'private' | 'group'}>;
 }
 
 export interface GroupResponse {
@@ -871,6 +897,20 @@ export class ApiClient {
     });
   }
 
+  // Notification settings endpoints
+  async getNotificationSettings(): Promise<NotificationSettings> {
+    return this.request<NotificationSettings>('/api/notifications/settings', {
+      method: 'GET',
+    });
+  }
+
+  async updateNotificationSettings(settings: NotificationSettingsRequest): Promise<{ message: string; settings: NotificationSettings }> {
+    return this.request<{ message: string; settings: NotificationSettings }>('/api/notifications/settings', {
+      method: 'PUT',
+      body: JSON.stringify(settings),
+    });
+  }
+
   // Groups endpoints
   async getUserGroups(userId: number): Promise<{ groups: GroupResponse[], count: number, limit: number, offset: number }> {
     return this.request<{ groups: GroupResponse[], count: number, limit: number, offset: number }>(`/api/groups/user/${userId}`, {
@@ -1044,9 +1084,15 @@ export class ApiClient {
   }
 
   async cancelEvent(eventId: number, data: CancelEventRequest): Promise<{ message: string }> {
+    return this.request<{ message: string }>(`/api/events/${eventId}/cancel`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteEvent(eventId: number): Promise<{ message: string }> {
     return this.request<{ message: string }>(`/api/events/${eventId}`, {
       method: 'DELETE',
-      body: JSON.stringify(data),
     });
   }
 
@@ -1147,10 +1193,9 @@ export class ApiClient {
     });
   }
 
-  async markMessagesAsUnread(messageIds: number[]): Promise<{ message: string; count: number }> {
-    return this.request<{ message: string; count: number }>('/api/messages/unread', {
-      method: 'PUT',
-      body: JSON.stringify({ message_ids: messageIds }),
+  async deleteMessage(messageId: number): Promise<{ message: string }> {
+    return this.request<{ message: string }>(`/api/messages/${messageId}`, {
+      method: 'DELETE',
     });
   }
 

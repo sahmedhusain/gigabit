@@ -7,5 +7,3 @@ CREATE TABLE IF NOT EXISTS post_privacy (
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
     UNIQUE(post_id, user_id)
 );
-
-

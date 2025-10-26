@@ -67,11 +67,17 @@ export function useRealTimeMessages() {
 
   // WebSocket subscription for real-time message updates
   const { send, isConnected } = useWebSocketSubscription({
-    messageTypes: ['private_message', 'group_message'],
+    messageTypes: ['private_message', 'group_message', 'message_deleted', 'shared_post', 'image_shared'],
     onMessage: (message) => {
-      console.log('WebSocket message received:', message)
+      console.log('🔌 [useRealTimeMessages] WebSocket message received:', {
+        type: message.type,
+        from: message.from,
+        to: message.to,
+        data: message.data,
+        timestamp: message.timestamp
+      })
 
-      if (message.type === 'private_message' || message.type === 'group_message') {
+      if (message.type === 'private_message' || message.type === 'group_message' || message.type === 'shared_post' || message.type === 'image_shared') {
         // Get conversation ID from message data
         const conversationId = (message as any).data?.conversation_id || 0
 
@@ -89,7 +95,7 @@ export function useRealTimeMessages() {
           conversation_id: conversationId,
           sender_id: message.from || 0,
           content: message.content || '',
-          message_type: 'text',
+          message_type: (message as any).data?.message_type || 'text',
           created_at: createdAt,
           is_read: false,
           sender: {
@@ -165,6 +171,71 @@ export function useRealTimeMessages() {
         setTimeout(() => {
           fetchConversations()
         }, 500)
+      } else if (message.type === 'message_deleted') {
+        console.log('📨 [useRealTimeMessages] Received message_deleted WebSocket message:', {
+          type: message.type,
+          from: message.from,
+          to: message.to,
+          data: message.data,
+          timestamp: message.timestamp
+        })
+        // Handle message deletion
+        const deletedMessageId = Number((message as any).data?.message_id)
+        const messageType = (message as any).data?.message_type || 'unknown'
+        console.log('🔍 [useRealTimeMessages] Processing message deletion:', {
+          deletedMessageId,
+          messageType,
+          dataType: typeof (message as any).data?.message_id,
+          parsedId: deletedMessageId,
+          isValidId: deletedMessageId && !isNaN(deletedMessageId)
+        })
+        if (deletedMessageId && !isNaN(deletedMessageId)) {
+          
+          // Set the appropriate deleted content based on message type
+          const deletedContent = messageType === 'private' ? 'XdeletedbyuserX' : 'This message was deleted'
+          
+          // Update the message content to show as deleted
+          setMessages(prev => {
+            console.log('🔄 [useRealTimeMessages] setMessages called for deletion, prev messages:', Array.from(prev.entries()).map(([convId, msgs]) => ({
+              conversationId: convId,
+              messageCount: msgs.length,
+              messageIds: msgs.map(m => m.id)
+            })))
+            
+            const updated = new Map(prev)
+            
+            // Find and update the message in all conversations
+            for (const [conversationId, conversationMessages] of prev.entries()) {
+              const messageIndex = conversationMessages.findIndex(msg => Number(msg.id) === deletedMessageId)
+              if (messageIndex !== -1) {
+                const updatedMessages = [...conversationMessages]
+                const oldMessage = updatedMessages[messageIndex]
+                updatedMessages[messageIndex] = {
+                  ...updatedMessages[messageIndex],
+                  content: deletedContent
+                }
+                updated.set(conversationId, updatedMessages)
+                console.log(`✅ [useRealTimeMessages] Updated message ${deletedMessageId} in conversation ${conversationId}:`, {
+                  oldContent: oldMessage.content.substring(0, 50),
+                  newContent: deletedContent
+                })
+                break // Only update in one conversation
+              } else {
+                console.log(`❌ [useRealTimeMessages] Message ${deletedMessageId} not found in conversation ${conversationId}, available IDs:`, conversationMessages.map(m => m.id))
+              }
+            }
+            
+            console.log('🔄 [useRealTimeMessages] setMessages returning updated map:', Array.from(updated.entries()).map(([convId, msgs]) => ({
+              conversationId: convId,
+              messageCount: msgs.length,
+              messages: msgs.map(m => ({ id: m.id, content: m.content.substring(0, 50) }))
+            })))
+            
+            return updated
+          })
+        } else {
+          console.warn('Invalid message ID in deletion WebSocket message:', (message as any).data?.message_id)
+        }
       }
     }
   })
@@ -218,7 +289,13 @@ export function useRealTimeMessages() {
           response = { messages: [], count: 0, limit, offset }
         }
       } else {
-        response = await api.getConversationMessages(conversationId, limit, offset)
+        try {
+          response = await api.getConversationMessages(conversationId, limit, offset)
+        } catch (convError: any) {
+          console.warn('Failed to fetch conversation messages, user may not have access:', convError.message)
+          // Return empty response instead of throwing
+          response = { messages: [], count: 0, limit, offset }
+        }
       }
 
       console.log('API response:', response)
@@ -368,14 +445,35 @@ export function useRealTimeMessages() {
 
       // Send to backend API - the backend will handle WebSocket broadcast
       const apiData: any = {
-        content,
+        content: messageType === 'image' ? '' : content, // Empty content for images
         message_type: groupId ? 'group' : 'private'
+      }
+
+      if (messageType === 'image') {
+        apiData.image_url = content // Send image URL in image_url field
       }
 
       if (groupId) {
         apiData.group_id = groupId
-      } else if (recipientId) {
-        apiData.receiver_id = recipientId
+      } else {
+        // For private messages, ensure we have a recipient_id
+        let finalRecipientId = recipientId
+        
+        // If recipientId is not provided, try to derive it from existing messages
+        if (!finalRecipientId) {
+          const conversationMessages = messages.get(conversationId) || []
+          // Find the other participant (not the current user)
+          const otherParticipant = conversationMessages.find(msg => msg.sender_id !== user.id)
+          if (otherParticipant) {
+            finalRecipientId = otherParticipant.sender_id
+          }
+        }
+        
+        if (finalRecipientId) {
+          apiData.receiver_id = finalRecipientId
+        } else {
+          throw new Error('Receiver ID required for private messages')
+        }
       }
 
       try {

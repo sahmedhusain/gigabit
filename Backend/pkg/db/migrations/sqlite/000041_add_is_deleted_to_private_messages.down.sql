@@ -1,1 +1,0 @@
-ALTER TABLE private_messages DROP COLUMN is_deleted;

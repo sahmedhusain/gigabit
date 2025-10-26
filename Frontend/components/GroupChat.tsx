@@ -161,7 +161,7 @@ const GroupChat: React.FC<GroupChatProps> = ({ groupId, groupTitle }) => {
                 disabled={!connectionStatus}
                 className={`flex items-center px-3 py-2 rounded-xl text-white transition-all duration-200 text-sm ${
                   connectionStatus 
-                    ? 'bg-purple-500/20 hover:bg-purple-500/30 border border-purple-400/30' 
+                    ? 'bg-blue-500/20 hover:bg-blue-500/30 border border-blue-400/30' 
                     : 'bg-gray-500/20 cursor-not-allowed border border-gray-500/30'
                 }`}
                 title="Create Event"

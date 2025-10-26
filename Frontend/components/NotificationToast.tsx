@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
-import { X, Heart, MessageCircle, UserPlus, Users, Calendar, Mail, Bell } from 'lucide-react'
+import { X } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 
@@ -74,26 +74,6 @@ const NotificationToast: React.FC<NotificationToastProps> = ({
     }
   }
 
-  const getIcon = () => {
-    const iconClass = "w-5 h-5"
-    switch (notification.type) {
-      case 'like':
-        return <Heart className={`${iconClass} text-red-400 fill-red-400`} />
-      case 'comment':
-        return <MessageCircle className={`${iconClass} text-blue-400`} />
-      case 'follow':
-        return <UserPlus className={`${iconClass} text-emerald-400`} />
-      case 'message':
-        return <Mail className={`${iconClass} text-cyan-400`} />
-      case 'group':
-        return <Users className={`${iconClass} text-orange-400`} />
-      case 'event':
-        return <Calendar className={`${iconClass} text-purple-400`} />
-      default:
-        return <Bell className={`${iconClass} text-gray-400`} />
-    }
-  }
-
   const getBgGradient = () => {
     switch (notification.type) {
       case 'like':
@@ -107,7 +87,7 @@ const NotificationToast: React.FC<NotificationToastProps> = ({
       case 'group':
         return 'from-orange-500/20 to-amber-500/20 border-orange-500/30'
       case 'event':
-        return 'from-purple-500/20 to-pink-500/20 border-purple-500/30'
+        return 'from-blue-500/20 to-cyan-500/20 border-blue-500/30'
       default:
         return 'from-gray-500/20 to-slate-500/20 border-gray-500/30'
     }

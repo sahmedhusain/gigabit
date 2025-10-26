@@ -75,7 +75,7 @@ export default function Homepage() {
         <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-emerald-500/20 rounded-full blur-3xl animate-pulse"></div>
         <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-teal-500/20 rounded-full blur-3xl animate-pulse delay-1000"></div>
         <div className="absolute top-3/4 left-1/2 w-64 h-64 bg-cyan-500/20 rounded-full blur-3xl animate-pulse delay-2000"></div>
-        <div className="absolute top-1/2 right-1/3 w-48 h-48 bg-purple-500/20 rounded-full blur-3xl animate-pulse delay-3000"></div>
+        <div className="absolute top-1/2 right-1/3 w-48 h-48 bg-blue-500/20 rounded-full blur-3xl animate-pulse delay-3000"></div>
       </div>
 
       {/* Floating Particles */}
@@ -191,7 +191,7 @@ export default function Homepage() {
               icon={MessageCircle}
               title="Real-time Chat"
               description="Instant messaging with friends and groups. Share files, images, and stay connected 24/7."
-              gradient="from-blue-500 to-purple-500"
+              gradient="from-blue-500 to-cyan-500"
             />
             <FeatureCard
               icon={Users}

@@ -8,8 +8,8 @@ CREATE TABLE IF NOT EXISTS events (
     location TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    canceled BOOLEAN DEFAULT FALSE,
+    cancel_reason TEXT,
     FOREIGN KEY (group_id) REFERENCES groups(id) ON DELETE CASCADE,
     FOREIGN KEY (creator_id) REFERENCES users(id) ON DELETE CASCADE
 );
-
-

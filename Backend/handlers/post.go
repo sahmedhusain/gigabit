@@ -21,6 +21,7 @@ type PostHandler struct {
 	commentService      *services.CommentService
 	likeService         *services.LikeService
 	notificationService *services.NotificationService
+	groupService        *services.GroupService
 	hub                 *websocket.Hub
 }
 
@@ -30,6 +31,7 @@ func NewPostHandler(db *sql.DB, hub *websocket.Hub) *PostHandler {
 		commentService:      services.NewCommentService(db, hub),
 		likeService:         services.NewLikeService(db, hub),
 		notificationService: services.NewNotificationService(db, hub),
+		groupService:        services.NewGroupService(db),
 		hub:                 hub,
 	}
 }
@@ -403,10 +405,31 @@ func (h *PostHandler) LikePost(w http.ResponseWriter, r *http.Request, postIDStr
 	}
 
 	// Get post owner to send notification
-	post, err := h.postService.GetPostByID(uint(postID), userID.(uint))
-	if err == nil && post != nil {
-		// Send notification to post owner (async, don't wait for it)
-		go h.notificationService.NotifyPostLiked(userID.(uint), post.UserID, uint(postID))
+	isGroupPost, groupID, err := h.likeService.IsPostGroupPost(uint(postID))
+	if err == nil && isGroupPost {
+		log.Printf("DEBUG: Group post detected, groupID: %d", groupID)
+		// For group posts, get the post owner directly
+		postOwnerID, err := h.groupService.GetGroupPostOwner(uint(postID))
+		if err == nil {
+			log.Printf("DEBUG: Group post owner: %d, skipping notification for group post like", postOwnerID)
+			// Skip notification for group post likes as per requirement
+		} else {
+			log.Printf("DEBUG: Failed to get group post owner: %v", err)
+		}
+	} else if err != nil {
+		log.Printf("DEBUG: Error checking if post is group post: %v", err)
+	} else {
+		log.Printf("DEBUG: Regular post detected")
+		// For regular posts, get post owner directly
+		var postOwnerID uint
+		err := h.postService.GetPostOwner(uint(postID), &postOwnerID)
+		if err == nil {
+			log.Printf("DEBUG: Post owner: %d, calling NotifyPostLiked", postOwnerID)
+			// Send notification to post owner
+			h.notificationService.NotifyPostLiked(userID.(uint), postOwnerID, uint(postID))
+		} else {
+			log.Printf("DEBUG: Failed to get post owner: %v", err)
+		}
 	}
 
 	log.Printf("Post %d liked successfully by user %v", postID, userID)
@@ -544,11 +567,16 @@ func (h *PostHandler) CreateComment(w http.ResponseWriter, r *http.Request, post
 		return
 	}
 
-	// Get post owner to send notification
-	post, err := h.postService.GetPostByID(uint(postID), userID.(uint))
-	if err == nil && post != nil {
-		// Send notification to post owner (async, don't wait for it)
-		go h.notificationService.NotifyPostCommented(userID.(uint), post.UserID, uint(postID))
+	// Get post owner to send notification (only for regular posts, not group posts)
+	isGroupPost, _, err := h.likeService.IsPostGroupPost(uint(postID))
+	if err == nil && !isGroupPost {
+		// Only send notifications for regular posts
+		var postOwnerID uint
+		err := h.postService.GetPostOwner(uint(postID), &postOwnerID)
+		if err == nil {
+			// For regular posts, send notification to post owner
+			h.notificationService.NotifyPostCommented(userID.(uint), postOwnerID, uint(postID))
+		}
 	}
 
 	writeJSON(w, http.StatusCreated, map[string]interface{}{

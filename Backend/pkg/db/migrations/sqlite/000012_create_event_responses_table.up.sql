@@ -9,5 +9,3 @@ CREATE TABLE IF NOT EXISTS event_responses (
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
     UNIQUE(event_id, user_id)
 );
-
-

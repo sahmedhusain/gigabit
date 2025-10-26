@@ -8,7 +8,8 @@ export interface WebSocketMessage {
         'post_update' | 'comment_update' | 'like_update' | 'like' | 'follow_update' | 
         'follow' | 'unfollow' | 'follow_request' | 'cancel_follow_request' | 'follow_status' |
         'group_update' | 'event_update' | 'category_update' | 'follower_count_update' |
-        'poll_update' | 'poll_vote_update' | 'layout_sync' | 'ping' | 'pong' | 'error'
+        'poll_update' | 'poll_vote_update' | 'layout_sync' | 'ping' | 'pong' | 'error' |
+        'message_deleted' | 'shared_post' | 'image_shared'
   from?: number
   to?: number
   group_id?: number
@@ -103,6 +104,13 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
     newSocket.onmessage = (event) => {
       try {
         const message: WebSocketMessage = JSON.parse(event.data)
+        console.log('🌐 [WebSocket] Received message:', {
+          type: message.type,
+          from: message.from,
+          to: message.to,
+          data: message.data,
+          timestamp: message.timestamp
+        })
         
         // Handle different message types
         switch (message.type) {
@@ -176,6 +184,9 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
           case 'group_message':
           case 'notification':
           case 'typing':
+          case 'shared_post':
+          case 'image_shared':
+          case 'message_deleted':
           default:
             // Notify all listeners
             messageListeners.current.forEach(callback => callback(message))

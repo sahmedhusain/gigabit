@@ -39,7 +39,7 @@ export default function EventSearchResult({ result }: EventSearchResultProps) {
         <div className="flex items-center space-x-4 flex-1">
           {/* Enhanced Icon with Gradient Border */}
           <div className="relative group cursor-pointer">
-            <div className="w-14 h-14 bg-gradient-to-br from-blue-400 via-indigo-500 to-purple-500 rounded-full flex items-center justify-center shadow-md group-hover:shadow-blue-500/25 transition-all duration-300">
+            <div className="w-14 h-14 bg-gradient-to-br from-blue-400 via-cyan-500 to-teal-500 rounded-full flex items-center justify-center shadow-md group-hover:shadow-blue-500/25 transition-all duration-300">
               <Calendar className="w-7 h-7 text-white drop-shadow-sm" />
             </div>
           </div>
@@ -57,9 +57,9 @@ export default function EventSearchResult({ result }: EventSearchResultProps) {
             {/* Enhanced Event Details */}
             <div className="flex items-center space-x-4 mt-2 text-sm text-white/70">
               {result.metadata?.eventTime && (
-                <div className="flex items-center space-x-2 bg-indigo-500/10 border border-indigo-500/20 rounded-xl px-3 py-1">
-                  <Clock className="w-3 h-3 text-indigo-400" />
-                  <span className="text-indigo-300 text-xs font-medium">{formatEventTime(result.metadata.eventTime)}</span>
+                <div className="flex items-center space-x-2 bg-blue-500/10 border border-blue-500/20 rounded-xl px-3 py-1">
+                  <Clock className="w-3 h-3 text-blue-400" />
+                  <span className="text-blue-300 text-xs font-medium">{formatEventTime(result.metadata.eventTime)}</span>
                 </div>
               )}
               {result.metadata?.location && (
@@ -81,9 +81,9 @@ export default function EventSearchResult({ result }: EventSearchResultProps) {
 
             {/* Enhanced Metadata */}
             <div className="flex items-center space-x-4 mt-3">
-              <div className="flex items-center space-x-2 bg-purple-500/10 border border-purple-500/20 rounded-xl px-3 py-1">
-                <div className="w-2 h-2 bg-purple-400 rounded-full"></div>
-                <span className="text-purple-300 text-xs font-medium">Event</span>
+              <div className="flex items-center space-x-2 bg-blue-500/10 border border-blue-500/20 rounded-xl px-3 py-1">
+                <div className="w-2 h-2 bg-blue-400 rounded-full"></div>
+                <span className="text-blue-300 text-xs font-medium">Event</span>
               </div>
               {result.metadata?.goingCount && (
                 <div className="flex items-center space-x-2 bg-emerald-500/10 border border-emerald-500/20 rounded-xl px-3 py-1">

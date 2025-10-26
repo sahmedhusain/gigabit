@@ -117,6 +117,16 @@ export const NotificationToastProvider: React.FC<{ children: React.ReactNode }> 
                 title = 'New Message'
                 link = '/direct-messages'
                 break
+              case 'image_shared':
+                notificationType = 'message'
+                title = 'Image Shared'
+                link = '/direct-messages'
+                break
+              case 'post_shared':
+                notificationType = 'message'
+                title = 'Post Shared'
+                link = '/direct-messages'
+                break
               case 'group_post':
                 notificationType = 'group'
                 title = 'New Group Post'

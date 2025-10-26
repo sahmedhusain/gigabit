@@ -616,22 +616,22 @@ export default function ProfileSettings() {
             transition={{ delay: 0.1 }}
             className="relative group"
           >
-            <div className="absolute -inset-0.5 bg-gradient-to-r from-blue-500/20 via-cyan-500/20 to-teal-500/20 rounded-3xl blur opacity-30 group-hover:opacity-50 transition-opacity duration-500"></div>
-            <div className="relative p-8 bg-gradient-to-br from-slate-800/40 via-slate-900/40 to-slate-800/40 backdrop-blur-2xl border-2 border-blue-400/20 rounded-3xl shadow-2xl overflow-hidden h-full">
-              <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl from-blue-500/10 to-transparent rounded-full -translate-y-8 translate-x-8"></div>
-              <div className="absolute bottom-0 left-0 w-24 h-24 bg-gradient-to-tr from-cyan-500/10 to-transparent rounded-full translate-y-6 -translate-x-6"></div>
+            <div className="absolute -inset-0.5 bg-gradient-to-r from-emerald-500/20 via-green-500/20 to-teal-500/20 rounded-3xl blur opacity-30 group-hover:opacity-50 transition-opacity duration-500"></div>
+            <div className="relative p-8 bg-gradient-to-br from-slate-800/40 via-slate-900/40 to-slate-800/40 backdrop-blur-2xl border-2 border-emerald-400/20 rounded-3xl shadow-2xl overflow-hidden h-full">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl from-emerald-500/10 to-transparent rounded-full -translate-y-8 translate-x-8"></div>
+              <div className="absolute bottom-0 left-0 w-24 h-24 bg-gradient-to-tr from-green-500/10 to-transparent rounded-full translate-y-6 -translate-x-6"></div>
 
               <div className="relative z-10 h-full flex flex-col">
                 <div className="flex items-center space-x-3 mb-6">
-                  <div className="p-2 bg-gradient-to-br from-blue-500/20 to-cyan-500/20 rounded-xl">
-                    <Camera className="w-5 h-5 text-blue-400" />
+                  <div className="p-2 bg-gradient-to-br from-emerald-500/20 to-green-500/20 rounded-xl">
+                    <Camera className="w-5 h-5 text-emerald-400" />
                   </div>
                   <h3 className="text-lg font-semibold text-white">Avatar</h3>
                 </div>
 
                 <div className="flex-1 flex flex-col justify-center items-center">
                   <div className="relative group">
-                    <div className="w-28 h-28 rounded-full overflow-hidden bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform duration-300">
+                    <div className="w-28 h-28 rounded-full overflow-hidden bg-gradient-to-br from-emerald-500 to-green-500 flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform duration-300">
                       {formData.avatar ? (
                         <Image
                           src={formData.avatar}
@@ -651,7 +651,7 @@ export default function ProfileSettings() {
                       <div className="absolute -bottom-2 -right-2">
                         <button
                           onClick={() => fileInputRef.current?.click()}
-                          className="p-2 bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white rounded-xl transition-all duration-300 shadow-lg hover:scale-110"
+                          className="p-2 bg-gradient-to-r from-emerald-500 to-green-500 hover:from-emerald-600 hover:to-green-600 text-white rounded-xl transition-all duration-300 shadow-lg hover:scale-110"
                           aria-label="Upload new profile picture"
                         >
                           <Camera className="w-4 h-4" />
@@ -921,15 +921,15 @@ export default function ProfileSettings() {
           transition={{ delay: 0.3 }}
           className="relative group"
         >
-          <div className="absolute -inset-0.5 bg-gradient-to-r from-purple-500/20 via-violet-500/20 to-indigo-500/20 rounded-3xl blur opacity-30 group-hover:opacity-50 transition-opacity duration-500"></div>
-          <div className="relative p-8 bg-gradient-to-br from-slate-800/40 via-slate-900/40 to-slate-800/40 backdrop-blur-2xl border-2 border-purple-400/20 rounded-3xl shadow-2xl overflow-hidden">
-            <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl from-purple-500/10 to-transparent rounded-full -translate-y-8 translate-x-8"></div>
-            <div className="absolute bottom-0 left-0 w-24 h-24 bg-gradient-to-tr from-violet-500/10 to-transparent rounded-full translate-y-6 -translate-x-6"></div>
+          <div className="absolute -inset-0.5 bg-gradient-to-r from-blue-500/20 via-cyan-500/20 to-teal-500/20 rounded-3xl blur opacity-30 group-hover:opacity-50 transition-opacity duration-500"></div>
+          <div className="relative p-8 bg-gradient-to-br from-slate-800/40 via-slate-900/40 to-slate-800/40 backdrop-blur-2xl border-2 border-blue-400/20 rounded-3xl shadow-2xl overflow-hidden">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl from-blue-500/10 to-transparent rounded-full -translate-y-8 translate-x-8"></div>
+            <div className="absolute bottom-0 left-0 w-24 h-24 bg-gradient-to-tr from-cyan-500/10 to-transparent rounded-full translate-y-6 -translate-x-6"></div>
 
             <div className="relative z-10">
               <div className="flex items-center space-x-3 mb-6">
-                <div className="p-2 bg-gradient-to-br from-purple-500/20 to-violet-500/20 rounded-xl">
-                  <Shield className="w-5 h-5 text-purple-400" />
+                <div className="p-2 bg-gradient-to-br from-blue-500/20 to-cyan-500/20 rounded-xl">
+                  <Shield className="w-5 h-5 text-blue-400" />
                 </div>
                 <h3 className="text-lg font-semibold text-white">Additional Information</h3>
               </div>
@@ -943,7 +943,7 @@ export default function ProfileSettings() {
                   <div className="relative group">
                     <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none z-10">
                       <Calendar className={`h-4 w-4 transition-colors ${
-                        fieldErrors.date_of_birth ? 'text-red-400' : 'text-purple-400/70 group-focus-within:text-purple-400'
+                        fieldErrors.date_of_birth ? 'text-red-400' : 'text-blue-400/70 group-focus-within:text-blue-400'
                       }`} />
                     </div>
                     {isEditing ? (
@@ -954,7 +954,7 @@ export default function ProfileSettings() {
                         onChange={handleChange}
                         onFocus={() => handleFieldFocus('date_of_birth')}
                         onBlur={() => handleFieldBlur('date_of_birth')}
-                        className={`w-full pl-11 pr-4 py-3.5 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-purple-400 focus:border-transparent backdrop-blur-xl transition-all duration-300 bg-white/10 border ${fieldErrors.date_of_birth ? 'border-red-400/50' : 'border-white/20'} [color-scheme:dark]`}
+                        className={`w-full pl-11 pr-4 py-3.5 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent backdrop-blur-xl transition-all duration-300 bg-white/10 border ${fieldErrors.date_of_birth ? 'border-red-400/50' : 'border-white/20'} [color-scheme:dark]`}
                         title="Select your date of birth"
                         required
                       />
@@ -988,7 +988,7 @@ export default function ProfileSettings() {
                   <div className="relative group">
                     <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none z-10">
                       <User className={`h-4 w-4 transition-colors ${
-                        fieldErrors.gender ? 'text-red-400' : 'text-purple-400/70 group-focus-within:text-purple-400'
+                        fieldErrors.gender ? 'text-red-400' : 'text-blue-400/70 group-focus-within:text-blue-400'
                       }`} />
                     </div>
                     {isEditing ? (
@@ -996,7 +996,7 @@ export default function ProfileSettings() {
                         name="gender"
                         value={formData.gender}
                         onChange={(e) => handleGenderChange(e.target.value)}
-                        className="w-full pl-11 pr-4 py-3.5 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-purple-400 focus:border-transparent backdrop-blur-xl transition-all duration-300 bg-white/10 border border-white/20 appearance-none cursor-pointer"
+                        className="w-full pl-11 pr-4 py-3.5 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent backdrop-blur-xl transition-all duration-300 bg-white/10 border border-white/20 appearance-none cursor-pointer"
                         aria-label="Select your gender"
                         title="Select your gender"
                       >
@@ -1016,7 +1016,7 @@ export default function ProfileSettings() {
                     )}
                     {isEditing && (
                       <div className="absolute inset-y-0 right-0 pr-3.5 flex items-center pointer-events-none z-10">
-                        <svg className="h-4 w-4 text-purple-400/70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className="h-4 w-4 text-blue-400/70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                         </svg>
                       </div>
@@ -1033,7 +1033,7 @@ export default function ProfileSettings() {
                 <div className="relative group">
                   <div className="absolute top-0 left-0 pl-3.5 flex items-start pointer-events-none z-10 pt-3.5">
                     <Heart className={`h-4 w-4 transition-colors ${
-                      fieldErrors.about_me ? 'text-red-400' : 'text-purple-400/70 group-focus-within:text-purple-400'
+                      fieldErrors.about_me ? 'text-red-400' : 'text-blue-400/70 group-focus-within:text-blue-400'
                     } mt-3.5`} />
                   </div>
                   <textarea
@@ -1043,7 +1043,7 @@ export default function ProfileSettings() {
                     onFocus={() => handleFieldFocus('about_me')}
                     rows={4}
                     readOnly={!isEditing}
-                    className={`w-full pl-11 pr-4 py-3.5 rounded-xl text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-purple-400 focus:border-transparent backdrop-blur-xl transition-all duration-300 resize-none ${
+                    className={`w-full pl-11 pr-4 py-3.5 rounded-xl text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent backdrop-blur-xl transition-all duration-300 resize-none ${
                       isEditing
                         ? `bg-white/10 border ${fieldErrors.about_me ? 'border-red-400/50' : 'border-white/20'}`
                         : 'bg-white/5 border border-white/10 cursor-not-allowed'

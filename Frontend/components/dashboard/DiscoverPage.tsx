@@ -881,9 +881,9 @@ export default function DiscoverPage() {
               <Bell className="w-4 h-4" />
               <span>
                 Requests
-                {((followRequests.incoming?.length || 0) + (groupRequests.incoming?.length || 0) + (groupInvitations.incoming?.length || 0) + (followRequests.outgoing?.length || 0) + (groupRequests.outgoing?.length || 0) + (groupInvitations.outgoing?.length || 0)) > 0 && (
+                {((followRequests.incoming?.length || 0) + (groupRequests.incoming?.length || 0) + (groupInvitations.incoming?.length || 0)) > 0 && (
                   <span className="ml-1 bg-gradient-to-r from-red-500 to-pink-500 text-white text-xs px-1.5 py-0.5 rounded-full font-bold shadow-lg">
-                    {(followRequests.incoming?.length || 0) + (groupRequests.incoming?.length || 0) + (groupInvitations.incoming?.length || 0) + (followRequests.outgoing?.length || 0) + (groupRequests.outgoing?.length || 0) + (groupInvitations.outgoing?.length || 0)}
+                    {(followRequests.incoming?.length || 0) + (groupRequests.incoming?.length || 0) + (groupInvitations.incoming?.length || 0)}
                   </span>
                 )}
               </span>
@@ -1142,7 +1142,7 @@ function UsersSection({
                   <motion.span
                     initial={{ scale: 0 }}
                     animate={{ scale: 1 }}
-                    className="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold bg-gradient-to-r from-purple-500/20 to-pink-500/20 text-purple-300 border border-purple-400/30 backdrop-blur-sm shadow-lg"
+                    className="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold bg-gradient-to-r from-blue-500/20 to-cyan-500/20 text-blue-300 border border-blue-400/30 backdrop-blur-sm shadow-lg"
                   >
                     <Lock className="w-3 h-3 mr-1" />
                     Private
@@ -1236,7 +1236,7 @@ function UsersSection({
                     <motion.span
                       initial={{ scale: 0 }}
                       animate={{ scale: 1 }}
-                      className="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold bg-gradient-to-r from-purple-500/20 to-pink-500/20 text-purple-300 border border-purple-400/30 backdrop-blur-sm shadow-lg"
+                      className="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold bg-gradient-to-r from-blue-500/20 to-cyan-500/20 text-blue-300 border border-blue-400/30 backdrop-blur-sm shadow-lg"
                     >
                       <Lock className="w-3 h-3 mr-1" />
                       Private
@@ -1360,7 +1360,7 @@ function GroupsSection({
                     initial={{ scale: 0 }}
                     animate={{ scale: 1 }}
                     transition={{ delay: 0.1 }}
-                    className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold bg-gradient-to-r from-purple-500/20 to-pink-500/20 text-purple-300 border border-purple-400/30 backdrop-blur-sm shadow-lg"
+                    className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold bg-gradient-to-r from-blue-500/20 to-cyan-500/20 text-blue-300 border border-blue-400/30 backdrop-blur-sm shadow-lg"
                   >
                     <UserCheck className="w-3 h-3 mr-1.5" />
                     Admin
@@ -1496,7 +1496,7 @@ function GroupsSection({
                       initial={{ scale: 0 }}
                       animate={{ scale: 1 }}
                       transition={{ delay: 0.1 }}
-                      className="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold bg-gradient-to-r from-purple-500/20 to-pink-500/20 text-purple-300 border border-purple-400/30 backdrop-blur-sm shadow-lg"
+                      className="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold bg-gradient-to-r from-blue-500/20 to-cyan-500/20 text-blue-300 border border-blue-400/30 backdrop-blur-sm shadow-lg"
                     >
                       <UserCheck className="w-3 h-3 mr-1" />
                       Admin

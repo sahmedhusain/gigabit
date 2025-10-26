@@ -35,6 +35,9 @@ const (
 	MessageTypePong                = "pong"
 	MessageTypePollUpdate          = "poll_update"
 	MessageTypePollVoteUpdate      = "poll_vote_update"
+	MessageTypeMessageDeleted      = "message_deleted"
+	MessageTypeSharedPost          = "shared_post"
+	MessageTypeImageShared         = "image_shared"
 )
 
 type Message struct {

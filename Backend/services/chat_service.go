@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"social/models"
 	"sort"
+	"strings"
 	"time"
 )
 
@@ -130,12 +131,35 @@ func (s *ChatService) getPrivateChats(userID uint) ([]models.UnifiedChatItem, er
 		var lastMessageSender *models.UserResponse
 		if msgContent.Valid {
 			content := msgContent.String
+			isImage := strings.HasPrefix(content, "http")
+			displayContent := content
+			if isImage {
+				displayContent = "📷 Photo"
+			}
+
+			// Check for deleted message marker
+			if content == "XdeletedbyuserX" || content == "This message was deleted" {
+				displayContent = "🗑️ Message has been deleted"
+			}
+
 			if msgSenderID.Valid && uint(msgSenderID.Int64) == userID {
-				formatted := "You: " + content
+				formatted := "You: " + displayContent
 				lastMessage = &formatted
 			} else {
-				lastMessage = &content
+				lastMessage = &displayContent
 				lastMessageSender = &participant
+			}
+		}
+
+		// Determine message type for chat list preview
+		var lastMessageType *string
+		if msgContent.Valid {
+			if strings.HasPrefix(msgContent.String, "http") {
+				messageType := "image"
+				lastMessageType = &messageType
+			} else {
+				messageType := "text"
+				lastMessageType = &messageType
 			}
 		}
 
@@ -150,6 +174,7 @@ func (s *ChatService) getPrivateChats(userID uint) ([]models.UnifiedChatItem, er
 			Name:              fmt.Sprintf("%s %s", participant.FirstName, participant.LastName),
 			Avatar:            participant.Avatar,
 			LastMessage:       lastMessage,
+			LastMessageType:   lastMessageType,
 			LastMessageTime:   &lastMessageTime,
 			LastMessageSender: lastMessageSender,
 			HasUnread:         unreadCount > 0,
@@ -233,15 +258,38 @@ func (s *ChatService) getGroupChats(userID uint) ([]models.UnifiedChatItem, erro
 		var lastMessageSender *models.UserResponse
 		if lastMessage.Valid {
 			content := lastMessage.String
+			isImage := strings.HasPrefix(content, "http")
+			displayContent := content
+			if isImage {
+				displayContent = "📷 Photo"
+			}
+
+			// Check for deleted message marker
+			if content == "XdeletedbyuserX" || content == "This message was deleted" {
+				displayContent = "🗑️ Message has been deleted"
+			}
+
 			if msgSenderID.Valid && uint(msgSenderID.Int64) == userID {
-				formatted := "You: " + content
+				formatted := "You: " + displayContent
 				lastMsg = &formatted
 			} else if sender != nil {
-				formatted := sender.FirstName + ": " + content
+				formatted := sender.FirstName + ": " + displayContent
 				lastMsg = &formatted
 				lastMessageSender = sender
 			} else {
-				lastMsg = &content
+				lastMsg = &displayContent
+			}
+		}
+
+		// Determine message type for chat list preview
+		var lastMessageType *string
+		if lastMessage.Valid {
+			if strings.HasPrefix(lastMessage.String, "http") {
+				messageType := "image"
+				lastMessageType = &messageType
+			} else {
+				messageType := "text"
+				lastMessageType = &messageType
 			}
 		}
 
@@ -258,8 +306,8 @@ func (s *ChatService) getGroupChats(userID uint) ([]models.UnifiedChatItem, erro
 		unreadCount := 0
 		if convID.Valid {
 			unreadQuery := `SELECT COUNT(*) FROM group_messages m
-				LEFT JOIN group_members gm ON gm.group_id = ? AND gm.user_id = ?
-				WHERE m.conversation_id = ? AND m.sender_id != ? AND m.is_read = 0`
+				JOIN group_members gm ON gm.group_id = ? AND gm.user_id = ? AND gm.status = 'member'
+				WHERE m.conversation_id = ? AND m.sender_id != ? AND m.is_read = 0 AND m.created_at >= gm.created_at`
 			s.db.QueryRow(unreadQuery, groupID, userID, convIDValue, userID).Scan(&unreadCount)
 		}
 
@@ -278,6 +326,7 @@ func (s *ChatService) getGroupChats(userID uint) ([]models.UnifiedChatItem, erro
 			Type:              "group",
 			Name:              groupName,
 			LastMessage:       lastMsg,
+			LastMessageType:   lastMessageType,
 			LastMessageTime:   &timestamp,
 			LastMessageSender: lastMessageSender,
 			HasUnread:         unreadCount > 0,

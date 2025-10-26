@@ -1,13 +1,13 @@
 'use client'
 import Link from 'next/link'
-import { 
-  ArrowRight, 
-  Sparkles, 
-  Users, 
-  MessageCircle, 
-  Heart, 
-  Globe, 
-  Shield, 
+import AnimatedBackground from '@/components/AnimatedBackground'
+import {
+  ArrowRight,
+  Users,
+  MessageCircle,
+  Heart,
+  Globe,
+  Shield,
   Zap,
   Star,
   Smartphone,
@@ -16,33 +16,8 @@ import {
 
 export default function HomePage() {
   return (
-    <div className="min-h-screen relative overflow-hidden bg-gradient-to-br from-emerald-900 via-teal-900 to-cyan-800">
-      {/* Animated Background Elements */}
-      <div className="absolute inset-0">
-        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-emerald-500/20 rounded-full blur-3xl animate-pulse"></div>
-        <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-teal-500/20 rounded-full blur-3xl animate-pulse delay-1000"></div>
-        <div className="absolute top-3/4 left-1/2 w-64 h-64 bg-cyan-500/20 rounded-full blur-3xl animate-pulse delay-2000"></div>
-        <div className="absolute top-1/2 left-1/3 w-72 h-72 bg-emerald-400/10 rounded-full blur-3xl animate-pulse delay-3000"></div>
-      </div>
-      
-      {/* Floating Particles */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        {[...Array(30)].map((_, i) => (
-          <div
-            key={i}
-            className="absolute animate-bounce"
-            style={{
-              left: `${Math.random() * 100}%`,
-              top: `${Math.random() * 100}%`,
-              animationDelay: `${Math.random() * 5}s`,
-              animationDuration: `${3 + Math.random() * 2}s`
-            }}
-          >
-            <Sparkles className="w-2 h-2 text-white/20" />
-          </div>
-        ))}
-      </div>
-
+    <div className="fullscreen-container">
+    <AnimatedBackground />
       {/* Navigation */}
       <nav className="relative z-10 flex justify-between items-center p-6 lg:px-8">
         <div className="flex items-center">

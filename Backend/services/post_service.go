@@ -576,3 +576,8 @@ LIMIT ? OFFSET ?
 
 	return posts, nil
 }
+
+func (s *PostService) GetPostOwner(postID uint, ownerID *uint) error {
+	query := "SELECT user_id FROM posts WHERE id = ?"
+	return s.db.QueryRow(query, postID).Scan(ownerID)
+}

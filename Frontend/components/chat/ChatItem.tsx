@@ -1,5 +1,5 @@
 import { ChatItem as ChatItemType } from '@/types/chat';
-import { Clock, Trash2, Check, ShieldCheck, MoreHorizontal, Eye, EyeOff, Info, LogOut, Settings, User as UserIcon, Crown, Shield } from 'lucide-react';
+import { Clock, Trash2, Check, ShieldCheck, MoreHorizontal, Eye, EyeOff, Info, LogOut, Settings, User as UserIcon, Crown, Shield, VolumeOff } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Image from 'next/image';
 import { useState, useRef, useEffect, type MouseEvent as ReactMouseEvent } from 'react';
@@ -20,9 +20,15 @@ interface ChatItemProps {
   onShowInfo?: (conversationId: number, type: 'private' | 'group') => void;
   onLeaveGroup?: (groupId: number) => void;
   onShowSettings?: (conversationId: number, type: 'private' | 'group') => void;
+  mutedConversations?: number[];
+  onToggleMute?: (conversationId: number) => void;
+  newPostsCount?: number;
+  unrespondedPollsCount?: number;
+  unrespondedEventsCount?: number;
+  pendingRequestsCount?: number;
 }
 
-export default function ChatItem({ item, onClick, onDelete, getUserStatus, typingUsers = [], currentUser, onMarkAsRead, onMarkAsUnread, onShowInfo, onLeaveGroup, onShowSettings }: ChatItemProps) {
+export default function ChatItem({ item, onClick, onDelete, getUserStatus, typingUsers = [], currentUser, onMarkAsRead, onMarkAsUnread, onShowInfo, onLeaveGroup, onShowSettings, mutedConversations = [], onToggleMute, newPostsCount = 0, unrespondedPollsCount = 0, unrespondedEventsCount = 0, pendingRequestsCount = 0 }: ChatItemProps) {
   const router = useRouter();
   const isGroup = item.type === 'group';
   const participantId = item.participantId;
@@ -123,6 +129,22 @@ export default function ChatItem({ item, onClick, onDelete, getUserStatus, typin
     return item.lastMessage || 'Joined the group'
   })();
 
+  // Format the last message preview based on message type
+  const formatLastMessagePreview = (message: string | undefined, messageType: string | undefined) => {
+    if (!message) return 'No messages yet';
+    
+    if (messageType === 'image') {
+      return '📷 Photo';
+    }
+    
+    // Check for deleted message marker
+    if (message === 'XdeletedbyuserX' || message === 'This message was deleted') {
+      return 'Message deleted';
+    }
+    
+    return message;
+  }
+
   // Clamp overly long preview (including emoji runs)
   const clampedPreview = (text: string, max = 120) => {
     if (!text) return text
@@ -177,6 +199,17 @@ export default function ChatItem({ item, onClick, onDelete, getUserStatus, typin
   const resolvedUnread = (item.unreadCount ?? item.unread_count ?? 0) || 0;
   const hasManualUnread = item.has_unread || false; // manually marked as unread
   const hasUnread = resolvedUnread > 0 || hasManualUnread;
+
+  // Check if conversation is muted
+  const isMuted = mutedConversations.includes(item.conversationId || item.id);
+
+  // Check if group has unread tab content
+  const hasUnreadTabContent = isGroup && (
+    (newPostsCount ?? 0) > 0 ||
+    (unrespondedPollsCount ?? 0) > 0 ||
+    (unrespondedEventsCount ?? 0) > 0 ||
+    (pendingRequestsCount ?? 0) > 0
+  );
 
   // Normalize avatar to a usable URL if it's an ID or relative token
   const normalizedAvatar = !imageError ? getAvatarUrl(item.avatar) : null;
@@ -472,6 +505,18 @@ export default function ChatItem({ item, onClick, onDelete, getUserStatus, typin
               </motion.div>
             )}
           </AnimatePresence>
+
+          {/* Muted indicator */}
+          {isMuted && (
+            <motion.div
+              initial={{ scale: 0, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0, opacity: 0 }}
+              className="absolute -bottom-1 -right-1 w-5 h-5 bg-gradient-to-r from-orange-500 to-amber-500 rounded-full flex items-center justify-center shadow-lg ring-2 ring-white/20"
+            >
+              <VolumeOff className="w-3 h-3 text-white" />
+            </motion.div>
+          )}
         </div>
 
         {/* Content */}
@@ -483,6 +528,15 @@ export default function ChatItem({ item, onClick, onDelete, getUserStatus, typin
             >
               {item.name}
             </motion.h3>
+            {/* Red dot indicator for unread tab content in groups */}
+            {hasUnreadTabContent && (
+              <motion.div
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                exit={{ scale: 0 }}
+                className="w-2 h-2 bg-red-500 rounded-full flex-shrink-0"
+              />
+            )}
             {/* Only show the Admin badge for group chats if current user is admin */}
             {showAdminBadge && (
               <span className="hidden sm:inline-flex items-center px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider rounded-full bg-emerald-500/20 text-emerald-200 border border-emerald-400/30">
@@ -535,7 +589,7 @@ export default function ChatItem({ item, onClick, onDelete, getUserStatus, typin
                     exit={{ opacity: 0, y: -10 }}
                     className={`text-[13px] md:text-sm whitespace-nowrap overflow-hidden text-ellipsis max-w-[22ch] md:max-w-[34ch] ${highlightStatus ? 'text-amber-200' : 'text-white/70'}`}
                   >
-                    {clampedPreview(resolvedLastMessage)}
+                    {clampedPreview(formatLastMessagePreview(resolvedLastMessage, item.lastMessageType))}
                   </motion.p>
                 )}
               </AnimatePresence>
@@ -703,6 +757,21 @@ export default function ChatItem({ item, onClick, onDelete, getUserStatus, typin
                 </motion.button>
               )}
 
+              {/* Mute/Unmute option */}
+              <motion.button
+                onClick={() => {
+                  if (onToggleMute) {
+                    onToggleMute(item.conversationId || item.id);
+                  }
+                  setShowMenu(false);
+                }}
+                className="w-full px-4 py-3 text-left text-white/90 hover:bg-white/10 transition-colors flex items-center space-x-3"
+                whileHover={{ x: 4 }}
+              >
+                <VolumeOff className={`w-4 h-4 ${isMuted ? 'text-orange-400' : 'text-gray-400'}`} />
+                <span className="text-sm font-medium">{isMuted ? 'Unmute notifications' : 'Mute notifications'}</span>
+              </motion.button>
+
               {/* Private chat specific options */}
               {!isGroup && (
                 <>
@@ -711,7 +780,7 @@ export default function ChatItem({ item, onClick, onDelete, getUserStatus, typin
                     className="w-full px-4 py-3 text-left text-white/90 hover:bg-white/10 transition-colors flex items-center space-x-3"
                     whileHover={{ x: 4 }}
                   >
-                    <UserIcon className="w-4 h-4 text-purple-400" />
+                    <UserIcon className="w-4 h-4 text-blue-400" />
                     <span className="text-sm font-medium">View profile</span>
                   </motion.button>
 
@@ -750,7 +819,7 @@ export default function ChatItem({ item, onClick, onDelete, getUserStatus, typin
                       className="w-full px-4 py-3 text-left text-white/90 hover:bg-white/10 transition-colors flex items-center space-x-3"
                       whileHover={{ x: 4 }}
                     >
-                      <Settings className="w-4 h-4 text-purple-400" />
+                      <Settings className="w-4 h-4 text-blue-400" />
                       <span className="text-sm font-medium">Settings</span>
                     </motion.button>
                   )}

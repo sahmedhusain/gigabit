@@ -8,6 +8,7 @@ import { useWebSocket } from '@/context/WebSocketContext'
 import { api, GroupResponse, Member } from '@/lib/api'
 import { getAvatarUrl, getUserInitials, getGroupInitials } from '@/utils/avatarUtils'
 import Image from 'next/image'
+import ImagePreviewModal from '@/components/ImagePreviewModal'
 
 interface GroupInfoTabProps {
   groupId: number
@@ -25,6 +26,7 @@ const GroupInfoTab: React.FC<GroupInfoTabProps> = ({ groupId, onLeaveGroup, onMa
   const [nextAdmin, setNextAdmin] = useState<string>('')
   const [hasExistingAdmins, setHasExistingAdmins] = useState(false)
   const [hasOtherAdmins, setHasOtherAdmins] = useState(false)
+  const [imagePreviewState, setImagePreviewState] = useState({ isOpen: false, url: null as string | null })
   const { user } = useAuth()
   const router = useRouter()
   const { onlineUsers, isConnected } = useWebSocket()
@@ -184,6 +186,17 @@ const GroupInfoTab: React.FC<GroupInfoTabProps> = ({ groupId, onLeaveGroup, onMa
     }
   }
 
+  // Image preview handlers
+  const handleGroupAvatarClick = () => {
+    if (groupInfo?.avatar && getAvatarUrl(groupInfo.avatar)) {
+      setImagePreviewState({ isOpen: true, url: getAvatarUrl(groupInfo.avatar)! })
+    }
+  }
+
+  const handleImagePreviewClose = () => {
+    setImagePreviewState({ isOpen: false, url: null })
+  }
+
   const getOnlineGroupMembersCount = () => {
     if (!isConnected || !members.length) return 0
     
@@ -249,17 +262,21 @@ const GroupInfoTab: React.FC<GroupInfoTabProps> = ({ groupId, onLeaveGroup, onMa
           )}
 
           <div className="flex flex-col items-center text-center">
-            <div className="w-32 h-32 mx-auto mb-6 rounded-full bg-gradient-to-br from-emerald-400 via-teal-500 to-cyan-600 flex items-center justify-center text-white text-4xl font-bold shadow-2xl ring-4 ring-white/20 overflow-hidden">
-              {groupInfo.avatar && getAvatarUrl(groupInfo.avatar) ? (
+            <div 
+              className={`w-32 h-32 mx-auto mb-6 rounded-full bg-gradient-to-br from-emerald-400 via-teal-500 to-cyan-600 flex items-center justify-center text-white text-4xl font-bold shadow-2xl ring-4 ring-white/20 ${groupInfo?.avatar && getAvatarUrl(groupInfo.avatar) ? 'cursor-pointer hover:ring-emerald-400/60 transition-all duration-300' : ''}`}
+              onClick={groupInfo?.avatar && getAvatarUrl(groupInfo.avatar) ? handleGroupAvatarClick : undefined}
+              title={groupInfo?.avatar && getAvatarUrl(groupInfo.avatar) ? 'Click to view full size' : undefined}
+            >
+              {groupInfo?.avatar && getAvatarUrl(groupInfo.avatar) ? (
                 <Image
                   src={getAvatarUrl(groupInfo.avatar)!}
                   alt={groupInfo.title}
-                  width={56}
-                  height={56}
-                  className="w-full h-full object-cover rounded-full"
+                  width={128}
+                  height={128}
+                  className="w-full h-full object-cover rounded-full hover:brightness-110 transition-all duration-200"
                 />
               ) : (
-                getGroupInitials(groupInfo.title)
+                getGroupInitials(groupInfo?.title || '')
               )}
             </div>
             <h1 className="text-4xl font-bold bg-gradient-to-r from-white to-white/80 bg-clip-text text-transparent mb-4">
@@ -465,6 +482,14 @@ const GroupInfoTab: React.FC<GroupInfoTabProps> = ({ groupId, onLeaveGroup, onMa
           </motion.div>
         )}
       </div>
+      
+      {/* Image Preview Modal */}
+      <ImagePreviewModal
+        isOpen={imagePreviewState.isOpen}
+        imageUrl={imagePreviewState.url}
+        alt={`${groupInfo?.title} avatar`}
+        onClose={handleImagePreviewClose}
+      />
       
       {/* Leave Group Confirmation Dialog */}
       <AnimatePresence>

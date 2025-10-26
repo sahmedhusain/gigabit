@@ -1,1 +1,0 @@
-ALTER TABLE groups ADD COLUMN content_creation TEXT NOT NULL DEFAULT 'all_members';

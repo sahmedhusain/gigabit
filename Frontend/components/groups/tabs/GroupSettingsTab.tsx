@@ -1,7 +1,7 @@
 'use client'
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import Image from 'next/image'
-import { Settings, Users, Crown, Shield, User, UserPlus, Trash2, Lock, Unlock, Eye, EyeOff, AlertTriangle, Search, Check, X, Edit3, Send, Clock, ChevronRight, Upload, Loader2 } from 'lucide-react'
+import { Settings, Users, Crown, Shield, User, UserPlus, Trash2, Lock, Unlock, Eye, AlertTriangle, Search, Check, X, Edit3, Send, Clock, ChevronRight, Loader2, Calendar } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useConnectionStatus, useUpload } from '@/hooks'
 import { api, Member, User as UserType, GroupResponse } from '@/lib/api'
@@ -17,18 +17,16 @@ const GroupSettingsTab: React.FC<GroupSettingsTabProps> = ({ groupId }) => {
   const [members, setMembers] = useState<Member[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [showInviteModal, setShowInviteModal] = useState(false)
-  const [inviteEmail, setInviteEmail] = useState('')
   const [isInviting, setIsInviting] = useState(false)
-  const [activeTab, setActiveTab] = useState<'members' | 'privacy' | 'requests' | 'danger'>('members')
+  const [activeTab, setActiveTab] = useState<'members' | 'privacy' | 'requests' | 'events' | 'danger'>('members')
   const [groupInfo, setGroupInfo] = useState<GroupResponse | null>(null)
   const [userRole, setUserRole] = useState<string>('')
-  const [invitableUsers, setInvitableUsers] = useState<UserType[]>([])
   const [allUsers, setAllUsers] = useState<UserType[]>([])
-  const [followingUsers, setFollowingUsers] = useState<UserType[]>([])
   const [filteredUsers, setFilteredUsers] = useState<UserType[]>([])
   const [searchTerm, setSearchTerm] = useState('')
   const [sentRequests, setSentRequests] = useState<Member[]>([])
   const [receivedRequests, setReceivedRequests] = useState<Member[]>([])
+  const [unrespondedEventsCount, setUnrespondedEventsCount] = useState(0)
   const [showEditModal, setShowEditModal] = useState(false)
   const [editTitle, setEditTitle] = useState('')
   const [editDescription, setEditDescription] = useState('')
@@ -143,7 +141,7 @@ const GroupSettingsTab: React.FC<GroupSettingsTabProps> = ({ groupId }) => {
         avatar = result.url
         setAvatarUrl(avatar)
         success('Avatar uploaded successfully!')
-      } catch (err) {
+      } catch {
         toastError('Failed to upload avatar')
         setIsUpdating(false)
         return
@@ -191,20 +189,6 @@ const GroupSettingsTab: React.FC<GroupSettingsTabProps> = ({ groupId }) => {
       setMembers(members.filter(member => member.user.id !== userId))
     } catch (error) {
       console.error('Failed to kick member:', error)
-    }
-  }
-
-  // Handle invite user
-  const handleInviteUser = async (userId: number) => {
-    try {
-      setIsInviting(true)
-      await api.inviteUserToGroup(groupId, userId)
-      // Refresh sent requests
-      fetchJoinRequests()
-    } catch (error) {
-      console.error('Failed to invite user:', error)
-    } finally {
-      setIsInviting(false)
     }
   }
 
@@ -273,16 +257,14 @@ const GroupSettingsTab: React.FC<GroupSettingsTabProps> = ({ groupId }) => {
   }
 
   // Load all invitable users when modal opens
-  const loadInvitableUsers = async () => {
+  const loadInvitableUsers = useCallback(async () => {
     try {
       // Get all invitable users
       const invitableResponse = await api.getInvitableUsers(groupId)
-      setInvitableUsers(invitableResponse.users)
       
       // Get following users for filtering private profiles
       if (user?.id) {
         const followingResponse = await api.getFollowing(user.id)
-        setFollowingUsers(followingResponse.following)
         
         // Filter users: exclude private users not followed by admin
         const followingIds = new Set(followingResponse.following.map(f => f.id))
@@ -296,7 +278,7 @@ const GroupSettingsTab: React.FC<GroupSettingsTabProps> = ({ groupId }) => {
     } catch (error) {
       console.error('Failed to load invitable users:', error)
     }
-  }
+  }, [groupId, user?.id])
 
   // Load invitable users when modal opens
   useEffect(() => {
@@ -307,10 +289,9 @@ const GroupSettingsTab: React.FC<GroupSettingsTabProps> = ({ groupId }) => {
       setSearchTerm('')
       setFilteredUsers([])
       setAllUsers([])
-      setFollowingUsers([])
       setSelectedUsers([])
     }
-  }, [showInviteModal, user?.id])
+  }, [showInviteModal, user?.id, loadInvitableUsers])
 
   // Countdown timer for delete confirmation
   useEffect(() => {
@@ -327,35 +308,46 @@ const GroupSettingsTab: React.FC<GroupSettingsTabProps> = ({ groupId }) => {
 
   const isAdmin = userRole === 'admin' || userRole === 'creator'
 
-  // Fetch join requests when requests tab becomes active
-  useEffect(() => {
-    console.log('useEffect triggered - activeTab:', activeTab, 'isAdmin:', isAdmin)
-    if (activeTab === 'requests' && isAdmin) {
-      console.log('Fetching join requests...')
-      fetchJoinRequests()
-    }
-  }, [activeTab, isAdmin])
-
   // Fetch join requests
-  const fetchJoinRequests = async () => {
+  const fetchJoinRequests = useCallback(async () => {
     try {
-      console.log('Making API calls for join requests...')
       const [sentResponse, receivedResponse] = await Promise.all([
         api.getSentJoinRequests(groupId),
         api.getReceivedJoinRequests(groupId)
       ])
-      console.log('Sent response:', sentResponse)
-      console.log('Received response:', receivedResponse)
       setSentRequests(sentResponse.requests || [])
       setReceivedRequests(receivedResponse.requests || [])
-      console.log('State updated - sentRequests:', (sentResponse.requests || []).length, 'receivedRequests:', (receivedResponse.requests || []).length)
     } catch (error) {
       console.error('Failed to fetch join requests:', error)
       // Set to empty arrays on error
       setSentRequests([])
       setReceivedRequests([])
     }
-  }
+  }, [groupId])
+
+  // Fetch join requests when requests tab becomes active
+  useEffect(() => {
+    if (activeTab === 'requests' && isAdmin) {
+      fetchJoinRequests()
+    }
+  }, [activeTab, isAdmin, fetchJoinRequests])
+
+  // Fetch unresponded events count
+  useEffect(() => {
+    const fetchUnrespondedEvents = async () => {
+      try {
+        const eventsResponse = await api.getGroupEvents(groupId)
+        const unrespondedCount = eventsResponse.events.filter(event => event.user_response !== 'going' && event.user_response !== 'not_going').length
+        setUnrespondedEventsCount(unrespondedCount)
+      } catch (error) {
+        console.error('Failed to fetch unresponded events:', error)
+      }
+    }
+
+    if (isAdmin) {
+      fetchUnrespondedEvents()
+    }
+  }, [groupId, isAdmin])
 
   // Format join date
   const formatJoinDate = (dateString?: string) => {
@@ -486,30 +478,45 @@ const GroupSettingsTab: React.FC<GroupSettingsTabProps> = ({ groupId }) => {
       <div className="px-6 mb-6">
         <div className="bg-gradient-to-br from-white/10 via-white/5 to-transparent backdrop-blur-xl rounded-3xl border border-white/20 shadow-2xl p-1 hover:shadow-emerald-500/10 transition-all duration-500">
           <div className="flex space-x-1">
-            {[
-              { id: 'members', label: 'Members', icon: Users },
-              { id: 'privacy', label: 'Privacy & Permissions', icon: Lock },
-              { id: 'requests', label: 'Join Requests', icon: UserPlus },
-              { id: 'danger', label: 'Danger Zone', icon: AlertTriangle }
-            ].map((tab) => {
-              const Icon = tab.icon
-              return (
-                <motion.button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id as 'members' | 'privacy' | 'requests' | 'danger')}
-                  className={`flex items-center space-x-2 px-4 py-2 rounded-2xl text-sm font-medium transition-all duration-200 flex-1 justify-center ${
-                    activeTab === tab.id
-                      ? 'bg-emerald-500 text-white shadow-lg'
-                      : 'text-white/70 hover:text-white hover:bg-white/10'
-                  }`}
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                >
-                  <Icon className="w-4 h-4" />
-                  <span>{tab.label}</span>
-                </motion.button>
-              )
-            })}
+            {(() => {
+              const baseTabs = [
+                { id: 'members', label: 'Members', icon: Users },
+                { id: 'privacy', label: 'Privacy & Permissions', icon: Lock },
+                { id: 'requests', label: 'Join Requests', icon: UserPlus },
+                { id: 'danger', label: 'Danger Zone', icon: AlertTriangle }
+              ]
+              
+              if (isAdmin) {
+                baseTabs.splice(3, 0, { id: 'events', label: 'Events', icon: Calendar })
+              }
+              
+              return baseTabs.map((tab) => {
+                const Icon = tab.icon
+                const hasBadge = (tab.id === 'requests' && receivedRequests.length > 0) || (tab.id === 'events' && unrespondedEventsCount > 0)
+                const badgeCount = tab.id === 'requests' ? receivedRequests.length : tab.id === 'events' ? unrespondedEventsCount : 0
+                return (
+                  <motion.button
+                    key={tab.id}
+                    onClick={() => setActiveTab(tab.id as 'members' | 'privacy' | 'requests' | 'events' | 'danger')}
+                    className={`flex items-center space-x-2 px-4 py-2 rounded-2xl text-sm font-medium transition-all duration-200 flex-1 justify-center ${
+                      activeTab === tab.id
+                        ? 'bg-emerald-500 text-white shadow-lg'
+                        : 'text-white/70 hover:text-white hover:bg-white/10'
+                    }`}
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                  >
+                    <Icon className="w-4 h-4" />
+                    <span>{tab.label}</span>
+                    {hasBadge && (
+                      <div className="bg-red-500 text-white text-xs font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
+                        {badgeCount}
+                      </div>
+                    )}
+                  </motion.button>
+                )
+              })
+            })()}
           </div>
         </div>
       </div>
@@ -571,9 +578,11 @@ const GroupSettingsTab: React.FC<GroupSettingsTabProps> = ({ groupId }) => {
                           {/* Avatar */}
                           <div className="relative">
                             {member.user.avatar ? (
-                              <img
+                              <Image
                                 src={member.user.avatar}
                                 alt={`${member.user.first_name} ${member.user.last_name}`}
+                                width={48}
+                                height={48}
                                 className="w-12 h-12 rounded-full object-cover shadow-lg"
                               />
                             ) : (
@@ -834,7 +843,7 @@ const GroupSettingsTab: React.FC<GroupSettingsTabProps> = ({ groupId }) => {
                   {/* Events Permission */}
                   <div className="flex items-center justify-between p-4 bg-white/5 rounded-2xl border border-white/10">
                     <div className="flex items-center space-x-3">
-                      <Crown className="w-5 h-5 text-purple-400" />
+                      <Crown className="w-5 h-5 text-blue-400" />
                       <div>
                         <div className="font-medium text-white">Events</div>
                         <div className="text-sm text-white/60">
@@ -939,9 +948,11 @@ const GroupSettingsTab: React.FC<GroupSettingsTabProps> = ({ groupId }) => {
                           <div className="flex items-center justify-between">
                             <div className="flex items-center space-x-4">
                               {request.user.avatar ? (
-                                <img
+                                <Image
                                   src={request.user.avatar}
                                   alt={request.user.first_name}
+                                  width={40}
+                                  height={40}
                                   className="w-10 h-10 rounded-full object-cover"
                                 />
                               ) : (
@@ -997,9 +1008,12 @@ const GroupSettingsTab: React.FC<GroupSettingsTabProps> = ({ groupId }) => {
                           <div className="flex items-center justify-between">
                             <div className="flex items-center space-x-4">
                               {request.user.avatar ? (
-                                <img
+                                <Image
                                   src={request.user.avatar}
                                   alt={request.user.first_name}
+                                  width={40}
+                                  height={40}
+                                  unoptimized={true}
                                   className="w-10 h-10 rounded-full object-cover"
                                 />
                               ) : (
@@ -1033,6 +1047,29 @@ const GroupSettingsTab: React.FC<GroupSettingsTabProps> = ({ groupId }) => {
                       ))}
                     </div>
                   )}
+                </div>
+              </div>
+            </motion.div>
+          )}
+
+          {/* Events Tab */}
+          {activeTab === 'events' && isAdmin && (
+            <motion.div
+              key="events"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              className="p-6"
+            >
+              <div className="space-y-6">
+                {/* Unresponded Events */}
+                <div>
+                  <h3 className="text-lg font-semibold text-white mb-4">Unresponded Events ({unrespondedEventsCount})</h3>
+                  <div className="text-center py-8 text-white/60">
+                    <Calendar className="w-12 h-12 mx-auto mb-4 text-white/30" />
+                    <p>Events management coming soon...</p>
+                    <p className="text-sm mt-2">This tab will show events that need admin attention.</p>
+                  </div>
                 </div>
               </div>
             </motion.div>
@@ -1297,9 +1334,12 @@ const GroupSettingsTab: React.FC<GroupSettingsTabProps> = ({ groupId }) => {
                         <div className="relative flex-shrink-0">
                           <div className="w-12 h-12 bg-gradient-to-br from-emerald-400 via-teal-500 to-cyan-600 rounded-full flex items-center justify-center overflow-hidden">
                             {user.avatar ? (
-                              <img
+                              <Image
                                 src={user.avatar}
                                 alt={`${user.first_name} ${user.last_name}`}
+                                width={48}
+                                height={48}
+                                unoptimized={true}
                                 className="w-full h-full object-cover"
                               />
                             ) : (

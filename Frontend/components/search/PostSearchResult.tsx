@@ -1,9 +1,8 @@
 'use client'
-import { FileText, Clock, ExternalLink } from 'lucide-react'
+import { Clock, ExternalLink } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { SearchResult } from '@/hooks/useSearch'
 import Image from 'next/image'
-import { getUserInitials } from '@/utils/avatarUtils'
 interface PostSearchResultProps {
   result: SearchResult
 }

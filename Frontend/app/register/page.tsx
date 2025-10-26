@@ -8,6 +8,7 @@ import { useAuth } from '@/context/AuthContext'
 import { getAvatarOptions } from '@/utils/avatarUtils'
 import Image from 'next/image'
 import { motion, AnimatePresence } from 'framer-motion'
+import AnimatedBackground from '@/components/AnimatedBackground'
 
 import { Eye, EyeOff, Mail, Lock, User, Calendar, Camera, Edit3, ArrowRight, Sparkles, X, Palette } from 'lucide-react'
 import TermsPopup from '@/components/TermsPopup'
@@ -308,40 +309,8 @@ function RegisterPage() {
   }
 
   return (
-    <div className="fixed inset-0 h-screen w-screen overflow-hidden bg-gradient-to-br from-emerald-900 via-teal-900 to-cyan-800">
-      {/* Animated Background Elements */}
-      <div className="absolute inset-0">
-        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-emerald-500/20 rounded-full blur-3xl animate-pulse"></div>
-        <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-teal-500/20 rounded-full blur-3xl animate-pulse delay-1000"></div>
-        <div className="absolute top-3/4 left-1/2 w-64 h-64 bg-cyan-500/20 rounded-full blur-3xl animate-pulse delay-2000"></div>
-      </div>
-
-      {/* Floating Particles */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        {[...Array(15)].map((_, i) => {
-          const left = (i * 23 + 17) % 100;
-          const top = (i * 31 + 41) % 100;
-          const delay = (i * 0.3) % 3;
-          const duration = 3 + (i * 0.2) % 2;
-
-          return (
-            <div
-              key={i}
-              className={`absolute animate-bounce`}
-              style={{
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                left: `${left}%`,
-                top: `${top}%`,
-                animationDelay: `${delay}s`,
-                animationDuration: `${duration}s`
-              } as any}
-            >
-              <Sparkles className="w-2 h-2 text-white/30" />
-            </div>
-          );
-        })}
-      </div>
-
+    <div className="fixed inset-0 h-screen w-screen overflow-hidden">
+      <AnimatedBackground />
       {/* Main Container - Horizontal Layout */}
       <div className="relative h-full flex">
         {/* Left Side - Welcome Content */}
@@ -393,9 +362,9 @@ function RegisterPage() {
                 </div>
                 <p className="text-white/60 text-xs">Organize and discover events</p>
               </div>
-              <div className="group p-4 bg-white/5 backdrop-blur-sm rounded-xl border border-white/10 hover:bg-white/10 hover:border-purple-400/30 transition-all duration-300">
+              <div className="group p-4 bg-white/5 backdrop-blur-sm rounded-xl border border-white/10 hover:bg-white/10 hover:border-blue-400/30 transition-all duration-300">
                 <div className="flex items-center space-x-3 mb-2">
-                  <div className="w-2 h-2 bg-purple-400 rounded-full group-hover:animate-bounce delay-300"></div>
+                  <div className="w-2 h-2 bg-blue-400 rounded-full group-hover:animate-bounce delay-300"></div>
                   <span className="text-white/80 text-sm font-medium">Privacy first</span>
                 </div>
                 <p className="text-white/60 text-xs">Your data stays secure</p>
@@ -788,22 +757,22 @@ function RegisterPage() {
                             >
                               {/* Enhanced Compact Separator */}
                               <div className="flex items-center justify-center mb-4">
-                                <div className="flex-1 h-px bg-gradient-to-r from-transparent via-violet-400/30 to-violet-500/50"></div>
+                                <div className="flex-1 h-px bg-gradient-to-r from-transparent via-blue-400/30 to-blue-500/50"></div>
                                 <motion.div
-                                  className="mx-3 px-3 py-1.5 bg-gradient-to-r from-violet-500/10 via-purple-500/10 to-fuchsia-500/10 rounded-full border border-violet-400/20 backdrop-blur-sm"
+                                  className="mx-3 px-3 py-1.5 bg-gradient-to-r from-blue-500/10 via-cyan-500/10 to-teal-500/10 rounded-full border border-blue-400/20 backdrop-blur-sm"
                                   whileHover={{ scale: 1.05 }}
                                   transition={{ type: 'spring', stiffness: 400, damping: 17 }}
                                 >
                                   <div className="flex items-center space-x-1.5">
            
-                                      <Sparkles className="w-3.5 h-3.5 text-violet-400" />
+                                      <Sparkles className="w-3.5 h-3.5 text-blue-400" />
                   
-                                    <span className="text-xs font-bold bg-gradient-to-r from-violet-300 to-purple-300 bg-clip-text text-transparent">
+                                    <span className="text-xs font-bold bg-gradient-to-r from-blue-300 to-cyan-300 bg-clip-text text-transparent">
                                       Avatar Preview
                                     </span>
                                   </div>
                                 </motion.div>
-                                <div className="flex-1 h-px bg-gradient-to-l from-transparent via-fuchsia-400/30 to-fuchsia-500/50"></div>
+                                <div className="flex-1 h-px bg-gradient-to-l from-transparent via-teal-400/30 to-teal-500/50"></div>
                               </div>
 
                               {/* Enhanced Avatar Container */}
@@ -981,20 +950,20 @@ function RegisterPage() {
                                   >
                                     {/* Enhanced Compact Separator */}
                                     <div className="flex items-center justify-center mb-4">
-                                      <div className="flex-1 h-px bg-gradient-to-r from-transparent via-indigo-400/30 to-indigo-500/50"></div>
+                                      <div className="flex-1 h-px bg-gradient-to-r from-transparent via-blue-400/30 to-blue-500/50"></div>
                                       <motion.div
-                                        className="mx-3 px-3 py-1.5 bg-gradient-to-r from-indigo-500/10 via-purple-500/10 to-pink-500/10 rounded-full border border-indigo-400/20 backdrop-blur-sm"
+                                        className="mx-3 px-3 py-1.5 bg-gradient-to-r from-blue-500/10 via-cyan-500/10 to-teal-500/10 rounded-full border border-blue-400/20 backdrop-blur-sm"
                                         whileHover={{ scale: 1.05 }}
                                         transition={{ type: 'spring', stiffness: 400, damping: 17 }}
                                       >
                                         <div className="flex items-center space-x-1.5">
-                                          <Palette className="w-3.5 h-3.5 text-indigo-400" />
-                                          <span className="text-xs font-bold bg-gradient-to-r from-indigo-300 to-purple-300 bg-clip-text text-transparent">
+                                          <Palette className="w-3.5 h-3.5 text-blue-400" />
+                                          <span className="text-xs font-bold bg-gradient-to-r from-blue-300 to-cyan-300 bg-clip-text text-transparent">
                                             Select Avatar
                                           </span>
                                         </div>
                                       </motion.div>
-                                      <div className="flex-1 h-px bg-gradient-to-l from-transparent via-pink-400/30 to-pink-500/50"></div>
+                                      <div className="flex-1 h-px bg-gradient-to-l from-transparent via-cyan-400/30 to-cyan-500/50"></div>
                                     </div>
 
                                     {/* Enhanced Avatar Grid */}
@@ -1004,7 +973,7 @@ function RegisterPage() {
                                           <motion.div
                                             key={avatar.id}
                                             onClick={() => handleAvatarSelect(avatar.id)}
-                                            className="relative w-16 h-16 rounded-full border-3 cursor-pointer transition-all duration-500 flex items-center justify-center backdrop-blur-sm overflow-hidden group shadow-xl transform hover:-translate-y-2 border-white/40 hover:border-indigo-400/80 bg-gradient-to-br from-white/10 to-white/5"
+                                            className="relative w-16 h-16 rounded-full border-3 cursor-pointer transition-all duration-500 flex items-center justify-center backdrop-blur-sm overflow-hidden group shadow-xl transform hover:-translate-y-2 border-white/40 hover:border-blue-400/80 bg-gradient-to-br from-white/10 to-white/5"
                                             whileHover={{
                                               scale: 1.15,
                                               y: -8,
@@ -1043,7 +1012,7 @@ function RegisterPage() {
                                             {/* Enhanced selected indicator */}
                                             {formData.avatar === avatar.imageUrl && (
                                               <motion.div
-                                                className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full shadow-xl border-3 border-white/50 flex items-center justify-center"
+                                                className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-full shadow-xl border-3 border-white/50 flex items-center justify-center"
                                                 initial={{ scale: 0 }}
                                                 animate={{
                                                   scale: [1, 1.3, 1],
@@ -1063,8 +1032,8 @@ function RegisterPage() {
                                             )}
 
                                             {/* Enhanced hover overlay with multiple effects */}
-                                            <div className="absolute inset-0 rounded-full bg-gradient-to-r from-indigo-500/20 via-purple-500/20 to-pink-500/20 opacity-0 group-hover:opacity-100 transition-all duration-300 z-20"></div>
-                                            <div className="absolute inset-0 rounded-full bg-gradient-to-r from-indigo-400/10 to-purple-400/10 opacity-0 group-hover:opacity-50 transition-all duration-300 z-30 blur-sm"></div>
+                                            <div className="absolute inset-0 rounded-full bg-gradient-to-r from-blue-500/20 via-cyan-500/20 to-teal-500/20 opacity-0 group-hover:opacity-100 transition-all duration-300 z-20"></div>
+                                            <div className="absolute inset-0 rounded-full bg-gradient-to-r from-blue-400/10 to-cyan-400/10 opacity-0 group-hover:opacity-50 transition-all duration-300 z-30 blur-sm"></div>
                                           </motion.div>
                                         ))}
                                         <motion.div
@@ -1091,8 +1060,8 @@ function RegisterPage() {
                                           </label>
 
                                           {/* Enhanced hover overlay with multiple effects */}
-                                          <div className="absolute inset-0 rounded-full bg-gradient-to-r from-indigo-500/20 via-purple-500/20 to-pink-500/20 opacity-0 group-hover:opacity-100 transition-all duration-300 z-20 pointer-events-none"></div>
-                                          <div className="absolute inset-0 rounded-full bg-gradient-to-r from-indigo-400/10 to-purple-400/10 opacity-0 group-hover:opacity-50 transition-all duration-300 z-30 blur-sm pointer-events-none"></div>
+                                          <div className="absolute inset-0 rounded-full bg-gradient-to-r from-blue-500/20 via-cyan-500/20 to-teal-500/20 opacity-0 group-hover:opacity-100 transition-all duration-300 z-20 pointer-events-none"></div>
+                                          <div className="absolute inset-0 rounded-full bg-gradient-to-r from-blue-400/10 to-cyan-400/10 opacity-0 group-hover:opacity-50 transition-all duration-300 z-30 blur-sm pointer-events-none"></div>
                                         </motion.div>                                      </div>
                                     </div>
                                   </motion.div>

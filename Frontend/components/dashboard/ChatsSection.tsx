@@ -39,8 +39,11 @@ export default function ChatsSection({
   const { data: chats, isLoading } = useSWR('chats', fetcher, { refreshInterval: 5000 })
   const { addMessageListener } = useWebSocket()
   const [typingChats, setTypingChats] = useState<Record<string, string[]>>({})
+  const [lastTypingUpdate, setLastTypingUpdate] = useState<Record<string, number>>({})
   const [searchResults, setSearchResults] = useState<ConversationSearchResult[]>([])
   const [searchMode, setSearchMode] = useState<'normal' | 'messages'>('normal')
+  const [mutedConversations, setMutedConversations] = useState<number[]>([])
+  const [groupTabCounts, setGroupTabCounts] = useState<Record<number, { newPostsCount: number; unrespondedPollsCount: number; unrespondedEventsCount: number; pendingRequestsCount: number }>>({})
 
   // Handle search functionality
   useEffect(() => {
@@ -70,6 +73,24 @@ export default function ChatsSection({
     const debounceTimer = setTimeout(performSearch, 300) // Debounce search
     return () => clearTimeout(debounceTimer)
   }, [searchQuery, searchMode])
+
+  // Fetch muted conversations from notification settings
+  useEffect(() => {
+    const fetchNotificationSettings = async () => {
+      try {
+        const settings = await api.getNotificationSettings()
+        setMutedConversations((settings.muted_conversations || []).map(item => item.id))
+      } catch (error) {
+        console.error('Failed to fetch notification settings:', error)
+        // Fallback to empty array
+        setMutedConversations([])
+      }
+    }
+
+    if (currentUser) {
+      fetchNotificationSettings()
+    }
+  }, [currentUser])
 
   const handleDeleteConversation = async (conversationId: number) => {
     try {
@@ -215,6 +236,57 @@ export default function ChatsSection({
     }
   }
 
+  const handleToggleMute = async (conversationId: number) => {
+    try {
+      const isCurrentlyMuted = mutedConversations.includes(conversationId)
+      const newMutedConversations = isCurrentlyMuted
+        ? mutedConversations.filter(id => id !== conversationId)
+        : [...mutedConversations, conversationId]
+
+      // Update local state immediately for responsive UI
+      setMutedConversations(newMutedConversations)
+
+      // Find the conversation to get its type
+      const conversation = normalizedChats.find(chat => {
+        const chatIdNum = chat.id ? (typeof chat.id === 'string' ? parseInt(chat.id.replace(/\D/g, '')) : chat.id) : 0;
+        return chatIdNum === conversationId;
+      });
+
+      if (!conversation) {
+        console.error('Conversation not found for mute toggle:', conversationId);
+        return;
+      }
+
+      // Transform to API expected format
+      const apiMutedConversations = newMutedConversations.map(id => {
+        // For each muted conversation ID, find its type
+        const conv = normalizedChats.find(chat => {
+          const chatIdNum = chat.id ? (typeof chat.id === 'string' ? parseInt(chat.id.replace(/\D/g, '')) : chat.id) : 0;
+          return chatIdNum === id;
+        });
+        return {
+          id,
+          type: conv?.type || 'private' // Default to private if not found
+        };
+      });
+
+      // Update server
+      await api.updateNotificationSettings({
+        sound_enabled: true, // These will be overridden by current settings, but we need to provide them
+        sound_theme: 'classic',
+        browser_push_enabled: true,
+        quiet_hours_enabled: false,
+        quiet_hours_start: '22:00',
+        quiet_hours_end: '08:00',
+        muted_conversations: apiMutedConversations
+      })
+    } catch (error) {
+      console.error('Failed to toggle mute status:', error)
+      // Revert local state on error
+      setMutedConversations(mutedConversations)
+    }
+  }
+
   useEffect(() => {
     const cleanup = addMessageListener((message) => {
       // Typing indicators
@@ -255,6 +327,8 @@ export default function ChatsSection({
             console.log(`📝 [Typing] Added ${username} to ${conversationKey}: ${JSON.stringify(updated[conversationKey!])}`)
             return updated
           })
+          // Update timestamp for cleanup
+          setLastTypingUpdate(prev => ({ ...prev, [conversationKey!]: Date.now() }))
         } else if (action === 'stop') {
           setTypingChats(prev => {
             const current = prev[conversationKey!] || []
@@ -280,8 +354,105 @@ export default function ChatsSection({
     return cleanup
   }, [addMessageListener, currentUser?.id, typingChats])
 
+  // Clean up stale typing indicators (same timing as ChatWindow: 3 seconds)
+  useEffect(() => {
+    const cleanupInterval = setInterval(() => {
+      const now = Date.now()
+      setTypingChats(prev => {
+        const updated: Record<string, string[]> = {}
+        let hasChanges = false
+        
+        for (const [key, users] of Object.entries(prev)) {
+          const lastUpdate = lastTypingUpdate[key] || 0
+          // Remove typing indicators after 3 seconds (same as ChatWindow)
+          if (now - lastUpdate < 3000) {
+            updated[key] = users
+          } else {
+            hasChanges = true
+          }
+        }
+        
+        return hasChanges ? updated : prev
+      })
+    }, 1000) // Check every second
+
+    return () => clearInterval(cleanupInterval)
+  }, [lastTypingUpdate])
+
   // Normalize chats for consistent preview formatting
   const normalizedChats = (chats || []).map(chat => normalizeConversation(chat))
+
+  // Fetch tab counts for groups
+  useEffect(() => {
+    const fetchGroupTabCounts = async () => {
+      if (!currentUser) return
+
+      const groupChats = normalizedChats.filter(chat => chat.type === 'group' && chat.groupId)
+      if (groupChats.length === 0) return
+
+      const counts: Record<number, { newPostsCount: number; unrespondedPollsCount: number; unrespondedEventsCount: number; pendingRequestsCount: number }> = {}
+
+      for (const chat of groupChats) {
+        if (!chat.groupId) continue
+
+        try {
+          // Fetch unread posts count
+          const postsResponse = await api.getGroupPosts(chat.groupId, 1, 100)
+          const lastAccessedKey = `group_${chat.groupId}_last_accessed`
+          const lastAccessed = localStorage.getItem(lastAccessedKey)
+          const lastAccessedDate = lastAccessed ? new Date(lastAccessed) : new Date(0)
+          const unreadPosts = (postsResponse.posts || []).filter((post: any) => new Date(post.created_at) > lastAccessedDate)
+          
+          // Fetch unresponded polls count
+          const pollsResponse = await api.getGroupPolls(chat.groupId, 20, 0)
+          const unrespondedPolls = (pollsResponse || []).filter((poll: any) => {
+            // Filter out expired polls (same logic as PollCard)
+            const isExpired = poll.is_expired || (poll.expires_at && new Date(poll.expires_at) < new Date())
+            return !poll.user_voted && !isExpired
+          })
+          
+          // Fetch unresponded events count
+          const eventsResponse = await api.getGroupEvents(chat.groupId, 1, 1)
+          const unrespondedEvents = (eventsResponse?.events || []).filter((event: any) => {
+            // Filter out cancelled or ended events (same logic as GroupEventsTab)
+            const isEventEnded = event.canceled || new Date(event.event_time) < new Date()
+            return event.user_response !== 'going' && event.user_response !== 'not_going' && !isEventEnded
+          })
+          
+          // Fetch pending requests count (for admins)
+          let pendingRequestsCount = 0
+          try {
+            const requestsResponse = await api.getReceivedJoinRequests(chat.groupId)
+            pendingRequestsCount = requestsResponse.count || 0
+          } catch (error) {
+            // Not an admin or no permissions
+            pendingRequestsCount = 0
+          }
+
+          counts[chat.groupId] = {
+            newPostsCount: unreadPosts.length || 0,
+            unrespondedPollsCount: unrespondedPolls.length || 0,
+            unrespondedEventsCount: unrespondedEvents.length || 0,
+            pendingRequestsCount
+          }
+
+          console.log(`🔍 [TabCounts] Group ${chat.groupId}: posts=${unreadPosts.length}, polls=${unrespondedPolls.length}, events=${unrespondedEvents.length}, requests=${pendingRequestsCount}`)
+        } catch (error) {
+          console.error(`Failed to fetch tab counts for group ${chat.groupId}:`, error)
+          counts[chat.groupId] = {
+            newPostsCount: 0,
+            unrespondedPollsCount: 0,
+            unrespondedEventsCount: 0,
+            pendingRequestsCount: 0
+          }
+        }
+      }
+
+      setGroupTabCounts(counts)
+    }
+
+    fetchGroupTabCounts()
+  }, [normalizedChats, currentUser])
 
   // Debug logging for chats
   useEffect(() => {
@@ -382,7 +553,7 @@ export default function ChatsSection({
           title: 'Private Chats',
           subtitle: '',
           icon: User,
-          gradient: 'from-blue-500/20 to-indigo-500/20',
+          gradient: 'from-blue-500/20 to-blue-600/20',
           iconColor: 'text-blue-400',
           stats: [
             { label: `${baseStats.online} online`, color: 'text-blue-300', pulse: true },
@@ -573,8 +744,14 @@ export default function ChatsSection({
                     onShowInfo={() => {}} // Disable info for search results
                     onLeaveGroup={() => {}} // Disable leave group for search results
                     onShowSettings={() => {}} // Disable settings for search results
+                    mutedConversations={mutedConversations}
+                    onToggleMute={handleToggleMute}
                     onClick={handleOpenChat}
                     currentUser={currentUser}
+                    newPostsCount={0}
+                    unrespondedPollsCount={0}
+                    unrespondedEventsCount={0}
+                    pendingRequestsCount={0}
                   />
                 </motion.div>
               );
@@ -653,7 +830,7 @@ export default function ChatsSection({
                     // Navigate to discover users page
                     window.location.href = '/discover'
                   }}
-                  className="px-4 py-2 bg-gradient-to-r from-blue-500/20 to-indigo-500/20 hover:from-blue-500/30 hover:to-indigo-500/30 text-blue-300 rounded-lg border border-blue-400/30 hover:border-blue-400/50 transition-all duration-300 flex items-center space-x-2"
+                  className="px-4 py-2 bg-gradient-to-r from-blue-500/20 to-blue-600/20 hover:from-blue-500/30 hover:to-blue-600/30 text-blue-300 rounded-lg border border-blue-400/30 hover:border-blue-400/50 transition-all duration-300 flex items-center space-x-2"
                   whileHover={{ scale: 1.05, y: -1 }}
                   whileTap={{ scale: 0.95 }}
                 >
@@ -666,7 +843,7 @@ export default function ChatsSection({
                     // Navigate to discover groups page
                     window.location.href = '/discover?tab=groups'
                   }}
-                  className="px-4 py-2 bg-gradient-to-r from-purple-500/20 to-pink-500/20 hover:from-purple-500/30 hover:to-pink-500/30 text-purple-300 rounded-lg border border-purple-400/30 hover:border-purple-400/50 transition-all duration-300 flex items-center space-x-2"
+                  className="px-4 py-2 bg-gradient-to-r from-blue-500/20 to-cyan-500/20 hover:from-blue-500/30 hover:to-cyan-500/30 text-blue-300 rounded-lg border border-blue-400/30 hover:border-blue-400/50 transition-all duration-300 flex items-center space-x-2"
                   whileHover={{ scale: 1.05, y: -1 }}
                   whileTap={{ scale: 0.95 }}
                 >
@@ -768,8 +945,14 @@ export default function ChatsSection({
                       onShowInfo={handleShowInfo}
                       onLeaveGroup={handleLeaveGroup}
                       onShowSettings={handleShowSettings}
+                    mutedConversations={mutedConversations}
+                    onToggleMute={handleToggleMute}
                     onClick={handleOpenChat}
                     currentUser={currentUser}
+                    newPostsCount={chat.groupId ? groupTabCounts[chat.groupId]?.newPostsCount : 0}
+                    unrespondedPollsCount={chat.groupId ? groupTabCounts[chat.groupId]?.unrespondedPollsCount : 0}
+                    unrespondedEventsCount={chat.groupId ? groupTabCounts[chat.groupId]?.unrespondedEventsCount : 0}
+                    pendingRequestsCount={chat.groupId ? groupTabCounts[chat.groupId]?.pendingRequestsCount : 0}
                   />
                 </motion.div>
               );
@@ -863,7 +1046,7 @@ export default function ChatsSection({
                     whileHover={{ scale: 1.02, y: -1 }}
                     whileTap={{ scale: 0.98 }}
                   >
-                    <div className="absolute inset-0 bg-gradient-to-r from-blue-500/10 to-indigo-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                    <div className="absolute inset-0 bg-gradient-to-r from-blue-500/10 to-blue-600/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
                     <MessageSquarePlus className="w-5 h-5 text-blue-400 group-hover:text-blue-300 transition-colors relative z-10" />
                     <span className="font-semibold relative z-10">{tabConfig.newChatLabel}</span>
                   </motion.button>

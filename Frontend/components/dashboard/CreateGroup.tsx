@@ -488,15 +488,15 @@ export default function CreateGroup({
                       onClick={() => setPrivacy('private')}
                       className={`relative w-full text-left rounded-2xl border p-5 transition-all duration-300 backdrop-blur-lg ${
                         privacy === 'private'
-                          ? 'border-purple-400/60 bg-purple-400/10 shadow-lg shadow-purple-500/20'
-                          : 'border-white/10 bg-white/5 hover:border-purple-400/40 hover:bg-purple-400/5'
+                          ? 'border-blue-400/60 bg-blue-400/10 shadow-lg shadow-blue-500/20'
+                          : 'border-white/10 bg-white/5 hover:border-blue-400/40 hover:bg-blue-400/5'
                       }`}
                       whileHover={{ scale: 1.02 }}
                       whileTap={{ scale: 0.98 }}
                     >
                       <div className="flex items-start justify-between">
                         <div className="flex items-center space-x-3">
-                          <div className="w-11 h-11 rounded-xl bg-gradient-to-r from-purple-500 to-indigo-500 flex items-center justify-center text-white shadow-lg">
+                          <div className="w-11 h-11 rounded-xl bg-gradient-to-r from-blue-500 to-cyan-500 flex items-center justify-center text-white shadow-lg">
                             <Lock className="w-5 h-5" />
                           </div>
                           <div>
@@ -506,7 +506,7 @@ export default function CreateGroup({
                         </div>
                         {privacy === 'private' && (
                           <motion.div
-                            className="w-6 h-6 rounded-full bg-purple-500 flex items-center justify-center text-white shadow-md"
+                            className="w-6 h-6 rounded-full bg-blue-500 flex items-center justify-center text-white shadow-md"
                             initial={{ scale: 0.8, opacity: 0 }}
                             animate={{ scale: 1, opacity: 1 }}
                           >

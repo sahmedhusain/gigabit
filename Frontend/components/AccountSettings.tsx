@@ -68,11 +68,8 @@ export default function AccountSettings({
   deleteCountdown,
   setDeleteCountdown,
   setDeletePasswordError,
-  deleteConfirmation,
   setDeleteConfirmation,
-  deletePassword,
   setDeletePassword,
-  deletePasswordError,
 }: AccountSettingsProps) {
   const [changePasswordData, setChangePasswordData] = useState({
     current_password: '',

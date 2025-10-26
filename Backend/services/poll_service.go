@@ -30,19 +30,21 @@ func (s *PollService) CreatePoll(userID uint, req *models.CreatePollRequest) (*m
 		return nil, errors.New("poll cannot have more than 10 options")
 	}
 
-	if req.GroupID != nil {
-		role, err := s.getUserRoleInGroup(*req.GroupID, userID)
-		if err != nil {
-			return nil, errors.New("user is not a member of this group")
-		}
+	if req.GroupID == nil || *req.GroupID == 0 {
+		return nil, errors.New("polls can only be created in groups")
+	}
 
-		canCreatePolls, err := s.canUserCreatePolls(*req.GroupID, role)
-		if err != nil {
-			return nil, err
-		}
-		if !canCreatePolls {
-			return nil, errors.New("you don't have permission to create polls in this group")
-		}
+	role, err := s.getUserRoleInGroup(*req.GroupID, userID)
+	if err != nil {
+		return nil, errors.New("user is not a member of this group")
+	}
+
+	canCreatePolls, err := s.canUserCreatePolls(*req.GroupID, role)
+	if err != nil {
+		return nil, err
+	}
+	if !canCreatePolls {
+		return nil, errors.New("you don't have permission to create polls in this group")
 	}
 
 	var expiresAt *time.Time
@@ -224,6 +226,10 @@ func (s *PollService) GetGroupPolls(groupID, userID uint, limit, offset int) ([]
 		if err != nil {
 			continue
 		}
+		// Double-check that the poll belongs to the correct group
+		if poll.GroupID == nil || *poll.GroupID != groupID {
+			continue
+		}
 		polls = append(polls, *poll)
 	}
 
@@ -272,7 +278,7 @@ func (s *PollService) VotePoll(pollID, userID uint, optionIDs []uint) error {
 	defer tx.Rollback()
 
 	_, err = tx.Exec(`
-		DELETE FROM poll_votes WHERE poll_id = ? AND user_id = ?
+		DELETE FROM poll_votes WHERE poll_id = ? AND user_id = CAST(? AS INTEGER)
 	`, pollID, userID)
 	if err != nil {
 		return err
@@ -281,7 +287,7 @@ func (s *PollService) VotePoll(pollID, userID uint, optionIDs []uint) error {
 	for _, optionID := range optionIDs {
 		_, err := tx.Exec(`
 			INSERT INTO poll_votes (poll_id, option_id, user_id, created_at)
-			VALUES (?, ?, ?, ?)
+			VALUES (?, ?, CAST(? AS INTEGER), ?)
 		`, pollID, optionID, userID, time.Now())
 		if err != nil {
 			return err
@@ -323,7 +329,7 @@ func (s *PollService) UnvotePoll(pollID, userID uint) error {
 	}
 
 	result, err := s.db.Exec(`
-		DELETE FROM poll_votes WHERE poll_id = ? AND user_id = ?
+		DELETE FROM poll_votes WHERE poll_id = ? AND user_id = CAST(? AS INTEGER)
 	`, pollID, userID)
 	if err != nil {
 		return err
@@ -561,7 +567,7 @@ func (s *PollService) getPollOptions(pollID, userID uint) ([]models.PollOptionRe
 func (s *PollService) getUserVotes(pollID, userID uint) ([]uint, error) {
 	rows, err := s.db.Query(`
 		SELECT option_id FROM poll_votes
-		WHERE poll_id = ? AND user_id = ?
+		WHERE poll_id = ? AND user_id = CAST(? AS INTEGER)
 	`, pollID, userID)
 	if err != nil {
 		return nil, err
@@ -625,17 +631,11 @@ func (s *PollService) isUserGroupAdmin(groupID, userID uint) (bool, error) {
 		return false, err
 	}
 	if creatorID == userID {
-		query := `SELECT role FROM group_members WHERE group_id = ? AND user_id = ? AND status = 'member'`
-		var role string
-		err := s.db.QueryRow(query, groupID, userID).Scan(&role)
-		if err == nil && role == "member" {
-			return false, nil
-		}
 		return true, nil
 	}
 
 	query := `
-		SELECT COUNT(*) FROM group_members 
+		SELECT COUNT(*) FROM group_members
 		WHERE group_id = ? AND user_id = ? AND role = 'admin'
 	`
 

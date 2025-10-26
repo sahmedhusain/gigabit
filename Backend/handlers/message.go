@@ -49,8 +49,9 @@ func (h *MessageHandler) SendMessage(w http.ResponseWriter, r *http.Request) {
 		MessageType: req.MessageType,
 	}
 
+	// If ImageURL is provided, use it as content (images are stored as URLs in content field)
 	if req.ImageURL != "" {
-		message.ImageURL = &req.ImageURL
+		message.Content = req.ImageURL
 	}
 
 	var err error
@@ -97,12 +98,18 @@ func (h *MessageHandler) SendMessage(w http.ResponseWriter, r *http.Request) {
 	wsMessage := websocket.Message{
 		Type:      websocket.MessageTypePrivateMessage,
 		From:      userID,
-		Content:   req.Content,
+		Content:   message.Content,
 		Timestamp: time.Now().Unix(),
 		Data: map[string]interface{}{
-			"id":           message.ID,
-			"message_type": req.MessageType,
-			"image_url":    req.ImageURL,
+			"id": message.ID,
+			"message_type": func() string {
+				if strings.HasPrefix(message.Content, "http") {
+					return "image"
+				} else if strings.HasPrefix(message.Content, "Shared a post:") {
+					return "share"
+				}
+				return "text"
+			}(),
 			"sender": map[string]interface{}{
 				"id":         userID,
 				"first_name": senderFirstName,
@@ -114,19 +121,85 @@ func (h *MessageHandler) SendMessage(w http.ResponseWriter, r *http.Request) {
 		},
 	}
 
+	// Send additional image_shared WebSocket message for images
+	var imageWsMessage *websocket.Message
+	if strings.HasPrefix(message.Content, "http") {
+		imageWsMessage = &websocket.Message{
+			Type:      websocket.MessageTypeImageShared,
+			From:      userID,
+			Content:   message.Content,
+			Timestamp: time.Now().Unix(),
+			Data: map[string]interface{}{
+				"id":        message.ID,
+				"image_url": message.Content,
+				"sender": map[string]interface{}{
+					"id":         userID,
+					"first_name": senderFirstName,
+					"last_name":  senderLastName,
+					"avatar":     senderAvatar,
+				},
+				"conversation_id": conversationID,
+				"created_at":      message.CreatedAt.Format(time.RFC3339),
+			},
+		}
+	}
+
 	if req.MessageType == "private" {
 		wsMessage.To = req.ReceiverID
 		h.hub.BroadcastMessage(wsMessage)
 
-		// Send notification for private message
-		go h.notificationService.NotifyNewMessage(userID, req.ReceiverID, message.ID)
+		// Send image_shared message if it's an image
+		if imageWsMessage != nil {
+			imageWsMessage.To = req.ReceiverID
+			h.hub.BroadcastMessage(*imageWsMessage)
+		}
+
+		// Send appropriate notification based on message type
+		if imageWsMessage != nil {
+			// Send image sharing notification for images
+			go h.notificationService.NotifyImageShared(userID, req.ReceiverID, message.ID)
+		} else {
+			// Send notification for text messages
+			go h.notificationService.NotifyPrivateMessage(userID, req.ReceiverID, message.ID)
+		}
 	} else if req.MessageType == "group" {
 		wsMessage.Type = websocket.MessageTypeGroupMessage
 		wsMessage.GroupID = req.GroupID
 		h.hub.BroadcastMessage(wsMessage)
 
-		// Note: Not sending individual notifications for group messages to avoid spam
-		// Group members will see the message in real-time via WebSocket or when they check the group
+		// Send image_shared message if it's an image
+		if imageWsMessage != nil {
+			imageWsMessage.Type = websocket.MessageTypeGroupMessage
+			imageWsMessage.GroupID = req.GroupID
+			h.hub.BroadcastMessage(*imageWsMessage)
+		}
+
+		// Send notifications for group messages
+		if strings.HasPrefix(message.Content, "http") {
+			// For images, send to each member individually
+			memberIDs, err := h.notificationService.GetGroupMemberIDs(req.GroupID, userID)
+			if err == nil {
+				for _, memberID := range memberIDs {
+					h.notificationService.NotifyImageShared(userID, memberID, message.ID)
+				}
+			}
+		} else if strings.HasPrefix(message.Content, "Shared a post:") {
+			// For shares, send to each member individually
+			memberIDs, err := h.notificationService.GetGroupMemberIDs(req.GroupID, userID)
+			if err == nil {
+				for _, memberID := range memberIDs {
+					h.notificationService.NotifyPostShared(userID, memberID, message.ID)
+				}
+			}
+		} else {
+			// For regular messages, send individual notifications like images and shares
+			memberIDs, err := h.notificationService.GetGroupMemberIDs(req.GroupID, userID)
+			if err == nil {
+				for _, memberID := range memberIDs {
+					h.notificationService.NotifyPrivateMessage(userID, memberID, message.ID)
+				}
+			}
+		}
 	}
 
 	writeJSON(w, http.StatusCreated, map[string]interface{}{
@@ -287,6 +360,20 @@ func (h *MessageHandler) GetConversations(w http.ResponseWriter, r *http.Request
 			messageSummary := &models.MessageSummary{
 				Content:   *chat.LastMessage,
 				CreatedAt: chat.LastMessageTime.Format(time.RFC3339),
+			}
+
+			// Set message type if available
+			if chat.LastMessageType != nil {
+				messageSummary.MessageType = *chat.LastMessageType
+			} else {
+				// Fallback: determine from content
+				if strings.HasPrefix(*chat.LastMessage, "http") {
+					messageSummary.MessageType = "image"
+				} else if strings.HasPrefix(*chat.LastMessage, "Shared a post:") {
+					messageSummary.MessageType = "share"
+				} else {
+					messageSummary.MessageType = "text"
+				}
 			}
 
 			// Add sender information if available
@@ -468,6 +555,107 @@ func (h *MessageHandler) MarkAsUnread(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]interface{}{
 		"message": "Messages marked as unread",
 		"count":   len(req.MessageIDs),
+	})
+}
+
+func (h *MessageHandler) DeleteMessage(w http.ResponseWriter, r *http.Request) {
+	userID, ok := r.Context().Value("user_id").(uint)
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "User not authenticated")
+		return
+	}
+
+	messageIDStr := strings.TrimPrefix(r.URL.Path, "/api/messages/")
+	messageID, err := strconv.ParseUint(messageIDStr, 10, 32)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "Invalid message ID")
+		return
+	}
+
+	log.Printf("🗑️ [DeleteMessage] Starting deletion for message ID: %d by user: %d", messageID, userID)
+
+	err = h.messageService.DeleteMessage(uint(messageID), userID)
+	if err != nil {
+		log.Printf("❌ [DeleteMessage] DeleteMessage service error: %v", err)
+		if strings.Contains(err.Error(), "not found") {
+			writeError(w, http.StatusNotFound, err.Error())
+		} else if strings.Contains(err.Error(), "only delete your own") {
+			writeError(w, http.StatusForbidden, err.Error())
+		} else if strings.Contains(err.Error(), "within 3 days") {
+			writeError(w, http.StatusBadRequest, err.Error())
+		} else {
+			writeError(w, http.StatusInternalServerError, "Failed to delete message")
+		}
+		return
+	}
+
+	log.Printf("✅ [DeleteMessage] Message %d deleted successfully", messageID)
+
+	// Determine message type for WebSocket broadcast
+	var messageType string
+	checkQuery := `
+		SELECT 'private' as type FROM private_messages WHERE id = ?
+		UNION ALL
+		SELECT 'group' as type FROM group_messages WHERE id = ?
+		LIMIT 1
+	`
+	db := h.messageService.GetDB()
+	err = db.QueryRow(checkQuery, messageID, messageID).Scan(&messageType)
+	if err != nil {
+		log.Printf("❌ [DeleteMessage] Error determining message type for message %d: %v", messageID, err)
+		messageType = "unknown"
+	} else {
+		log.Printf("📋 [DeleteMessage] Message %d type determined: %s", messageID, messageType)
+	}
+
+	// Broadcast message deletion via WebSocket
+	wsMessage := websocket.Message{
+		Type:      websocket.MessageTypeMessageDeleted,
+		From:      userID,
+		Timestamp: time.Now().Unix(),
+		Data: map[string]interface{}{
+			"message_id":   uint(messageID),
+			"message_type": messageType,
+		},
+	}
+
+	log.Printf("📡 [DeleteMessage] Broadcasting message deletion: type=%s, id=%d, message_type=%s", wsMessage.Type, messageID, messageType)
+
+	// Determine if it's private or group message and broadcast accordingly
+	var conversationType string
+	var receiverID, groupID uint
+	conversationCheckQuery := `
+		SELECT 'private' as type, 
+		       CASE WHEN pc.participant1_id = ? THEN pc.participant2_id ELSE pc.participant1_id END as other_id, 
+		       0 as group_id
+		FROM private_messages pm 
+		JOIN private_conversations pc ON pm.conversation_id = pc.id 
+		WHERE pm.id = ?
+		UNION ALL
+		SELECT 'group' as type, 0 as other_id, gc.group_id
+		FROM group_messages gm 
+		JOIN group_conversations gc ON gm.conversation_id = gc.id 
+		WHERE gm.id = ?
+		LIMIT 1
+	`
+	err = db.QueryRow(conversationCheckQuery, userID, messageID, messageID).Scan(&conversationType, &receiverID, &groupID)
+	if err == nil {
+		log.Printf("📋 [DeleteMessage] Conversation check successful: type=%s, receiverID=%d, groupID=%d", conversationType, receiverID, groupID)
+		if conversationType == "private" {
+			wsMessage.To = receiverID
+			log.Printf("📡 [DeleteMessage] Broadcasting private message deletion to user %d", receiverID)
+			h.hub.BroadcastMessage(wsMessage)
+		} else if conversationType == "group" {
+			wsMessage.GroupID = groupID
+			log.Printf("📡 [DeleteMessage] Broadcasting group message deletion to group %d", groupID)
+			h.hub.BroadcastMessage(wsMessage)
+		}
+	} else {
+		log.Printf("❌ [DeleteMessage] Error determining conversation type for message %d: %v", messageID, err)
+	}
+
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"message": "Message deleted successfully",
 	})
 }
 

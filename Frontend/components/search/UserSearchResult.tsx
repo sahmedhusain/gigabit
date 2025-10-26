@@ -3,7 +3,6 @@ import { User, UserCheck } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import { SearchResult } from '@/hooks/useSearch'
-import { getUserInitials } from '@/utils/avatarUtils'
 
 interface UserSearchResultProps {
   result: SearchResult

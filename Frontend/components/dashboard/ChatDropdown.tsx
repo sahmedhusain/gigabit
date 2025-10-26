@@ -101,7 +101,9 @@ export default function ChatDropdown({
                     <h4 className="text-white font-medium truncate text-sm lg:text-base">{chat.name}</h4>
                     <span className="text-white/60 text-xs flex-shrink-0">{chat.time}</span>
                   </div>
-                  <p className="text-white/70 text-xs lg:text-sm truncate">{chat.lastMessage}</p>
+                  <p className="text-white/70 text-xs lg:text-sm truncate">
+                    {chat.lastMessage === 'XdeletedbyuserX' ? 'Message deleted' : chat.lastMessage}
+                  </p>
                 </div>
                 
                 {chat.unread > 0 && (

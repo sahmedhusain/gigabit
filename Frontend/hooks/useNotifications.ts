@@ -3,9 +3,11 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { api, type NotificationResponse } from '@/lib/api'
 import { useToast } from '@/context/ToastContext'
 import { useWebSocketSubscription } from './useWebSocketSubscription'
+import { useNotificationSettings } from './useNotificationSettings'
 
 export function useNotifications() {
   const { error, success } = useToast()
+  const { playNotification } = useNotificationSettings()
   const [items, setItems] = useState<NotificationResponse[]>([])
   const [unread, setUnread] = useState<number>(0)
   const [loading, setLoading] = useState(false)
@@ -141,6 +143,10 @@ export function useNotifications() {
             return [notification, ...prev]
           })
           setUnread(u => u + 1)
+          
+          // Play notification sound and show browser notification for new notifications
+          const actorName = notification.actor ? `${notification.actor.first_name} ${notification.actor.last_name}` : 'Someone';
+          playNotification(undefined, actorName, notification.message)
         }
       }
     }

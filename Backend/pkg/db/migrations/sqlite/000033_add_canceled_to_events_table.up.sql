@@ -1,2 +1,0 @@
-ALTER TABLE events ADD COLUMN canceled BOOLEAN DEFAULT FALSE;
-ALTER TABLE events ADD COLUMN cancel_reason TEXT;

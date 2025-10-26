@@ -724,6 +724,47 @@ func (h *GroupHandler) DeleteGroupPost(w http.ResponseWriter, r *http.Request, g
 	writeJSON(w, http.StatusOK, map[string]interface{}{"message": "Group post deleted successfully"})
 }
 
+// GetGroupPost retrieves a single group post by ID
+func (h *GroupHandler) GetGroupPost(w http.ResponseWriter, r *http.Request, groupIDStr, postIDStr string) {
+	groupID, err := strconv.ParseUint(groupIDStr, 10, 32)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "Invalid group ID")
+		return
+	}
+
+	postID, err := strconv.ParseUint(postIDStr, 10, 32)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "Invalid post ID")
+		return
+	}
+
+	userID, ok := r.Context().Value("user_id").(uint)
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "User not authenticated")
+		return
+	}
+
+	// Check if user is a member of the group
+	role, err := h.groupService.GetUserRole(uint(groupID), userID)
+	if err != nil {
+		writeError(w, http.StatusForbidden, "User is not a member of this group")
+		return
+	}
+
+	if role == "" {
+		writeError(w, http.StatusForbidden, "User is not a member of this group")
+		return
+	}
+
+	post, err := h.groupService.GetGroupPostByID(uint(postID), userID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "Failed to get group post")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, post)
+}
+
 func (h *GroupHandler) GetUserInvitations(w http.ResponseWriter, r *http.Request) {
 	userID, ok := r.Context().Value("user_id").(uint)
 	if !ok {

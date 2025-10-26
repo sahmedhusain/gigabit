@@ -6,6 +6,8 @@ func (h *Hub) handleMessage(message Message) {
 		h.handlePrivateMessage(message)
 	case MessageTypeGroupMessage:
 		h.handleGroupMessage(message)
+	case MessageTypeSharedPost:
+		h.handleSharedPost(message)
 	case MessageTypeNotification:
 		h.handleNotification(message)
 	case MessageTypeUserStatus:
@@ -46,14 +48,14 @@ func (h *Hub) handleMessage(message Message) {
 		h.handlePollUpdate(message)
 	case MessageTypePollVoteUpdate:
 		h.handlePollVoteUpdate(message)
-	case MessageTypeLayoutSync:
-		h.handleLayoutSync(message)
 	case MessageTypeSearch:
 		h.handleSearch(message)
 	case MessageTypePing:
 		h.handlePing(message)
 	case MessageTypePong:
 		h.handlePong(message)
+	case MessageTypeMessageDeleted:
+		h.handleMessageDeleted(message)
 	default:
 		// log.Printf("Unknown message type: %s", message.Type)
 	}

@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
-import { Heart, MessageSquare, MoreHorizontal, Send, Image as ImageIcon, Bookmark, ZoomIn, ZoomOut, Download, X, Trash2, Lock, ArrowUp, ArrowDown } from 'lucide-react'
+import { Heart, MessageSquare, MoreHorizontal, Send, Image as ImageIcon, Bookmark, X, Trash2, Lock, ArrowUp, ArrowDown } from 'lucide-react'
 import ProtectedRoute from '@/components/ProtectedRoute'
 import AppLayout from '@/components/AppLayout'
 import { useAuth } from '@/context/AuthContext'
@@ -14,6 +14,7 @@ import Image from 'next/image'
 import { motion, AnimatePresence } from 'framer-motion'
 import ManagePrivacy from '@/components/dashboard/ManagePrivacy'
 import SharePopup from '@/components/SharePopup'
+import ImagePreviewModal from '@/components/ImagePreviewModal'
 
 interface CommentWithUser extends CommentType {
     timeAgo: string
@@ -43,8 +44,6 @@ function PostDetailPage() {
   const [newCommentImage, setNewCommentImage] = useState<File | null>(null)
   const [isSubmittingComment, setIsSubmittingComment] = useState(false)
   const [isCommentModalOpen, setIsCommentModalOpen] = useState(false)
-  const [imagePopupUrl, setImagePopupUrl] = useState<string | null>(null)
-  const [imageZoom, setImageZoom] = useState(1)
   const [openMenu, setOpenMenu] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
@@ -59,6 +58,7 @@ function PostDetailPage() {
   const [isSorting, setIsSorting] = useState(false)
   const [isSharePopupOpen, setIsSharePopupOpen] = useState(false)
   const [selectedPostForShare, setSelectedPostForShare] = useState<APIPost | null>(null)
+  const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null)
 
     // Real-time optimistic updates for likes
     const { performUpdate: performOptimisticUpdate, isLoading: likePending } = useOptimisticUpdate(
@@ -414,62 +414,14 @@ function PostDetailPage() {
     }
   }
 
-  // Image popup handlers
-  const handleZoomIn = () => setImageZoom(prev => Math.min(prev + 0.25, 3))
-  const handleZoomOut = () => setImageZoom(prev => Math.max(prev - 0.25, 0.25))
-  const handleResetZoom = () => setImageZoom(1)
-  const handleWheelZoom = (e: React.WheelEvent) => {
-    e.preventDefault()
-    if (e.deltaY < 0) {
-      handleZoomIn()
-    } else {
-      handleZoomOut()
-    }
-  }
-  const handleDownload = async () => {
-    if (!imagePopupUrl) return
+  // ImagePreviewModal handlers
+  const handleImagePreviewOpen = (url: string) => {
+    setImagePreviewUrl(url);
+  };
 
-    try {
-      // Fetch the image as a blob
-      const response = await fetch(imagePopupUrl, {
-        credentials: 'include' // Include cookies for authentication
-      })
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch image')
-      }
-
-      const blob = await response.blob()
-
-      // Create a blob URL for download
-      const blobUrl = URL.createObjectURL(blob)
-
-      // Create download link
-      const link = document.createElement('a')
-      link.href = blobUrl
-      link.download = `image-${Date.now()}.jpg`
-      document.body.appendChild(link)
-      link.click()
-      document.body.removeChild(link)
-
-      // Clean up the blob URL
-      URL.revokeObjectURL(blobUrl)
-    } catch (error) {
-      console.error('Download failed:', error)
-      // Fallback to direct download
-      const link = document.createElement('a')
-      link.href = imagePopupUrl
-      link.download = `image-${Date.now()}.jpg`
-      link.target = '_blank'
-      document.body.appendChild(link)
-      link.click()
-      document.body.removeChild(link)
-    }
-  }
-  const handleCloseImagePopup = () => {
-    setImagePopupUrl(null)
-    setImageZoom(1)
-  }
+  const handleImagePreviewClose = () => {
+    setImagePreviewUrl(null);
+  };
 
     // WebSocket message listener
     useEffect(() => {
@@ -603,7 +555,7 @@ function PostDetailPage() {
         }
       }}
     >
-      <div className="post-page-container h-full overflow-y-auto scrollbar-hide" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+      <div className="post-page-container h-full overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
         {/* Post Card */}
         <div className="bg-gradient-to-br from-white/10 via-white/5 to-transparent backdrop-blur-xl rounded-3xl border border-white/20 shadow-2xl p-8 mb-8 hover:shadow-emerald-500/10 transition-all duration-300 group">
           {/* Post Header */}
@@ -715,7 +667,7 @@ function PostDetailPage() {
           {/* Post Image */}
           {post.image_url && (
             <div className="mb-6 flex justify-center">
-              <div className="inline-block border border-white/20 rounded-2xl overflow-hidden">
+              <div className="inline-block border border-white/20 rounded-2xl overflow-hidden cursor-pointer" onClick={() => handleImagePreviewOpen(post.image_url!.startsWith('http') ? post.image_url! : `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}${post.image_url}`)}>
                 <Image
                   src={post.image_url.startsWith('http') ?
                     post.image_url :
@@ -998,7 +950,7 @@ function PostDetailPage() {
                                   height={300}
                                   unoptimized={true}
                                   className="max-w-full max-h-72 object-contain hover:scale-105 cursor-pointer transition-transform duration-500 rounded-2xl"
-                                  onClick={() => comment.image_url && setImagePopupUrl(comment.image_url.startsWith('http') ?
+                                  onClick={() => comment.image_url && handleImagePreviewOpen(comment.image_url.startsWith('http') ?
                                     comment.image_url :
                                     `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}${comment.image_url}`
                                   )}
@@ -1287,77 +1239,12 @@ function PostDetailPage() {
           )}
         </AnimatePresence>
 
-        {/* Image Popup Modal */}
-        {imagePopupUrl && (
-          <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-[9999] flex items-center justify-center" onClick={handleCloseImagePopup}>
-            {/* Control Bar */}
-            <div className="absolute top-20 left-1/2 transform -translate-x-1/2 z-[10000] flex items-center space-x-4 bg-black/50 backdrop-blur-xl rounded-2xl p-3 border border-white/20">
-              <button
-                onClick={(e) => { e.stopPropagation(); handleZoomOut(); }}
-                className="p-3 text-white/70 hover:text-white hover:bg-white/10 rounded-xl transition-all duration-300 hover:scale-105"
-                title="Zoom Out"
-              >
-                <ZoomOut className="w-5 h-5" />
-              </button>
-              <button
-                onClick={(e) => { e.stopPropagation(); handleResetZoom(); }}
-                className="px-3 py-2 text-white/70 hover:text-white hover:bg-white/10 rounded-xl transition-all duration-300 hover:scale-105 text-sm font-medium"
-                title="Reset Zoom"
-              >
-                100%
-              </button>
-              <span className="text-white text-sm font-medium min-w-[60px] text-center">
-                {Math.round(imageZoom * 100)}%
-              </span>
-              <button
-                onClick={(e) => { e.stopPropagation(); handleZoomIn(); }}
-                className="p-3 text-white/70 hover:text-white hover:bg-white/10 rounded-xl transition-all duration-300 hover:scale-105"
-                title="Zoom In"
-              >
-                <ZoomIn className="w-5 h-5" />
-              </button>
-              <div className="w-px h-8 bg-white/20 mx-2"></div>
-              <button
-                onClick={(e) => { e.stopPropagation(); handleDownload(); }}
-                className="p-3 text-white/70 hover:text-white hover:bg-white/10 rounded-xl transition-all duration-300 hover:scale-105"
-                title="Download Image"
-              >
-                <Download className="w-5 h-5" />
-              </button>
-              <div className="w-px h-8 bg-white/20 mx-2"></div>
-              <button
-                onClick={(e) => { e.stopPropagation(); handleCloseImagePopup(); }}
-                className="p-3 text-white/70 hover:text-white hover:bg-white/10 rounded-xl transition-all duration-300 hover:scale-105"
-                title="Close"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* Image Container */}
-            <div className="relative w-full h-full max-w-[90vw] max-h-[calc(100vh-200px)] flex items-center justify-center">
-              <div
-                style={{
-                  transform: `scale(${imageZoom})`,
-                  transformOrigin: 'center center'
-                }}
-              >
-                <Image
-                  src={imagePopupUrl}
-                  alt="Full size image"
-                  width={800}
-                  height={600}
-                  unoptimized={true}
-                  className="max-w-full max-h-full object-contain rounded-2xl shadow-2xl transition-transform duration-300 cursor-grab active:cursor-grabbing select-none"
-                  onClick={(e) => e.stopPropagation()}
-                  onDoubleClick={handleResetZoom}
-                  onWheel={handleWheelZoom}
-                  draggable={false}
-                />
-              </div>
-            </div>
-          </div>
-        )}
+        {/* ImagePreviewModal */}
+        <ImagePreviewModal
+          isOpen={!!imagePreviewUrl}
+          imageUrl={imagePreviewUrl}
+          onClose={handleImagePreviewClose}
+        />
 
         {/* Delete Confirmation Modal */}
         <AnimatePresence>

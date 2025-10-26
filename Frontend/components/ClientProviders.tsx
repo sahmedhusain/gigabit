@@ -14,6 +14,7 @@ import { NotificationToastProvider } from "@/context/NotificationToastContext";
 import { SidebarDataProvider } from "@/context/SidebarDataContext";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import NotificationToastContainer from "@/components/NotificationToastContainer";
+import BackgroundThemeProvider from "@/components/BackgroundThemeProvider";
 import type { EmotionCache } from '@emotion/cache';
 
 // Create a client-side emotion cache
@@ -91,18 +92,20 @@ export default function ClientProviders({
       <MUIThemeProvider theme={theme}>
         {/* <CssBaseline /> */}
         <ErrorBoundary>
-          <AuthProvider>
-            <WebSocketProvider>
-              <SidebarDataProvider>
-                <ToastProvider>
-                  <NotificationToastProvider>
-                    {children}
-                    <NotificationToastContainer />
-                  </NotificationToastProvider>
-                </ToastProvider>
-              </SidebarDataProvider>
-            </WebSocketProvider>
-          </AuthProvider>
+          <BackgroundThemeProvider>
+            <AuthProvider>
+              <WebSocketProvider>
+                <SidebarDataProvider>
+                  <ToastProvider>
+                    <NotificationToastProvider>
+                      {children}
+                      <NotificationToastContainer />
+                    </NotificationToastProvider>
+                  </ToastProvider>
+                </SidebarDataProvider>
+              </WebSocketProvider>
+            </AuthProvider>
+          </BackgroundThemeProvider>
         </ErrorBoundary>
       </MUIThemeProvider>
     </CacheProvider>

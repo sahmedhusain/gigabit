@@ -1,6 +1,6 @@
 'use client'
 import React from 'react'
-import { Globe, EyeOff, Lock, User as UserIcon, Heart, MessageSquare, Send } from 'lucide-react'
+import { Heart, MessageSquare, Send } from 'lucide-react'
 import Image from 'next/image'
 import { motion } from 'framer-motion'
 import { useRouter } from 'next/navigation'
@@ -29,9 +29,11 @@ interface SharedPostMessageProps {
   isCurrentUser: boolean
   messageId: number
   messageCreatedAt: string
+  canDelete?: boolean
+  onDeleteClick?: (messageId: number, event: React.MouseEvent) => void
 }
 
-const SharedPostMessage: React.FC<SharedPostMessageProps> = ({ sharedPost, isCurrentUser, messageId, messageCreatedAt }) => {
+const SharedPostMessage: React.FC<SharedPostMessageProps> = ({ sharedPost, isCurrentUser, messageId, messageCreatedAt, canDelete = false, onDeleteClick }) => {
   const router = useRouter()
 
   // Parse various timestamp formats robustly: ISO strings, milliseconds, or seconds
@@ -71,38 +73,6 @@ const SharedPostMessage: React.FC<SharedPostMessageProps> = ({ sharedPost, isCur
     return d
   }
 
-  const getPrivacyIcon = (privacy: string) => {
-    switch (privacy) {
-      case 'public':
-        return <Globe className="w-3 h-3" />
-      case 'followers':
-        return <EyeOff className="w-3 h-3" />
-      case 'friends':
-        return <Lock className="w-3 h-3" />
-      case 'listed':
-        return <UserIcon className="w-3 h-3" />
-      default:
-        return <Globe className="w-3 h-3" />
-    }
-  }
-
-  const formatTimeAgo = (dateString: string) => {
-    const date = new Date(dateString)
-    const now = new Date()
-    const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000)
-
-    if (diffInSeconds < 60) return 'Just now'
-    if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m ago`
-    if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h ago`
-    if (diffInSeconds < 604800) return `${Math.floor(diffInSeconds / 86400)}d ago`
-
-    return date.toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric'
-    })
-  }
-
   const formatMessageTime = (dateString: string) => {
     const date = parseDate(dateString)
     if (isNaN(date.getTime()) || date.getTime() === 0) return ''
@@ -110,20 +80,10 @@ const SharedPostMessage: React.FC<SharedPostMessageProps> = ({ sharedPost, isCur
   }
 
   return (
-    <motion.div
-      className={`relative px-5 py-4 rounded-2xl shadow-xl backdrop-blur-lg border transition-all duration-300 hover:shadow-2xl hover:scale-[1.02] cursor-pointer ${
-        isCurrentUser
-          ? 'bg-gradient-to-br from-emerald-500 via-teal-500 to-cyan-600 text-white border-emerald-400/40 rounded-br-lg shadow-emerald-500/20'
-          : 'bg-gradient-to-br from-white/15 to-white/10 text-white border-white/25 rounded-bl-lg hover:from-white/20 hover:to-white/15 shadow-white/10'
-      }`}
-      data-message-id={messageId}
-      whileHover={{ scale: 1.02 }}
-      transition={{ duration: 0.2 }}
-      onClick={() => router.push(`/post/${sharedPost.id}`)}
-    >
+    <div className={`w-full max-w-md ${isCurrentUser ? 'ml-auto' : 'mr-auto'}`}>
       {/* Shared Post Header */}
       <div className="flex items-center space-x-2 mb-3">
-        <div className="w-4 h-4 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 flex items-center justify-center">
+        <div className="w-4 h-4 rounded-full bg-gradient-to-r from-blue-500 to-cyan-500 flex items-center justify-center">
           <Send className="w-2.5 h-2.5 text-white" />
         </div>
         <span className="text-xs font-medium text-white/70">
@@ -137,13 +97,39 @@ const SharedPostMessage: React.FC<SharedPostMessageProps> = ({ sharedPost, isCur
 
       {/* Post Content Container */}
       <motion.div
-        className={`rounded-xl p-4 border transition-all duration-300 ${
-          isCurrentUser
-            ? 'bg-white/10 border-white/20 hover:bg-white/15'
-            : 'bg-gradient-to-br from-emerald-500/10 to-teal-500/10 border-emerald-400/20 hover:from-emerald-500/15 hover:to-teal-500/15'
+        className={`relative rounded-xl p-4 border transition-all duration-300 hover:shadow-lg cursor-pointer bg-gradient-to-br from-white/10 to-white/5 border-white/20 hover:from-white/15 hover:to-white/10 ${
+          isCurrentUser ? 'rounded-br-lg' : 'rounded-bl-lg'
         }`}
         whileHover={{ y: -1 }}
+        transition={{ duration: 0.2 }}
+        onClick={() => router.push(`/post/${sharedPost.id}`)}
       >
+        {/* Message menu button - positioned outside container in top right */}
+        {canDelete && onDeleteClick && (
+          <motion.button
+            onClick={(e) => {
+              e.preventDefault()
+              e.stopPropagation()
+              onDeleteClick(messageId, e)
+            }}
+            className="absolute -top-4 -right-1 z-20 p-2 text-white/70 hover:text-white transition-all duration-200 rounded-full hover:bg-white/10"
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.9 }}
+            title="Message options"
+          >
+            <div className="flex space-x-0.5">
+              <div className="w-0.5 h-0.5 bg-current rounded-full"></div>
+              <div className="w-0.5 h-0.5 bg-current rounded-full"></div>
+              <div className="w-0.5 h-0.5 bg-current rounded-full"></div>
+            </div>
+          </motion.button>
+        )}
+        {/* Message tail */}
+        <div className={`absolute bottom-0 ${
+          isCurrentUser
+            ? '-right-2 border-l-emerald-400 border-l-8 border-t-8 border-t-transparent border-b-8 border-b-transparent'
+            : '-left-2 border-r-white/20 border-r-8 border-t-8 border-t-transparent border-b-8 border-b-transparent'
+        }`}></div>
         {/* Post Header */}
         <div className="flex items-start space-x-3 mb-3">
           {/* Author Avatar */}
@@ -190,17 +176,6 @@ const SharedPostMessage: React.FC<SharedPostMessageProps> = ({ sharedPost, isCur
                   @{sharedPost.user.nickname}
                 </span>
               )}
-            </div>
-
-            <div className="flex items-center space-x-2 mt-1">
-              <span className="text-xs text-white/60">
-                {formatTimeAgo(sharedPost.created_at)}
-              </span>
-              <span className="text-xs text-white/40">·</span>
-              <div className="flex items-center space-x-1 text-white/60">
-                {getPrivacyIcon(sharedPost.privacy)}
-                <span className="text-xs capitalize">{sharedPost.privacy}</span>
-              </div>
             </div>
           </div>
         </div>
@@ -251,36 +226,18 @@ const SharedPostMessage: React.FC<SharedPostMessageProps> = ({ sharedPost, isCur
 
             {/* Likes */}
             <motion.button
-              className={`flex items-center space-x-1 transition-colors group ${
-                sharedPost.like_count > 0 ? 'text-red-400' : 'text-white/70 hover:text-red-400'
-              }`}
+              className="flex items-center space-x-1 text-white/70 hover:text-white transition-colors group"
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
               onClick={(e) => e.stopPropagation()}
             >
-              <Heart className={`w-4 h-4 group-hover:scale-110 transition-transform ${
-                sharedPost.like_count > 0 ? 'fill-current' : ''
-              }`} />
+              <Heart className="w-4 h-4 group-hover:scale-110 transition-transform" />
               <span className="text-xs font-medium">{sharedPost.like_count}</span>
             </motion.button>
           </div>
         </div>
       </motion.div>
-
-      {/* Message tail */}
-      <div className={`absolute bottom-0 ${
-        isCurrentUser
-          ? '-right-2 border-l-emerald-400 border-l-8 border-t-8 border-t-transparent border-b-8 border-b-transparent'
-          : '-left-2 border-r-white/20 border-r-8 border-t-8 border-t-transparent border-b-8 border-b-transparent'
-      }`}></div>
-
-      {/* Hover effect */}
-      <motion.div
-        className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent opacity-0 rounded-2xl"
-        whileHover={{ opacity: 1 }}
-        transition={{ duration: 0.2 }}
-      />
-    </motion.div>
+    </div>
   )
 }
 

@@ -47,14 +47,14 @@ function SettingsPage() {
       label: 'Privacy',
       icon: Lock,
       description: 'Control your privacy settings',
-      color: 'from-purple-500 to-violet-600'
+      color: 'from-blue-500 to-cyan-600'
     },
     {
       id: 'appearance',
       label: 'Appearance',
       icon: Palette,
       description: 'Customize your visual experience',
-      color: 'from-indigo-500 to-purple-600'
+      color: 'from-blue-500 to-cyan-600'
     },
     {
       id: 'notifications',

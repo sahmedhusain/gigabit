@@ -215,9 +215,9 @@ export default function GroupSearchResult({ result }: GroupSearchResultProps) {
 
             {/* Enhanced Metadata */}
             <div className="flex items-center space-x-4 mt-3">
-              <div className="flex items-center space-x-2 bg-purple-500/10 border border-purple-500/20 rounded-xl px-3 py-1">
-                <div className="w-2 h-2 bg-purple-400 rounded-full"></div>
-                <span className="text-purple-300 text-xs font-medium">Group</span>
+              <div className="flex items-center space-x-2 bg-blue-500/10 border border-blue-500/20 rounded-xl px-3 py-1">
+                <div className="w-2 h-2 bg-blue-400 rounded-full"></div>
+                <span className="text-blue-300 text-xs font-medium">Group</span>
               </div>
               <div className="flex items-center space-x-2 bg-emerald-500/10 border border-emerald-500/20 rounded-xl px-3 py-1">
                 <Users className="w-3 h-3 text-emerald-400" />

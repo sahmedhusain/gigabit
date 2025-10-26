@@ -13,7 +13,13 @@ import {
   Trash2, 
   Search, 
   AlertCircle,
-  Clock
+  Clock,
+  FileText,
+  BarChart3,
+  CheckCircle,
+  Reply,
+  MessageSquare,
+  Send
 } from 'lucide-react'
 import { useNotifications } from '@/hooks/useNotifications'
 import { useRouter } from 'next/navigation'
@@ -93,19 +99,49 @@ export default function NotificationsPage() {
   const getNotificationIcon = (type: string) => {
     switch (type) {
       case 'like':
+      case 'post_liked':
         return <Heart className="w-5 h-5 text-red-400" />
       case 'comment':
+      case 'post_commented':
         return <MessageCircle className="w-5 h-5 text-blue-400" />
       case 'follow':
+      case 'follow_request':
         return <UserPlus className="w-5 h-5 text-emerald-400" />
+      case 'follow_accepted':
+        return <CheckCircle className="w-5 h-5 text-green-400" />
       case 'event_invite':
       case 'event_reminder':
-        return <Calendar className="w-5 h-5 text-purple-400" />
+      case 'event_created':
+        return <Calendar className="w-5 h-5 text-blue-400" />
+      case 'event_response':
+        return <CheckCircle className="w-5 h-5 text-purple-400" />
       case 'message':
+      case 'new_message':
         return <Mail className="w-5 h-5 text-cyan-400" />
       case 'group_invite':
+      case 'join_request':
       case 'group_join':
         return <Users className="w-5 h-5 text-orange-400" />
+      case 'join_accepted':
+        return <CheckCircle className="w-5 h-5 text-green-400" />
+      case 'new_post':
+        return <FileText className="w-5 h-5 text-indigo-400" />
+      case 'new_poll':
+        return <BarChart3 className="w-5 h-5 text-teal-400" />
+      case 'poll_voted':
+        return <CheckCircle className="w-5 h-5 text-lime-400" />
+      case 'comment_replied':
+        return <Reply className="w-5 h-5 text-pink-400" />
+      case 'group_message':
+        return <MessageSquare className="w-5 h-5 text-violet-400" />
+      case 'private_message':
+        return <Send className="w-5 h-5 text-cyan-400" />
+      case 'group_post':
+      case 'group_post_liked':
+        return <FileText className="w-5 h-5 text-amber-400" />
+      case 'image_shared':
+      case 'post_shared':
+        return <Send className="w-5 h-5 text-rose-400" />
       default:
         return <Bell className="w-5 h-5 text-gray-400" />
     }
@@ -325,9 +361,130 @@ export default function NotificationsPage() {
               {filteredNotifications.map((notification) => (
                 <div
                   key={notification.id}
-                  className={`group bg-white/5 backdrop-blur-xl rounded-xl border border-white/10 p-4 hover:bg-white/10 transition-all duration-300 ${
+                  className={`group bg-white/5 backdrop-blur-xl rounded-xl border border-white/10 p-4 hover:bg-white/10 transition-all duration-300 cursor-pointer ${
                     !notification.is_read ? 'border-emerald-500/30 bg-emerald-500/5' : ''
                   }`}
+                  onClick={() => {
+                    // Handle redirection based on notification type and redirect_url
+                    if (notification.redirect_url) {
+                      // Use the backend-provided redirect URL
+                      router.push(notification.redirect_url);
+                    } else {
+                      // Fallback redirection based on type and redirect_type
+                      switch (notification.redirect_type || notification.type) {
+                        case 'profile':
+                        case 'follow_request':
+                        case 'follow_accepted':
+                          router.push(`/profile/${notification.actor.id}`);
+                          break;
+                        case 'post':
+                        case 'post_liked':
+                        case 'post_commented':
+                        case 'comment_replied':
+                        case 'new_post':
+                        case 'post_shared':
+                        case 'image_shared':
+                          // Try to extract post ID from various patterns
+                          const postPatterns = [
+                            /post (\d+)/i,
+                            /post\/(\d+)/i,
+                            /#(\d+)/
+                          ];
+                          let postId = null;
+                          for (const pattern of postPatterns) {
+                            const match = notification.message.match(pattern);
+                            if (match) {
+                              postId = match[1];
+                              break;
+                            }
+                          }
+                          if (postId) {
+                            router.push(`/post/${postId}`);
+                          } else {
+                            // Fallback to actor's profile
+                            router.push(`/profile/${notification.actor.id}`);
+                          }
+                          break;
+                        case 'poll':
+                        case 'new_poll':
+                        case 'poll_voted':
+                          // Try to extract poll ID
+                          const pollMatch = notification.message.match(/poll (\d+)/i) || 
+                                          notification.message.match(/poll\/(\d+)/i);
+                          if (pollMatch) {
+                            router.push(`/poll/${pollMatch[1]}`);
+                          } else {
+                            router.push(`/profile/${notification.actor.id}`);
+                          }
+                          break;
+                        case 'event':
+                        case 'event_created':
+                        case 'event_response':
+                        case 'event_invite':
+                        case 'event_reminder':
+                          // Try to extract event ID
+                          const eventMatch = notification.message.match(/event (\d+)/i) || 
+                                           notification.message.match(/event\/(\d+)/i);
+                          if (eventMatch) {
+                            router.push(`/event/${eventMatch[1]}`);
+                          } else {
+                            router.push(`/events`);
+                          }
+                          break;
+                        case 'group':
+                        case 'group_invite':
+                        case 'join_request':
+                        case 'join_accepted':
+                        case 'group_message':
+                        case 'group_post':
+                        case 'group_post_liked':
+                          // Try to extract group ID
+                          const groupPatterns = [
+                            /group (\d+)/i,
+                            /group\/(\d+)/i,
+                            /#(\d+)/
+                          ];
+                          let groupId = null;
+                          for (const pattern of groupPatterns) {
+                            const match = notification.message.match(pattern);
+                            if (match) {
+                              groupId = match[1];
+                              break;
+                            }
+                          }
+                          if (groupId) {
+                            router.push(`/group/${groupId}`);
+                          } else {
+                            router.push(`/profile/${notification.actor.id}`);
+                          }
+                          break;
+                        case 'chat':
+                        case 'private_message':
+                        case 'new_message':
+                          // Navigate to private chat using unified URL
+                          router.push(`/chats/all?chat=${notification.actor.id}`);
+                          break;
+                        case 'group_chat':
+                        case 'group_message':
+                          // Try to extract group ID for group chat
+                          const groupChatMatch = notification.message.match(/group (\d+)/i);
+                          if (groupChatMatch) {
+                            router.push(`/chats/all?group=${groupChatMatch[1]}`);
+                          } else {
+                            router.push(`/chats/all`);
+                          }
+                          break;
+                        default:
+                          // Default to actor's profile
+                          router.push(`/profile/${notification.actor.id}`);
+                      }
+                    }
+                    
+                    // Mark as read if not already read
+                    if (!notification.is_read) {
+                      markAsRead(notification.id);
+                    }
+                  }}
                 >
                   <div className="flex items-start space-x-4">
                     {/* Selection Checkbox */}

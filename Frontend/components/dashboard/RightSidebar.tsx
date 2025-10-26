@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import {
@@ -350,10 +350,10 @@ export default function RightSidebar({
   }
 
   // Close events slide-up
-  const closeEventsSlideUp = () => {
+  const closeEventsSlideUp = useCallback(() => {
     setShowEventsSlideUp(false)
     setSlideUpDate(null)
-  }
+  }, [])
 
   // Check if date has events
   const hasEvents = (date: Date) => {
@@ -364,6 +364,21 @@ export default function RightSidebar({
         eventDate.getDate() === date.getDate()
     })
   }
+
+  // Close events slide-up when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (showEventsSlideUp) {
+        const target = event.target as Element;
+        if (!target.closest('.events-overflow-modal')) {
+          closeEventsSlideUp();
+        }
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showEventsSlideUp, closeEventsSlideUp]);
 
   const toggleSection = (section: 'calendar' | 'following' | 'invitations') => {
     setExpandedSection(expandedSection === section ? null : section)
@@ -736,97 +751,101 @@ export default function RightSidebar({
                   </div>
                 </div>
 
-                {/* Events Slide-Up Modal - Overflowing calendar container */}
-                {showEventsSlideUp && slideUpDate && (
-                  <div className="events-overflow-modal transform transition-all duration-300 ease-out animate-slide-up">
-                    <div className="bg-gradient-to-br from-slate-800 via-slate-900 to-gray-900 rounded-2xl shadow-2xl border border-slate-600/30 overflow-hidden backdrop-blur-sm">
-                      {/* Overlay for extra depth */}
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-white/5 rounded-2xl"></div>
-                      {/* Content wrapper */}
-                      <div className="relative z-10">
-                        {/* Header */}
-                        <div className="flex items-center justify-between p-4 border-b border-white/20">
-                          <div>
-                            <h3 className="text-white font-bold text-base">
-                              {(() => {
-                                const isSameDay = (date1: Date, date2: Date) => {
-                                  return date1.getDate() === date2.getDate() &&
-                                    date1.getMonth() === date2.getMonth() &&
-                                    date1.getFullYear() === date2.getFullYear();
-                                };
+                {/* Calendar is now non-scrollable - events shown in slide-up modal */}
+              </div>
+            )}
 
-                                return isSameDay(slideUpDate, new Date())
-                                  ? "Today's Events"
-                                  : `Events for ${slideUpDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
-                              })()}
-                            </h3>
-                            <p className="text-white/80 text-xs mt-1">
-                              {slideUpDate.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
-                            </p>
-                          </div>
-                          <button
-                            onClick={closeEventsSlideUp}
-                            className="p-2 rounded-lg hover:bg-white/15 transition-colors"
-                            title="Close events"
-                          >
-                            <X className="w-5 h-5 text-white/80" />
-                          </button>
-                        </div>
-
-                        {/* Events List */}
-                        <div className="max-h-60 overflow-y-auto scrollbar-hide p-4 space-y-3">
+            {/* Events Slide-Up Modal - Positioned in overall calendar container */}
+            {showEventsSlideUp && slideUpDate && (
+              <div className="events-overflow-modal transform transition-all duration-300 ease-out animate-slide-up">
+                <div className="bg-gradient-to-br from-slate-800 via-slate-900 to-gray-900 rounded-2xl shadow-2xl border border-slate-600/30 overflow-hidden backdrop-blur-sm">
+                  {/* Overlay for extra depth */}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-white/5 rounded-2xl"></div>
+                  {/* Content wrapper */}
+                  <div className="relative z-10">
+                    {/* Header */}
+                    <div className="flex items-center justify-between p-4 border-b border-white/20">
+                      <div>
+                        <h3 className="text-white font-bold text-base">
                           {(() => {
-                            const eventsForDate = getEventsForDate(slideUpDate);
-                            return eventsForDate.map((event) => {
-                              // Find the full event details
-                              const fullEvent = events.find(e => e.id === event.id);
-                              return (
-                                <div key={event.id} className="bg-white/15 rounded-lg p-3 border border-white/20 hover:bg-white/25 transition-colors">
-                                  <div className="flex items-start justify-between mb-2">
-                                    <div className="flex items-center space-x-2 flex-1">
-                                      <span className="text-sm text-white font-medium">{event.title}</span>
-                                      {fullEvent?.canceled && (
-                                        <span className="px-1.5 py-0.5 bg-red-500 text-white text-xs rounded-full font-medium">
-                                          CANCELED
-                                        </span>
-                                      )}
-                                      {fullEvent && !fullEvent.canceled && new Date(fullEvent.event_time) < new Date() && (
-                                        <span className="px-1.5 py-0.5 bg-gray-500 text-white text-xs rounded-full font-medium">
-                                          ENDED
-                                        </span>
-                                      )}
-                                    </div>
-                                    <span className="text-xs text-white/70 ml-2 flex-shrink-0">{event.time}</span>
-                                  </div>
-                                  {fullEvent?.location && (
-                                    <div className="flex items-center space-x-2 mb-2">
-                                      <MapPin className="w-3 h-3 text-white/60" />
-                                      <span className="text-xs text-white/80">{fullEvent.location}</span>
-                                    </div>
-                                  )}
-                                  {fullEvent?.group && (
-                                    <div className="flex items-center space-x-2 mb-2">
-                                      <Users className="w-3 h-3 text-white/60" />
-                                      <span className="text-xs text-white/80">{fullEvent.group.title}</span>
-                                    </div>
-                                  )}
-                                  <div className="flex items-center space-x-2">
-                                    <div className={`w-2 h-2 ${event.color} rounded-full`}></div>
-                                    <span className="text-xs text-white/80">
-                                      {fullEvent?.going_count || 0} going • {fullEvent?.not_going_count || 0} not going
-                                    </span>
-                                  </div>
-                                </div>
-                              );
-                            });
+                            const isSameDay = (date1: Date, date2: Date) => {
+                              return date1.getDate() === date2.getDate() &&
+                                date1.getMonth() === date2.getMonth() &&
+                                date1.getFullYear() === date2.getFullYear();
+                            };
+
+                            return isSameDay(slideUpDate, new Date())
+                              ? "Today's Events"
+                              : `Events for ${slideUpDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
                           })()}
-                        </div>
+                        </h3>
+                        <p className="text-white/80 text-xs mt-1">
+                          {slideUpDate.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                        </p>
                       </div>
+                      <button
+                        onClick={closeEventsSlideUp}
+                        className="p-2 rounded-lg hover:bg-white/15 transition-colors"
+                        title="Close events"
+                      >
+                        <X className="w-5 h-5 text-white/80" />
+                      </button>
+                    </div>
+
+                    {/* Events List */}
+                    <div className="max-h-60 overflow-y-auto scrollbar-hide p-4 space-y-3">
+                      {(() => {
+                        const eventsForDate = getEventsForDate(slideUpDate);
+                        return eventsForDate.map((event) => {
+                          // Find the full event details
+                          const fullEvent = events.find(e => e.id === event.id);
+                          return (
+                            <div 
+                              key={event.id} 
+                              className="bg-white/15 rounded-lg p-3 border border-white/20 hover:bg-white/25 transition-colors cursor-pointer"
+                              onClick={() => router.push(`/events/all?event=${event.id}`)}
+                            >
+                              <div className="flex items-start justify-between mb-2">
+                                <div className="flex items-center space-x-2 flex-1">
+                                  <span className="text-sm text-white font-medium">{event.title}</span>
+                                  {fullEvent?.canceled && (
+                                    <span className="px-1.5 py-0.5 bg-red-500 text-white text-xs rounded-full font-medium">
+                                      CANCELED
+                                    </span>
+                                  )}
+                                  {fullEvent && !fullEvent.canceled && new Date(fullEvent.event_time) < new Date() && (
+                                    <span className="px-1.5 py-0.5 bg-gray-500 text-white text-xs rounded-full font-medium">
+                                      ENDED
+                                    </span>
+                                  )}
+                                </div>
+                                <span className="text-xs text-white/70 ml-2 flex-shrink-0">{event.time}</span>
+                              </div>
+                              {fullEvent?.location && (
+                                <div className="flex items-center space-x-2 mb-2">
+                                  <MapPin className="w-3 h-3 text-white/60" />
+                                  <span className="text-xs text-white/80">{fullEvent.location}</span>
+                                </div>
+                              )}
+                              {fullEvent?.group && (
+                                <div className="flex items-center space-x-2 mb-2">
+                                  <Users className="w-3 h-3 text-white/60" />
+                                  <span className="text-xs text-white/80">{fullEvent.group.title}</span>
+                                </div>
+                              )}
+                              <div className="flex items-center space-x-2">
+                                <div className={`w-2 h-2 ${event.color} rounded-full`}></div>
+                                <span className="text-xs text-white/80">
+                                  {fullEvent?.going_count || 0} going • {fullEvent?.not_going_count || 0} not going
+                                </span>
+                              </div>
+                            </div>
+                          );
+                        });
+                      })()}
                     </div>
                   </div>
-                )}
-
-                {/* Calendar is now non-scrollable - events shown in slide-up modal */}
+                </div>
               </div>
             )}
           </div>
@@ -1282,7 +1301,7 @@ export default function RightSidebar({
                                 console.log("Requester:", request.user?.avatar),
                                 <div
                                   key={`follow-${request.request_id}`}
-                                  className="relative bg-gradient-to-br from-blue-500/10 via-purple-500/10 to-pink-500/10 backdrop-blur-sm rounded-xl p-3 border border-blue-400/20 hover:border-blue-400/40 shadow-lg hover:shadow-blue-500/10 transition-all duration-300 group overflow-hidden"
+                                  className="relative bg-gradient-to-br from-blue-500/10 via-cyan-500/10 to-teal-500/10 backdrop-blur-sm rounded-xl p-3 border border-blue-400/20 hover:border-blue-400/40 shadow-lg hover:shadow-blue-500/10 transition-all duration-300 group overflow-hidden"
                                 >
                                   {/* Subtle background pattern */}
                                   <div className="absolute inset-0 bg-gradient-to-br from-transparent via-white/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
@@ -1300,11 +1319,11 @@ export default function RightSidebar({
                                             className="w-10 h-10 rounded-full border-2 border-blue-400/50 group-hover:border-blue-400 group-hover:scale-105 transition-all duration-300 shadow-lg"
                                           />
                                         ) : (
-                                          <div className="w-10 h-10 rounded-full bg-gradient-to-r from-blue-400 to-purple-500 flex items-center justify-center text-white font-bold border-2 border-blue-400/50 group-hover:border-blue-400 group-hover:scale-105 transition-all duration-300 shadow-lg">
+                                          <div className="w-10 h-10 rounded-full bg-gradient-to-r from-blue-400 to-cyan-500 flex items-center justify-center text-white font-bold border-2 border-blue-400/50 group-hover:border-blue-400 group-hover:scale-105 transition-all duration-300 shadow-lg">
                                             {getUserInitials(request.user)}
                                           </div>
                                         )}
-                                        <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full border-2 border-white flex items-center justify-center shadow-md">
+                                        <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-full border-2 border-white flex items-center justify-center shadow-md">
                                           <UserPlus className="w-2 h-2 text-white" />
                                         </div>
                                       </div>

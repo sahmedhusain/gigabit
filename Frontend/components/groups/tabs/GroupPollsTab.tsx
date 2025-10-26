@@ -151,6 +151,9 @@ const GroupPollsTab: React.FC<GroupPollsTabProps> = ({ groupId }) => {
     return false
   }
 
+  // Check if user has voted in all polls
+  const hasVotedInAllPolls = polls.length > 0 && polls.every(poll => poll.user_votes && poll.user_votes.length > 0)
+
   const canCreatePolls = () => {
     if (!groupPermissions) return false
     return userRole?.is_admin_or_creator || groupPermissions.create_polls === 'all_members'
@@ -233,6 +236,7 @@ const GroupPollsTab: React.FC<GroupPollsTabProps> = ({ groupId }) => {
               onDelete={handleDeletePoll}
               onExpire={handleExpirePoll}
               canManage={canManagePoll(poll)}
+              hideCounts={hasVotedInAllPolls}
             />
           ))
         )}

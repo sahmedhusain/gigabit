@@ -344,23 +344,23 @@ export default function PrivacySettings() {
           transition={{ delay: 0.6, duration: 0.6, ease: "easeOut" }}
           className="relative group"
         >
-          <div className="absolute -inset-0.5 bg-gradient-to-r from-purple-500/20 via-violet-500/20 to-indigo-500/20 rounded-3xl blur opacity-30 group-hover:opacity-50 transition-opacity duration-500"></div>
-          <div className="relative p-8 bg-gradient-to-br from-slate-800/40 via-slate-900/40 to-slate-800/40 backdrop-blur-2xl border-2 border-purple-400/20 rounded-3xl shadow-2xl overflow-hidden">
-            <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl from-purple-500/10 to-transparent rounded-full -translate-y-8 translate-x-8"></div>
-            <div className="absolute bottom-0 left-0 w-24 h-24 bg-gradient-to-tr from-violet-500/10 to-transparent rounded-full translate-y-6 -translate-x-6"></div>
+          <div className="absolute -inset-0.5 bg-gradient-to-r from-blue-500/20 via-cyan-500/20 to-teal-500/20 rounded-3xl blur opacity-30 group-hover:opacity-50 transition-opacity duration-500"></div>
+          <div className="relative p-8 bg-gradient-to-br from-slate-800/40 via-slate-900/40 to-slate-800/40 backdrop-blur-2xl border-2 border-blue-400/20 rounded-3xl shadow-2xl overflow-hidden">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl from-blue-500/10 to-transparent rounded-full -translate-y-8 translate-x-8"></div>
+            <div className="absolute bottom-0 left-0 w-24 h-24 bg-gradient-to-tr from-cyan-500/10 to-transparent rounded-full translate-y-6 -translate-x-6"></div>
 
             <div className="relative z-10">
               <div className="flex items-center space-x-4 mb-6">
                 <motion.div
                   whileHover={{ scale: 1.05, rotate: 5 }}
                   transition={{ duration: 0.3 }}
-                  className="p-3 bg-gradient-to-br from-purple-500/20 to-violet-500/20 backdrop-blur-xl rounded-2xl border border-purple-400/30 shadow-lg"
+                  className="p-3 bg-gradient-to-br from-blue-500/20 to-cyan-500/20 backdrop-blur-xl rounded-2xl border border-blue-400/30 shadow-lg"
                 >
-                  <Shield className="w-6 h-6 text-purple-400" />
+                  <Shield className="w-6 h-6 text-blue-400" />
                 </motion.div>
                 <div>
                   <h3 className="text-xl font-bold text-white">Personal Information Privacy</h3>
-                  <p className="text-purple-200/70">Control who can see your birthday and gender</p>
+                  <p className="text-blue-200/70">Control who can see your birthday and gender</p>
                 </div>
               </div>
 
@@ -370,19 +370,19 @@ export default function PrivacySettings() {
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.1, duration: 0.4 }}
-                  className="p-6 bg-gradient-to-r from-white/5 to-white/10 backdrop-blur-xl border-2 border-purple-400/20 rounded-2xl shadow-lg"
+                  className="p-6 bg-gradient-to-r from-white/5 to-white/10 backdrop-blur-xl border-2 border-blue-400/20 rounded-2xl shadow-lg"
                 >
                   <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center space-x-3">
                       <motion.div
                         whileHover={{ scale: 1.1 }}
-                        className="p-2 bg-gradient-to-br from-purple-500/20 to-violet-500/20 rounded-xl"
+                        className="p-2 bg-gradient-to-br from-blue-500/20 to-cyan-500/20 rounded-xl"
                       >
-                        <Eye className="w-5 h-5 text-purple-400" />
+                        <Eye className="w-5 h-5 text-blue-400" />
                       </motion.div>
                       <div>
                         <h4 className="text-lg font-bold text-white">Birthday Visibility</h4>
-                        <p className="text-purple-200/70 text-sm">Who can see your date of birth</p>
+                        <p className="text-blue-200/70 text-sm">Who can see your date of birth</p>
                       </div>
                     </div>
                   </div>
@@ -401,16 +401,16 @@ export default function PrivacySettings() {
                         disabled={saving}
                         className={`p-4 rounded-xl border-2 transition-all duration-300 backdrop-blur-xl ${
                           birthdayPrivacy === option.value
-                            ? 'bg-gradient-to-r from-purple-500/20 to-violet-500/20 border-purple-400 shadow-lg shadow-purple-500/20'
-                            : 'bg-white/5 border-white/20 hover:bg-white/10 hover:border-purple-400/50'
+                            ? 'bg-gradient-to-r from-blue-500/20 to-cyan-500/20 border-blue-400 shadow-lg shadow-blue-500/20'
+                            : 'bg-white/5 border-white/20 hover:bg-white/10 hover:border-blue-400/50'
                         }`}
                       >
                         <div className="flex flex-col items-center space-y-2">
                           <option.icon className={`w-5 h-5 ${
-                            birthdayPrivacy === option.value ? 'text-purple-400' : 'text-white/70'
+                            birthdayPrivacy === option.value ? 'text-blue-400' : 'text-white/70'
                           }`} />
                           <span className={`text-sm font-medium ${
-                            birthdayPrivacy === option.value ? 'text-purple-200' : 'text-white/70'
+                            birthdayPrivacy === option.value ? 'text-blue-200' : 'text-white/70'
                           }`}>
                             {option.label}
                           </span>
@@ -425,19 +425,19 @@ export default function PrivacySettings() {
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.2, duration: 0.4 }}
-                  className="p-6 bg-gradient-to-r from-white/5 to-white/10 backdrop-blur-xl border-2 border-purple-400/20 rounded-2xl shadow-lg"
+                  className="p-6 bg-gradient-to-r from-white/5 to-white/10 backdrop-blur-xl border-2 border-blue-400/20 rounded-2xl shadow-lg"
                 >
                   <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center space-x-3">
                       <motion.div
                         whileHover={{ scale: 1.1 }}
-                        className="p-2 bg-gradient-to-br from-purple-500/20 to-violet-500/20 rounded-xl"
+                        className="p-2 bg-gradient-to-br from-blue-500/20 to-cyan-500/20 rounded-xl"
                       >
-                        <Users className="w-5 h-5 text-purple-400" />
+                        <Users className="w-5 h-5 text-blue-400" />
                       </motion.div>
                       <div>
                         <h4 className="text-lg font-bold text-white">Gender Visibility</h4>
-                        <p className="text-purple-200/70 text-sm">Who can see your gender information</p>
+                        <p className="text-blue-200/70 text-sm">Who can see your gender information</p>
                       </div>
                     </div>
                   </div>
@@ -456,16 +456,16 @@ export default function PrivacySettings() {
                         disabled={saving}
                         className={`p-4 rounded-xl border-2 transition-all duration-300 backdrop-blur-xl ${
                           genderPrivacy === option.value
-                            ? 'bg-gradient-to-r from-purple-500/20 to-violet-500/20 border-purple-400 shadow-lg shadow-purple-500/20'
-                            : 'bg-white/5 border-white/20 hover:bg-white/10 hover:border-purple-400/50'
+                            ? 'bg-gradient-to-r from-blue-500/20 to-cyan-500/20 border-blue-400 shadow-lg shadow-blue-500/20'
+                            : 'bg-white/5 border-white/20 hover:bg-white/10 hover:border-blue-400/50'
                         }`}
                       >
                         <div className="flex flex-col items-center space-y-2">
                           <option.icon className={`w-5 h-5 ${
-                            genderPrivacy === option.value ? 'text-purple-400' : 'text-white/70'
+                            genderPrivacy === option.value ? 'text-blue-400' : 'text-white/70'
                           }`} />
                           <span className={`text-sm font-medium ${
-                            genderPrivacy === option.value ? 'text-purple-200' : 'text-white/70'
+                            genderPrivacy === option.value ? 'text-blue-200' : 'text-white/70'
                           }`}>
                             {option.label}
                           </span>

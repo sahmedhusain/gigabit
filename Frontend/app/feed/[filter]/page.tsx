@@ -30,7 +30,14 @@ function FeedFilterPage() {
   const { isConnected, addMessageListener } = useWebSocket()
   const { success, error } = useToast()
 
-  const [feedSubTab, setFeedSubTab] = useState(filter || 'all')
+  const [feedSubTab, setFeedSubTab] = useState<'all' | 'following' | 'friends'>(filter === 'following' || filter === 'friends' ? filter : 'all')
+
+  // Wrapper function to validate feed sub tab
+  const handleSetFeedSubTab = (tab: string) => {
+    if (tab === 'all' || tab === 'following' || tab === 'friends') {
+      setFeedSubTab(tab)
+    }
+  }
   const [sortOrder, setSortOrder] = useState<'newest' | 'oldest'>((searchParams?.get('sort') as 'newest' | 'oldest') || 'newest')
   const [showCreatePost, setShowCreatePost] = useState(false)
 
@@ -402,7 +409,7 @@ function FeedFilterPage() {
     <AppLayout 
       activeTab="feed"
       feedSubTab={feedSubTab}
-      setFeedSubTab={setFeedSubTab}
+      setFeedSubTab={handleSetFeedSubTab}
     >
       <CreatePost
         show={showCreatePost}

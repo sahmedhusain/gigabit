@@ -7,6 +7,7 @@ export interface UnifiedChatItem {
   name: string
   avatar?: string | null
   lastMessage?: string
+  lastMessageType?: string
   lastMessageTime?: string
   timestamp?: string
   unread?: number
@@ -31,6 +32,7 @@ export function normalizeConversation(conv: any): UnifiedChatItem {
     ? (conv.group?.avatar || conv.group?.Avatar || null)
     : (conv.participant?.avatar || conv.participant?.Avatar || null)
   const lastMsg = conv.last_message?.content || conv.LastMessage || ''
+  const lastMessageType = conv.last_message_type || conv.LastMessageType || ''
   const lastMessageTime = conv.last_message?.created_at || conv.LastMessageTime || ''
   const unread = conv.unread_count ?? conv.UnreadCount ?? 0
   const participantId = conv.participant?.id || conv.participant?.ID
@@ -45,6 +47,7 @@ export function normalizeConversation(conv: any): UnifiedChatItem {
     name,
     avatar,
     lastMessage: lastMsg,
+    lastMessageType,
     lastMessageTime,
     timestamp: conv.updated_at || conv.LastMessageTime || conv.UpdatedAt,
     unread,

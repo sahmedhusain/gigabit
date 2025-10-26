@@ -697,6 +697,19 @@ func (s *Server) handleGroupRoute(groupHandler *handlers.GroupHandler, eventHand
 				default:
 					writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
 				}
+			case "polls":
+				if r.Method != http.MethodGet {
+					writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
+					return
+				}
+				authMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					userID, ok := middleware.GetUserID(r)
+					if !ok {
+						writeError(w, http.StatusUnauthorized, "Unauthorized")
+						return
+					}
+					pollHandler.GetGroupPolls(w, r, userID)
+				})).ServeHTTP(w, r)
 			case "request":
 				if len(parts) >= 3 {
 					userID := parts[2]
@@ -727,13 +740,18 @@ func (s *Server) handleGroupRoute(groupHandler *handlers.GroupHandler, eventHand
 				if len(parts) >= 3 {
 					// Handle individual post operations: /api/groups/{groupID}/posts/{postID}
 					postID := parts[2]
-					if r.Method != http.MethodDelete {
+					switch r.Method {
+					case http.MethodGet:
+						authMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+							groupHandler.GetGroupPost(w, r, groupID, postID)
+						})).ServeHTTP(w, r)
+					case http.MethodDelete:
+						authMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+							groupHandler.DeleteGroupPost(w, r, groupID, postID)
+						})).ServeHTTP(w, r)
+					default:
 						writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
-						return
 					}
-					authMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-						groupHandler.DeleteGroupPost(w, r, groupID, postID)
-					})).ServeHTTP(w, r)
 				} else {
 					// Handle group posts collection: /api/groups/{groupID}/posts
 					switch r.Method {
@@ -875,6 +893,14 @@ func (s *Server) handleEventRoute(handler *handlers.EventHandler) http.HandlerFu
 				authMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					handler.GetEventResponses(w, r, eventID)
 				})).ServeHTTP(w, r)
+			case "cancel":
+				if r.Method != http.MethodPut {
+					writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
+					return
+				}
+				authMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					handler.CancelEvent(w, r, eventID)
+				})).ServeHTTP(w, r)
 			default:
 				writeError(w, http.StatusNotFound, "Route not found")
 			}
@@ -905,8 +931,17 @@ func (s *Server) handleMessageRoute(handler *handlers.MessageHandler) http.Handl
 			return
 		}
 
-		messageType := parts[0]
 		authMiddleware := middleware.AuthMiddleware(s.DB.GetDB())
+
+		// Handle DELETE /api/messages/{id}
+		if len(parts) == 1 && r.Method == http.MethodDelete {
+			authMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				handler.DeleteMessage(w, r)
+			})).ServeHTTP(w, r)
+			return
+		}
+
+		messageType := parts[0]
 
 		// Handle routes that don't need targetID
 		if messageType == "read" || messageType == "unread" || messageType == "search" {
@@ -1012,6 +1047,15 @@ func (s *Server) handleNotificationRoute(handler *handlers.NotificationHandler) 
 				return
 			}
 			authMiddleware(http.HandlerFunc(handler.DeleteAllRead)).ServeHTTP(w, r)
+		case "settings":
+			switch r.Method {
+			case http.MethodGet:
+				authMiddleware(http.HandlerFunc(handler.GetNotificationSettings)).ServeHTTP(w, r)
+			case http.MethodPut:
+				authMiddleware(http.HandlerFunc(handler.UpdateNotificationSettings)).ServeHTTP(w, r)
+			default:
+				writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
+			}
 		default:
 			// Assume it's a notification ID
 			if r.Method != http.MethodDelete {

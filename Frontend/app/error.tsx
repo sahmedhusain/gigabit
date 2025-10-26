@@ -85,7 +85,7 @@ export default function Error({
                 Error ID: {error.digest}
               </p>
               <p className="text-white/60 text-sm mt-1">
-                If this problem persists, please contact our support team.
+                If this problem persists, please contact our support team at support@gigabit.com.
               </p>
             </div>
           </div>

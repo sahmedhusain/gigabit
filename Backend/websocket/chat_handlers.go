@@ -4,43 +4,58 @@ import (
 	"time"
 )
 
-// handlePrivateMessage sends a message to a specific user (real-time only, no DB save)
+// handlePrivateMessage sends a message to both sender and receiver (for real-time updates)
 func (h *Hub) handlePrivateMessage(message Message) {
 	h.mu.RLock()
-	targetClient, exists := h.clients[message.To]
-	h.mu.RUnlock()
-	if exists {
+	defer h.mu.RUnlock()
+
+	// Send to receiver
+	if targetClient, exists := h.clients[message.To]; exists {
 		select {
 		case targetClient.Send <- message:
 		default:
-			h.mu.Lock()
-			delete(h.clients, targetClient.ID)
-			h.mu.Unlock()
-			h.safeCloseClient(targetClient)
+			go func(c *Client) {
+				h.mu.Lock()
+				delete(h.clients, c.ID)
+				h.mu.Unlock()
+				h.safeCloseClient(c)
+			}(targetClient)
+		}
+	}
+
+	// Send to sender (to replace optimistic message with real ID)
+	if senderClient, exists := h.clients[message.From]; exists {
+		select {
+		case senderClient.Send <- message:
+		default:
+			go func(c *Client) {
+				h.mu.Lock()
+				delete(h.clients, c.ID)
+				h.mu.Unlock()
+				h.safeCloseClient(c)
+			}(senderClient)
 		}
 	}
 }
 
-// handleGroupMessage broadcasts a message to all group members (real-time only, no DB save)
+// handleGroupMessage broadcasts a message to all group members INCLUDING the sender (for real-time updates)
 func (h *Hub) handleGroupMessage(message Message) {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
-	for userID, client := range h.clients {
-		if userID != message.From {
-			client.mu.RLock()
-			isMember := client.Groups[message.GroupID]
-			client.mu.RUnlock()
-			if isMember {
-				select {
-				case client.Send <- message:
-				default:
-					go func(c *Client) {
-						h.mu.Lock()
-						delete(h.clients, c.ID)
-						h.mu.Unlock()
-						h.safeCloseClient(c)
-					}(client)
-				}
+	for _, client := range h.clients {
+		client.mu.RLock()
+		isMember := client.Groups[message.GroupID]
+		client.mu.RUnlock()
+		if isMember {
+			select {
+			case client.Send <- message:
+			default:
+				go func(c *Client) {
+					h.mu.Lock()
+					delete(h.clients, c.ID)
+					h.mu.Unlock()
+					h.safeCloseClient(c)
+				}(client)
 			}
 		}
 	}
@@ -250,19 +265,59 @@ func (h *Hub) handlePong(message Message) {
 	}
 }
 
-// handleLayoutSync synchronizes layout changes across all user's active sessions
-func (h *Hub) handleLayoutSync(message Message) {
-	if message.Data == nil {
-		return
-	}
-	h.mu.RLock()
-	defer h.mu.RUnlock()
-	userID := message.From
-	for _, client := range h.clients {
-		if client.ID == userID {
+// handleMessageDeleted sends message deletion notifications to the appropriate recipients
+func (h *Hub) handleMessageDeleted(message Message) {
+	if message.GroupID > 0 {
+		// Group message deletion - send to all group members
+		h.mu.RLock()
+		defer h.mu.RUnlock()
+		for _, client := range h.clients {
+			client.mu.RLock()
+			isMember := client.Groups[message.GroupID]
+			client.mu.RUnlock()
+			if isMember {
+				select {
+				case client.Send <- message:
+				default:
+					go func(c *Client) {
+						h.mu.Lock()
+						delete(h.clients, c.ID)
+						h.mu.Unlock()
+						h.safeCloseClient(c)
+					}(client)
+				}
+			}
+		}
+	} else if message.To > 0 {
+		// Private message deletion - send to both sender and receiver
+		h.mu.RLock()
+		defer h.mu.RUnlock()
+
+		// Send to receiver
+		if targetClient, exists := h.clients[message.To]; exists {
 			select {
-			case client.Send <- message:
+			case targetClient.Send <- message:
 			default:
+				go func(c *Client) {
+					h.mu.Lock()
+					delete(h.clients, c.ID)
+					h.mu.Unlock()
+					h.safeCloseClient(c)
+				}(targetClient)
+			}
+		}
+
+		// Send to sender (to update their view as well)
+		if senderClient, exists := h.clients[message.From]; exists {
+			select {
+			case senderClient.Send <- message:
+			default:
+				go func(c *Client) {
+					h.mu.Lock()
+					delete(h.clients, c.ID)
+					h.mu.Unlock()
+					h.safeCloseClient(c)
+				}(senderClient)
 			}
 		}
 	}

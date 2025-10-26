@@ -639,8 +639,16 @@ func (s *EventService) isUserGroupMember(groupID, userID uint) (bool, error) {
 }
 
 func (s *EventService) isUserGroupAdmin(groupID, userID uint) (bool, error) {
+	var creatorID uint
+	if err := s.db.QueryRow("SELECT creator_id FROM groups WHERE id = ?", groupID).Scan(&creatorID); err != nil {
+		return false, err
+	}
+	if creatorID == userID {
+		return true, nil
+	}
+
 	query := `
-		SELECT COUNT(*) FROM group_members 
+		SELECT COUNT(*) FROM group_members
 		WHERE group_id = ? AND user_id = ? AND role = 'admin'
 	`
 

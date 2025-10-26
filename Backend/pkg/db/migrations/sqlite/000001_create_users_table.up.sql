@@ -12,7 +12,9 @@ CREATE TABLE IF NOT EXISTS users (
     status VARCHAR(20) DEFAULT 'online',
     last_status_change DATETIME DEFAULT CURRENT_TIMESTAMP,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    gender VARCHAR(10),
+    is_deleted BOOLEAN DEFAULT FALSE,
+    birthday_privacy VARCHAR(20) DEFAULT 'everyone',
+    gender_privacy VARCHAR(20) DEFAULT 'everyone'
 );
-
-

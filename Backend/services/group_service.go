@@ -1376,3 +1376,10 @@ func (s *GroupService) DeleteGroupMessage(messageID uint, userID uint, groupID u
 
 	return nil
 }
+
+func (s *GroupService) GetGroupPostOwner(postID uint) (uint, error) {
+	query := `SELECT user_id FROM group_posts WHERE id = ?`
+	var userID uint
+	err := s.db.QueryRow(query, postID).Scan(&userID)
+	return userID, err
+}

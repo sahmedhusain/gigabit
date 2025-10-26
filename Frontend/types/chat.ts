@@ -6,6 +6,7 @@ export interface ChatItem {
   name?: string;
   avatar?: string;
   lastMessage?: string;
+  lastMessageType?: string;
   lastMessageTime?: string;
   lastMessageStatus?: 'sending' | 'sent' | 'delivered' | 'read';
   lastMessageSenderId?: number;

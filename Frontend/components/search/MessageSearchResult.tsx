@@ -1,9 +1,8 @@
 'use client'
-import { MessageCircle, Clock, Hash, Users, ExternalLink } from 'lucide-react'
+import { MessageCircle, Clock, Users, ExternalLink } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { SearchResult } from '@/hooks/useSearch'
 import Image from 'next/image'
-import { getUserInitials, getGroupInitials } from '@/utils/avatarUtils'
 
 interface MessageSearchResultProps {
   result: SearchResult
@@ -65,7 +64,7 @@ export default function MessageSearchResult({ result }: MessageSearchResultProps
             <div className={`w-14 h-14 rounded-full flex items-center justify-center overflow-hidden shadow-md transition-all duration-300 ${
               isGroupMessage
                 ? 'bg-gradient-to-br from-green-400 via-emerald-500 to-teal-500 group-hover:shadow-green-500/25'
-                : 'bg-gradient-to-br from-blue-400 via-indigo-500 to-cyan-500 group-hover:shadow-blue-500/25'
+                : 'bg-gradient-to-br from-blue-400 via-cyan-500 to-cyan-500 group-hover:shadow-blue-500/25'
             }`}>
               {result.image ? (
                 <Image
@@ -80,7 +79,7 @@ export default function MessageSearchResult({ result }: MessageSearchResultProps
                 <div className={`w-full h-full rounded-full flex items-center justify-center ${
                   isGroupMessage
                     ? 'bg-gradient-to-r from-green-400 to-emerald-500'
-                    : 'bg-gradient-to-r from-blue-400 to-indigo-500'
+                    : 'bg-gradient-to-r from-blue-400 to-cyan-500'
                 }`}>
                   <span className="text-white font-bold text-lg">
                     {getInitialsFromName(result.subtitle || 'Unknown')}
@@ -121,7 +120,7 @@ export default function MessageSearchResult({ result }: MessageSearchResultProps
               </div>
               <div className="flex items-center space-x-2">
                 {isGroupMessage ? (
-                  <Users className="w-4 h-4 text-purple-400" />
+                  <Users className="w-4 h-4 text-blue-400" />
                 ) : (
                   <MessageCircle className="w-4 h-4 text-blue-400" />
                 )}

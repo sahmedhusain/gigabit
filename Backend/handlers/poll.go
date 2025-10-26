@@ -12,12 +12,14 @@ import (
 )
 
 type PollHandler struct {
-	pollService *services.PollService
+	pollService         *services.PollService
+	notificationService *services.NotificationService
 }
 
 func NewPollHandler(db *sql.DB, hub *websocket.Hub) *PollHandler {
 	return &PollHandler{
-		pollService: services.NewPollService(db, hub),
+		pollService:         services.NewPollService(db, hub),
+		notificationService: services.NewNotificationService(db, hub),
 	}
 }
 
@@ -35,6 +37,11 @@ func (h *PollHandler) CreatePoll(w http.ResponseWriter, r *http.Request, userID 
 		return
 	}
 
+	if req.GroupID == nil || *req.GroupID == 0 {
+		http.Error(w, "Polls can only be created in groups", http.StatusBadRequest)
+		return
+	}
+
 	if len(req.Options) < 2 {
 		http.Error(w, "Poll must have at least 2 options", http.StatusBadRequest)
 		return
@@ -47,6 +54,9 @@ func (h *PollHandler) CreatePoll(w http.ResponseWriter, r *http.Request, userID 
 		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
 		return
 	}
+
+	// Send notification to group members (same as events)
+	h.notificationService.NotifyGroupPollCreated(userID, *req.GroupID, poll.ID)
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)

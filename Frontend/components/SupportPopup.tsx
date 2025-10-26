@@ -140,7 +140,7 @@ export default function SupportPopup({ isOpen, onClose }: SupportPopupProps) {
                     <h4 className="text-lg font-semibold text-white mb-3">Support Hours</h4>
                     <div className="bg-white/5 rounded-xl p-4 border border-white/10">
                       <div className="flex items-center mb-3">
-                        <Clock className="w-5 h-5 text-purple-400 mr-3" />
+                        <Clock className="w-5 h-5 text-blue-400 mr-3" />
                         <h5 className="font-semibold text-white">When We&apos;re Available</h5>
                       </div>
                       <div className="space-y-2 text-sm">

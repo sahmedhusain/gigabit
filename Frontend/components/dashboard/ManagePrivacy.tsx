@@ -207,7 +207,7 @@ export default function ManagePrivacy({
                     animate={{ opacity: 1, y: 0 }}
                   >
                     <label className="text-white font-semibold mb-4 text-sm lg:text-base flex items-center space-x-2">
-                      <div className="w-2 h-2 bg-purple-400 rounded-full"></div>
+                      <div className="w-2 h-2 bg-blue-400 rounded-full"></div>
                       <span>Select Users</span>
                     </label>
                     <div className="space-y-2">

@@ -233,7 +233,7 @@ export default function CreatePollModal({
                     animate={{ opacity: 1 }}
                     transition={{ delay: 0.5, duration: 0.3 }}
                   >
-                    <div className="w-2 h-2 bg-indigo-400 rounded-full"></div>
+                    <div className="w-2 h-2 bg-blue-400 rounded-full"></div>
                     <span>Description (Optional)</span>
                   </motion.label>
                   <div className="relative">

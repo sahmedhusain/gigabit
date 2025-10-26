@@ -113,10 +113,11 @@ type ConversationResponse struct {
 }
 
 type MessageSummary struct {
-	Content   string        `json:"content"`
-	CreatedAt string        `json:"created_at"`
-	SenderID  uint          `json:"sender_id,omitempty"`
-	Sender    *UserResponse `json:"sender,omitempty"`
+	Content     string        `json:"content"`
+	MessageType string        `json:"message_type"`
+	CreatedAt   string        `json:"created_at"`
+	SenderID    uint          `json:"sender_id,omitempty"`
+	Sender      *UserResponse `json:"sender,omitempty"`
 }
 
 type ConversationSearchResult struct {

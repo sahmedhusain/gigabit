@@ -9,5 +9,3 @@ CREATE TABLE IF NOT EXISTS follows (
     FOREIGN KEY (following_id) REFERENCES users(id) ON DELETE CASCADE,
     UNIQUE(follower_id, following_id)
 );
-
-

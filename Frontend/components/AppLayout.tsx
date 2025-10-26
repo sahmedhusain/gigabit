@@ -6,12 +6,12 @@ import { useWebSocket } from '@/context/WebSocketContext'
 import { useSidebarData } from '@/context/SidebarDataContext'
 import { useNotifications } from '@/hooks'
 import { api } from '@/lib/api'
-import { Sparkles } from 'lucide-react'
 
 // Import layout components
 import TopBar from '@/components/dashboard/TopBar'
 import Sidebar from '@/components/dashboard/Sidebar'
 import RightSidebar from '@/components/dashboard/RightSidebar'
+import AnimatedBackground from './AnimatedBackground'
 
 interface AppLayoutProps {
   children: ReactNode
@@ -120,26 +120,8 @@ export default function AppLayout({
   const chatUnreadGroups = (chats || []).filter(c => c.isGroup && (c.unread || 0) > 0).length
 
   return (
-    <div className="min-h-screen relative overflow-hidden bg-gradient-to-br from-emerald-900 via-teal-900 to-cyan-800">
-      {/* Animated Background Elements */}
-      <div className="absolute inset-0">
-        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-emerald-500/20 rounded-full blur-3xl animate-pulse"></div>
-        <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-teal-500/20 rounded-full blur-3xl animate-pulse delay-1000"></div>
-        <div className="absolute top-3/4 left-1/2 w-64 h-64 bg-cyan-500/20 rounded-full blur-3xl animate-pulse delay-2000"></div>
-      </div>
-
-      {/* Floating Particles */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        {[...Array(20)].map((_, i) => (
-          <div
-            key={i}
-            className="absolute animate-bounce floating-particle"
-          >
-            <Sparkles className="w-2 h-2 text-white/30" />
-          </div>
-        ))}
-      </div>
-
+    <div className="min-h-screen relative overflow-hidden">
+      <AnimatedBackground />
       <Sidebar
         isMobileMenuOpen={isMobileMenuOpen}
         setIsMobileMenuOpen={setIsMobileMenuOpen}

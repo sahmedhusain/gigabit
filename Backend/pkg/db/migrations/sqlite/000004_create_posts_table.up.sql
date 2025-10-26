@@ -6,6 +6,6 @@ CREATE TABLE IF NOT EXISTS posts (
     privacy VARCHAR(20) DEFAULT 'public', -- 'public', 'followers', 'private'
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    share_count INTEGER DEFAULT 0,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
-

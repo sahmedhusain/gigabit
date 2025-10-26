@@ -76,6 +76,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       const response = await api.login({ email, password });
       setToken(response.token);
       setUser(response.user);
+      // Mark as fresh login
+      if (typeof window !== 'undefined') {
+        sessionStorage.setItem('freshLogin', 'true');
+      }
     } catch (error) {
       console.error('Login failed:', error);
       throw error;
@@ -90,6 +94,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       const response = await api.register(userData);
       setToken(response.token);
       setUser(response.user);
+      // Mark as fresh registration
+      if (typeof window !== 'undefined') {
+        sessionStorage.setItem('freshLogin', 'true');
+      }
     } catch (error) {
       console.error('Registration failed:', error);
       throw error;

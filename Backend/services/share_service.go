@@ -9,14 +9,16 @@ import (
 )
 
 type ShareService struct {
-	db  *sql.DB
-	hub *websocket.Hub
+	db                  *sql.DB
+	hub                 *websocket.Hub
+	notificationService *NotificationService
 }
 
 func NewShareService(db *sql.DB, hub *websocket.Hub) *ShareService {
 	return &ShareService{
-		db:  db,
-		hub: hub,
+		db:                  db,
+		hub:                 hub,
+		notificationService: NewNotificationService(db, hub),
 	}
 }
 
@@ -31,15 +33,62 @@ func (s *ShareService) SharePost(userID uint, req *models.ShareRequest) error {
 	}
 
 	for _, convID := range req.ConversationIDs {
-		_ = s.shareToConversation(userID, req.PostID, convID, post)
+		messageID, err := s.shareToConversation(userID, req.PostID, convID, post)
+		if err == nil && messageID > 0 {
+			s.broadcastSharedPost(userID, messageID, convID, 0, post)
+			// Create notification for the other participant
+			var otherUserID uint
+			err := s.db.QueryRow("SELECT participant1_id, participant2_id FROM private_conversations WHERE id = ?", convID).Scan(&otherUserID, &otherUserID)
+			if err == nil {
+				if otherUserID == userID {
+					err = s.db.QueryRow("SELECT CASE WHEN participant1_id = ? THEN participant2_id ELSE participant1_id END FROM private_conversations WHERE id = ?", userID, convID).Scan(&otherUserID)
+				}
+				if err == nil {
+					if notifyErr := s.notificationService.NotifyPostShared(userID, otherUserID, messageID); notifyErr != nil {
+						fmt.Printf("Failed to send post shared notification to user %d: %v\n", otherUserID, notifyErr)
+					}
+				}
+			}
+		}
 	}
 
 	for _, groupID := range req.GroupIDs {
-		_ = s.shareToGroup(userID, req.PostID, groupID, post)
+		messageID, err := s.shareToGroup(userID, req.PostID, groupID, post)
+		if err == nil && messageID > 0 {
+			s.broadcastSharedPost(userID, messageID, 0, groupID, post)
+			// Create notifications for all group members except sender
+			memberIDs, err := s.notificationService.GetGroupMemberIDs(groupID, userID)
+			if err == nil {
+				for _, memberID := range memberIDs {
+					if notifyErr := s.notificationService.NotifyPostShared(userID, memberID, messageID); notifyErr != nil {
+						fmt.Printf("Failed to send post shared notification to group member %d: %v\n", memberID, notifyErr)
+					}
+				}
+			} else {
+				fmt.Printf("Failed to get group member IDs for group %d: %v\n", groupID, err)
+			}
+		}
 	}
 
 	for _, targetUserID := range req.UserIDs {
-		_ = s.shareToUser(userID, req.PostID, targetUserID, post)
+		messageID, err := s.shareToUser(userID, req.PostID, targetUserID, post)
+		if err == nil && messageID > 0 {
+			// For user shares, we need to get the conversation ID
+			var conversationID uint
+			checkQuery := `
+				SELECT id FROM private_conversations
+				WHERE (participant1_id = ? AND participant2_id = ?)
+				   OR (participant1_id = ? AND participant2_id = ?)
+			`
+			err := s.db.QueryRow(checkQuery, userID, targetUserID, targetUserID, userID).Scan(&conversationID)
+			if err == nil {
+				s.broadcastSharedPost(userID, messageID, conversationID, 0, post)
+				// Create notification for the target user
+				if notifyErr := s.notificationService.NotifyPostShared(userID, targetUserID, messageID); notifyErr != nil {
+					fmt.Printf("Failed to send post shared notification to user %d: %v\n", targetUserID, notifyErr)
+				}
+			}
+		}
 	}
 
 	totalShares := len(req.ConversationIDs) + len(req.GroupIDs) + len(req.UserIDs)
@@ -50,7 +99,7 @@ func (s *ShareService) SharePost(userID uint, req *models.ShareRequest) error {
 	return nil
 }
 
-func (s *ShareService) shareToConversation(userID, postID, conversationID uint, post *models.PostResponse) error {
+func (s *ShareService) shareToConversation(userID, postID, conversationID uint, post *models.PostResponse) (uint, error) {
 	content := "Shared a post: " + post.Content
 	if len(content) > 100 {
 		content = content[:97] + "..."
@@ -59,12 +108,12 @@ func (s *ShareService) shareToConversation(userID, postID, conversationID uint, 
 	var otherUserID uint
 	err := s.db.QueryRow("SELECT participant1_id, participant2_id FROM private_conversations WHERE id = ?", conversationID).Scan(&otherUserID, &otherUserID)
 	if err != nil {
-		return err
+		return 0, err
 	}
 	if otherUserID == userID {
 		err = s.db.QueryRow("SELECT CASE WHEN participant1_id = ? THEN participant2_id ELSE participant1_id END FROM private_conversations WHERE id = ?", userID, conversationID).Scan(&otherUserID)
 		if err != nil {
-			return err
+			return 0, err
 		}
 	}
 
@@ -73,12 +122,12 @@ func (s *ShareService) shareToConversation(userID, postID, conversationID uint, 
 		VALUES (?, ?, ?, false, ?)
 	`, conversationID, userID, content, time.Now())
 	if err != nil {
-		return err
+		return 0, err
 	}
 
 	messageID, err := result.LastInsertId()
 	if err != nil {
-		return err
+		return 0, err
 	}
 
 	_, err = s.db.Exec(`
@@ -86,7 +135,7 @@ func (s *ShareService) shareToConversation(userID, postID, conversationID uint, 
 		VALUES (?, ?, ?, ?, ?)
 	`, postID, userID, conversationID, uint(messageID), time.Now())
 	if err != nil {
-		return err
+		return 0, err
 	}
 
 	_, err = s.db.Exec(`
@@ -102,10 +151,10 @@ func (s *ShareService) shareToConversation(userID, postID, conversationID uint, 
 	`
 	_, _ = s.db.Exec(updateQuery, otherUserID, otherUserID, time.Now(), conversationID)
 
-	return err
+	return uint(messageID), err
 }
 
-func (s *ShareService) shareToGroup(userID, postID, groupID uint, post *models.PostResponse) error {
+func (s *ShareService) shareToGroup(userID, postID, groupID uint, post *models.PostResponse) (uint, error) {
 	content := "Shared a post: " + post.Content
 	if len(content) > 100 {
 		content = content[:97] + "..."
@@ -119,15 +168,15 @@ func (s *ShareService) shareToGroup(userID, postID, groupID uint, post *models.P
 		now := time.Now()
 		result, err := s.db.Exec(insertQuery, groupID, now, now)
 		if err != nil {
-			return err
+			return 0, err
 		}
 		convID, err := result.LastInsertId()
 		if err != nil {
-			return err
+			return 0, err
 		}
 		conversationID = uint(convID)
 	} else if err != nil {
-		return err
+		return 0, err
 	}
 
 	result, err := s.db.Exec(`
@@ -135,12 +184,12 @@ func (s *ShareService) shareToGroup(userID, postID, groupID uint, post *models.P
 		VALUES (?, ?, ?, false, ?)
 	`, conversationID, userID, content, time.Now())
 	if err != nil {
-		return err
+		return 0, err
 	}
 
 	messageID, err := result.LastInsertId()
 	if err != nil {
-		return err
+		return 0, err
 	}
 
 	_, err = s.db.Exec(`
@@ -148,17 +197,17 @@ func (s *ShareService) shareToGroup(userID, postID, groupID uint, post *models.P
 		VALUES (?, ?, ?, ?, ?)
 	`, postID, userID, groupID, uint(messageID), time.Now())
 	if err != nil {
-		return err
+		return 0, err
 	}
 
 	_, err = s.db.Exec(`
 		UPDATE group_conversations SET last_message_id = ?, updated_at = ? WHERE id = ?
 	`, messageID, time.Now(), conversationID)
 
-	return err
+	return uint(messageID), err
 }
 
-func (s *ShareService) shareToUser(userID, postID, targetUserID uint, post *models.PostResponse) error {
+func (s *ShareService) shareToUser(userID, postID, targetUserID uint, post *models.PostResponse) (uint, error) {
 	content := "Shared a post: " + post.Content
 	if len(content) > 100 {
 		content = content[:97] + "..."
@@ -180,15 +229,15 @@ func (s *ShareService) shareToUser(userID, postID, targetUserID uint, post *mode
 		now := time.Now()
 		result, err := s.db.Exec(insertQuery, userID, targetUserID, now, now)
 		if err != nil {
-			return err
+			return 0, err
 		}
 		convID, err := result.LastInsertId()
 		if err != nil {
-			return err
+			return 0, err
 		}
 		conversationID = uint(convID)
 	} else if err != nil {
-		return err
+		return 0, err
 	}
 
 	result, err := s.db.Exec(`
@@ -196,12 +245,12 @@ func (s *ShareService) shareToUser(userID, postID, targetUserID uint, post *mode
 		VALUES (?, ?, ?, false, ?)
 	`, conversationID, userID, content, time.Now())
 	if err != nil {
-		return err
+		return 0, err
 	}
 
 	messageID, err := result.LastInsertId()
 	if err != nil {
-		return err
+		return 0, err
 	}
 
 	_, err = s.db.Exec(`
@@ -209,7 +258,7 @@ func (s *ShareService) shareToUser(userID, postID, targetUserID uint, post *mode
 		VALUES (?, ?, ?, ?, ?)
 	`, postID, userID, conversationID, uint(messageID), time.Now())
 	if err != nil {
-		return err
+		return 0, err
 	}
 
 	_, err = s.db.Exec(`
@@ -225,7 +274,7 @@ func (s *ShareService) shareToUser(userID, postID, targetUserID uint, post *mode
 	`
 	_, _ = s.db.Exec(updateQuery, targetUserID, targetUserID, time.Now(), conversationID)
 
-	return err
+	return uint(messageID), err
 }
 
 func (s *ShareService) getPostByID(postID uint) (*models.PostResponse, error) {
@@ -574,4 +623,94 @@ func (s *ShareService) SearchShareableEntities(userID uint, query string) ([]mod
 	}
 
 	return items, nil
+}
+
+func (s *ShareService) broadcastSharedPost(userID, messageID, conversationID, groupID uint, post *models.PostResponse) {
+	// Get sender information
+	var senderFirstName, senderLastName, senderAvatar string
+	senderQuery := `SELECT first_name, last_name, avatar FROM users WHERE id = ?`
+	err := s.db.QueryRow(senderQuery, userID).Scan(&senderFirstName, &senderLastName, &senderAvatar)
+	if err != nil {
+		senderFirstName = "Unknown"
+		senderLastName = "User"
+	}
+
+	// Get like, comment, and share counts
+	var likeCount, commentCount, shareCount int64
+	statsQuery := `
+		SELECT 
+			COALESCE(like_stats.like_count, 0) as like_count,
+			COALESCE(comment_stats.comment_count, 0) as comment_count,
+			COALESCE(share_stats.share_count, 0) as share_count
+		FROM posts p
+		LEFT JOIN (SELECT post_id, COUNT(*) as like_count FROM likes GROUP BY post_id) like_stats ON p.id = like_stats.post_id
+		LEFT JOIN (SELECT post_id, COUNT(*) as comment_count FROM comments GROUP BY post_id) comment_stats ON p.id = comment_stats.post_id
+		LEFT JOIN (SELECT post_id, COUNT(*) as share_count FROM shares WHERE message_id IS NOT NULL GROUP BY post_id) share_stats ON p.id = share_stats.post_id
+		WHERE p.id = ?
+	`
+	err = s.db.QueryRow(statsQuery, post.ID).Scan(&likeCount, &commentCount, &shareCount)
+	if err != nil {
+		likeCount = 0
+		commentCount = 0
+		shareCount = 0
+	}
+
+	// Create WebSocket message
+	wsMessage := websocket.Message{
+		Type:      websocket.MessageTypeSharedPost,
+		From:      userID,
+		Timestamp: time.Now().Unix(),
+		Data: map[string]interface{}{
+			"id":              messageID,
+			"conversation_id": conversationID,
+			"group_id":        groupID,
+			"sender": map[string]interface{}{
+				"id":         userID,
+				"first_name": senderFirstName,
+				"last_name":  senderLastName,
+				"avatar":     senderAvatar,
+			},
+			"shared_post": map[string]interface{}{
+				"id":         post.ID,
+				"user_id":    post.UserID,
+				"content":    post.Content,
+				"image_url":  post.ImageURL,
+				"privacy":    post.Privacy,
+				"created_at": post.CreatedAt.Format(time.RFC3339),
+				"user": map[string]interface{}{
+					"id":         post.User.ID,
+					"first_name": post.User.FirstName,
+					"last_name":  post.User.LastName,
+					"avatar":     post.User.Avatar,
+					"nickname":   post.User.Nickname,
+				},
+				"like_count":    likeCount,
+				"comment_count": commentCount,
+				"share_count":   shareCount,
+			},
+			"created_at": time.Now().Format(time.RFC3339),
+		},
+	}
+
+	if groupID > 0 {
+		wsMessage.GroupID = groupID
+	} else {
+		// For private messages, we need to determine the recipient
+		var recipientID uint
+		if conversationID > 0 {
+			// Get the other participant in the conversation
+			var p1ID, p2ID uint
+			err := s.db.QueryRow("SELECT participant1_id, participant2_id FROM private_conversations WHERE id = ?", conversationID).Scan(&p1ID, &p2ID)
+			if err == nil {
+				if p1ID == userID {
+					recipientID = p2ID
+				} else {
+					recipientID = p1ID
+				}
+				wsMessage.To = recipientID
+			}
+		}
+	}
+
+	s.hub.BroadcastMessage(wsMessage)
 }

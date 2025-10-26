@@ -559,7 +559,7 @@ export default function HomeFeed({
             {feedSubTab === 'following' && (
               <motion.button
                 onClick={() => window.location.href = '/discover'}
-                className="px-6 py-3 bg-gradient-to-r from-blue-500/20 to-indigo-500/20 hover:from-blue-500/30 hover:to-indigo-500/30 text-blue-300 rounded-xl border border-blue-400/30 hover:border-blue-400/50 transition-all duration-300 flex items-center space-x-2 mx-auto"
+                className="px-6 py-3 bg-gradient-to-r from-blue-500/20 to-cyan-500/20 hover:from-blue-500/30 hover:to-cyan-500/30 text-blue-300 rounded-xl border border-blue-400/30 hover:border-blue-400/50 transition-all duration-300 flex items-center space-x-2 mx-auto"
                 whileHover={{ scale: 1.05, y: -1 }}
                 whileTap={{ scale: 0.95 }}
               >

@@ -1,3 +1,0 @@
--- Fix sessions table (placeholder migration)
--- This migration was referenced but the up file was missing
--- No actual changes needed

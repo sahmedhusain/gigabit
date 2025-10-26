@@ -234,6 +234,13 @@ func (s *MessageService) GetPrivateMessages(userID1, userID2 uint, limit, offset
 		message.MessageType = "private"
 		message.UpdatedAt = message.CreatedAt
 
+		// Determine content type based on content
+		if strings.HasPrefix(message.Content, "http") {
+			message.MessageType = "image"
+		} else {
+			message.MessageType = "text"
+		}
+
 		if message.SenderID == userID1 {
 			message.ReceiverID = userID2
 			message.IsRead = true
@@ -323,6 +330,7 @@ func (s *MessageService) GetGroupMessages(groupID, userID uint, limit, offset in
 	FROM group_messages m
 	JOIN users u ON m.sender_id = u.id
 	JOIN groups g ON g.id = ?
+	JOIN group_members gm ON g.id = gm.group_id AND gm.user_id = ? AND gm.status = 'member'
 	LEFT JOIN shares s ON m.id = s.message_id
 	LEFT JOIN posts p ON s.post_id = p.id
 	LEFT JOIN users pu ON p.user_id = pu.id
@@ -330,11 +338,12 @@ func (s *MessageService) GetGroupMessages(groupID, userID uint, limit, offset in
 	LEFT JOIN (SELECT post_id, COUNT(*) as comment_count FROM comments GROUP BY post_id) comment_stats ON p.id = comment_stats.post_id
 	LEFT JOIN (SELECT post_id, COUNT(*) as share_count FROM shares WHERE message_id IS NOT NULL GROUP BY post_id) share_stats ON p.id = share_stats.post_id
 	WHERE m.conversation_id = ?
+	AND m.created_at >= gm.created_at
 	ORDER BY m.created_at DESC
 	LIMIT ? OFFSET ?
 	`
 
-	rows, err := s.db.Query(query, groupID, conversationID, limit, offset)
+	rows, err := s.db.Query(query, groupID, userID, conversationID, limit, offset)
 	if err != nil {
 		return nil, err
 	}
@@ -369,6 +378,13 @@ func (s *MessageService) GetGroupMessages(groupID, userID uint, limit, offset in
 		message.MessageType = "group"
 		message.GroupID = &groupID
 		message.UpdatedAt = message.CreatedAt
+
+		// Determine content type based on content
+		if strings.HasPrefix(message.Content, "http") {
+			message.MessageType = "image"
+		} else {
+			message.MessageType = "text"
+		}
 
 		group := models.GroupMessageResponse{
 			ID:    groupID,
@@ -459,7 +475,7 @@ func (s *MessageService) canUsersMessage(userID1, userID2 uint) (bool, error) {
 func (s *MessageService) isUserGroupMember(groupID, userID uint) (bool, error) {
 	query := `
 		SELECT COUNT(*) FROM group_members 
-		WHERE group_id = ? AND user_id = ? AND (status = 'member' OR status = 'accepted')
+		WHERE group_id = ? AND user_id = ? AND status = 'member'
 	`
 
 	var count int
@@ -710,12 +726,16 @@ func (s *MessageService) MarkMessagesAsRead(messageIDs []uint, userID uint) erro
 		WHERE id IN (?) AND conversation_id IN (
 			SELECT gc.id FROM group_conversations gc
 			JOIN group_members gm ON gc.group_id = gm.group_id
-			WHERE gm.user_id = ?
+			WHERE gm.user_id = ? AND gm.status = 'member'
+		) AND created_at >= (
+			SELECT gm2.created_at FROM group_members gm2 
+			WHERE gm2.group_id = (SELECT group_id FROM group_conversations WHERE id = conversation_id) 
+			AND gm2.user_id = ? AND gm2.status = 'member'
 		)
 	`
 
 	fullGroupQuery := strings.Replace(groupQuery, "?", inClause, 1)
-	groupArgs := append(ids, userID)
+	groupArgs := append(ids, userID, userID)
 
 	_, err = s.db.Exec(fullGroupQuery, groupArgs...)
 	if err != nil {
@@ -769,12 +789,16 @@ func (s *MessageService) MarkMessagesAsUnread(messageIDs []uint, userID uint) er
 		WHERE id IN (?) AND conversation_id IN (
 			SELECT gc.id FROM group_conversations gc
 			JOIN group_members gm ON gc.group_id = gm.group_id
-			WHERE gm.user_id = ?
+			WHERE gm.user_id = ? AND gm.status = 'member'
+		) AND created_at >= (
+			SELECT gm2.created_at FROM group_members gm2 
+			WHERE gm2.group_id = (SELECT group_id FROM group_conversations WHERE id = conversation_id) 
+			AND gm2.user_id = ? AND gm2.status = 'member'
 		)
 	`
 
 	fullGroupQuery := strings.Replace(groupQuery, "?", inClause, 1)
-	groupArgs := append(ids, userID)
+	groupArgs := append(ids, userID, userID)
 
 	_, err = s.db.Exec(fullGroupQuery, groupArgs...)
 	if err != nil {
@@ -906,8 +930,9 @@ func (s *MessageService) MarkConversationAsRead(conversationID uint, userID uint
 			WHERE conversation_id = ? 
 			AND sender_id != ?
 			AND is_read = FALSE
+			AND created_at >= (SELECT created_at FROM group_members WHERE group_id = (SELECT group_id FROM group_conversations WHERE id = ?) AND user_id = ? AND status = 'member')
 		`
-		_, err := s.db.Exec(query, conversationID, userID)
+		_, err := s.db.Exec(query, conversationID, userID, conversationID, userID)
 		return err
 	} else {
 		query := `
@@ -932,11 +957,12 @@ func (s *MessageService) MarkConversationAsUnread(conversationID uint, userID ui
 			AND id = (
 				SELECT id FROM group_messages 
 				WHERE conversation_id = ? AND sender_id != ?
+				AND created_at >= (SELECT created_at FROM group_members WHERE group_id = (SELECT group_id FROM group_conversations WHERE id = ?) AND user_id = ? AND status = 'member')
 				ORDER BY created_at DESC 
 				LIMIT 1
 			)
 		`
-		_, err := s.db.Exec(query, conversationID, userID, conversationID, userID)
+		_, err := s.db.Exec(query, conversationID, userID, conversationID, userID, conversationID, userID)
 		return err
 	} else {
 		query := `
@@ -1003,9 +1029,10 @@ func (s *MessageService) SearchMessages(userID uint, query string, limit, offset
 		FROM group_messages gm
 		JOIN group_conversations gc ON gm.conversation_id = gc.id
 		JOIN groups g ON gc.group_id = g.id
-		JOIN group_members gmbr ON g.id = gmbr.group_id AND gmbr.user_id = ?
+		JOIN group_members gmbr ON g.id = gmbr.group_id AND gmbr.user_id = ? AND gmbr.status = 'member'
 		JOIN users u ON gm.sender_id = u.id
 		WHERE LOWER(gm.content) LIKE ?
+		AND gm.created_at >= gmbr.created_at
 		ORDER BY gm.created_at DESC
 		LIMIT ? OFFSET ?
 	`
@@ -1136,4 +1163,119 @@ func (s *MessageService) SearchMessages(userID uint, query string, limit, offset
 	}
 
 	return results, nil
+}
+
+func (s *MessageService) isUserGroupAdmin(groupID, userID uint) (bool, error) {
+	var creatorID uint
+	if err := s.db.QueryRow("SELECT creator_id FROM groups WHERE id = ?", groupID).Scan(&creatorID); err != nil {
+		return false, err
+	}
+	if creatorID == userID {
+		return true, nil
+	}
+
+	query := `
+		SELECT COUNT(*) FROM group_members
+		WHERE group_id = ? AND user_id = ? AND role = 'admin'
+	`
+
+	var count int
+	err := s.db.QueryRow(query, groupID, userID).Scan(&count)
+	if err != nil {
+		return false, err
+	}
+
+	return count > 0, nil
+}
+
+func (s *MessageService) DeleteMessage(messageID, userID uint) error {
+	// Check if message exists and get details
+	var senderID uint
+	var createdAt time.Time
+	var messageType string
+	var groupID uint
+
+	checkQuery := `
+		SELECT gm.sender_id, gm.created_at, 'group' as type, gc.group_id
+		FROM group_messages gm
+		JOIN group_conversations gc ON gm.conversation_id = gc.id
+		WHERE gm.id = ?
+		UNION ALL
+		SELECT sender_id, created_at, 'private' as type, 0 as group_id FROM private_messages WHERE id = ?
+		LIMIT 1
+	`
+
+	err := s.db.QueryRow(checkQuery, messageID, messageID).Scan(&senderID, &createdAt, &messageType, &groupID)
+	if err == sql.ErrNoRows {
+		return errors.New("message not found")
+	}
+	if err != nil {
+		return err
+	}
+
+	// Check permissions
+	canDelete := false
+	if messageType == "private" {
+		// For private messages, only sender can delete
+		canDelete = (senderID == userID)
+	} else {
+		// For group messages, sender or group admin can delete
+		if senderID == userID {
+			canDelete = true
+		} else {
+			// Check if user is group admin
+			isAdmin, err := s.isUserGroupAdmin(groupID, userID)
+			if err != nil {
+				return err
+			}
+			canDelete = isAdmin
+		}
+	}
+
+	if !canDelete {
+		return errors.New("you can only delete your own messages")
+	}
+
+	// Check time limit (only for non-admin users deleting their own messages)
+	if senderID == userID && messageType == "group" {
+		// For group messages, check if user is admin - admins have no time limit
+		isAdmin, err := s.isUserGroupAdmin(groupID, userID)
+		if err != nil {
+			return err
+		}
+		if !isAdmin {
+			now := time.Now()
+			threeDaysAgo := now.AddDate(0, 0, -3)
+			if createdAt.Before(threeDaysAgo) {
+				return errors.New("messages can only be deleted within 3 days of sending")
+			}
+		}
+	} else if senderID == userID && messageType == "private" {
+		// For private messages, always check time limit
+		now := time.Now()
+		threeDaysAgo := now.AddDate(0, 0, -3)
+		if createdAt.Before(threeDaysAgo) {
+			return errors.New("messages can only be deleted within 3 days of sending")
+		}
+	}
+
+	// Delete message content (set to deleted marker)
+	var updateQuery string
+	var deletedContent string
+	if messageType == "private" {
+		updateQuery = `UPDATE private_messages SET content = ? WHERE id = ?`
+		deletedContent = "XdeletedbyuserX"
+	} else {
+		updateQuery = `UPDATE group_messages SET content = ? WHERE id = ?`
+		deletedContent = "This message was deleted"
+	}
+
+	_, err = s.db.Exec(updateQuery, deletedContent, messageID)
+	if err != nil {
+		return err
+	}
+
+	// Delete associated share record if it exists
+	_, err = s.db.Exec(`DELETE FROM shares WHERE message_id = ?`, messageID)
+	return err
 }

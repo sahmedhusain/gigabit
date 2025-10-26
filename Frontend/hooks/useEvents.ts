@@ -40,8 +40,15 @@ export function useEvents(groupId?: number) {
   }, [refetch, success])
 
   const remove = useCallback(async (eventId: number) => {
-    const res = await api.cancelEvent(eventId, { cancel_reason: 'Deleted by user' })
+    const res = await api.deleteEvent(eventId)
     success('Event deleted')
+    await refetch()
+    return res
+  }, [refetch, success])
+
+  const cancel = useCallback(async (eventId: number, cancelReason: string) => {
+    const res = await api.cancelEvent(eventId, { cancel_reason: cancelReason })
+    success('Event cancelled')
     await refetch()
     return res
   }, [refetch, success])
@@ -54,5 +61,5 @@ export function useEvents(groupId?: number) {
 
   useEffect(() => { refetch() }, [refetch])
 
-  return useMemo(() => ({ events, loading, error: err, refetch, create, update, remove, respond }), [events, loading, err, refetch, create, update, remove, respond])
+  return useMemo(() => ({ events, loading, error: err, refetch, create, update, remove, cancel, respond }), [events, loading, err, refetch, create, update, remove, cancel, respond])
 }

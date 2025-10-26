@@ -187,3 +187,55 @@ func (h *NotificationHandler) CreateNotification(w http.ResponseWriter, r *http.
 		"notification": notification,
 	})
 }
+
+func (h *NotificationHandler) GetNotificationSettings(w http.ResponseWriter, r *http.Request) {
+	userID, ok := r.Context().Value("user_id").(uint)
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "User not authenticated")
+		return
+	}
+
+	settings, err := h.notificationService.GetNotificationSettings(userID)
+	if err != nil {
+		// If no settings exist, return default settings
+		defaultSettings := &models.NotificationSettings{
+			UserID:             userID,
+			SoundEnabled:       true,
+			SoundTheme:         "classic",
+			BrowserPushEnabled: true,
+			QuietHoursEnabled:  false,
+			QuietHoursStart:    "22:00",
+			QuietHoursEnd:      "08:00",
+			MutedConversations: []models.MutedConversation{},
+		}
+		writeJSON(w, http.StatusOK, defaultSettings)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, settings)
+}
+
+func (h *NotificationHandler) UpdateNotificationSettings(w http.ResponseWriter, r *http.Request) {
+	userID, ok := r.Context().Value("user_id").(uint)
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "User not authenticated")
+		return
+	}
+
+	var req models.NotificationSettingsRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "Invalid request body")
+		return
+	}
+
+	settings, err := h.notificationService.UpdateNotificationSettings(userID, &req)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "Failed to update notification settings")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"message":  "Notification settings updated successfully",
+		"settings": settings,
+	})
+}

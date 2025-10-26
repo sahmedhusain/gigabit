@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react'
 import useSWR from 'swr'
 import { MessageCircle, Plus, Search, MessageSquarePlus, Filter, User, X, Users, UserCheck, MessageSquare } from 'lucide-react'
-import { api, ConversationSearchResult } from '@/lib/api'
+import { api, ConversationSearchResult, PollResponse, EventResponse, PostResponse } from '@/lib/api'
 import type { ChatItem } from '@/types/chat'
 import ChatItemComponent from '@/components/chat/ChatItem'
 import ChatSkeleton from '@/components/chat/ChatSkeleton'
@@ -80,8 +80,8 @@ export default function ChatsSection({
       try {
         const settings = await api.getNotificationSettings()
         setMutedConversations((settings.muted_conversations || []).map(item => item.id))
-      } catch (error) {
-        console.error('Failed to fetch notification settings:', error)
+      } catch {
+        console.error('Failed to fetch notification settings:', 'Unknown error')
         // Fallback to empty array
         setMutedConversations([])
       }
@@ -401,11 +401,11 @@ export default function ChatsSection({
           const lastAccessedKey = `group_${chat.groupId}_last_accessed`
           const lastAccessed = localStorage.getItem(lastAccessedKey)
           const lastAccessedDate = lastAccessed ? new Date(lastAccessed) : new Date(0)
-          const unreadPosts = (postsResponse.posts || []).filter((post: any) => new Date(post.created_at) > lastAccessedDate)
+          const unreadPosts = (postsResponse.posts || []).filter((post: PostResponse) => new Date(post.created_at) > lastAccessedDate)
           
           // Fetch unresponded polls count
           const pollsResponse = await api.getGroupPolls(chat.groupId, 20, 0)
-          const unrespondedPolls = (pollsResponse || []).filter((poll: any) => {
+          const unrespondedPolls = (pollsResponse || []).filter((poll: PollResponse) => {
             // Filter out expired polls (same logic as PollCard)
             const isExpired = poll.is_expired || (poll.expires_at && new Date(poll.expires_at) < new Date())
             return !poll.user_voted && !isExpired
@@ -413,7 +413,7 @@ export default function ChatsSection({
           
           // Fetch unresponded events count
           const eventsResponse = await api.getGroupEvents(chat.groupId, 1, 1)
-          const unrespondedEvents = (eventsResponse?.events || []).filter((event: any) => {
+          const unrespondedEvents = (eventsResponse?.events || []).filter((event: EventResponse) => {
             // Filter out cancelled or ended events (same logic as GroupEventsTab)
             const isEventEnded = event.canceled || new Date(event.event_time) < new Date()
             return event.user_response !== 'going' && event.user_response !== 'not_going' && !isEventEnded
@@ -424,7 +424,7 @@ export default function ChatsSection({
           try {
             const requestsResponse = await api.getReceivedJoinRequests(chat.groupId)
             pendingRequestsCount = requestsResponse.count || 0
-          } catch (error) {
+          } catch {
             // Not an admin or no permissions
             pendingRequestsCount = 0
           }
@@ -437,8 +437,8 @@ export default function ChatsSection({
           }
 
           console.log(`🔍 [TabCounts] Group ${chat.groupId}: posts=${unreadPosts.length}, polls=${unrespondedPolls.length}, events=${unrespondedEvents.length}, requests=${pendingRequestsCount}`)
-        } catch (error) {
-          console.error(`Failed to fetch tab counts for group ${chat.groupId}:`, error)
+        } catch {
+          console.error(`Failed to fetch tab counts for group ${chat.groupId}:`, 'Unknown error')
           counts[chat.groupId] = {
             newPostsCount: 0,
             unrespondedPollsCount: 0,

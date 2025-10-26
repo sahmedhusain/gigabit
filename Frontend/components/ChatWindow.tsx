@@ -739,7 +739,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
       }
       fetchTabCounts()
     }
-  }, [effectiveChatType, groupId, groupData?.role])
+  }, [effectiveChatType, groupId, groupData?.role, user?.id])
 
   // Update last accessed timestamp when group chat is opened
   useEffect(() => {
@@ -834,7 +834,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
 
   useEffect(() => {
     handleMessagesChange()
-  }, [messages, handleMessagesChange, effectiveConversationId])
+  }, [handleMessagesChange, user])
 
   const handleLeaveGroup = async (groupIdToLeave: number) => {
     try {

@@ -5,10 +5,11 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
-	"social/services"
 	"strconv"
 	"strings"
 	"time"
+
+	"social/services"
 )
 
 type StatusHandler struct {
@@ -23,7 +24,6 @@ func NewStatusHandler(db *sql.DB) *StatusHandler {
 	}
 }
 
-// StatusResponse represents the response structure for status operations
 type StatusResponse struct {
 	UserID           uint      `json:"user_id"`
 	Status           string    `json:"status"`
@@ -31,19 +31,16 @@ type StatusResponse struct {
 	IsOnline         bool      `json:"is_online"`
 }
 
-// StatusUpdateRequest represents the request to update user status
 type StatusUpdateRequest struct {
 	Status string `json:"status"`
 }
 
-// GetUserStatus returns the current status of a user
 func (h *StatusHandler) GetUserStatus(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
 		return
 	}
 
-	// Extract user ID from URL path: /api/users/{id}/status
 	path := strings.TrimPrefix(r.URL.Path, "/api/users/")
 	parts := strings.Split(path, "/")
 	if len(parts) < 2 || parts[1] != "status" {
@@ -57,7 +54,6 @@ func (h *StatusHandler) GetUserStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get user status from database
 	var status string
 	var lastStatusChange time.Time
 	query := `SELECT status, last_status_change FROM users WHERE id = ?`
@@ -72,7 +68,6 @@ func (h *StatusHandler) GetUserStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// For invisible users, return offline status to others (except themselves)
 	requestingUserID := r.Context().Value("user_id")
 	displayStatus := status
 	if status == "invisible" && requestingUserID != uint(userID) {
@@ -89,7 +84,6 @@ func (h *StatusHandler) GetUserStatus(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, response)
 }
 
-// GetMyStatus returns the current status of the authenticated user
 func (h *StatusHandler) GetMyStatus(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
@@ -102,7 +96,6 @@ func (h *StatusHandler) GetMyStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get user status from database
 	var status string
 	var lastStatusChange time.Time
 	query := `SELECT status, last_status_change FROM users WHERE id = ?`
@@ -117,18 +110,16 @@ func (h *StatusHandler) GetMyStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Return the real status to the user themselves
 	response := StatusResponse{
 		UserID:           userID.(uint),
 		Status:           status,
 		LastStatusChange: lastStatusChange,
-		IsOnline:         true, // If they're making a request, they're online
+		IsOnline:         true,
 	}
 
 	writeJSON(w, http.StatusOK, response)
 }
 
-// UpdateMyStatus updates the authenticated user's status
 func (h *StatusHandler) UpdateMyStatus(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPut {
 		writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
@@ -147,7 +138,6 @@ func (h *StatusHandler) UpdateMyStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Validate status
 	validStatuses := map[string]bool{
 		"online":    true,
 		"away":      true,
@@ -161,7 +151,6 @@ func (h *StatusHandler) UpdateMyStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Update status in database
 	query := `UPDATE users SET status = ?, last_status_change = CURRENT_TIMESTAMP WHERE id = ?`
 	_, err := h.db.Exec(query, req.Status, userID.(uint))
 	if err != nil {
@@ -170,7 +159,6 @@ func (h *StatusHandler) UpdateMyStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get updated status and timestamp
 	var updatedStatus string
 	var lastStatusChange time.Time
 	query = `SELECT status, last_status_change FROM users WHERE id = ?`
@@ -193,7 +181,6 @@ func (h *StatusHandler) UpdateMyStatus(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, response)
 }
 
-// GetOnlineUsers returns a list of all online users with their statuses
 func (h *StatusHandler) GetOnlineUsers(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
@@ -206,7 +193,6 @@ func (h *StatusHandler) GetOnlineUsers(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get all users with their current status (exclude offline and invisible users for others)
 	query := `
 		SELECT u.id, u.first_name, u.last_name, u.nickname, u.avatar, u.status, u.last_status_change
 		FROM users u 
@@ -237,7 +223,6 @@ func (h *StatusHandler) GetOnlineUsers(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 
-		// For invisible users, show them their real status but show as offline to others
 		displayStatus := status
 		if status == "invisible" && userID != requestingUserID.(uint) {
 			displayStatus = "offline"

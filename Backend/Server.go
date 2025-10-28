@@ -66,7 +66,6 @@ func writeError(w http.ResponseWriter, status int, message string) {
 	writeJSON(w, status, Response{Error: message})
 }
 
-// Database middleware
 func (s *Server) dbMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx := context.WithValue(r.Context(), dbContextKey, s.DB.GetDB())
@@ -86,7 +85,6 @@ func NewServer(hub *websocket.Hub) *Server {
 }
 
 func (s *Server) setupRoutes() {
-	// Initialize handlers
 	authHandler := handlers.NewAuthHandler(s.DB.GetDB())
 	uploadHandler := handlers.NewUploadHandler()
 	profileHandler := handlers.NewProfileHandler(s.DB.GetDB())
@@ -105,8 +103,6 @@ func (s *Server) setupRoutes() {
 	statusHandler := handlers.NewStatusHandler(s.DB.GetDB())
 	searchHandler := handlers.NewSearchHandler(s.DB.GetDB())
 	shareHandler := handlers.NewShareHandler(s.DB.GetDB(), s.Hub)
-
-	// Health check
 	s.router.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
 			writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
@@ -115,42 +111,31 @@ func (s *Server) setupRoutes() {
 		writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 	})
 
-	// Static file serving for images
 	s.router.Handle("/uploads/", http.StripPrefix("/uploads/", http.FileServer(http.Dir("./uploads"))))
 
-	// Public routes
 	s.router.HandleFunc("/api/register", s.handleRoute(authHandler.Register, false))
 	s.router.HandleFunc("/api/login", s.handleRoute(authHandler.Login, false))
 	s.router.HandleFunc("/api/images/", s.handleRoute(uploadHandler.ServeImage, false))
 
-	// Protected routes
-	s.router.HandleFunc("/api/me", s.handleRoute(authHandler.GetMe, true))
 	s.router.HandleFunc("/api/logout", s.handleRoute(authHandler.Logout, true))
 	s.router.HandleFunc("/api/change-password", s.handleRoute(authHandler.ChangePassword, true))
-
-	// Profile routes
 	s.router.HandleFunc("/api/profile/", s.handleProfileRoute(profileHandler))
 	s.router.HandleFunc("/api/profile", s.handleRoute(userHandler.UpdateProfile, true))
 	s.router.HandleFunc("/api/profile/image", s.handleRoute(profileHandler.UpdateProfileImage, true))
 	s.router.HandleFunc("/api/profile/privacy", s.handleRoute(profileHandler.TogglePrivacy, true))
 	s.router.HandleFunc("/api/users/search", s.handleRoute(profileHandler.SearchUsers, true))
-	// Public stats route (no authentication required)
 	s.router.HandleFunc("/api/stats/", s.handlePublicStatsRoute(profileHandler))
 
-	// Validation routes
 	s.router.HandleFunc("/api/validation/email", s.handleRoute(profileHandler.CheckEmailUniqueness, false))
 	s.router.HandleFunc("/api/validation/nickname", s.handleRoute(profileHandler.CheckNicknameUniqueness, false))
 
-	// Search routes
 	s.router.HandleFunc("/api/search/suggestions", s.handleRoute(searchHandler.UnifiedSearch, true))
 	s.router.HandleFunc("/api/search", s.handleRoute(searchHandler.SearchAll, true))
 
-	// Share routes
 	s.router.HandleFunc("/api/share", s.handleRoute(shareHandler.SharePost, true))
 	s.router.HandleFunc("/api/share/recent", s.handleRoute(shareHandler.GetRecentChatsAndGroups, true))
 	s.router.HandleFunc("/api/share/search", s.handleRoute(shareHandler.SearchShareableEntities, true))
 
-	// User routes
 	s.router.HandleFunc("/api/users", s.handleRoute(userHandler.GetAllUsers, true))
 	s.router.HandleFunc("/api/users/status", s.handleRoute(userHandler.UpdateStatus, true))
 	s.router.HandleFunc("/api/users/", s.handleUserRoute(followHandler, wsHandler))
@@ -159,21 +144,17 @@ func (s *Server) setupRoutes() {
 	s.router.HandleFunc("/api/privacy/birthday", s.handleRoute(userHandler.UpdateBirthdayPrivacy, true))
 	s.router.HandleFunc("/api/privacy/gender", s.handleRoute(userHandler.UpdateGenderPrivacy, true))
 
-	// Status routes
 	s.router.HandleFunc("/api/status/me", s.handleRoute(statusHandler.GetMyStatus, true))
 	s.router.HandleFunc("/api/status/update", s.handleRoute(statusHandler.UpdateMyStatus, true))
 	s.router.HandleFunc("/api/status/online", s.handleRoute(statusHandler.GetOnlineUsers, true))
 
-	// Post routes
 	s.router.HandleFunc("/api/posts", s.handlePostsRoute(postHandler))
 	s.router.HandleFunc("/api/posts/", s.handlePostRoute(postHandler))
 	s.router.HandleFunc("/api/feed", s.handleRoute(postHandler.GetFeedPosts, true))
 
-	// Activity routes
 	s.router.HandleFunc("/api/posts/liked", s.handleRoute(postHandler.GetUserLikedPosts, true))
 	s.router.HandleFunc("/api/posts/commented", s.handleRoute(postHandler.GetUserCommentedPosts, true))
 
-	// Bookmark routes
 	s.router.HandleFunc("/api/bookmarks", s.handleRoute(bookmarkHandler.GetUserBookmarks, true))
 	s.router.HandleFunc("/api/bookmarks/", s.handleBookmarkRoute(bookmarkHandler))
 
@@ -185,40 +166,31 @@ func (s *Server) setupRoutes() {
 	s.router.HandleFunc("/api/follow/requests/outgoing", s.handleRoute(followHandler.GetOutgoingFollowRequests, true))
 	s.router.HandleFunc("/api/groups/join-requests/outgoing", s.handleRoute(groupHandler.GetOutgoingGroupJoinRequests, true))
 
-	// Event routes
 	s.router.HandleFunc("/api/events", s.handleUserEventsRoute(eventHandler))
 	s.router.HandleFunc("/api/events/", s.handleEventRoute(eventHandler))
 
-	// Message routes
 	s.router.HandleFunc("/api/messages", s.handleMessagesRoute(messageHandler))
 	s.router.HandleFunc("/api/messages/", s.handleMessageRoute(messageHandler))
 	s.router.HandleFunc("/api/conversations", s.handleRoute(messageHandler.GetConversations, true))
 	s.router.HandleFunc("/api/conversations/", s.handleConversationRoute(conversationHandler))
 	s.router.HandleFunc("/api/chats", s.handleChatsRoute(chatHandler, messageHandler, groupHandler))
 
-	// Notification routes
 	s.router.HandleFunc("/api/notifications", s.handleNotificationsRoute(notificationHandler))
 	s.router.HandleFunc("/api/notifications/", s.handleNotificationRoute(notificationHandler))
 
-	// WebSocket routes
 	s.router.HandleFunc("/api/ws", s.handleRoute(wsHandler.HandleWebSocket, true))
 	s.router.HandleFunc("/api/users/online", s.handleRoute(wsHandler.GetOnlineUsers, true))
 
-	// Upload routes
 	s.router.HandleFunc("/api/uploads", s.handleRoute(uploadHandler.UploadImage, true))
 	s.router.HandleFunc("/api/upload/avatar", s.handleRoute(uploadHandler.UploadAvatar, true))
 
-	// Poll routes
 	s.router.HandleFunc("/api/polls", s.handlePollsRoute(pollHandler))
 	s.router.HandleFunc("/api/polls/", s.handlePollRoute(pollHandler))
-
 }
 
-// Route handler wrapper
 func (s *Server) handleRoute(handler func(http.ResponseWriter, *http.Request), requireAuth bool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if requireAuth {
-			// Apply auth middleware
 			authMiddleware := middleware.AuthMiddleware(s.DB.GetDB())
 			authMiddleware(http.HandlerFunc(handler)).ServeHTTP(w, r)
 		} else {
@@ -241,7 +213,6 @@ func (s *Server) handleProfileRoute(handler *handlers.ProfileHandler) http.Handl
 			return
 		}
 
-		// Extract ID and call handler
 		authMiddleware := middleware.AuthMiddleware(s.DB.GetDB())
 		authMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			handler.GetProfile(w, r, path)
@@ -258,7 +229,6 @@ func (s *Server) handlePublicStatsRoute(handler *handlers.ProfileHandler) http.H
 			return
 		}
 
-		// Call the handler directly (no authentication middleware)
 		handler.GetPublicStats(w, r, path)
 	}
 }

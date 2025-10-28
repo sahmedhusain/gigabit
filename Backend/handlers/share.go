@@ -41,7 +41,6 @@ func (h *ShareHandler) SharePost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Validate max 5 each
 	if len(req.ConversationIDs) > 5 || len(req.GroupIDs) > 5 || len(req.UserIDs) > 5 {
 		writeError(w, http.StatusBadRequest, "Cannot share to more than 5 chats, groups, or users at once")
 		return

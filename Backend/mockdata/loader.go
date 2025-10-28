@@ -11,8 +11,6 @@ import (
 
 // LoadMockData loads all mock data SQL files into the database
 func LoadMockData(db *sql.DB) error {
-	log.Println("Loading mock data...")
-
 	// Clear existing data first
 	if err := ClearAllData(db); err != nil {
 		return fmt.Errorf("failed to clear existing data: %v", err)
@@ -52,8 +50,6 @@ func LoadMockData(db *sql.DB) error {
 	for _, filename := range sqlFiles {
 		filePath := filepath.Join(mockDataDir, filename)
 
-		log.Printf("Loading %s...", filename)
-
 		// Check if file exists
 		if _, err := os.Stat(filePath); os.IsNotExist(err) {
 			log.Printf("Warning: %s not found, skipping", filename)
@@ -71,7 +67,6 @@ func LoadMockData(db *sql.DB) error {
 			return fmt.Errorf("failed to execute %s: %v", filename, err)
 		}
 
-		log.Printf("✓ Loaded %s successfully", filename)
 	}
 
 	// Re-enable foreign key constraints
@@ -85,7 +80,6 @@ func LoadMockData(db *sql.DB) error {
 
 // ClearAllData clears all data from tables (useful for testing)
 func ClearAllData(db *sql.DB) error {
-	log.Println("Clearing all data...")
 
 	// Disable foreign key constraints during clearing
 	if _, err := db.Exec("PRAGMA foreign_keys = OFF"); err != nil {
@@ -129,7 +123,6 @@ func ClearAllData(db *sql.DB) error {
 		if _, err := db.Exec(fmt.Sprintf("DELETE FROM sqlite_sequence WHERE name='%s'", table)); err != nil {
 			// Ignore errors here as some tables may not have auto-increment or may not exist
 		}
-		log.Printf("✓ Cleared table %s", table)
 	}
 
 	// Re-enable foreign key constraints

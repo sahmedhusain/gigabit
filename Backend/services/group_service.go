@@ -5,11 +5,11 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	sqlite3 "github.com/mattn/go-sqlite3"
 
 	"social/models"
-	"time"
 )
 
 type GroupService struct {

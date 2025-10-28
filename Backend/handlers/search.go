@@ -4,11 +4,12 @@ import (
 	"database/sql"
 	"fmt"
 	"net/http"
+	"sort"
+	"strings"
+
 	"social/middleware"
 	"social/models"
 	"social/services"
-	"sort"
-	"strings"
 )
 
 type SearchHandler struct {
@@ -23,10 +24,8 @@ func NewSearchHandler(db *sql.DB) *SearchHandler {
 	}
 }
 
-// SearchSuggestion represents a generic search result - alias to the service type
 type SearchSuggestion = services.SearchSuggestion
 
-// UnifiedSearch searches across all resource types (for suggestions)
 func (h *SearchHandler) UnifiedSearch(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
@@ -61,7 +60,6 @@ func (h *SearchHandler) UnifiedSearch(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// SearchAll handles comprehensive search with filtering by category for the search results page
 func (h *SearchHandler) SearchAll(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
@@ -69,7 +67,7 @@ func (h *SearchHandler) SearchAll(w http.ResponseWriter, r *http.Request) {
 	}
 
 	query := r.URL.Query().Get("q")
-	filter := r.URL.Query().Get("filter") // users, groups, events, posts, messages, tags, all
+	filter := r.URL.Query().Get("filter")
 	page := r.URL.Query().Get("page")
 	limit := r.URL.Query().Get("limit")
 
@@ -89,7 +87,6 @@ func (h *SearchHandler) SearchAll(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Parse pagination parameters
 	pageNum := 1
 	if page != "" {
 		if p, err := fmt.Sscanf(page, "%d", &pageNum); err != nil || p != 1 || pageNum < 1 {
@@ -131,8 +128,7 @@ func (h *SearchHandler) SearchAll(w http.ResponseWriter, r *http.Request) {
 	case "chats":
 		results = h.searchChats(userID, searchPattern, limitNum, offset)
 		totalCount = h.countChats(userID, searchPattern)
-	default: // "all" or any other value
-		// Search across all categories with higher limits for comprehensive results
+	default:
 		userResults := h.searchUsers(userID, searchPattern, 10, 0)
 		results = append(results, userResults...)
 
@@ -154,7 +150,6 @@ func (h *SearchHandler) SearchAll(w http.ResponseWriter, r *http.Request) {
 		messageResults := h.searchMessages(userID, searchPattern, 10, 0)
 		results = append(results, messageResults...)
 
-		// Sort by relevance
 		sort.Slice(results, func(i, j int) bool {
 			order := map[string]int{
 				"user": 1, "private": 2, "group": 3, "event": 4, "post": 5, "tag": 6, "message": 7,
@@ -162,9 +157,8 @@ func (h *SearchHandler) SearchAll(w http.ResponseWriter, r *http.Request) {
 			return order[results[i].Type] < order[results[j].Type]
 		})
 
-		totalCount = len(results) // For "all" filter, total count is the combined results
+		totalCount = len(results)
 
-		// Apply pagination to combined results
 		start := (pageNum - 1) * limitNum
 		end := start + limitNum
 		if start >= len(results) {
@@ -291,23 +285,18 @@ func (h *SearchHandler) searchGroups(userID uint, pattern string, limit int, off
 
 		isMember := isMemberInt == 1
 		joinable := !isMember && strings.ToLower(privacy) == "public"
-		// If member and conversation exists, deep link to chats/all
 		url := fmt.Sprintf("/group/%d", id)
 		if isMember {
 			if conversationID.Valid {
 				url = fmt.Sprintf("/chats/all?group=%d", id)
 			} else {
-				// Fallback: use group id; frontend can resolve
 				url = fmt.Sprintf("/chats/all?group=%d", id)
 			}
 		}
 
-		// Process avatar URL
 		var avatarURL string
 		if avatar.Valid && avatar.String != "" {
-			// If it's already a full URL, use as is
 			if !strings.HasPrefix(avatar.String, "http") && !strings.HasPrefix(avatar.String, "/avatars/") && !strings.HasPrefix(avatar.String, "image:") {
-				// For uploaded files, prepend the uploads path
 				avatarURL = fmt.Sprintf("http://localhost:8080/api/uploads/%s", avatar.String)
 			} else {
 				avatarURL = avatar.String

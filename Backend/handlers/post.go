@@ -7,12 +7,9 @@ import (
 	"net/http"
 	"strconv"
 
-	// "strings"
-
 	"social/models"
 	"social/services"
 
-	// "social/utils"
 	"social/websocket"
 )
 
@@ -55,12 +52,10 @@ func (h *PostHandler) CreatePost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Set default privacy if not provided
 	if req.Privacy == "" {
 		req.Privacy = "public"
 	}
 
-	// Validate privacy value
 	validPrivacy := []string{"public", "followers", "friends", "listed"}
 	isValid := false
 	for _, v := range validPrivacy {
@@ -94,12 +89,7 @@ func (h *PostHandler) CreatePost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Add specific users for listed posts
-	if req.Privacy == "listed" {
-		if len(req.SpecificUserIDs) == 0 {
-			writeError(w, http.StatusBadRequest, "Listed posts must specify at least one user")
-			return
-		}
+	if req.Privacy == "listed" && len(req.SpecificUserIDs) > 0 {
 		if err := h.postService.AddPostPrivacyUsers(post.ID, req.SpecificUserIDs); err != nil {
 			log.Printf("Failed to add privacy users for post %d: %v", post.ID, err)
 			writeError(w, http.StatusInternalServerError, "Failed to set post privacy")
@@ -133,13 +123,12 @@ func (h *PostHandler) GetPost(w http.ResponseWriter, r *http.Request, postIDStr 
 		return
 	}
 
-	// Get sort parameter
 	sort := r.URL.Query().Get("sort")
-	if sort == "" {
-		sort = "newest" // Default to newest first
-	}
 	if sort != "newest" && sort != "oldest" {
-		sort = "newest" // Default to newest if invalid
+		sort = "newest"
+	}
+	if sort == "" {
+		sort = "newest"
 	}
 
 	post, err := h.postService.GetPostByIDWithSort(uint(postID), userID.(uint), sort)
@@ -163,7 +152,6 @@ func (h *PostHandler) GetPosts(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get pagination parameters
 	limitStr := r.URL.Query().Get("limit")
 	if limitStr == "" {
 		limitStr = "50"
@@ -183,7 +171,6 @@ func (h *PostHandler) GetPosts(w http.ResponseWriter, r *http.Request) {
 		offset = 0
 	}
 
-	// Use the service layer to get posts with proper privacy filtering
 	posts, err := h.postService.GetFeedPosts(currentUserID.(uint), limit, offset)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "Failed to get posts")
@@ -215,7 +202,6 @@ func (h *PostHandler) GetUserPosts(w http.ResponseWriter, r *http.Request, userI
 		return
 	}
 
-	// Get pagination parameters
 	limitStr := r.URL.Query().Get("limit")
 	if limitStr == "" {
 		limitStr = "20"
@@ -261,7 +247,6 @@ func (h *PostHandler) GetFeedPosts(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get pagination parameters
 	limitStr := r.URL.Query().Get("limit")
 	if limitStr == "" {
 		limitStr = "20"
@@ -281,7 +266,6 @@ func (h *PostHandler) GetFeedPosts(w http.ResponseWriter, r *http.Request) {
 		offset = 0
 	}
 
-	// Get filter parameter to determine which feed to show
 	filter := r.URL.Query().Get("filter")
 
 	var posts []models.PostResponse
@@ -404,15 +388,12 @@ func (h *PostHandler) LikePost(w http.ResponseWriter, r *http.Request, postIDStr
 		return
 	}
 
-	// Get post owner to send notification
 	isGroupPost, groupID, err := h.likeService.IsPostGroupPost(uint(postID))
 	if err == nil && isGroupPost {
 		log.Printf("DEBUG: Group post detected, groupID: %d", groupID)
-		// For group posts, get the post owner directly
 		postOwnerID, err := h.groupService.GetGroupPostOwner(uint(postID))
 		if err == nil {
 			log.Printf("DEBUG: Group post owner: %d, sending notification for group post like", postOwnerID)
-			// Send notification to post owner for group post likes
 			h.notificationService.NotifyGroupPostLiked(userID.(uint), postOwnerID, uint(postID), groupID)
 		} else {
 			log.Printf("DEBUG: Failed to get group post owner: %v", err)
@@ -421,12 +402,10 @@ func (h *PostHandler) LikePost(w http.ResponseWriter, r *http.Request, postIDStr
 		log.Printf("DEBUG: Error checking if post is group post: %v", err)
 	} else {
 		log.Printf("DEBUG: Regular post detected")
-		// For regular posts, get post owner directly
 		var postOwnerID uint
 		err := h.postService.GetPostOwner(uint(postID), &postOwnerID)
 		if err == nil {
 			log.Printf("DEBUG: Post owner: %d, calling NotifyPostLiked", postOwnerID)
-			// Send notification to post owner
 			h.notificationService.NotifyPostLiked(userID.(uint), postOwnerID, uint(postID))
 		} else {
 			log.Printf("DEBUG: Failed to get post owner: %v", err)
@@ -521,7 +500,6 @@ func (h *PostHandler) UndislikePost(w http.ResponseWriter, r *http.Request, post
 	writeJSON(w, http.StatusOK, map[string]string{"message": "Post undisliked successfully"})
 }
 
-// CreateComment handles creating a new comment on a post
 func (h *PostHandler) CreateComment(w http.ResponseWriter, r *http.Request, postIDStr string) {
 	if r.Method != http.MethodPost {
 		writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
@@ -568,14 +546,11 @@ func (h *PostHandler) CreateComment(w http.ResponseWriter, r *http.Request, post
 		return
 	}
 
-	// Get post owner to send notification (only for regular posts, not group posts)
 	isGroupPost, _, err := h.likeService.IsPostGroupPost(uint(postID))
 	if err == nil && !isGroupPost {
-		// Only send notifications for regular posts
 		var postOwnerID uint
 		err := h.postService.GetPostOwner(uint(postID), &postOwnerID)
 		if err == nil {
-			// For regular posts, send notification to post owner
 			h.notificationService.NotifyPostCommented(userID.(uint), postOwnerID, uint(postID), comment.ID)
 		}
 	}
@@ -586,7 +561,6 @@ func (h *PostHandler) CreateComment(w http.ResponseWriter, r *http.Request, post
 	})
 }
 
-// GetPostComments handles getting comments for a specific post
 func (h *PostHandler) GetPostComments(w http.ResponseWriter, r *http.Request, postIDStr string) {
 	if r.Method != http.MethodGet {
 		writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
@@ -634,7 +608,6 @@ func (h *PostHandler) GetPostComments(w http.ResponseWriter, r *http.Request, po
 	})
 }
 
-// DeleteComment handles deleting a specific comment
 func (h *PostHandler) DeleteComment(w http.ResponseWriter, r *http.Request, postIDStr string, commentIDStr string) {
 	if r.Method != http.MethodDelete {
 		writeError(w, http.StatusMethodNotAllowed, "Method not allowed")

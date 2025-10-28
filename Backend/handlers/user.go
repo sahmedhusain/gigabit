@@ -251,17 +251,13 @@ func (h *UserHandler) UpdateStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Determine what status to broadcast to other users
 	broadcastStatus := req.Status
 	if req.Status == "invisible" {
-		// If user is going invisible, broadcast offline status instead
 		broadcastStatus = "offline"
 	}
 
-	// Broadcast status change to all connected clients via WebSocket
 	h.hub.BroadcastUserStatus(userID, broadcastStatus)
 
-	// Get updated user
 	user, err := h.userService.GetUserByID(userID)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "Failed to get updated user")
@@ -297,19 +293,16 @@ func (h *UserHandler) DeleteAccount(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Verify password
 	if !utils.CheckPassword(req.Password, user.Password) {
 		writeError(w, http.StatusUnauthorized, "Incorrect password")
 		return
 	}
 
-	// Perform comprehensive account deletion
 	if err := h.userService.DeleteAccount(userID); err != nil {
 		writeError(w, http.StatusInternalServerError, "Failed to delete account")
 		return
 	}
 
-	// Delete sessions
 	h.db.Exec("DELETE FROM sessions WHERE user_id = ?", userID)
 
 	writeJSON(w, http.StatusOK, map[string]string{"message": "Account deleted successfully"})
@@ -370,7 +363,6 @@ func (h *UserHandler) UpdateBirthdayPrivacy(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	// Validate privacy setting
 	validSettings := map[string]bool{
 		"everyone":  true,
 		"friends":   true,
@@ -417,7 +409,6 @@ func (h *UserHandler) UpdateGenderPrivacy(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	// Validate privacy setting
 	validSettings := map[string]bool{
 		"everyone":  true,
 		"friends":   true,

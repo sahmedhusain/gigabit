@@ -4,10 +4,11 @@ import (
 	"database/sql"
 	"encoding/json"
 	"net/http"
+	"strconv"
+
 	"social/models"
 	"social/services"
 	"social/websocket"
-	"strconv"
 )
 
 type EventHandler struct {
@@ -37,34 +38,29 @@ func (h *EventHandler) CreateEvent(w http.ResponseWriter, r *http.Request, group
 		return
 	}
 
-	// Check if user is a member of the group
 	isMember, err := h.groupService.IsUserMember(uint(groupID), userID)
 	if err != nil || !isMember {
 		writeError(w, http.StatusForbidden, "Must be a group member to create events")
 		return
 	}
 
-	// Get user role in the group
 	userRole, err := h.groupService.GetUserRole(uint(groupID), userID)
 	if err != nil {
 		writeError(w, http.StatusForbidden, "User is not a member of this group")
 		return
 	}
 
-	// Only members can post (not pending or invited users)
 	if userRole == "" {
 		writeError(w, http.StatusForbidden, "User is not a member of this group")
 		return
 	}
 
-	// Check group permissions for creating events
 	group, err := h.groupService.GetGroupByID(uint(groupID), userID)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "Failed to get group information")
 		return
 	}
 
-	// Check if user has permission to create events
 	isAdminOrCreator, err := h.groupService.IsUserAdminOrCreator(uint(groupID), userID)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "Failed to check user permissions")
@@ -96,7 +92,6 @@ func (h *EventHandler) CreateEvent(w http.ResponseWriter, r *http.Request, group
 		return
 	}
 
-	// Send notifications to all group members (async, don't wait for it)
 	go h.notificationService.NotifyEventCreated(userID, uint(groupID), event.ID)
 
 	writeJSON(w, http.StatusCreated, map[string]interface{}{
@@ -140,7 +135,6 @@ func (h *EventHandler) GetGroupEvents(w http.ResponseWriter, r *http.Request, gr
 		return
 	}
 
-	// Get pagination parameters
 	limitStr := r.URL.Query().Get("limit")
 	if limitStr == "" {
 		limitStr = "20"
@@ -185,7 +179,6 @@ func (h *EventHandler) GetUserEvents(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get pagination parameters
 	limitStr := r.URL.Query().Get("limit")
 	if limitStr == "" {
 		limitStr = "20"
@@ -325,7 +318,6 @@ func (h *EventHandler) RespondToEvent(w http.ResponseWriter, r *http.Request, ev
 		return
 	}
 
-	// Get current response to check if it's being removed
 	currentResponse, _ := h.eventService.GetUserEventResponse(uint(eventID), userID)
 	wasRemoved := currentResponse == req.Option
 
@@ -375,7 +367,6 @@ func (h *EventHandler) GetEventResponses(w http.ResponseWriter, r *http.Request,
 		return
 	}
 
-	// Group responses by option for easier consumption
 	going := make([]models.EventResponseDetail, 0)
 	notGoing := make([]models.EventResponseDetail, 0)
 

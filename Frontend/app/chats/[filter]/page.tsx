@@ -159,7 +159,7 @@ function ChatsFilterPage() {
     } finally {
       setIsLoadingChats(false)
     }
-  }, [onlineUsers])  // Removed 'error' from dependencies
+  }, [onlineUsers, error])
 
   const fetchGroups = useCallback(async () => {
     if (!user?.id) return
@@ -197,7 +197,7 @@ function ChatsFilterPage() {
     } finally {
       setIsLoadingGroups(false)
     }
-  }, [user?.id])  // Removed 'error' from dependencies
+  }, [user?.id, error])
 
   const fetchFollowers = useCallback(async () => {
     if (!user) return

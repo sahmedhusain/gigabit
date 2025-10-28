@@ -176,7 +176,7 @@ function ChatsPage() {
     } finally {
       setIsLoadingChats(false)
     }
-  }, [user?.id, getUserStatus])  // Removed 'error' from dependencies
+  }, [user?.id, getUserStatus, error])
 
   const fetchGroups = useCallback(async () => {
     if (!user?.id) return
@@ -204,7 +204,7 @@ function ChatsPage() {
     } finally {
       setIsLoadingGroups(false)
     }
-  }, [user?.id])  // Removed 'error' from dependencies
+  }, [user?.id, error])
 
   const fetchFollowers = useCallback(async () => {
     if (!user) return

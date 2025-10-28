@@ -116,7 +116,7 @@ const GroupChatTab: React.FC<GroupChatTabProps> = ({
         }
       }
     }, 100)
-  }, [messages, effectiveConversationId, highlightMessageId, hasMoreMessages, isLoadingMore, loadMoreMessages])
+  }, [messages, effectiveConversationId, highlightMessageId, hasMoreMessages, isLoadingMore, loadMoreMessages, groupId])
 
   
   useEffect(() => {
@@ -257,22 +257,23 @@ const GroupChatTab: React.FC<GroupChatTabProps> = ({
         setGroupPermissions({
           send_messages: groupData.send_messages
         })
-      } catch (err: any) {
+      } catch (err: unknown) {
+        const error = err as { status?: number; name?: string; message?: string }
         console.error('[GroupChatTab] Error loading role:', {
-          status: err?.status,
-          name: err?.name,
-          message: err?.message,
+          status: error?.status,
+          name: error?.name,
+          message: error?.message,
           fullError: err
         })
         // Check for 403 Forbidden - user is not a member of this group
-        if (err?.status === 403 || (err?.name === 'NetworkError' && err?.message?.includes('forbidden'))) {
+        if (error?.status === 403 || (error?.name === 'NetworkError' && error?.message?.includes('forbidden'))) {
           console.log('User is not a member of group', groupId)
           setIsNotMember(true)
           setUserRole(null)
           setGroupPermissions(null)
         } else {
           // Log other errors for debugging
-          console.error('Failed to load user role and permissions for group:', err?.message || err)
+          console.error('Failed to load user role and permissions for group:', error?.message || err)
           // Still set to not member to prevent sending messages if permissions can't be loaded
           setIsNotMember(false)
           setUserRole(null)
@@ -477,27 +478,6 @@ const GroupChatTab: React.FC<GroupChatTabProps> = ({
     console.log('[GroupChatTab] Can send messages:', result)
     return result.canSend
   }
-
-  const getMessageInputStatus = () => {
-    if (isNotMember) {
-      console.log('[GroupChatTab] Status: not_member')
-      return 'not_member'
-    }
-    if (!groupPermissions) {
-      console.log('[GroupChatTab] Status: loading (no permissions)')
-      return 'loading'
-    }
-    if (userRole?.is_admin_or_creator || groupPermissions.send_messages === 'all_members') {
-      console.log('[GroupChatTab] Status: can_send', { 
-        isAdmin: userRole?.is_admin_or_creator,
-        sendMessages: groupPermissions.send_messages 
-      })
-      return 'can_send'
-    }
-    console.log('[GroupChatTab] Status: admin_only')
-    return 'admin_only'
-  }
-
 
 
   return (

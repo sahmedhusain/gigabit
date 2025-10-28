@@ -309,10 +309,11 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
         try {
           const members = await api.getGroupMembers(groupId)
           setGroupMembers(members.members)
-        } catch (error: any) {
+        } catch (error: unknown) {
           // Silently ignore 403 errors (user not a member) - this is expected behavior
-          if (error?.status !== 403 && !(error?.name === 'NetworkError' && error?.message?.includes('forbidden'))) {
-            console.error('Failed to fetch group members:', error?.message || error)
+          const err = error as { status?: number; name?: string; message?: string }
+          if (err?.status !== 403 && !(err?.name === 'NetworkError' && err?.message?.includes('forbidden'))) {
+            console.error('Failed to fetch group members:', err?.message || error)
           }
         }
       }
@@ -368,10 +369,11 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
             const requestsResponse = await api.getReceivedJoinRequests(groupId)
             setPendingRequestsCount(requestsResponse.count || 0)
           }
-        } catch (error: any) {
+        } catch (error: unknown) {
           // Silently ignore 403 errors (user not a member) - this is expected behavior
-          if (error?.status !== 403 && !(error?.name === 'NetworkError' && error?.message?.includes('forbidden'))) {
-            console.error('Failed to fetch tab counts:', error?.message || error)
+          const err = error as { status?: number; name?: string; message?: string }
+          if (err?.status !== 403 && !(err?.name === 'NetworkError' && err?.message?.includes('forbidden'))) {
+            console.error('Failed to fetch tab counts:', err?.message || error)
           }
         }
       }

@@ -1,23 +1,31 @@
 #!/usr/bin/env bash
-# run.sh - Unified runner for development, build, testing and docker workflows
+# run.sh - Unified runner for development, build, testing and Docker workflows
 # Usage: ./run.sh <command> [options]
 # Commands:
-#   help            Show this help
-#   dev             Start frontend dev server and backend in dev mode (concurrently)
-#   build           Build frontend and backend artifacts for production
-#   start           Start production artifacts (frontend static/server + backend binary)
-#   docker-build    Build Docker images for frontend and backend
-#   docker-up       Run docker-compose up -d --build
-#   docker-down     Run docker-compose down
-#   test            Run frontend and backend tests
-#   lint            Run linters for frontend (if configured)
-#   fmt             Format code (frontend/backend if configured)
-#   clean           Remove build artifacts
-#   debug           Run backend in debug mode (if debugger configured)
+#   help                Show this help
+#   dev                 Start frontend dev server and backend in dev mode (concurrently)
+#   build               Build frontend and backend artifacts for production
+#   start               Start production artifacts (frontend static/server + backend binary)
+#   
+#   Docker Commands:
+#   docker:build        Build Docker containers (same as ./build.sh)
+#   docker:up           Start Docker containers
+#   docker:down         Stop Docker containers
+#   docker:restart      Restart Docker containers
+#   docker:logs         View container logs (all or specific service)
+#   docker:status       Show container status
+#   docker:shell        Open shell in backend or frontend container
+#   docker:clean        Remove all containers, images, and volumes
+#   
+#   test                Run frontend and backend tests
+#   lint                Run linters for frontend (if configured)
+#   fmt                 Format code (frontend/backend if configured)
+#   clean               Remove build artifacts
+#   debug               Run backend in debug mode (if debugger configured)
 #
 # Environment variables you can set:
 #   FRONTEND_PORT     Default: 3000 (dev) / 3003 (when 3000 in use)
-#   BACKEND_PORT      Default: 3001
+#   BACKEND_PORT      Default: 8080
 #   DOCKER_COMPOSE    Default: docker-compose.yml
 #   NODE_ENV          Default: development
 #
@@ -31,13 +39,21 @@ FRONTEND_DIR="$ROOT_DIR/Frontend"
 BACKEND_DIR="$ROOT_DIR/Backend"
 DOCKER_COMPOSE_FILE="${DOCKER_COMPOSE:-$ROOT_DIR/docker-compose.yml}"
 FRONTEND_PORT="${FRONTEND_PORT:-3000}"
-BACKEND_PORT="${BACKEND_PORT:-3001}"
+BACKEND_PORT="${BACKEND_PORT:-8080}"
 NODE_ENV="${NODE_ENV:-development}"
 
-# Helper: print header
-info() { echo -e "\033[1;34m[INFO]\033[0m $*"; }
-warn() { echo -e "\033[1;33m[WARN]\033[0m $*"; }
-err()  { echo -e "\033[1;31m[ERROR]\033[0m $*" >&2; }
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+# Helper functions
+info() { echo -e "${BLUE}[INFO]${NC} $*"; }
+warn() { echo -e "${YELLOW}[WARN]${NC} $*"; }
+err()  { echo -e "${RED}[ERROR]${NC} $*" >&2; }
+success() { echo -e "${GREEN}[SUCCESS]${NC} $*"; }
 
 command_exists() {
   command -v "$1" >/dev/null 2>&1
@@ -139,25 +155,97 @@ debug_backend() {
 }
 
 # Docker helpers
-docker_build_images() {
-  info "Building Docker images (frontend/backend) using Dockerfile(s)..."
-  if [ -d "$FRONTEND_DIR" ]; then
-    docker build -t social-network-frontend "$FRONTEND_DIR"
+docker_build_containers() {
+  info "Building Docker containers using docker-compose..."
+  if [ ! -f "$DOCKER_COMPOSE_FILE" ]; then
+    err "docker-compose.yml not found at $DOCKER_COMPOSE_FILE"
+    exit 1
   fi
-  if [ -d "$BACKEND_DIR" ]; then
-    docker build -t social-network-backend "$BACKEND_DIR"
-  fi
-  info "Docker images built."
+  
+  info "Building images and creating containers..."
+  docker compose -f "$DOCKER_COMPOSE_FILE" build --no-cache
+  success "Docker containers built successfully"
+  
+  info "Starting containers..."
+  docker compose -f "$DOCKER_COMPOSE_FILE" up -d
+  success "Containers started"
+  
+  info "Container status:"
+  docker compose -f "$DOCKER_COMPOSE_FILE" ps
 }
 
 docker_compose_up() {
-  info "Starting containers with docker-compose ($DOCKER_COMPOSE_FILE)..."
-  docker compose -f "$DOCKER_COMPOSE_FILE" up -d --build
+  info "Starting Docker containers..."
+  if ! docker compose -f "$DOCKER_COMPOSE_FILE" ps | grep -q "Up"; then
+    docker compose -f "$DOCKER_COMPOSE_FILE" up -d
+    success "Containers started"
+  else
+    warn "Containers are already running"
+  fi
+  docker compose -f "$DOCKER_COMPOSE_FILE" ps
 }
 
 docker_compose_down() {
-  info "Stopping containers with docker-compose..."
+  info "Stopping Docker containers..."
   docker compose -f "$DOCKER_COMPOSE_FILE" down
+  success "Containers stopped"
+}
+
+docker_compose_restart() {
+  info "Restarting Docker containers..."
+  docker compose -f "$DOCKER_COMPOSE_FILE" restart
+  success "Containers restarted"
+  docker compose -f "$DOCKER_COMPOSE_FILE" ps
+}
+
+docker_compose_logs() {
+  local service="${1:-}"
+  if [ -n "$service" ]; then
+    info "Showing logs for $service..."
+    docker compose -f "$DOCKER_COMPOSE_FILE" logs -f "$service"
+  else
+    info "Showing logs for all containers..."
+    docker compose -f "$DOCKER_COMPOSE_FILE" logs -f
+  fi
+}
+
+docker_compose_status() {
+  info "Container status:"
+  docker compose -f "$DOCKER_COMPOSE_FILE" ps
+  echo ""
+  info "Health status:"
+  docker inspect social-network-backend --format='Backend: {{.State.Health.Status}}' 2>/dev/null || echo "Backend: not running"
+  docker inspect social-network-frontend --format='Frontend: {{.State.Health.Status}}' 2>/dev/null || echo "Frontend: not running"
+}
+
+docker_compose_shell() {
+  local service="${1:-backend}"
+  info "Opening shell in $service container..."
+  if [ "$service" = "backend" ]; then
+    docker exec -it social-network-backend /bin/sh
+  elif [ "$service" = "frontend" ]; then
+    docker exec -it social-network-frontend /bin/sh
+  else
+    err "Invalid service. Use 'backend' or 'frontend'"
+    exit 1
+  fi
+}
+
+docker_compose_clean() {
+  warn "This will remove ALL containers, images, and volumes for this project!"
+  read -p "Are you sure? (yes/no): " -r
+  if [[ $REPLY =~ ^[Yy][Ee][Ss]$ ]]; then
+    info "Removing containers and volumes..."
+    docker compose -f "$DOCKER_COMPOSE_FILE" down -v --remove-orphans
+    
+    info "Removing images..."
+    docker image rm social-network-backend:latest 2>/dev/null || true
+    docker image rm social-network-frontend:latest 2>/dev/null || true
+    
+    success "Docker cleanup completed"
+  else
+    info "Cleanup cancelled"
+  fi
 }
 
 run_tests() {
@@ -255,15 +343,51 @@ main() {
       start_frontend_prod
       ;;
 
+    docker:build)
+      docker_build_containers
+      ;;
+
+    docker:up)
+      docker_compose_up
+      ;;
+
+    docker:down)
+      docker_compose_down
+      ;;
+
+    docker:restart)
+      docker_compose_restart
+      ;;
+
+    docker:logs)
+      docker_compose_logs "${1:-}"
+      ;;
+
+    docker:status)
+      docker_compose_status
+      ;;
+
+    docker:shell)
+      docker_compose_shell "${1:-backend}"
+      ;;
+
+    docker:clean)
+      docker_compose_clean
+      ;;
+    
+    # Legacy support for old commands
     docker-build)
-      docker_build_images
+      warn "Command 'docker-build' is deprecated. Use 'docker:build' instead."
+      docker_build_containers
       ;;
 
     docker-up)
+      warn "Command 'docker-up' is deprecated. Use 'docker:up' instead."
       docker_compose_up
       ;;
 
     docker-down)
+      warn "Command 'docker-down' is deprecated. Use 'docker:down' instead."
       docker_compose_down
       ;;
 

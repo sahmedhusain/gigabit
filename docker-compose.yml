@@ -1,16 +1,19 @@
-version: '3.8'
-
 services:
+  # Backend Container - Go API Server
   backend:
     build:
       context: ./Backend
       dockerfile: Dockerfile
+      args:
+        - GO_VERSION=1.23
+    image: social-network-backend:latest
     container_name: social-network-backend
     ports:
       - "8080:8080"
     environment:
       - GIN_MODE=release
       - DB_PATH=/data/social_network.db
+      - PORT=8080
     volumes:
       - backend_data:/data
       - backend_uploads:/root/uploads
@@ -23,17 +26,27 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
+  # Frontend Container - Next.js Application
   frontend:
     build:
       context: ./Frontend
       dockerfile: Dockerfile
+      args:
+        - NODE_VERSION=18
+    image: social-network-frontend:latest
     container_name: social-network-frontend
     ports:
       - "3000:3000"
     environment:
       - NODE_ENV=production
       - NEXT_PUBLIC_API_URL=http://backend:8080
+      - PORT=3000
     depends_on:
       backend:
         condition: service_healthy
@@ -46,13 +59,23 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
+# Persistent Volumes
 volumes:
   backend_data:
     driver: local
+    name: social-network-backend-data
   backend_uploads:
     driver: local
+    name: social-network-backend-uploads
 
+# Network Configuration
 networks:
   social-network:
     driver: bridge
+    name: social-network-bridge

@@ -3,16 +3,16 @@ FROM node:18-alpine AS deps
 RUN apk add --no-cache libc6-compat
 WORKDIR /app
 
-# Copy package files
-COPY package*.json ./
+# Copy package files (including package-lock.json)
+COPY package.json package-lock.json ./
 RUN npm ci --only=production
 
 # Builder stage
 FROM node:18-alpine AS builder
 WORKDIR /app
 
-# Copy package files and install all dependencies
-COPY package*.json ./
+# Copy package files and install all dependencies (including package-lock.json)
+COPY package.json package-lock.json ./
 RUN npm ci
 
 # Copy source code

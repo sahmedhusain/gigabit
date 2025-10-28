@@ -1,0 +1,62 @@
+# Dependencies
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+# Keep package-lock.json for npm ci
+# package-lock.json - REQUIRED for Docker build
+yarn.lock
+pnpm-lock.yaml
+
+# Build output
+.next/
+out/
+build/
+dist/
+
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Documentation
+*.md
+README.md
+
+# Testing
+coverage/
+.nyc_output/
+*.lcov
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Environment files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Misc
+.eslintcache
+.turbo
+*.tsbuildinfo
+
+# Logs
+*.log
+logs/
+
+# OS files
+Thumbs.db
+

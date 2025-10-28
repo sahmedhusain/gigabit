@@ -1,0 +1,53 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Documentation
+*.md
+README.md
+LICENSE
+
+# Database files (will be in volumes)
+*.db
+*.db-shm
+*.db-wal
+social_network.db*
+
+# Build artifacts
+main
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test binaries
+*.test
+*.out
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Uploads (will be in volumes)
+uploads/
+!uploads/.gitkeep
+
+# Go workspace file
+go.work
+
+# Misc
+.env
+.env.local
+*.log
+

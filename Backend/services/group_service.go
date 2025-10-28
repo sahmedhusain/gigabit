@@ -819,7 +819,7 @@ SELECT gp.id, gp.group_id, gp.user_id, gp.content, gp.image_url, gp.created_at, 
        u.first_name, u.last_name, u.avatar, u.nickname, u.status,
        (SELECT COUNT(*) FROM likes WHERE entity_type = 'group_posts' AND entity_id = gp.id AND reaction_type = 'like') as like_count,
        (SELECT COUNT(*) FROM likes WHERE entity_type = 'group_posts' AND entity_id = gp.id AND reaction_type = 'dislike') as dislike_count,
-       (SELECT COUNT(*) FROM comments WHERE post_id = gp.id) as comment_count,
+       (SELECT COUNT(*) FROM group_post_comments WHERE group_post_id = gp.id) as comment_count,
        (SELECT COUNT(*) > 0 FROM likes WHERE entity_type = 'group_posts' AND entity_id = gp.id AND user_id = ? AND reaction_type = 'like') as is_liked,
        (SELECT COUNT(*) > 0 FROM likes WHERE entity_type = 'group_posts' AND entity_id = gp.id AND user_id = ? AND reaction_type = 'dislike') as is_disliked
 FROM group_posts gp
@@ -877,7 +877,7 @@ SELECT gp.id, gp.group_id, gp.user_id, gp.content, gp.image_url, gp.created_at, 
        u.first_name, u.last_name, u.avatar, u.nickname, u.status,
        (SELECT COUNT(*) FROM likes WHERE entity_type = 'group_posts' AND entity_id = gp.id AND reaction_type = 'like') as like_count,
        (SELECT COUNT(*) FROM likes WHERE entity_type = 'group_posts' AND entity_id = gp.id AND reaction_type = 'dislike') as dislike_count,
-       0 as comment_count,
+       (SELECT COUNT(*) FROM group_post_comments WHERE group_post_id = gp.id) as comment_count,
        (SELECT COUNT(*) > 0 FROM likes WHERE entity_type = 'group_posts' AND entity_id = gp.id AND user_id = ? AND reaction_type = 'like') as is_liked,
        (SELECT COUNT(*) > 0 FROM likes WHERE entity_type = 'group_posts' AND entity_id = gp.id AND user_id = ? AND reaction_type = 'dislike') as is_disliked
 FROM group_posts gp
@@ -948,7 +948,8 @@ func (s *GroupService) DeleteGroupPost(postID, groupID, userID uint) error {
 		}
 	}
 
-	_, err = s.db.Exec("DELETE FROM comments WHERE post_id = ?", postID)
+	// Delete associated comments (CASCADE DELETE will handle this, but explicit is clear)
+	_, err = s.db.Exec("DELETE FROM group_post_comments WHERE group_post_id = ?", postID)
 	if err != nil {
 		return err
 	}

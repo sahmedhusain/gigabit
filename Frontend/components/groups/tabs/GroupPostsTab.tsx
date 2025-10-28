@@ -1,6 +1,6 @@
 'use client'
 import React, { useState, useEffect } from 'react'
-import { Plus, MoreHorizontal, Newspaper, ThumbsDown, ThumbsUp, Trash2 } from 'lucide-react'
+import { Plus, MoreHorizontal, Newspaper, ThumbsDown, ThumbsUp, Trash2, MessageCircle } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useAuth } from '@/context/AuthContext'
 import { api, PostResponse } from '@/lib/api'
@@ -10,6 +10,7 @@ import Image from 'next/image'
 import { getAvatarUrl, getUserInitials } from '@/utils/avatarUtils'
 import { useToast } from '@/context/ToastContext'
 import { GroupPostsTabProps } from '@/types/groups'
+import GroupPostComments from '../GroupPostComments'
 
 const GroupPostsTab: React.FC<GroupPostsTabProps> = ({ groupId, groupTitle }) => {
   const [posts, setPosts] = useState<PostResponse[]>([])
@@ -21,6 +22,7 @@ const GroupPostsTab: React.FC<GroupPostsTabProps> = ({ groupId, groupTitle }) =>
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [postToDelete, setPostToDelete] = useState<number | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
+  const [openCommentsPostId, setOpenCommentsPostId] = useState<number | null>(null)
   const { user } = useAuth()
   const router = useRouter()
   const { success, error: showError } = useToast()
@@ -452,8 +454,33 @@ const GroupPostsTab: React.FC<GroupPostsTabProps> = ({ groupId, groupTitle }) =>
                     <ThumbsDown className={`w-5 h-5 ${post.is_disliked ? 'fill-current animate-pulse' : ''}`} />
                     <span className="text-sm font-medium">{post.dislike_count}</span>
                   </button>
+
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setOpenCommentsPostId(openCommentsPostId === post.id ? null : post.id)
+                    }}
+                    className={`flex items-center justify-center space-x-2 px-4 py-2 rounded-2xl transition-all duration-300 hover:scale-105 ${
+                      openCommentsPostId === post.id
+                        ? 'text-emerald-400 bg-gradient-to-r from-emerald-500/20 to-teal-500/20 border border-emerald-400/30'
+                        : 'text-white/70 hover:text-white hover:bg-gradient-to-r from-white/10 to-white/5 border border-white/10'
+                    }`}
+                    title="Comments"
+                  >
+                    <MessageCircle className={`w-5 h-5 ${openCommentsPostId === post.id ? 'fill-current' : ''}`} />
+                    <span className="text-sm font-medium">{post.comment_count || 0}</span>
+                  </button>
                 </div>
               </div>
+
+              {/* Comments Section */}
+              <GroupPostComments
+                groupId={groupId}
+                postId={post.id}
+                isAdminOrCreator={isAdminOrCreator}
+                isOpen={openCommentsPostId === post.id}
+                commentCount={post.comment_count || 0}
+              />
             </motion.div>
           ))
         )}

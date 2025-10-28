@@ -1,5 +1,5 @@
 import { ApiClient } from './client';
-import { GroupResponse, CreateGroupRequest, Member, PostResponse, EventResponse, CreatePostRequest, User } from './types';
+import { GroupResponse, CreateGroupRequest, Member, PostResponse, EventResponse, CreatePostRequest, User, GroupPostCommentResponse } from './types';
 
 declare module './client' {
   interface ApiClient {
@@ -40,6 +40,9 @@ declare module './client' {
     updateGroup(groupId: number, data: { title?: string; description?: string; avatar?: string | null }): Promise<{ message: string }>;
     deleteGroup(groupId: number): Promise<{ message: string }>;
     cancelInvitation(groupId: number, invitationId: number): Promise<{ message: string }>;
+    createGroupPostComment(groupId: number, postId: number, content: string): Promise<{ message: string; comment: GroupPostCommentResponse }>;
+    getGroupPostComments(groupId: number, postId: number, limit?: number, offset?: number): Promise<{ comments: GroupPostCommentResponse[]; count: number }>;
+    deleteGroupPostComment(groupId: number, postId: number, commentId: number): Promise<{ message: string }>;
   }
 }
 
@@ -277,6 +280,25 @@ ApiClient.prototype.deleteGroup = async function(groupId: number): Promise<{ mes
 
 ApiClient.prototype.cancelInvitation = async function(groupId: number, invitationId: number): Promise<{ message: string }> {
   return this.request<{ message: string }>(`/api/groups/${groupId}/cancel-invitation/${invitationId}`, {
+    method: 'DELETE',
+  });
+};
+
+ApiClient.prototype.createGroupPostComment = async function(groupId: number, postId: number, content: string): Promise<{ message: string; comment: GroupPostCommentResponse }> {
+  return this.request<{ message: string; comment: GroupPostCommentResponse }>(`/api/groups/${groupId}/posts/${postId}/comments`, {
+    method: 'POST',
+    body: JSON.stringify({ content }),
+  });
+};
+
+ApiClient.prototype.getGroupPostComments = async function(groupId: number, postId: number, limit: number = 50, offset: number = 0): Promise<{ comments: GroupPostCommentResponse[]; count: number }> {
+  return this.request<{ comments: GroupPostCommentResponse[]; count: number }>(`/api/groups/${groupId}/posts/${postId}/comments?limit=${limit}&offset=${offset}`, {
+    method: 'GET',
+  });
+};
+
+ApiClient.prototype.deleteGroupPostComment = async function(groupId: number, postId: number, commentId: number): Promise<{ message: string }> {
+  return this.request<{ message: string }>(`/api/groups/${groupId}/posts/${postId}/comments/${commentId}`, {
     method: 'DELETE',
   });
 };

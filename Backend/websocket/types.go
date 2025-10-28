@@ -46,6 +46,7 @@ type Message struct {
 	To        uint        `json:"to,omitempty"`
 	GroupID   uint        `json:"group_id,omitempty"`
 	PostID    uint        `json:"post_id,omitempty"`
+	CommentID uint        `json:"comment_id,omitempty"`
 	EventID   uint        `json:"event_id,omitempty"`
 	Content   string      `json:"content"`
 	Action    string      `json:"action,omitempty"`

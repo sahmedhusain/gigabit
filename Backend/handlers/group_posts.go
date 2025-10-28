@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"social/models"
+	"social/services"
 	"social/websocket"
 )
 
@@ -446,4 +447,173 @@ func (h *GroupHandler) UndislikeGroupPost(w http.ResponseWriter, r *http.Request
 	}
 
 	writeJSON(w, http.StatusOK, map[string]string{"message": "Post undisliked successfully"})
+}
+
+// CreateGroupPostComment creates a new comment on a group post
+func (h *GroupHandler) CreateGroupPostComment(w http.ResponseWriter, r *http.Request, groupIDStr, postIDStr string, commentService *services.GroupCommentService) {
+	groupID, err := strconv.ParseUint(groupIDStr, 10, 32)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "Invalid group ID")
+		return
+	}
+
+	postID, err := strconv.ParseUint(postIDStr, 10, 32)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "Invalid post ID")
+		return
+	}
+
+	userID, ok := r.Context().Value("user_id").(uint)
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "User not authenticated")
+		return
+	}
+
+	// Check if user is a member of the group
+	role, err := h.groupService.GetUserRole(uint(groupID), userID)
+	if err != nil {
+		writeError(w, http.StatusForbidden, "User is not a member of this group")
+		return
+	}
+
+	if role == "" {
+		writeError(w, http.StatusForbidden, "User is not a member of this group")
+		return
+	}
+
+	var req models.CreateGroupPostCommentRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "Invalid request body")
+		return
+	}
+
+	comment := &models.GroupPostComment{
+		GroupPostID: uint(postID),
+		UserID:      userID,
+		Content:     req.Content,
+	}
+
+	if err := commentService.CreateGroupPostComment(comment, uint(groupID)); err != nil {
+		writeError(w, http.StatusInternalServerError, "Failed to create comment")
+		return
+	}
+
+	// Get the full comment response with user details
+	commentResponse, err := commentService.GetCommentByID(comment.ID)
+	if err != nil {
+		writeJSON(w, http.StatusCreated, map[string]interface{}{
+			"message":    "Comment created successfully",
+			"comment_id": comment.ID,
+		})
+		return
+	}
+
+	writeJSON(w, http.StatusCreated, map[string]interface{}{
+		"message": "Comment created successfully",
+		"comment": commentResponse,
+	})
+}
+
+// GetGroupPostComments retrieves all comments for a group post
+func (h *GroupHandler) GetGroupPostComments(w http.ResponseWriter, r *http.Request, groupIDStr, postIDStr string, commentService *services.GroupCommentService) {
+	groupID, err := strconv.ParseUint(groupIDStr, 10, 32)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "Invalid group ID")
+		return
+	}
+
+	postID, err := strconv.ParseUint(postIDStr, 10, 32)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "Invalid post ID")
+		return
+	}
+
+	userID, ok := r.Context().Value("user_id").(uint)
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "User not authenticated")
+		return
+	}
+
+	// Check if user is a member of the group
+	role, err := h.groupService.GetUserRole(uint(groupID), userID)
+	if err != nil {
+		writeError(w, http.StatusForbidden, "User is not a member of this group")
+		return
+	}
+
+	if role == "" {
+		writeError(w, http.StatusForbidden, "User is not a member of this group")
+		return
+	}
+
+	// Get pagination parameters
+	limitStr := r.URL.Query().Get("limit")
+	if limitStr == "" {
+		limitStr = "50"
+	}
+	offsetStr := r.URL.Query().Get("offset")
+	if offsetStr == "" {
+		offsetStr = "0"
+	}
+
+	limit, err := strconv.Atoi(limitStr)
+	if err != nil || limit > 100 {
+		limit = 50
+	}
+
+	offset, err := strconv.Atoi(offsetStr)
+	if err != nil || offset < 0 {
+		offset = 0
+	}
+
+	comments, err := commentService.GetGroupPostComments(uint(postID), limit, offset)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "Failed to get comments")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"comments": comments,
+		"count":    len(comments),
+		"limit":    limit,
+		"offset":   offset,
+	})
+}
+
+// DeleteGroupPostComment deletes a comment from a group post
+func (h *GroupHandler) DeleteGroupPostComment(w http.ResponseWriter, r *http.Request, groupIDStr, postIDStr, commentIDStr string, commentService *services.GroupCommentService) {
+	groupID, err := strconv.ParseUint(groupIDStr, 10, 32)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "Invalid group ID")
+		return
+	}
+
+	_, err = strconv.ParseUint(postIDStr, 10, 32)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "Invalid post ID")
+		return
+	}
+
+	commentID, err := strconv.ParseUint(commentIDStr, 10, 32)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "Invalid comment ID")
+		return
+	}
+
+	userID, ok := r.Context().Value("user_id").(uint)
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "User not authenticated")
+		return
+	}
+
+	if err := commentService.DeleteGroupPostComment(uint(commentID), userID, uint(groupID), h.groupService); err != nil {
+		if err == sql.ErrNoRows {
+			writeError(w, http.StatusForbidden, "Cannot delete this comment")
+		} else {
+			writeError(w, http.StatusInternalServerError, "Failed to delete comment")
+		}
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]string{"message": "Comment deleted successfully"})
 }

@@ -8,6 +8,7 @@ import CreateGroupEvent from '@/components/groups/CreateGroupEvent'
 import { MessageCircle, Users, Hash, FileText, Calendar } from 'lucide-react'
 import { useRealTimeMessages, useConnectionStatus } from '@/hooks'
 import { getAvatarUrl, getUserInitials } from '@/utils/avatarUtils'
+import { parseConversationId } from '@/utils/chatUtils'
 import Image from 'next/image'
 import { GroupChatProps } from '@/types/groups'
 
@@ -77,7 +78,7 @@ const GroupChat: React.FC<GroupChatProps> = ({ groupId, groupTitle }) => {
       const convs = await api.getConversations()
       const match = (convs.conversations || []).find(c => c.type === 'group' && c.group && c.group.id === groupId)
       if (match) {
-        setConversationId(match.id)
+        setConversationId(parseConversationId(match.id).numericId)
       } else {
         
         setConversationId(null)

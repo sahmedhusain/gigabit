@@ -3,8 +3,6 @@ package handlers
 import (
 	"database/sql"
 	"encoding/json"
-	"fmt"
-	"log"
 	"net/http"
 	"strconv"
 
@@ -29,7 +27,6 @@ func (h *NotificationHandler) GetNotifications(w http.ResponseWriter, r *http.Re
 		writeError(w, http.StatusUnauthorized, "User not authenticated")
 		return
 	}
-	log.Printf("GetNotifications - entry user=%d remote=%s query=%s", userID, r.RemoteAddr, r.URL.RawQuery)
 
 	limitStr := r.URL.Query().Get("limit")
 	if limitStr == "" {
@@ -52,8 +49,6 @@ func (h *NotificationHandler) GetNotifications(w http.ResponseWriter, r *http.Re
 
 	notifications, err := h.notificationService.GetUserNotifications(userID, limit, offset)
 	if err != nil {
-		log.Printf("GetNotifications error for user %d: %v", userID, err)
-		fmt.Printf("GetNotifications debug: user=%v, limit=%d, offset=%d, err=%v\n", userID, limit, offset, err)
 		writeError(w, http.StatusInternalServerError, "Failed to get notifications")
 		return
 	}

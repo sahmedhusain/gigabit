@@ -82,3 +82,29 @@ export interface GroupInvitationItem {
   created_at: string;
   [key: string]: unknown;
 }
+
+export interface GroupPostComment {
+  id: number;
+  group_post_id: number;
+  user_id: number;
+  content: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface GroupPostCommentResponse {
+  id: number;
+  group_post_id: number;
+  user_id: number;
+  content: string;
+  created_at: string;
+  updated_at: string;
+  user: {
+    id: number;
+    first_name: string;
+    last_name: string;
+    avatar?: string;
+    nickname?: string;
+    status?: string;
+  };
+}

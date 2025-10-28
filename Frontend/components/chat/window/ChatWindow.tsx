@@ -28,7 +28,7 @@ import GroupChatTabs from '../tabs/GroupChatTabs'
 import GroupChatHeader from './GroupChatHeader'
 import PrivateChatHeader from './PrivateChatHeader'
 import MessagesArea from './MessagesArea'
-import { formatLastOnlineTime } from '@/utils/chatUtils'
+import { formatLastOnlineTime, parseConversationId } from '@/utils/chatUtils'
 
 const ChatWindow: React.FC<ChatWindowProps> = ({
   conversationId,
@@ -251,11 +251,14 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
     if (effectiveConversationId === groupId) {
       
       const match = conversations.find(c => c.type === 'group' && c.group && c.group.id === groupId)
-      if (match && match.id !== effectiveConversationId) {
-        setEffectiveConversationId(match.id)
-        onConversationResolved?.(match.id)
-        
-        fetchConversationMessages(match.id, 'group', undefined, 20, 0, false)
+      if (match) {
+        const matchIdNum = parseConversationId(match.id).numericId
+        if (matchIdNum !== effectiveConversationId) {
+          setEffectiveConversationId(matchIdNum)
+          onConversationResolved?.(matchIdNum)
+          
+          fetchConversationMessages(matchIdNum, 'group', undefined, 20, 0, false)
+        }
       }
     }
   }, [conversations, effectiveConversationId, groupId, conversationType, fetchConversationMessages, onConversationResolved])

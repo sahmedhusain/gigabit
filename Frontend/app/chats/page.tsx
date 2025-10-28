@@ -13,7 +13,7 @@ import {
   Chat,
   NetworkError
 } from '@/lib/api'
-import { formatConversationPreview, parseConversationId, findChatByConversationId, getConversationNumericId } from '@/utils/chatUtils'
+import { formatConversationPreview, findChatByConversationId, parseConversationId } from '@/utils/chatUtils'
 
 
 import TopBar from '@/components/layout/TopBar'
@@ -150,7 +150,7 @@ function ChatsPage() {
           : false
         
         return {
-          id: conversation.id,
+          id: parseConversationId(conversation.id).numericId,
           name: participantName,
           lastMessage: formattedLastMessage,
           time: formatTimeAgo(conversation.updated_at || new Date().toISOString()),
@@ -246,7 +246,7 @@ function ChatsPage() {
         chatToOpen = findChatByConversationId(chats, chatId, 'private')
         if (chatToOpen) {
           setOpenChatWindow({
-            conversationId: getConversationNumericId(chatToOpen),
+            conversationId: parseConversationId(chatToOpen.id).numericId,
             type: 'private',
             name: chatToOpen.name || 'Chat',
             participantId: chatToOpen.participantId,
@@ -258,7 +258,7 @@ function ChatsPage() {
         chatToOpen = chats.find(c => c.groupId === parseInt(groupParam))
         if (chatToOpen) {
           setOpenChatWindow({
-            conversationId: getConversationNumericId(chatToOpen),
+            conversationId: parseConversationId(chatToOpen.id).numericId,
             type: 'group',
             name: chatToOpen.name,
             groupId: chatToOpen.groupId,
@@ -275,7 +275,7 @@ function ChatsPage() {
           if (existingChat) {
             // Conversation exists, open it
             setOpenChatWindow({
-              conversationId: getConversationNumericId(existingChat),
+              conversationId: parseConversationId(existingChat.id).numericId,
               type: 'private',
               name: existingChat.name,
               participantId: userId,
@@ -333,7 +333,7 @@ function ChatsPage() {
       
       
       setOpenChatWindow({
-        conversationId: existingConversation?.id || 0, 
+        conversationId: existingConversation?.id ? parseConversationId(existingConversation.id).numericId : 0, 
         type: 'private',
         name: userName,
         participantId: userId
@@ -485,7 +485,7 @@ function ChatsPage() {
                     // Ensure we're using numeric conversation ID
                     const conversationId = typeof chat.conversationId === 'number' 
                       ? chat.conversationId 
-                      : getConversationNumericId({ id: chat.conversationId, type: chat.type } as any);
+                      : parseConversationId(chat.conversationId).numericId;
                     const participantId = chat.type === 'private' ? chat.participantId : undefined;
 
                     setOpenChatWindow({

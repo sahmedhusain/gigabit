@@ -4,6 +4,7 @@ import { api, type ConversationResponse } from '@/lib/api'
 import { useWebSocketSubscription } from './useWebSocketSubscription'
 import { useAuth } from '@/context/AuthContext'
 import { Message } from '@/types/hooks'
+import { parseConversationId } from '@/utils/chatUtils'
 
 export function useRealTimeMessages() {
   const { user } = useAuth()
@@ -179,7 +180,8 @@ export function useRealTimeMessages() {
       
       const unreadMap = new Map<number, number>()
       response.conversations.forEach(conv => {
-        unreadMap.set(conv.id, conv.unread_count)
+        const convIdNum = parseConversationId(conv.id).numericId
+        unreadMap.set(convIdNum, conv.unread_count)
       })
       setUnreadCounts(unreadMap)
 

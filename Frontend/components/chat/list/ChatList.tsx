@@ -1,6 +1,6 @@
 import { motion, AnimatePresence, LayoutGroup } from 'framer-motion'
 import { ChatItem } from '@/types/chat'
-import { UnifiedChatItem, getConversationNumericId } from '@/utils/chatUtils'
+import { UnifiedChatItem, parseConversationId } from '@/utils/chatUtils'
 import { User } from '@/lib/api'
 import ChatItemComponent from '@/components/chat/ChatItem'
 import { mutate } from 'swr'
@@ -80,13 +80,16 @@ export default function ChatList({
         <AnimatePresence mode="popLayout">
           {chats.map((chat) => {
             // Use the utility function to properly extract numeric conversation ID
-            const chatIdNum = getConversationNumericId(chat);
+            const chatIdNum = typeof chat.id === 'number' ? chat.id : parseConversationId(chat.id).numericId;
             const avatar = chat.avatar && typeof chat.avatar === 'string' ? chat.avatar : undefined;
 
             
             if (!chatIdNum || isNaN(chatIdNum)) {
               return null;
             }
+
+            // Create unique key combining type and numeric ID to avoid collisions between private_X and group_X
+            const uniqueKey = `${chat.type}_${chatIdNum}`;
 
             const handleOpenChat = () => {
               
@@ -95,7 +98,7 @@ export default function ChatList({
                 const updated = Array.isArray(current) ? current : current.conversations
                 if (!Array.isArray(updated)) return current
                 const next = updated.map((c: ChatItem) => {
-                  const cIdNum = getConversationNumericId(c as any);
+                  const cIdNum = typeof c.id === 'number' ? c.id : parseConversationId(c.id).numericId;
                   return cIdNum === chatIdNum ? { ...c, unread_count: 0 } : c;
                 })
                 // Preserve original shape if needed
@@ -113,7 +116,7 @@ export default function ChatList({
 
             return (
               <motion.div
-                key={chatIdNum}
+                key={uniqueKey}
                 variants={itemVariants}
                 layout
                 exit="exit"

@@ -13,7 +13,7 @@ export type { RegisterRequest, LoginRequest, AuthResponse, User } from '../../ty
 export type { Bookmark, Post, APIPost, Comment, PostResponse, CreatePostRequest, UpdatePostRequest, PostsResponse } from '../../types/posts';
 
 
-export type { Member, GroupMemberStatus, Group, GroupResponse, CreateGroupRequest, GroupInvitationItem } from '../../types/group-data';
+export type { Member, GroupMemberStatus, Group, GroupResponse, CreateGroupRequest, GroupInvitationItem, GroupPostComment, GroupPostCommentResponse } from '../../types/group-data';
 
 
 export type { Event, EventResponse, CreateEventRequest, UpdateEventRequest, CancelEventRequest, EventResponseDetail } from '../../types/event-data';

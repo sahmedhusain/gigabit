@@ -14,7 +14,7 @@ import {
   NetworkError,
   ConversationResponse
 } from '@/lib/api'
-import { parseConversationId, findChatByConversationId, getConversationNumericId } from '@/utils/chatUtils'
+import { parseConversationId, findChatByConversationId } from '@/utils/chatUtils'
 
 
 import AppLayout from '@/components/layout/AppLayout'

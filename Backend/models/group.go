@@ -100,20 +100,20 @@ type GroupPost struct {
 }
 
 type GroupPostResponse struct {
-	ID           uint              `json:"id"`
-	GroupID      uint              `json:"group_id"`
-	UserID       uint              `json:"user_id"`
-	Content      string            `json:"content"`
-	ImageURL     *string           `json:"image_url"`
-	CreatedAt    time.Time         `json:"created_at"`
-	UpdatedAt    time.Time         `json:"updated_at"`
-	User         UserResponse      `json:"user"`
-	LikeCount    int64             `json:"like_count"`
-	DislikeCount int64             `json:"dislike_count"`
-	CommentCount int64             `json:"comment_count"`
-	IsLiked      bool              `json:"is_liked"`
-	IsDisliked   bool              `json:"is_disliked"`
-	Comments     []CommentResponse `json:"comments,omitempty"`
+	ID           uint                       `json:"id"`
+	GroupID      uint                       `json:"group_id"`
+	UserID       uint                       `json:"user_id"`
+	Content      string                     `json:"content"`
+	ImageURL     *string                    `json:"image_url"`
+	CreatedAt    time.Time                  `json:"created_at"`
+	UpdatedAt    time.Time                  `json:"updated_at"`
+	User         UserResponse               `json:"user"`
+	LikeCount    int64                      `json:"like_count"`
+	DislikeCount int64                      `json:"dislike_count"`
+	CommentCount int64                      `json:"comment_count"`
+	IsLiked      bool                       `json:"is_liked"`
+	IsDisliked   bool                       `json:"is_disliked"`
+	Comments     []GroupPostCommentResponse `json:"comments,omitempty"`
 }
 
 type CreateGroupPostRequest struct {
@@ -139,4 +139,27 @@ type GroupInvitationResponse struct {
 	// RequestUser is populated when Type == "join_request" and represents
 	// the user who requested to join the group.
 	RequestUser *UserResponse `json:"request_user,omitempty"`
+}
+
+type GroupPostComment struct {
+	ID          uint      `json:"id"`
+	GroupPostID uint      `json:"group_post_id"`
+	UserID      uint      `json:"user_id"`
+	Content     string    `json:"content"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
+}
+
+type GroupPostCommentResponse struct {
+	ID          uint         `json:"id"`
+	GroupPostID uint         `json:"group_post_id"`
+	UserID      uint         `json:"user_id"`
+	Content     string       `json:"content"`
+	CreatedAt   time.Time    `json:"created_at"`
+	UpdatedAt   time.Time    `json:"updated_at"`
+	User        UserResponse `json:"user"`
+}
+
+type CreateGroupPostCommentRequest struct {
+	Content string `json:"content" binding:"required,min=1,max=500"`
 }

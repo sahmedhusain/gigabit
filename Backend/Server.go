@@ -13,6 +13,7 @@ import (
 	"social/handlers"
 	"social/middleware"
 	customsqlite "social/pkg/db/sqlite"
+	"social/services"
 	"social/websocket"
 )
 
@@ -708,7 +709,24 @@ func (s *Server) handleGroupRoute(groupHandler *handlers.GroupHandler, eventHand
 					writeError(w, http.StatusNotFound, "User ID required")
 				}
 			case "posts":
-				if len(parts) >= 4 {
+				if len(parts) >= 5 {
+					// Handle post comments: /api/groups/{groupID}/posts/{postID}/comments/{commentID}
+					postID := parts[2]
+					if parts[3] == "comments" {
+						commentID := parts[4]
+						switch r.Method {
+						case http.MethodDelete:
+							authMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+								commentService := services.NewGroupCommentService(s.DB.GetDB(), s.Hub)
+								groupHandler.DeleteGroupPostComment(w, r, groupID, postID, commentID, commentService)
+							})).ServeHTTP(w, r)
+						default:
+							writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
+						}
+					} else {
+						writeError(w, http.StatusNotFound, "Invalid route")
+					}
+				} else if len(parts) >= 4 {
 					// Handle individual post actions: /api/groups/{groupID}/posts/{postID}/{action}
 					postID := parts[2]
 					action := parts[3]
@@ -735,6 +753,22 @@ func (s *Server) handleGroupRoute(groupHandler *handlers.GroupHandler, eventHand
 						case http.MethodDelete:
 							authMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 								groupHandler.UndislikeGroupPost(w, r, groupID, postID)
+							})).ServeHTTP(w, r)
+						default:
+							writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
+						}
+					case "comments":
+						// Handle post comments collection: /api/groups/{groupID}/posts/{postID}/comments
+						switch r.Method {
+						case http.MethodGet:
+							authMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+								commentService := services.NewGroupCommentService(s.DB.GetDB(), s.Hub)
+								groupHandler.GetGroupPostComments(w, r, groupID, postID, commentService)
+							})).ServeHTTP(w, r)
+						case http.MethodPost:
+							authMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+								commentService := services.NewGroupCommentService(s.DB.GetDB(), s.Hub)
+								groupHandler.CreateGroupPostComment(w, r, groupID, postID, commentService)
 							})).ServeHTTP(w, r)
 						default:
 							writeError(w, http.StatusMethodNotAllowed, "Method not allowed")

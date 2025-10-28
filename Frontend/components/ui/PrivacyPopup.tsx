@@ -1,11 +1,7 @@
 'use client'
 import { X, Shield } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
-
-interface PrivacyPopupProps {
-  isOpen: boolean
-  onClose: () => void
-}
+import { PrivacyPopupProps } from '@/types/ui'
 
 export default function PrivacyPopup({ isOpen, onClose }: PrivacyPopupProps) {
   if (!isOpen) return null

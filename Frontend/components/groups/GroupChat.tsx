@@ -2,18 +2,14 @@
 
 import React, { useState, useEffect, useCallback } from 'react'
 import { API_BASE_URL, api } from '@/lib/api'
-import ChatWindow from '@/components/chat/ChatWindow'
+import ChatWindow from '@/components/chat/window/ChatWindow'
 import CreateGroupPost from '@/components/groups/CreateGroupPost'
 import CreateGroupEvent from '@/components/groups/CreateGroupEvent'
 import { MessageCircle, Users, Hash, FileText, Calendar } from 'lucide-react'
 import { useRealTimeMessages, useConnectionStatus } from '@/hooks'
 import { getAvatarUrl, getUserInitials } from '@/utils/avatarUtils'
 import Image from 'next/image'
-
-interface GroupChatProps {
-  groupId: number
-  groupTitle: string
-}
+import { GroupChatProps } from '@/types/groups'
 
 const GroupChat: React.FC<GroupChatProps> = ({ groupId, groupTitle }) => {
   const { isConnected: connectionStatus } = useConnectionStatus()
@@ -25,12 +21,12 @@ const GroupChat: React.FC<GroupChatProps> = ({ groupId, groupTitle }) => {
   const [conversationId, setConversationId] = useState<number | null>(null)
   const [isResolvingConversation, setIsResolvingConversation] = useState(false)
   
-  // Modal states
+  
   const [showCreatePost, setShowCreatePost] = useState(false)
   const [showCreateEvent, setShowCreateEvent] = useState(false)
 
-  // Calculate online member count from real-time data (excluding current user)
-  const onlineMemberCount = 0 // Temporarily force to 0 for debugging
+  
+  const onlineMemberCount = 0 
   const unreadCount = getUnreadCount(groupId)
 
   const fetchMemberCount = useCallback(async () => {
@@ -48,12 +44,12 @@ const GroupChat: React.FC<GroupChatProps> = ({ groupId, groupTitle }) => {
   }, [groupId])
 
   useEffect(() => {
-    // Fetch member count
+    
     fetchMemberCount()
   }, [groupId, fetchMemberCount])
 
   useEffect(() => {
-    // Fetch recent messages when chat is not open
+    
     if (!showChat) {
       const fetchRecentMessages = async () => {
         try {
@@ -74,7 +70,7 @@ const GroupChat: React.FC<GroupChatProps> = ({ groupId, groupTitle }) => {
     }
   }, [showChat, groupId])
 
-  // Resolve the conversation ID associated with this group (if it exists)
+  
   const resolveConversationId = useCallback(async () => {
     try {
       setIsResolvingConversation(true)
@@ -83,7 +79,7 @@ const GroupChat: React.FC<GroupChatProps> = ({ groupId, groupTitle }) => {
       if (match) {
         setConversationId(match.id)
       } else {
-        // No conversation yet (no messages). We'll fall back to using the groupId until a message creates one.
+        
         setConversationId(null)
       }
     } catch (err) {
@@ -94,14 +90,14 @@ const GroupChat: React.FC<GroupChatProps> = ({ groupId, groupTitle }) => {
   }, [groupId])
 
   useEffect(() => {
-    // Attempt to resolve on mount and when groupId changes
+    
     resolveConversationId()
   }, [resolveConversationId])
 
   const handleOpenChat = () => {
-    // Ensure we have attempted to resolve the conversation before opening
+    
     if (conversationId === null && !isResolvingConversation) {
-      // It's okay if this doesn't find one; ChatWindow will still allow sending the first message
+      
       resolveConversationId()
     }
     setShowChat(true)
@@ -217,7 +213,7 @@ const GroupChat: React.FC<GroupChatProps> = ({ groupId, groupTitle }) => {
                 }}
                 onClose={() => {
                   handleCloseChat()
-                  // Refresh conversation ID when closing so next open reflects new messages
+                  
                   resolveConversationId()
                 }}
               />
@@ -316,8 +312,7 @@ const GroupChat: React.FC<GroupChatProps> = ({ groupId, groupTitle }) => {
         groupId={groupId}
         groupTitle={groupTitle}
         onPostCreated={() => {
-          // Optionally refresh data or show success message
-          console.log('Post created for group:', groupId)
+          
         }}
       />
 
@@ -328,8 +323,7 @@ const GroupChat: React.FC<GroupChatProps> = ({ groupId, groupTitle }) => {
         groupId={groupId}
         groupTitle={groupTitle}
         onEventCreated={() => {
-          // Optionally refresh data or show success message
-          console.log('Event created for group:', groupId)
+          
         }}
       />
     </div>

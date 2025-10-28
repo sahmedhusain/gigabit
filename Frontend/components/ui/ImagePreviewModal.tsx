@@ -4,13 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { X, ZoomIn, ZoomOut, Download } from 'lucide-react'
 import Image from 'next/image'
 import { createPortal } from 'react-dom'
-
-interface ImagePreviewModalProps {
-  isOpen: boolean
-  imageUrl: string | null
-  alt?: string
-  onClose: () => void
-}
+import { ImagePreviewModalProps } from '@/types/ui'
 
 const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
   isOpen,
@@ -18,14 +12,13 @@ const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
   alt = 'Image preview',
   onClose
 }) => {
-  console.log('🎬 ImagePreviewModal: Component called with props:', { isOpen, imageUrl, alt })
 
   const [zoom, setZoom] = useState(1)
   const [isDragging, setIsDragging] = useState(false)
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 })
   const [position, setPosition] = useState({ x: 0, y: 0 })
 
-  // Reset zoom and position when modal opens/closes
+  
   useEffect(() => {
     if (isOpen) {
       setZoom(1)
@@ -33,28 +26,27 @@ const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
     }
   }, [isOpen])
 
-  // Debug effect to track modal state changes
+  
   useEffect(() => {
-    console.log('🔄 ImagePreviewModal: useEffect triggered - isOpen changed to:', isOpen, 'imageUrl:', imageUrl)
   }, [isOpen, imageUrl])
 
-  // Handle zoom in
+  
   const handleZoomIn = () => {
     setZoom(prev => Math.min(prev + 0.25, 3))
   }
 
-  // Handle zoom out
+  
   const handleZoomOut = () => {
     setZoom(prev => Math.max(prev - 0.25, 0.25))
   }
 
-  // Handle reset zoom
+  
   const handleResetZoom = () => {
     setZoom(1)
     setPosition({ x: 0, y: 0 })
   }
 
-  // Handle mouse wheel zoom
+  
   const handleWheelZoom = (e: React.WheelEvent) => {
     e.preventDefault()
     if (e.deltaY < 0) {
@@ -64,14 +56,14 @@ const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
     }
   }
 
-  // Handle download
+  
   const handleDownload = async () => {
     if (!imageUrl) return
 
     try {
-      // Fetch the image as a blob
+      
       const response = await fetch(imageUrl, {
-        credentials: 'include' // Include cookies for authentication
+        credentials: 'include' 
       })
 
       if (!response.ok) {
@@ -80,10 +72,10 @@ const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
 
       const blob = await response.blob()
 
-      // Create a blob URL for download
+      
       const blobUrl = URL.createObjectURL(blob)
 
-      // Create download link
+      
       const link = document.createElement('a')
       link.href = blobUrl
       link.download = `image-${Date.now()}.jpg`
@@ -91,11 +83,11 @@ const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
       link.click()
       document.body.removeChild(link)
 
-      // Clean up the blob URL
+      
       URL.revokeObjectURL(blobUrl)
     } catch (error) {
       console.error('Download failed:', error)
-      // Fallback to direct download
+      
       const link = document.createElement('a')
       link.href = imageUrl
       link.download = `image-${Date.now()}.jpg`
@@ -106,7 +98,7 @@ const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
     }
   }
 
-  // Handle mouse down for dragging
+  
   const handleMouseDown = (e: React.MouseEvent) => {
     if (zoom > 1) {
       setIsDragging(true)
@@ -114,7 +106,7 @@ const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
     }
   }
 
-  // Handle mouse move for dragging
+  
   const handleMouseMove = (e: React.MouseEvent) => {
     if (isDragging && zoom > 1) {
       setPosition({
@@ -124,22 +116,20 @@ const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
     }
   }
 
-  // Handle mouse up to stop dragging
+  
   const handleMouseUp = () => {
     setIsDragging(false)
   }
 
-  // Handle double click to reset zoom
+  
   const handleDoubleClick = () => {
     handleResetZoom()
   }
 
     if (!isOpen || !imageUrl) {
-    console.log('❌ ImagePreviewModal: Not rendering because isOpen is false or imageUrl is null:', { isOpen, imageUrl })
     return null
   }
 
-  console.log('✅ ImagePreviewModal: Rendering modal content for:', { isOpen, imageUrl })
 
   const modalContent = (
     <AnimatePresence>
@@ -243,14 +233,12 @@ const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
     </AnimatePresence>
   )
 
-  // Use portal to render at document body level
+  
   if (typeof document !== 'undefined') {
-    console.log('🚪 ImagePreviewModal: About to create portal with modalContent:', !!modalContent, 'document.body exists:', !!document.body)
     return createPortal(modalContent, document.body)
   }
 
-  // Fallback for SSR
-  console.log('🔄 ImagePreviewModal: Using SSR fallback')
+  
   return modalContent
 }
 

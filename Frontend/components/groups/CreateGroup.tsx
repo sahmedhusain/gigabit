@@ -8,12 +8,7 @@ import { useToast } from '@/context/ToastContext'
 import { useAuth } from '@/context/AuthContext'
 import { motion, AnimatePresence } from 'framer-motion'
 import { getUserInitials, getGroupInitials } from '@/utils/avatarUtils'
-
-interface CreateGroupProps {
-  show: boolean
-  onClose: () => void
-  onGroupCreated?: () => void
-}
+import { CreateGroupProps } from '@/types/groups'
 
 export default function CreateGroup({
   show,
@@ -144,7 +139,7 @@ export default function CreateGroup({
   )
 
   const handleCreateGroup = async () => {
-    // Validation
+    
     if (!groupTitle.trim()) {
       setError('Group title is required')
       return
@@ -196,7 +191,7 @@ export default function CreateGroup({
     try {
       await api.createGroup(groupData)
       
-      // Success: reset form, close popup, show success
+      
       setGroupTitle('')
       setGroupDescription('')
       setPrivacy('public')

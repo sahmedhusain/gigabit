@@ -3,7 +3,7 @@ import { ChatItem } from './types';
 
 declare module './client' {
   interface ApiClient {
-    // Share endpoints
+    
     sharePost(data: { post_id: number; conversation_ids: number[]; group_ids: number[]; user_ids?: number[] }): Promise<{ message: string }>;
     getRecentChatsAndGroups(): Promise<{ chats: ChatItem[] }>;
     searchShareableEntities(query: string): Promise<{ chats: ChatItem[] }>;

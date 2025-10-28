@@ -19,7 +19,7 @@ export function useGroups() {
       const dataAny: any = res
       const arr: GroupResponse[] = Array.isArray(dataAny?.data) ? dataAny.data : (Array.isArray(dataAny?.groups) ? dataAny.groups : [])
       
-      // Fetch role for each group
+      
       const groupsWithRoles = await Promise.all(
         arr.map(async (group) => {
           try {
@@ -35,7 +35,7 @@ export function useGroups() {
     } catch (e: any) {
       const msg = e?.message || 'Failed to load groups'
       setErr(msg)
-      error('Failed to load groups.')
+      error('Failed to load groups!')
     } finally {
       setLoading(false)
     }
@@ -43,20 +43,20 @@ export function useGroups() {
 
   const create = useCallback(async (payload: CreateGroupRequest) => {
     const res = await api.createGroup(payload)
-    success('Group created')
+    success('Group created!')
     await refetch()
     return res
   }, [refetch, success])
 
   const join = useCallback(async (groupId: number) => {
     await api.joinGroup(groupId)
-    success('Join request sent')
+    success('Join request sent!')
     await refetch()
   }, [refetch, success])
 
   const leave = useCallback(async (groupId: number) => {
     await api.leaveGroup(groupId)
-    success('Left group')
+    success('Left group!')
     await refetch()
   }, [refetch, success])
 

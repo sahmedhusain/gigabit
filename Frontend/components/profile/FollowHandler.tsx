@@ -1,27 +1,10 @@
 'use client'
 import React, { useState, useEffect, useCallback } from 'react'
 import { UserPlus, UserMinus, X } from 'lucide-react'
-import { useWebSocket, WebSocketMessage } from '@/context/WebSocketContext'
+import { useWebSocket } from '@/context/WebSocketContext'
+import { WebSocketMessage } from '@/types/contexts'
 import { useToast } from '@/context/ToastContext'
-import { User } from '@/lib/api'
-
-export interface FollowStatus {
-  isFollowing: boolean
-  isPending: boolean
-  isFollowedBy: boolean  // Whether the target user is following the current user
-  status: 'not_following' | 'pending' | 'following' | 'follow_back'
-}
-
-interface FollowHandlerProps {
-  targetUser: User
-  currentFollowStatus: FollowStatus
-  onStatusChange: (newStatus: FollowStatus) => void
-  disabled?: boolean
-  size?: 'sm' | 'md' | 'lg'
-  confirmUnfollow?: boolean
-  onUnfollowConfirm?: (userId: number, userName: string) => void
-  fullWidth?: boolean
-}
+import { FollowStatus, FollowHandlerProps } from '@/types/profile'
 
 export default function FollowHandler({
   targetUser,
@@ -58,9 +41,9 @@ export default function FollowHandler({
         }
         setLocalStatus(newFollowingStatus)
         onStatusChange(newFollowingStatus)
-        // Only show success message if this wasn't a status check
+        
         if (message.action !== 'status') {
-          success(data.message || `Now following ${data.user_name}`)
+          success('Following!')
         }
         break
 
@@ -73,9 +56,9 @@ export default function FollowHandler({
         }
         setLocalStatus(newPendingStatus)
         onStatusChange(newPendingStatus)
-        // Only show success message if this wasn't a status check
+        
         if (message.action !== 'status') {
-          success(data.message || `Follow request sent to ${data.user_name}`)
+          success('Request sent!')
         }
         break
 
@@ -88,9 +71,9 @@ export default function FollowHandler({
         }
         setLocalStatus(newNotFollowingStatus)
         onStatusChange(newNotFollowingStatus)
-        // Only show success message if this wasn't a status check
+        
         if (message.action !== 'status') {
-          success(data.message || `Unfollowed ${data.user_name}`)
+          success('Unfollowed!')
         }
         break
 
@@ -99,13 +82,13 @@ export default function FollowHandler({
     }
   }, [onStatusChange, success])
 
-  // Listen for WebSocket follow update messages
+  
   useEffect(() => {
     const removeListener = addMessageListener((message: WebSocketMessage) => {
       if (message.type === 'follow_update' && message.data?.user_id === targetUser.id) {
         handleFollowUpdateMessage(message)
       } else if (message.type === 'error' && isLoading) {
-        // Handle error messages when we're waiting for a follow response
+        
         setIsLoading(false)
         error(message.content || 'An error occurred')
       }
@@ -125,9 +108,9 @@ export default function FollowHandler({
     setIsLoading(true)
 
     try {
-      // Check if this is an unfollow action that requires confirmation
+      
       if (confirmUnfollow && localStatus.isFollowing && onUnfollowConfirm) {
-        setIsLoading(false) // Reset loading state since we're not proceeding with the action
+        setIsLoading(false) 
         onUnfollowConfirm(targetUser.id, `${targetUser.first_name} ${targetUser.last_name}`)
         return
       }
@@ -136,15 +119,15 @@ export default function FollowHandler({
       let action: string
 
       if (localStatus.isFollowing) {
-        // User is currently following, so unfollow
+        
         messageType = 'unfollow'
         action = 'unfollow'
       } else if (localStatus.isPending) {
-        // User has pending request, so cancel it
+        
         messageType = 'cancel_follow_request'
         action = 'cancel_request'
       } else {
-        // User is not following, determine if it's public or private
+        
         if (targetUser.is_private) {
           messageType = 'follow_request'
           action = 'request'
@@ -167,13 +150,13 @@ export default function FollowHandler({
 
       sendMessage(message)
 
-      // Set a timeout in case we don't receive a response
+      
       setTimeout(() => {
         if (isLoading) {
           setIsLoading(false)
           error('Request timed out. Please try again.')
         }
-      }, 10000) // 10 second timeout
+      }, 10000) 
 
     } catch (err) {
       setIsLoading(false)
@@ -312,7 +295,7 @@ export default function FollowHandler({
   )
 }
 
-// Helper hook for managing follow status
+
 export function useFollowStatus(initialStatus: FollowStatus) {
   const [status, setStatus] = useState<FollowStatus>(initialStatus)
 
@@ -326,7 +309,7 @@ export function useFollowStatus(initialStatus: FollowStatus) {
   }
 }
 
-// Helper function to determine follow status from API data
+
 export function getFollowStatusFromAPI(
   isFollowing: boolean,
   followStatus?: string,

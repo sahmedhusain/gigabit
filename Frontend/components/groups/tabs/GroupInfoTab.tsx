@@ -9,13 +9,7 @@ import { api, GroupResponse, Member } from '@/lib/api'
 import { getAvatarUrl, getUserInitials, getGroupInitials } from '@/utils/avatarUtils'
 import Image from 'next/image'
 import ImagePreviewModal from '@/components/ui/ImagePreviewModal'
-
-interface GroupInfoTabProps {
-  groupId: number
-  onLeaveGroup?: (groupId: number) => void
-  onManageAdmins?: () => void
-  onClose?: () => void
-}
+import { GroupInfoTabProps } from '@/types/groups'
 
 const GroupInfoTab: React.FC<GroupInfoTabProps> = ({ groupId, onLeaveGroup, onManageAdmins, onClose }) => {
   const [groupInfo, setGroupInfo] = useState<GroupResponse | null>(null)
@@ -49,7 +43,7 @@ const GroupInfoTab: React.FC<GroupInfoTabProps> = ({ groupId, onLeaveGroup, onMa
           try {
             const nextAdminData = await api.getNextAdmin(groupId)
             setHasExistingAdmins(nextAdminData.has_admins)
-            // Use first_member as next admin if no admins exist
+            
             setNextAdmin(nextAdminData.has_admins ? nextAdminData.next_admin : nextAdminData.first_member)
           } catch (error) {
             console.error('Failed to fetch next admin:', error)
@@ -59,7 +53,7 @@ const GroupInfoTab: React.FC<GroupInfoTabProps> = ({ groupId, onLeaveGroup, onMa
         } else if (roleData.role === 'admin') {
           try {
             const nextAdminData = await api.getNextAdmin(groupId)
-            // For admins, check if there are other admins (has_admins means there are admins besides creator)
+            
             setHasOtherAdmins(nextAdminData.has_admins)
           } catch (error) {
             console.error('Failed to check other admins:', error)
@@ -130,7 +124,7 @@ const GroupInfoTab: React.FC<GroupInfoTabProps> = ({ groupId, onLeaveGroup, onMa
 
   const getUserStatus = (userId: number) => {
     const onlineUser = onlineUsers.find(ou => ou.user_id === userId)
-    // Normalize to lowercase and fallback: if it's the current user and WS is connected, show online
+    
     const raw = onlineUser?.status ?? ((userId === user?.id && isConnected) ? 'online' : 'offline')
     return String(raw).toLowerCase() as 'online' | 'busy' | 'away' | 'invisible' | 'offline'
   }
@@ -140,14 +134,14 @@ const GroupInfoTab: React.FC<GroupInfoTabProps> = ({ groupId, onLeaveGroup, onMa
   }
 
   const handleLeaveGroup = () => {
-    // Find next admin if user is creator
+    
     if (userRole === 'creator') {
       const admins = members.filter(member => 
         member.role === 'admin' && member.user.id !== user?.id
       );
       
       if (admins.length === 0) {
-        // No other admins, find first non-creator member
+        
         const firstMember = members.find(member => 
           member.role === 'member' && member.user.id !== user?.id
         );

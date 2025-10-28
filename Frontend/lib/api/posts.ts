@@ -3,7 +3,7 @@ import { PostResponse, APIPost, Comment, CreatePostRequest, UpdatePostRequest, P
 
 declare module './client' {
   interface ApiClient {
-    // Posts endpoints
+    
     getFeed(limit?: number, offset?: number, filter?: string): Promise<{ posts: PostResponse[]; limit: number; offset: number }>;
     getAllFeed(limit?: number, offset?: number): Promise<{ posts: PostResponse[]; limit: number; offset: number }>;
     getFollowingFeed(limit?: number, offset?: number): Promise<{ posts: PostResponse[]; limit: number; offset: number }>;
@@ -155,10 +155,10 @@ ApiClient.prototype.getUserPosts = async function(userId: number, limit: number 
     method: 'GET',
   });
 
-  // Ensure posts is an array
+  
   const posts = response.posts || [];
 
-  // Transform PostResponse[] to Post[]
+  
   const transformedPosts: Post[] = posts.map(postResponse => ({
     id: postResponse.id,
     user: {

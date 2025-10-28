@@ -6,26 +6,7 @@ import { useOptimisticUpdate, useConnectionStatus } from '@/hooks'
 import { useToast } from '@/context/ToastContext'
 import Image from 'next/image'
 import { getAvatarUrl, getUserInitials } from '@/utils/avatarUtils'
-
-interface UserOption {
-  id: number
-  display_name?: string
-  first_name: string
-  last_name: string
-  nickname?: string
-  email: string
-  avatar?: string
-}
-
-interface ManagePrivacyProps {
-  show: boolean
-  onClose: () => void
-  currentPrivacy: 'public' | 'followers' | 'friends' | 'listed'
-  currentSelectedUsers: number[]
-  availableUsers: UserOption[]
-  loadingUsers: boolean
-  onUpdatePrivacy: (privacy: 'public' | 'followers' | 'friends' | 'listed', selectedUsers: number[]) => Promise<void>
-}
+import { ManagePrivacyProps } from '@/types/profile'
 
 export default function ManagePrivacy({
   show,
@@ -39,7 +20,7 @@ export default function ManagePrivacy({
   const { success, error: toastError } = useToast()
   const { isConnected } = useConnectionStatus()
 
-  // Local state for the form
+  
   const [postPrivacy, setPostPrivacy] = React.useState<'public' | 'followers' | 'friends' | 'listed'>(currentPrivacy)
   const [selectedUsers, setSelectedUsers] = React.useState<number[]>(currentSelectedUsers)
 
@@ -50,7 +31,7 @@ export default function ManagePrivacy({
 
   const { isLoading, performUpdate } = useOptimisticUpdate(null, {
     onSuccess: () => {
-      success('Post privacy updated successfully!')
+      success('Post privacy updated!')
       onClose()
     },
     onError: (err: unknown) => {

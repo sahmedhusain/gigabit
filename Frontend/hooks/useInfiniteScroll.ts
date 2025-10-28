@@ -1,14 +1,6 @@
 'use client'
 import React, { useState, useCallback, useRef, useEffect } from 'react'
-
-export interface InfiniteScrollOptions<T> {
-  threshold?: number
-  rootMargin?: string
-  enabled?: boolean
-  hasNextPage?: boolean
-  onLoadMore?: () => Promise<void>
-  onError?: (error: any) => void
-}
+import { InfiniteScrollOptions } from '@/types/hooks'
 
 export function useInfiniteScroll<T>(
   fetchNextPage: () => Promise<{ data: T[], hasMore: boolean }>,
@@ -75,7 +67,7 @@ export function useInfiniteScroll<T>(
     setData(prev => prev.map(item => predicate(item) ? updater(item) : item))
   }, [])
 
-  // Set up intersection observer
+  
   useEffect(() => {
     if (!enabled || !hasNextPage) {
       return
@@ -109,7 +101,7 @@ export function useInfiniteScroll<T>(
     }
   }, [enabled, hasNextPage, isFetchingNextPage, loadMore, threshold, rootMargin])
 
-  // Ref callback for the observer target
+  
   const setObserverTarget = useCallback((node: HTMLDivElement | null) => {
     if (observerTarget.current && observer.current) {
       observer.current.unobserve(observerTarget.current)

@@ -7,9 +7,10 @@ import { useAuth } from '@/context/AuthContext';
 import { useWebSocket } from '@/context/WebSocketContext';
 import { useToast } from '@/context/ToastContext';
 import { useNotifications } from '@/hooks';
-import { api, User, Post } from '@/lib/api';
+import { api, User } from '@/lib/api';
+import { Post } from '@/types/posts';
 
-// Import dashboard components
+
 import TopBar from '@/components/layout/TopBar';
 import Sidebar from '@/components/layout/Sidebar';
 import RightSidebar from '@/components/layout/RightSidebar';
@@ -26,14 +27,14 @@ export default function ProfilePage() {
   const [isSidebarCollapsed] = useState(false);
   const [isMobileRightSidebarOpen, setIsMobileRightSidebarOpen] = useState(false);
 
-  // Profile data state
+  
   const [profileUser, setProfileUser] = useState<User | null>(null);
   const [userPosts, setUserPosts] = useState<Post[]>([]);
   const [followers, setFollowers] = useState<unknown[]>([]);
   const [following, setFollowing] = useState<unknown[]>([]);
   const [, setIsLoading] = useState(true);
 
-    // Current User Processing for sidebars
+    
   const currentUserData = currentUser ? {
     id: currentUser.id,
     name: `${currentUser.first_name} ${currentUser.last_name}`,
@@ -47,22 +48,21 @@ export default function ProfilePage() {
     lastStatusChange: new Date().toISOString()
   } : null;
 
-  // Trending topics
-  // const trendingTopics = [
-  //   '#SocialNetwork', '#TechNews', '#WebDev', '#AI', '#Startups',
-  //   '#React', '#TypeScript', '#NodeJS', '#Python', '#DevOps'
-  // ];
+  
+  
+  
+  
+  
 
   const fetchUserProfile = useCallback(async (userId: number) => {
     try {
       setIsLoading(true);
-      console.log('Fetching profile for current user:', userId);
 
-      // Get basic profile info
+      
       const profileData = await api.getProfile(userId);
       setProfileUser(profileData);
 
-      // Get additional data
+      
       const [postsResponse, followersResponse, followingResponse] = await Promise.allSettled([
         api.getUserPosts(userId),
         api.getFollowers(userId),
@@ -115,7 +115,7 @@ export default function ProfilePage() {
       }
 
     } catch (err: unknown) {
-      console.error('Error fetching profile:', err);
+      
       const msg = err instanceof Error ? err.message : String(err);
       error(msg || 'Failed to load profile data');
     } finally {
@@ -123,20 +123,20 @@ export default function ProfilePage() {
     }
   }, [error]);
 
-  // Fetch profile data when component loads
+  
   useEffect(() => {
     if (currentUser) {
       fetchUserProfile(currentUser.id);
     }
   }, [currentUser, fetchUserProfile]);
 
-  // Trending topics
-  // const trendingTopics = [
-  //   '#SocialNetwork', '#TechNews', '#WebDev', '#AI', '#Startups',
-  //   '#React', '#TypeScript', '#NodeJS', '#Python', '#DevOps'
-  // ];
+  
+  
+  
+  
+  
 
-  // Fetch profile data when component loads
+  
   useEffect(() => {
     if (currentUser) {
       fetchUserProfile(currentUser.id);

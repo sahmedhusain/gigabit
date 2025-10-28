@@ -5,14 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useToast } from '@/context/ToastContext'
 import { useConnectionStatus } from '@/hooks'
 import { api } from '@/lib/api'
-
-interface CreateGroupEventProps {
-  show: boolean
-  onClose: () => void
-  groupId: number
-  groupTitle: string
-  onEventCreated?: () => void
-}
+import { CreateGroupEventProps } from '@/types/groups'
 
 export default function CreateGroupEvent({
   show,
@@ -69,7 +62,7 @@ export default function CreateGroupEvent({
       return
     }
 
-    // Combine date and time
+    
     const eventDateTime = new Date(`${eventDate}T${eventTime}`)
 
     if (eventDateTime <= new Date()) {
@@ -90,7 +83,7 @@ export default function CreateGroupEvent({
     try {
       await api.createEvent(groupId, eventData)
 
-      success('Event created successfully!')
+      success('Event created!')
 
       // Reset form
       setEventTitle('')

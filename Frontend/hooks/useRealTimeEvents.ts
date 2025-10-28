@@ -14,28 +14,28 @@ export function useRealTimeEvents(groupId?: number) {
   const [unreadUpdates, setUnreadUpdates] = useState<Map<number, number>>(new Map())
   const lastFetchTime = useRef<number>(Date.now())
 
-  // Custom optimistic update function that works with external state
+  
   const performOptimisticUpdate = useCallback(async <R>(
     optimisticUpdateFn: (currentEvents: EventResponse[]) => EventResponse[],
     asyncOperation: () => Promise<R>
   ): Promise<R> => {
     const previousEvents = events
     try {
-      // Apply optimistic update
+      
       const newEvents = optimisticUpdateFn(events)
       setEvents(newEvents)
       
-      // Perform async operation
+      
       const result = await asyncOperation()
       return result
     } catch (error) {
-      // Rollback on error
+      
       setEvents(previousEvents)
       throw error
     }
   }, [events])
 
-  // WebSocket subscription for real-time event updates
+  
   const { isConnected } = useWebSocketSubscription({
     messageTypes: ['event_update'],
     onMessage: (message) => {
@@ -43,10 +43,10 @@ export function useRealTimeEvents(groupId?: number) {
       
       if (message.type === 'event_update' && message.data) {
         const { event_id, event, user_id, response } = message.data
-        const action = message.action // Action is at message level, not in data
-        const actualEventId = event_id || message.EventID || message.event_id  // Handle EventID, event_id in data, or event_id at message level
+        const action = message.action 
+        const actualEventId = event_id || message.EventID || message.event_id  
 
-        // Filter events by group if groupId is specified
+        
         if (groupId && (message.data.group_id || message.GroupID || message.group_id) !== groupId) {
           return
         }
@@ -65,7 +65,7 @@ export function useRealTimeEvents(groupId?: number) {
             if (actualEventId) {
               setEvents(prev => prev.map(e => 
                 e.id === actualEventId 
-                  ? { ...e, ...message.data }  // message.data contains the updates directly
+                  ? { ...e, ...message.data }  
                   : e
               ))
               
@@ -109,13 +109,13 @@ export function useRealTimeEvents(groupId?: number) {
                 if (e.id === actualEventId) {
                   const updatedEvent = { ...e }
                   
-                  // Update user's own response if it's the current user
+                  
                   if (user_id === user?.id) {
                     updatedEvent.user_response = response
                   }
                   
-                  // Note: We don't update counts here because we don't know the previous response
-                  // The counts will be correct due to optimistic updates and will sync on page refresh
+                  
+                  
                   
                   return updatedEvent
                 }
@@ -152,7 +152,7 @@ export function useRealTimeEvents(groupId?: number) {
       const eventsData = res.events || []
       setEvents(eventsData)
       lastFetchTime.current = Date.now()
-      setUnreadUpdates(new Map()) // Reset unread updates on manual fetch
+      setUnreadUpdates(new Map()) 
       
     } catch (e: any) {
       const msg = e?.message || 'Failed to load events'
@@ -174,9 +174,9 @@ export function useRealTimeEvents(groupId?: number) {
     try {
       return await performOptimisticUpdate(
         (currentEvents) => {
-          // Create optimistic event
+          
           const optimisticEvent: EventResponse = {
-            id: Date.now(), // Temporary ID
+            id: Date.now(), 
             group_id: eventGroupId,
             creator_id: user.id,
             title: eventData.title,
@@ -209,8 +209,8 @@ export function useRealTimeEvents(groupId?: number) {
         },
         async () => {
           const res = await api.createEvent(eventGroupId, eventData)
-          success('Event created successfully')
-          await fetchEvents() // Refresh to get real data
+          success('Event created!')
+          await fetchEvents() 
           return res
         }
       )
@@ -228,24 +228,24 @@ export function useRealTimeEvents(groupId?: number) {
             const updatedEvent = { ...event }
             const previousResponse = event.user_response
             
-            // Check if clicking the same option (toggle to remove)
+            
             const isRemovingResponse = previousResponse === option
             
             if (isRemovingResponse) {
-              // Remove response
+              
               updatedEvent.user_response = 'none'
               
-              // Decrement count
+              
               if (option === 'going') {
                 updatedEvent.going_count = Math.max(0, updatedEvent.going_count - 1)
               } else {
                 updatedEvent.not_going_count = Math.max(0, updatedEvent.not_going_count - 1)
               }
             } else {
-              // Update user response
+              
               updatedEvent.user_response = option
               
-              // Update counts
+              
               if (option === 'going') {
                 if (previousResponse === 'not_going') {
                   updatedEvent.not_going_count = Math.max(0, updatedEvent.not_going_count - 1)
@@ -305,7 +305,7 @@ export function useRealTimeEvents(groupId?: number) {
         ),
         async () => {
           const res = await api.updateEvent(eventId, eventData)
-          success('Event updated successfully')
+          success('Event updated!')
           return res
         }
       )
@@ -325,7 +325,7 @@ export function useRealTimeEvents(groupId?: number) {
         ),
         async () => {
           const res = await api.cancelEvent(eventId, { cancel_reason: cancelReason })
-          success('Event cancelled successfully')
+          success('Event cancelled!')
           return res
         }
       )
@@ -340,10 +340,9 @@ export function useRealTimeEvents(groupId?: number) {
       return await performOptimisticUpdate(
         (currentEvents) => currentEvents.filter(event => event.id !== eventId),
         async () => {
-          // Note: Event deletion is not implemented in the API yet
-          // For now, we'll just do optimistic updates and let WebSocket sync handle it
-          success('Event deleted successfully')
-          return { message: 'Event deleted successfully' }
+          const res = await api.deleteEvent(eventId)
+          success('Event deleted!')
+          return res
         }
       )
     } catch (err: any) {
@@ -364,11 +363,11 @@ export function useRealTimeEvents(groupId?: number) {
     if (eventId) {
       return unreadUpdates.get(eventId) || 0
     }
-    // Return total unread count across all events
+    
     return Array.from(unreadUpdates.values()).reduce((sum, count) => sum + count, 0)
   }, [unreadUpdates])
 
-  // Initial load
+  
   useEffect(() => {
     fetchEvents()
   }, [fetchEvents])

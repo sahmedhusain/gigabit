@@ -15,11 +15,11 @@ import {
   AuthenticationError
 } from '@/lib/api'
 
-// Import dashboard components
+
 import ActivitySection from '@/components/profile/ActivitySection'
 import AppLayout from '@/components/layout/AppLayout'
 
-// Helper: format relative time
+
 const formatTimeAgo = (dateString: string) => {
   const date = new Date(dateString)
   const now = new Date()
@@ -47,11 +47,11 @@ function ActivityFilterPage() {
     (searchParams?.get('sort') === 'oldest' ? 'oldest' : 'newest')
   )
 
-  // Data State
+  
   const [posts, setPosts] = useState<Post[]>([])
   const [, setIsLoadingPosts] = useState(true)
 
-  // Pagination state for each activity type
+  
   const [paginationState, setPaginationState] = useState<{
     liked: { currentPage: number; hasMoreResults: boolean; isLoadingMore: boolean };
     commented: { currentPage: number; hasMoreResults: boolean; isLoadingMore: boolean };
@@ -62,17 +62,17 @@ function ActivityFilterPage() {
     saved: { currentPage: 0, hasMoreResults: true, isLoadingMore: false }
   })
 
-  // Scroll position preservation
+  
   const resultsContainerRef = useRef<HTMLDivElement>(null)
 
-  // Update URL when filter changes
+  
   useEffect(() => {
     if (activitySubTab !== filter) {
       router.replace(`/activity/${activitySubTab}`)
     }
   }, [activitySubTab, filter, router])
 
-  // Update URL when sort changes
+  
   useEffect(() => {
     const params = new URLSearchParams(searchParams?.toString() || '')
     if (sortOrder !== 'newest') {
@@ -84,7 +84,7 @@ function ActivityFilterPage() {
     router.replace(newUrl)
   }, [sortOrder, activitySubTab, searchParams, router])
 
-  // Fetch data when component loads
+  
   const fetchActivityPosts = useCallback(async (page: number = 0, append: boolean = false) => {
     try {
       if (append) {
@@ -96,26 +96,25 @@ function ActivityFilterPage() {
         setIsLoadingPosts(true)
       }
 
-      console.log('Fetching activity posts...', { activitySubTab, page, append })
       let response: { posts?: PostResponse[]; bookmarks?: Bookmark[]; count?: number } | undefined
 
       let postsArr: Array<PostResponse | APIPost> = []
 
       switch (activitySubTab) {
         case 'liked':
-          // Fetch posts liked by the user
+          
           response = await api.getUserLikedPosts(20, page * 20)
           postsArr = Array.isArray(response?.posts) ? response.posts : []
           break
         case 'commented':
-          // Fetch posts commented on by the user
+          
           response = await api.getUserCommentedPosts(20, page * 20)
           postsArr = Array.isArray(response?.posts) ? response.posts : []
           break
         case 'saved':
-          // Fetch saved/bookmarked posts
+          
           response = await api.getUserBookmarks(20, page * 20)
-          // Bookmarks response has a different structure - extract posts from bookmarks
+          
           const bookmarksArr = Array.isArray(response?.bookmarks) ? response.bookmarks : []
           postsArr = bookmarksArr
             .map((bookmark: Bookmark & { post?: APIPost }) => bookmark.post)
@@ -138,7 +137,7 @@ function ActivityFilterPage() {
       }
 
   const mappedPosts = postsArr.map((item: PostResponse | APIPost) => {
-        // Handle different response structures
+        
         const post = item
 
         return {
@@ -188,7 +187,7 @@ function ActivityFilterPage() {
         }))
       }
 
-      // Check if we got fewer posts than requested, indicating no more results
+      
       if (mappedPosts.length < 20) {
         setPaginationState(prev => ({
           ...prev,
@@ -213,19 +212,19 @@ function ActivityFilterPage() {
     }
       }, [activitySubTab, error])
 
-  // Fetch activity posts on mount and when filter changes
+  
   useEffect(() => {
-    fetchActivityPosts(0, false) // Reset to first page
+    fetchActivityPosts(0, false) 
   }, [fetchActivityPosts])
 
   const handleLoadMore = useCallback(() => {
     const currentState = paginationState[activitySubTab as keyof typeof paginationState]
     if (!currentState.isLoadingMore && currentState.hasMoreResults && resultsContainerRef.current) {
-      // Save current scroll position
+      
       const scrollTop = resultsContainerRef.current.scrollTop
 
       fetchActivityPosts(currentState.currentPage + 1, true).then(() => {
-        // Restore scroll position after new posts are loaded
+        
         requestAnimationFrame(() => {
           if (resultsContainerRef.current) {
             resultsContainerRef.current.scrollTop = scrollTop
@@ -235,7 +234,7 @@ function ActivityFilterPage() {
     }
   }, [activitySubTab, paginationState, fetchActivityPosts])
 
-      // WebSocket real-time notifications
+      
       useEffect(() => {
         if (!isConnected) return
 
@@ -244,16 +243,14 @@ function ActivityFilterPage() {
         case 'post_update':
         case 'like_update':
         case 'comment_update':
-          console.log(`${message.type} received:`, message.data)
-          // Refetch activity posts when any activity-related update occurs
+          
           if (message.data?.user_id === user?.id) {
-            console.log('Activity update for current user, refetching posts...')
             fetchActivityPosts()
           }
           break
 
         case 'like':
-          // Update like count in real-time
+          
           if (message.data?.post_id) {
             setPosts(prevPosts =>
               prevPosts.map(post =>
@@ -267,7 +264,7 @@ function ActivityFilterPage() {
               )
             )
             
-            // If this is the current user's action, also refetch to ensure data consistency
+            
             if (message.data.user_id === user?.id) {
               fetchActivityPosts()
             }
@@ -275,7 +272,6 @@ function ActivityFilterPage() {
           break
 
             default:
-              console.log('Received WebSocket message:', message)
           }
         })
 
@@ -287,10 +283,8 @@ function ActivityFilterPage() {
       const post = posts.find(p => p.id === postId)
       const wasLiked = post?.isLiked || false
 
-      if (wasLiked) {
-        await api.unlikePost(postId)
-      } else {
-        await api.likePost(postId)
+      if (post) {
+        await api.toggleLike(post, !wasLiked)
       }
 
       setPosts(posts.map(p =>
@@ -320,20 +314,20 @@ function ActivityFilterPage() {
         await api.toggleBookmark(postId)
       }
 
-      // Optimistically update the post
+      
       setPosts(posts.map(p =>
         p.id === postId
           ? { ...p, isBookmarked: !p.isBookmarked }
           : p
       ))
       
-      // If we're on the saved tab, refetch to update the list
+      
       if (activitySubTab === 'saved') {
-        setTimeout(() => fetchActivityPosts(), 500) // Small delay to ensure backend is updated
+        setTimeout(() => fetchActivityPosts(), 500) 
       }
     } catch (err) {
       console.error('Error toggling bookmark:', err)
-      // Revert optimistic update
+      
       setPosts(posts.map(p =>
         p.id === postId
           ? { ...p, isBookmarked: !p.isBookmarked }
@@ -343,7 +337,7 @@ function ActivityFilterPage() {
     }
   }
 
-  // handler intentionally removed (unused)
+  
 
   return (
     <AppLayout 
@@ -367,7 +361,7 @@ function ActivityFilterPage() {
   )
 }
 
-// Wrap the entire component with ProtectedRoute
+
 function ProtectedActivityFilterPage() {
   return (
     <ProtectedRoute>

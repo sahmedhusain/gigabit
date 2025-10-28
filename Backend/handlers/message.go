@@ -155,9 +155,12 @@ func (h *MessageHandler) SendMessage(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// Send appropriate notification based on message type
-		if imageWsMessage != nil {
+		if strings.HasPrefix(message.Content, "http") {
 			// Send image sharing notification for images
-			go h.notificationService.NotifyImageShared(userID, req.ReceiverID, message.ID)
+			go h.notificationService.NotifyImageShared(userID, 0, false, 0, req.ReceiverID)
+		} else if strings.HasPrefix(message.Content, "Shared a post:") {
+			// Send post sharing notification for shares
+			go h.notificationService.NotifyPostShared(userID, 0, false, 0, req.ReceiverID)
 		} else {
 			// Send notification for text messages
 			go h.notificationService.NotifyPrivateMessage(userID, req.ReceiverID, message.ID)
@@ -180,7 +183,7 @@ func (h *MessageHandler) SendMessage(w http.ResponseWriter, r *http.Request) {
 			memberIDs, err := h.notificationService.GetGroupMemberIDs(req.GroupID, userID)
 			if err == nil {
 				for _, memberID := range memberIDs {
-					h.notificationService.NotifyImageShared(userID, memberID, message.ID)
+					h.notificationService.NotifyImageShared(userID, 0, true, req.GroupID, memberID)
 				}
 			}
 		} else if strings.HasPrefix(message.Content, "Shared a post:") {
@@ -188,17 +191,12 @@ func (h *MessageHandler) SendMessage(w http.ResponseWriter, r *http.Request) {
 			memberIDs, err := h.notificationService.GetGroupMemberIDs(req.GroupID, userID)
 			if err == nil {
 				for _, memberID := range memberIDs {
-					h.notificationService.NotifyPostShared(userID, memberID, message.ID)
+					h.notificationService.NotifyPostShared(userID, 0, true, req.GroupID, memberID)
 				}
 			}
 		} else {
-			// For regular messages, send individual notifications like images and shares
-			memberIDs, err := h.notificationService.GetGroupMemberIDs(req.GroupID, userID)
-			if err == nil {
-				for _, memberID := range memberIDs {
-					h.notificationService.NotifyPrivateMessage(userID, memberID, message.ID)
-				}
-			}
+			// For regular text messages, use the proper group message notification
+			go h.notificationService.NotifyGroupMessage(userID, req.GroupID, message.ID)
 		}
 	}
 

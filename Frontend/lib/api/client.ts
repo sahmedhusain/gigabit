@@ -1,6 +1,6 @@
 import { API_BASE_URL, NetworkError, ValidationError, AuthenticationError } from './types';
 
-// Token management
+
 export const getToken = (): string | null => {
   if (typeof window !== 'undefined') {
     return localStorage.getItem('token');
@@ -20,7 +20,7 @@ export const removeToken = (): void => {
   }
 };
 
-// Auth utilities
+
 export const isAuthenticated = (): boolean => {
   return getToken() !== null;
 };
@@ -28,18 +28,18 @@ export const isAuthenticated = (): boolean => {
 export const logoutUser = async (): Promise<void> => {
   try {
     await api.logout();
-  } catch (_error) {
-    console.error('Logout error:', _error);
+  } catch  {
+    
   } finally {
     removeToken();
-    // Redirect to login page
+    
     if (typeof window !== 'undefined') {
       window.location.href = '/login';
     }
   }
 };
 
-// Session expiration handler
+
 export const handleSessionExpired = (): void => {
   removeToken();
   if (typeof window !== 'undefined') {
@@ -48,7 +48,7 @@ export const handleSessionExpired = (): void => {
   }
 };
 
-// API client class
+
 export class ApiClient {
   private baseURL: string;
   private maxRetries: number = 3;
@@ -84,12 +84,11 @@ export class ApiClient {
           status: response.status
         }));
 
-        // Handle specific error cases
+        
         if (response.status === 401) {
           const code = errorData.code;
           if (code === 'TOKEN_EXPIRED' || code === 'SESSION_EXPIRED') {
-            console.log('Token/session expired, logging out...');
-            removeToken();
+              removeToken();
             if (typeof window !== 'undefined') {
               window.location.href = '/login';
             }
@@ -102,11 +101,14 @@ export class ApiClient {
           throw new ValidationError(errorData.error || 'Validation failed', errorData.field);
         }
 
+        if (response.status === 409) {
+          throw new Error(errorData.error || 'Conflict');
+        }
+
         if (response.status >= 500) {
-          // Server errors - retry if possible
+          
           if (retryCount < this.maxRetries && this.shouldRetry(options.method)) {
-            console.log(`Retrying request (${retryCount + 1}/${this.maxRetries}) after ${this.retryDelay}ms`);
-            await this.delay(this.retryDelay * Math.pow(2, retryCount)); // Exponential backoff
+            await this.delay(this.retryDelay * Math.pow(2, retryCount)); 
             return this.request<T>(endpoint, options, retryCount + 1);
           }
           throw new NetworkError(errorData.error || 'Server error', response.status, errorData.code);
@@ -119,34 +121,18 @@ export class ApiClient {
       if (contentType && contentType.includes('application/json')) {
         return await response.json();
       } else {
-        // Handle non-JSON responses
+        
         const text = await response.text();
         return text as unknown as T;
       }
-    } catch (_error) {
-      const error = _error as unknown;
-      // Handle network errors
-      if (error instanceof TypeError && (error as Error).message === 'Failed to fetch') {
-        if (retryCount < this.maxRetries) {
-          console.log(`Network error, retrying (${retryCount + 1}/${this.maxRetries}) after ${this.retryDelay}ms`);
-          await this.delay(this.retryDelay * Math.pow(2, retryCount));
-          return this.request<T>(endpoint, options, retryCount + 1);
-        }
-        throw new NetworkError('Network connection failed. Please check your internet connection.');
-      }
-
-      // Re-throw custom errors
-      if ((error instanceof AuthenticationError) || (error instanceof ValidationError) || (error instanceof NetworkError)) {
-        throw error as Error;
-      }
-
-      console.error('API request failed:', error);
-      throw new NetworkError((error instanceof Error) ? error.message : 'Unknown error occurred');
+    } catch {
+      
+      throw new NetworkError('Network connection failed. Please check your internet connection.');
     }
   }
 
   private shouldRetry(method?: string): boolean {
-    // Only retry safe HTTP methods
+    
     return !method || ['GET', 'HEAD', 'OPTIONS'].includes(method.toUpperCase());
   }
 
@@ -164,26 +150,24 @@ export class ApiClient {
     return date.toLocaleDateString()
   }
 
-  // Health check with timeout
+  
   async checkConnection(): Promise<boolean> {
     try {
       await this.healthCheck();
       return true;
-    } catch (_error) {
-      // mark variable as used to satisfy linter
-      void _error;
+    } catch {
       return false;
     }
   }
 
-  // Health check
+  
   async healthCheck(): Promise<{ status: string }> {
     return this.request<{ status: string }>('/health', {
       method: 'GET',
     });
   }
 
-  // Validation helpers
+  
   static validateEmail(email: string): boolean {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     return emailRegex.test(email);
@@ -220,8 +204,45 @@ export class ApiClient {
     }
     return { isValid: true };
   }
+
+  
+  async toggleLike(post: { id: number; group_id?: number }, isLiking: boolean): Promise<void> {
+    if (post.group_id) {
+      
+      if (isLiking) {
+        await this.likeGroupPost(post.group_id, post.id);
+      } else {
+        await this.unlikeGroupPost(post.group_id, post.id);
+      }
+    } else {
+      
+      if (isLiking) {
+        await this.likePost(post.id);
+      } else {
+        await this.unlikePost(post.id);
+      }
+    }
+  }
+
+  async toggleDislike(post: { id: number; group_id?: number }, isDisliking: boolean): Promise<void> {
+    if (post.group_id) {
+      
+      if (isDisliking) {
+        await this.dislikeGroupPost(post.group_id, post.id);
+      } else {
+        await this.undislikeGroupPost(post.group_id, post.id);
+      }
+    } else {
+      
+      if (isDisliking) {
+        await this.dislikePost(post.id);
+      } else {
+        await this.undislikePost(post.id);
+      }
+    }
+  }
 }
 
-// Create and export API client instance
+
 export const api = new ApiClient(API_BASE_URL);
 export { API_BASE_URL };

@@ -2,12 +2,14 @@
 import { useEffect, useState, useRef } from 'react'
 import { api } from '@/lib/api'
 
+const DEBUG = process.env.DEBUG;
+
 export const useOffline = () => {
   const [isOffline, setIsOffline] = useState(false)
   const [lastConnectionCheck, setLastConnectionCheck] = useState<Date>(new Date())
   const checkIntervalRef = useRef<NodeJS.Timeout | null>(null)
 
-  // Check network connectivity
+  
   const checkNetworkConnection = async (): Promise<boolean> => {
     try {
       const isConnected = await api.checkConnection()
@@ -19,28 +21,26 @@ export const useOffline = () => {
     }
   }
 
-  // Handle online/offline events
+  
   useEffect(() => {
     const handleOnline = async () => {
-      console.log('Browser reported online')
       const isConnected = await checkNetworkConnection()
       setIsOffline(!isConnected)
     }
 
     const handleOffline = () => {
-      console.log('Browser reported offline')
       setIsOffline(true)
     }
 
-    // Initial check
+    
     if (typeof window !== 'undefined') {
       setIsOffline(!navigator.onLine)
       
-      // Set up event listeners
+      
       window.addEventListener('online', handleOnline)
       window.addEventListener('offline', handleOffline)
       
-      // Periodic connectivity check (every 30 seconds)
+      
       checkIntervalRef.current = setInterval(async () => {
         if (navigator.onLine) {
           const isConnected = await checkNetworkConnection()

@@ -1,14 +1,7 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
 import { useWebSocket } from '@/context/WebSocketContext'
-
-export interface ConnectionStatus {
-  isOnline: boolean
-  isConnected: boolean
-  lastConnected: Date | null
-  connectionAttempts: number
-  connectionError: string | null
-}
+import { ConnectionStatus } from '@/types/hooks'
 
 export function useConnectionStatus() {
   const { isConnected, socket } = useWebSocket()
@@ -17,7 +10,7 @@ export function useConnectionStatus() {
   const [connectionAttempts, setConnectionAttempts] = useState(0)
   const [connectionError, setConnectionError] = useState<string | null>(null)
 
-  // Monitor network status
+  
   useEffect(() => {
     const handleOnline = () => {
       setIsOnline(true)
@@ -38,7 +31,7 @@ export function useConnectionStatus() {
     }
   }, [])
 
-  // Monitor WebSocket connection status
+  
   useEffect(() => {
     if (isConnected) {
       setLastConnected(new Date())
@@ -47,7 +40,7 @@ export function useConnectionStatus() {
     } else {
       setConnectionAttempts(prev => {
         const newAttempts = prev + 1
-        // Set error if we're online and have connection attempts
+        
         if (isOnline && newAttempts > 0) {
           setConnectionError('WebSocket connection lost')
         }
@@ -56,7 +49,7 @@ export function useConnectionStatus() {
     }
   }, [isConnected, isOnline])
 
-  // Monitor socket state
+  
   useEffect(() => {
     if (socket) {
       const handleError = () => {

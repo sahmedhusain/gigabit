@@ -125,6 +125,21 @@ GROUP BY g.id, u.id
 	creator.ID = group.CreatorID
 	group.Creator = creator
 
+	// Process group avatar URL
+	if group.Avatar != nil && *group.Avatar != "" {
+		avatarStr := *group.Avatar
+		if strings.HasPrefix(avatarStr, "http") {
+			// Already a full URL
+		} else if strings.HasPrefix(avatarStr, "/avatars/") {
+			// Already processed
+		} else if strings.HasPrefix(avatarStr, "image:") {
+			group.Avatar = nil
+		} else {
+			avatarURL := fmt.Sprintf("http://localhost:8080/api/uploads/%s", avatarStr)
+			group.Avatar = &avatarURL
+		}
+	}
+
 	memberStatus, err := s.GetUserMembershipStatus(groupID, currentUserID)
 	if err != nil {
 		return nil, err
@@ -157,7 +172,6 @@ SELECT g.id, g.creator_id, g.name as title, g.description, g.privacy, g.create_p
 FROM groups g
 JOIN users u ON g.creator_id = u.id
 LEFT JOIN group_members gm ON g.id = gm.group_id AND gm.status = 'member'
-WHERE g.privacy = 'public'
 GROUP BY g.id, u.id
 ORDER BY g.created_at DESC
 LIMIT ? OFFSET ?
@@ -187,6 +201,21 @@ LIMIT ? OFFSET ?
 
 		creator.ID = group.CreatorID
 		group.Creator = creator
+
+		// Process group avatar URL
+		if group.Avatar != nil && *group.Avatar != "" {
+			avatarStr := *group.Avatar
+			if strings.HasPrefix(avatarStr, "http") {
+				// Already a full URL
+			} else if strings.HasPrefix(avatarStr, "/avatars/") {
+				// Already processed
+			} else if strings.HasPrefix(avatarStr, "image:") {
+				group.Avatar = nil
+			} else {
+				avatarURL := fmt.Sprintf("http://localhost:8080/api/uploads/%s", avatarStr)
+				group.Avatar = &avatarURL
+			}
+		}
 
 		memberStatus, err := s.GetUserMembershipStatus(group.ID, currentUserID)
 		if err != nil {
@@ -245,6 +274,22 @@ LIMIT ? OFFSET ?
 
 		creator.ID = group.CreatorID
 		group.Creator = creator
+
+		// Process group avatar URL
+		if group.Avatar != nil && *group.Avatar != "" {
+			avatarStr := *group.Avatar
+			if strings.HasPrefix(avatarStr, "http") {
+				// Already a full URL
+			} else if strings.HasPrefix(avatarStr, "/avatars/") {
+				// Already processed
+			} else if strings.HasPrefix(avatarStr, "image:") {
+				group.Avatar = nil
+			} else {
+				avatarURL := fmt.Sprintf("http://localhost:8080/api/uploads/%s", avatarStr)
+				group.Avatar = &avatarURL
+			}
+		}
+
 		group.MemberStatus = "member"
 		group.IsMember = true
 		if role, roleErr := s.GetUserRole(group.ID, userID); roleErr == nil {
@@ -714,12 +759,6 @@ func (s *GroupService) IsUserAdminOrCreator(groupID, userID uint) (bool, error) 
 		return false, err
 	}
 	if creatorID == userID {
-		query := `SELECT role FROM group_members WHERE group_id = ? AND user_id = ? AND status = 'member'`
-		var role string
-		err := s.db.QueryRow(query, groupID, userID).Scan(&role)
-		if err == nil && role == "member" {
-			return false, nil
-		}
 		return true, nil
 	}
 
@@ -758,11 +797,11 @@ func (s *GroupService) GetGroupPostByID(postID, currentUserID uint) (*models.Gro
 	query := `
 SELECT gp.id, gp.group_id, gp.user_id, gp.content, gp.image_url, gp.created_at, gp.updated_at,
        u.first_name, u.last_name, u.avatar, u.nickname, u.status,
-       (SELECT COUNT(*) FROM likes WHERE entity_type = 'group_post' AND entity_id = gp.id AND reaction_type = 'like') as like_count,
-       (SELECT COUNT(*) FROM likes WHERE entity_type = 'group_post' AND entity_id = gp.id AND reaction_type = 'dislike') as dislike_count,
+       (SELECT COUNT(*) FROM likes WHERE entity_type = 'group_posts' AND entity_id = gp.id AND reaction_type = 'like') as like_count,
+       (SELECT COUNT(*) FROM likes WHERE entity_type = 'group_posts' AND entity_id = gp.id AND reaction_type = 'dislike') as dislike_count,
        (SELECT COUNT(*) FROM comments WHERE post_id = gp.id) as comment_count,
-       (SELECT COUNT(*) > 0 FROM likes WHERE entity_type = 'group_post' AND entity_id = gp.id AND user_id = ? AND reaction_type = 'like') as is_liked,
-       (SELECT COUNT(*) > 0 FROM likes WHERE entity_type = 'group_post' AND entity_id = gp.id AND user_id = ? AND reaction_type = 'dislike') as is_disliked
+       (SELECT COUNT(*) > 0 FROM likes WHERE entity_type = 'group_posts' AND entity_id = gp.id AND user_id = ? AND reaction_type = 'like') as is_liked,
+       (SELECT COUNT(*) > 0 FROM likes WHERE entity_type = 'group_posts' AND entity_id = gp.id AND user_id = ? AND reaction_type = 'dislike') as is_disliked
 FROM group_posts gp
 JOIN users u ON gp.user_id = u.id
 WHERE gp.id = ?
@@ -806,11 +845,11 @@ func (s *GroupService) GetGroupPosts(groupID, currentUserID uint, limit, offset 
 	query := `
 SELECT gp.id, gp.group_id, gp.user_id, gp.content, gp.image_url, gp.created_at, gp.updated_at,
        u.first_name, u.last_name, u.avatar, u.nickname, u.status,
-       (SELECT COUNT(*) FROM likes WHERE entity_type = 'group_post' AND entity_id = gp.id AND reaction_type = 'like') as like_count,
-       (SELECT COUNT(*) FROM likes WHERE entity_type = 'group_post' AND entity_id = gp.id AND reaction_type = 'dislike') as dislike_count,
+       (SELECT COUNT(*) FROM likes WHERE entity_type = 'group_posts' AND entity_id = gp.id AND reaction_type = 'like') as like_count,
+       (SELECT COUNT(*) FROM likes WHERE entity_type = 'group_posts' AND entity_id = gp.id AND reaction_type = 'dislike') as dislike_count,
        0 as comment_count,
-       (SELECT COUNT(*) > 0 FROM likes WHERE entity_type = 'group_post' AND entity_id = gp.id AND user_id = ? AND reaction_type = 'like') as is_liked,
-       (SELECT COUNT(*) > 0 FROM likes WHERE entity_type = 'group_post' AND entity_id = gp.id AND user_id = ? AND reaction_type = 'dislike') as is_disliked
+       (SELECT COUNT(*) > 0 FROM likes WHERE entity_type = 'group_posts' AND entity_id = gp.id AND user_id = ? AND reaction_type = 'like') as is_liked,
+       (SELECT COUNT(*) > 0 FROM likes WHERE entity_type = 'group_posts' AND entity_id = gp.id AND user_id = ? AND reaction_type = 'dislike') as is_disliked
 FROM group_posts gp
 JOIN users u ON gp.user_id = u.id
 WHERE gp.group_id = ?
@@ -887,7 +926,7 @@ WHERE gp.id = ? AND gp.group_id = ? AND gm.user_id = ? AND gm.status = 'member'
 		return err
 	}
 
-	_, err = s.db.Exec("DELETE FROM likes WHERE entity_type = 'group_post' AND entity_id = ?", postID)
+	_, err = s.db.Exec("DELETE FROM likes WHERE entity_type = 'group_posts' AND entity_id = ?", postID)
 	if err != nil {
 		return err
 	}
@@ -912,7 +951,7 @@ WHERE gp.id = ? AND gp.group_id = ? AND gm.user_id = ? AND gm.status = 'member'
 func (s *GroupService) GetUserInvitations(userID uint) ([]models.GroupInvitationResponse, error) {
 	inviteQuery := `
 SELECT gm.id, gm.group_id, gm.created_at,
-	   g.name as group_name, g.description as group_description, g.privacy,
+	   g.name as group_name, g.description as group_description, g.privacy, g.avatar,
 	   g.creator_id,
 	   u.first_name, u.last_name, u.avatar, u.nickname
 FROM group_members gm
@@ -935,7 +974,7 @@ ORDER BY gm.created_at DESC`
 
 		err := rows.Scan(
 			&invitation.ID, &group.ID, &invitation.CreatedAt,
-			&group.Title, &group.Description, &group.Privacy,
+			&group.Title, &group.Description, &group.Privacy, &group.Avatar,
 			&group.CreatorID,
 			&creator.FirstName, &creator.LastName, &creator.Avatar, &creator.Nickname,
 		)
@@ -945,6 +984,22 @@ ORDER BY gm.created_at DESC`
 
 		creator.ID = group.CreatorID
 		group.Creator = creator
+
+		// Process group avatar URL
+		if group.Avatar != nil && *group.Avatar != "" {
+			avatarStr := *group.Avatar
+			if strings.HasPrefix(avatarStr, "http") {
+				// Already a full URL
+			} else if strings.HasPrefix(avatarStr, "/avatars/") {
+				// Already processed
+			} else if strings.HasPrefix(avatarStr, "image:") {
+				group.Avatar = nil
+			} else {
+				avatarURL := fmt.Sprintf("http://localhost:8080/api/uploads/%s", avatarStr)
+				group.Avatar = &avatarURL
+			}
+		}
+
 		invitation.Group = group
 		invitation.Type = "invite"
 		invitations = append(invitations, invitation)
@@ -952,7 +1007,7 @@ ORDER BY gm.created_at DESC`
 
 	joinReqQuery := `
 SELECT gm.id, gm.group_id, gm.created_at, gm.user_id, gm.requestor_id,
-	   g.name as group_name, g.description as group_description, g.privacy,
+	   g.name as group_name, g.description as group_description, g.privacy, g.avatar,
 	   g.creator_id,
 	   cu.first_name, cu.last_name, cu.avatar, cu.nickname,
 	   ru.first_name, ru.last_name, ru.avatar, ru.nickname
@@ -981,7 +1036,7 @@ ORDER BY gm.created_at DESC`
 
 		err := rows2.Scan(
 			&invitation.ID, &group.ID, &invitation.CreatedAt, &reqUserID, &requestorID,
-			&group.Title, &group.Description, &group.Privacy,
+			&group.Title, &group.Description, &group.Privacy, &group.Avatar,
 			&group.CreatorID,
 			&creator.FirstName, &creator.LastName, &creator.Avatar, &creator.Nickname,
 			&requestUser.FirstName, &requestUser.LastName, &requestUser.Avatar, &requestUser.Nickname,
@@ -992,6 +1047,21 @@ ORDER BY gm.created_at DESC`
 
 		creator.ID = group.CreatorID
 		group.Creator = creator
+
+		// Process group avatar URL
+		if group.Avatar != nil && *group.Avatar != "" {
+			avatarStr := *group.Avatar
+			if strings.HasPrefix(avatarStr, "http") {
+				// Already a full URL
+			} else if strings.HasPrefix(avatarStr, "/avatars/") {
+				// Already processed
+			} else if strings.HasPrefix(avatarStr, "image:") {
+				group.Avatar = nil
+			} else {
+				avatarURL := fmt.Sprintf("http://localhost:8080/api/uploads/%s", avatarStr)
+				group.Avatar = &avatarURL
+			}
+		}
 
 		requestUser.ID = reqUserID
 
@@ -1222,14 +1292,8 @@ AND u.id NOT IN (
 		args = append(args, searchPattern, searchPattern, searchPattern)
 	}
 
-	query += `
-AND (u.status != 'private' OR u.id IN (
-    SELECT f.following_id FROM follows f WHERE f.follower_id = ?
-))
-`
-
-	args = append(args, currentUserID)
-
+	// For group admins/creators, show all users regardless of privacy settings
+	// (they can invite anyone to their group)
 	query += ` ORDER BY u.first_name, u.last_name LIMIT 50`
 
 	rows, err := s.db.Query(query, args...)
@@ -1306,7 +1370,7 @@ ORDER BY gm.created_at DESC
 func (s *GroupService) GetOutgoingGroupJoinRequests(userID uint) ([]models.GroupInvitationResponse, error) {
 	query := `
 SELECT gm.id, gm.group_id, gm.created_at,
-       g.name as group_name, g.description as group_description, g.privacy,
+       g.name as group_name, g.description as group_description, g.privacy, g.avatar,
        g.creator_id,
        cu.first_name, cu.last_name, cu.avatar, cu.nickname
 FROM group_members gm
@@ -1330,7 +1394,7 @@ ORDER BY gm.created_at DESC
 
 		err := rows.Scan(
 			&request.ID, &group.ID, &request.CreatedAt,
-			&group.Title, &group.Description, &group.Privacy,
+			&group.Title, &group.Description, &group.Privacy, &group.Avatar,
 			&group.CreatorID,
 			&creator.FirstName, &creator.LastName, &creator.Avatar, &creator.Nickname,
 		)
@@ -1340,6 +1404,22 @@ ORDER BY gm.created_at DESC
 
 		creator.ID = group.CreatorID
 		group.Creator = creator
+
+		// Process group avatar URL
+		if group.Avatar != nil && *group.Avatar != "" {
+			avatarStr := *group.Avatar
+			if strings.HasPrefix(avatarStr, "http") {
+				// Already a full URL
+			} else if strings.HasPrefix(avatarStr, "/avatars/") {
+				// Already processed
+			} else if strings.HasPrefix(avatarStr, "image:") {
+				group.Avatar = nil
+			} else {
+				avatarURL := fmt.Sprintf("http://localhost:8080/api/uploads/%s", avatarStr)
+				group.Avatar = &avatarURL
+			}
+		}
+
 		request.Group = group
 		request.Type = "join_request"
 		requests = append(requests, request)

@@ -317,7 +317,7 @@ func (h *ProfileHandler) CheckEmailUniqueness(w http.ResponseWriter, r *http.Req
 	}
 
 	// Check if email exists
-	_, err := h.userService.GetUserByEmail(email)
+	existingUser, err := h.userService.GetUserByEmail(email)
 	if err != nil {
 		// If user not found, email is available
 		writeJSON(w, http.StatusOK, map[string]interface{}{
@@ -326,7 +326,15 @@ func (h *ProfileHandler) CheckEmailUniqueness(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	// Email exists, check if it's the current user's email
+	// Check if the existing user is deleted - if so, email is available
+	if existingUser.IsDeleted {
+		writeJSON(w, http.StatusOK, map[string]interface{}{
+			"available": true,
+		})
+		return
+	}
+
+	// Email exists and user is not deleted, check if it's the current user's email
 	userID := r.Context().Value("user_id")
 	if userID != nil {
 		currentUser, err := h.userService.GetUserByID(userID.(uint))
@@ -342,7 +350,7 @@ func (h *ProfileHandler) CheckEmailUniqueness(w http.ResponseWriter, r *http.Req
 	// Email is taken by someone else
 	writeJSON(w, http.StatusOK, map[string]interface{}{
 		"available": false,
-		"message":   "This email is already used",
+		"message":   "User with this email already exists",
 	})
 }
 
@@ -393,6 +401,6 @@ func (h *ProfileHandler) CheckNicknameUniqueness(w http.ResponseWriter, r *http.
 	// Nickname is taken by someone else
 	writeJSON(w, http.StatusOK, map[string]interface{}{
 		"available": false,
-		"message":   "This nickname is already used",
+		"message":   "User with this nickname already exists",
 	})
 }

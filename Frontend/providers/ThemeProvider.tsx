@@ -2,16 +2,16 @@
 
 import { ThemeProvider as MUIThemeProvider, createTheme } from '@mui/material/styles'
 import CssBaseline from '@mui/material/CssBaseline'
-import { ReactNode } from 'react'
+import { ThemeProviderProps } from '@/types/ui'
 
 const theme = createTheme({
   palette: {
     mode: 'dark',
     primary: {
-      main: '#10b981', // emerald
+      main: '#10b981', 
     },
     secondary: {
-      main: '#14b8a6', // teal
+      main: '#14b8a6', 
     },
   },
   components: {
@@ -38,10 +38,6 @@ const theme = createTheme({
     },
   },
 })
-
-interface ThemeProviderProps {
-  children: ReactNode
-}
 
 export default function ThemeProvider({ children }: ThemeProviderProps) {
   return (

@@ -1,16 +1,7 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
 import { SoundTheme, playNotificationSound } from '@/lib/notificationSounds'
-
-export interface NotificationSettings {
-  sound_enabled: boolean
-  sound_theme: SoundTheme
-  browser_push_enabled: boolean
-  quiet_hours_enabled: boolean
-  quiet_hours_start: string
-  quiet_hours_end: string
-  muted_conversations: number[]
-}
+import { NotificationSettings } from '@/types/hooks'
 
 const DEFAULT_SETTINGS: NotificationSettings = {
   sound_enabled: true,
@@ -26,7 +17,7 @@ export function useNotificationSettings() {
   const [settings, setSettings] = useState<NotificationSettings>(DEFAULT_SETTINGS)
   const [loaded, setLoaded] = useState(false)
 
-  // Load settings from localStorage on mount
+  
   useEffect(() => {
     const saved = localStorage.getItem('notificationSettings')
     if (saved) {
@@ -40,7 +31,7 @@ export function useNotificationSettings() {
     setLoaded(true)
   }, [])
 
-  // Save settings to localStorage whenever they change
+  
   useEffect(() => {
     if (loaded) {
       localStorage.setItem('notificationSettings', JSON.stringify(settings))
@@ -64,10 +55,10 @@ export function useNotificationSettings() {
     const endTime = endHour * 60 + endMinute
 
     if (startTime <= endTime) {
-      // Same day range (e.g., 08:00 to 22:00)
+      
       return currentTime >= startTime && currentTime <= endTime
     } else {
-      // Overnight range (e.g., 22:00 to 08:00)
+      
       return currentTime >= startTime || currentTime <= endTime
     }
   }, [settings.quiet_hours_enabled, settings.quiet_hours_start, settings.quiet_hours_end])
@@ -119,7 +110,7 @@ export function useNotificationSettings() {
       }
     }
 
-    // Show browser notification if enabled
+    
     if (title && body) {
       try {
         await showBrowserNotification(title, body, icon)

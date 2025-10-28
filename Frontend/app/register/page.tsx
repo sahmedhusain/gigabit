@@ -1,5 +1,4 @@
 'use client'
-/* eslint-disable react/style-prop-object, @typescript-eslint/no-explicit-any */
 import dynamic from 'next/dynamic'
 import { useState } from 'react'
 import Link from 'next/link'
@@ -13,6 +12,7 @@ import AnimatedBackground from '@/components/ui/AnimatedBackground'
 import { Eye, EyeOff, Mail, Lock, User, Calendar, Camera, Edit3, ArrowRight, Sparkles, X, Palette } from 'lucide-react'
 import TermsPopup from '@/components/ui/TermsPopup'
 import PrivacyPopup from '@/components/ui/PrivacyPopup'
+import { API_BASE_URL } from '@/lib/api'
 
 function validatePassword(password: string) {
 
@@ -20,7 +20,7 @@ function validatePassword(password: string) {
   const lower = /[a-z]/
   const number = /[0-9]/
   const space = /\s/
-  // Allow only ASCII printable characters (excluding space, but including common symbols)
+  
   const allowedChars = /^[a-zA-Z0-9!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?`~]+$/
 
   const errors = []
@@ -59,22 +59,22 @@ function validatePassword(password: string) {
 }
 
 function validateNickname(nickname: string) {
-  if (!nickname) return null // nickname is optional
+  if (!nickname) return null 
   
-  // Allow only English letters (a-z, A-Z), numbers (0-9), underscore (_), hyphen (-), and dot (.)
+  
   const allowedCharsRegex = /^[a-zA-Z0-9._-]+$/
   
   if (!allowedCharsRegex.test(nickname)) {
     return "Nickname can only contain English letters, numbers, underscore (_), hyphen (-), and dot (.)"
   }
   
-  // Must start with a letter or number (not special characters)
+  
   const startsWithAlphanumeric = /^[a-zA-Z0-9]/
   if (!startsWithAlphanumeric.test(nickname)) {
     return "Nickname must start with a letter or number"
   }
   
-  // Must end with a letter or number (not special characters)
+  
   const endsWithAlphanumeric = /[a-zA-Z0-9]$/
   if (!endsWithAlphanumeric.test(nickname)) {
     return "Nickname must end with a letter or number"
@@ -106,6 +106,8 @@ function RegisterPage() {
   const [showAvatarPopup, setShowAvatarPopup] = useState(false)
   const [nicknameError, setNicknameError] = useState<string | null>(null)
   const [nicknameChecking, setNicknameChecking] = useState(false)
+  const [emailError, setEmailError] = useState<string | null>(null)
+  const [emailChecking, setEmailChecking] = useState(false)
   const [passwordError, setPasswordError] = useState<string | null>(null)
   const [showTerms, setShowTerms] = useState(false)
   const [showPrivacy, setShowPrivacy] = useState(false)
@@ -113,18 +115,34 @@ function RegisterPage() {
   const checkNicknameUniqueness = async (nickname: string) => {
     setNicknameChecking(true)
     try {
-      const response = await fetch(`/api/validation/nickname?nickname=${encodeURIComponent(nickname)}`)
+      const response = await fetch(`${API_BASE_URL}/api/validation/nickname?nickname=${encodeURIComponent(nickname)}`)
       const data = await response.json()
       if (!data.available) {
         setNicknameError(data.message || "This nickname is already taken")
       } else {
         setNicknameError(null)
       }
-    } catch (error) {
-      console.error('Error checking nickname uniqueness:', error)
-      // Don't set error on network failure, let format validation handle it
+    } catch {
+      // Don't set error on network failure
     } finally {
       setNicknameChecking(false)
+    }
+  }
+
+  const checkEmailUniqueness = async (email: string) => {
+    setEmailChecking(true)
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/validation/email?email=${encodeURIComponent(email)}`)
+      const data = await response.json()
+      if (!data.available) {
+        setEmailError(data.message || "This email is already used")
+      } else {
+        setEmailError(null)
+      }
+    } catch {
+      // Don't set error on network failure
+    } finally {
+      setEmailChecking(false)
     }
   }
 
@@ -136,17 +154,27 @@ function RegisterPage() {
       [name]: value
     })
 
-    // Clear password error when user starts typing again
+    
     if (name === 'password') {
       setPasswordError(null)
     }
 
-    // Real-time validation for nickname
+    if (name === 'email') {
+      setEmailError(null)
+      const emailRegex = /^[a-zA-Z0-9!#$%&'*+/=?^_`{|}~]+(\.[a-zA-Z0-9!#$%&'*+/=?^_`{|}~]+)*@[a-zA-Z0-9-]+(\.[a-zA-Z0-9-]+)*\.[a-zA-Z]{2,}$/;
+      if (value && !emailRegex.test(value)) {
+        setEmailError('Please enter a valid email address')
+      } else if (value.trim()) {
+        checkEmailUniqueness(value.trim())
+      }
+    }
+
+    
     if (name === 'nickname') {
       const validation = validateNickname(value)
       setNicknameError(validation)
       
-      // Check uniqueness if format is valid and nickname is not empty
+      
       if (!validation && value.trim()) {
         checkNicknameUniqueness(value.trim())
       }
@@ -165,7 +193,7 @@ function RegisterPage() {
   const handleAvatarSelect = (avatarId: string) => {
     const selectedAvatar = getAvatarOptions(formData.gender as 'male' | 'female').find(avatar => avatar.id === avatarId);
     if (selectedAvatar) {
-      // Always store the imageUrl for consistency
+      
       setFormData({ ...formData, avatar: selectedAvatar.imageUrl })
       setAvatarPreview(selectedAvatar.imageUrl)
     }
@@ -174,13 +202,13 @@ function RegisterPage() {
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
-      // Validate file type
+      
       if (!file.type.startsWith('image/')) {
         setError('Please select a valid image file');
         return;
       }
 
-      // Validate file size (max 5MB)
+      
       if (file.size > 5 * 1024 * 1024) {
         setError('Image size must be less than 5MB');
         return;
@@ -189,7 +217,7 @@ function RegisterPage() {
       const reader = new FileReader();
       reader.onload = (e) => {
         const result = e.target?.result as string;
-        // Overwrite any existing avatar selection with uploaded image
+        
         setFormData({ ...formData, avatar: result });
         setAvatarPreview(result);
         setError(null);
@@ -205,7 +233,7 @@ function RegisterPage() {
     setPasswordError(null)
 
     try {
-      // Validate required fields
+      
       if (!formData.email || !formData.password || !formData.firstName || !formData.lastName || !formData.dateOfBirth) {
         throw new Error('Please fill in all required fields')
       }
@@ -225,19 +253,25 @@ function RegisterPage() {
       if (formData.lastName.length > 16) {
         throw new Error('Last name is too long')
       }
-
-      // Validate email format
       const emailRegex = /^[a-zA-Z0-9!#$%&'*+/=?^_`{|}~]+(\.[a-zA-Z0-9!#$%&'*+/=?^_`{|}~]+)*@[a-zA-Z0-9-]+(\.[a-zA-Z0-9-]+)*\.[a-zA-Z]{2,}$/;
       if (!emailRegex.test(formData.email)) {
         throw new Error('Please enter a valid email address')
       }
 
-      // Validate password and set specific error
+      if (emailChecking) {
+        throw new Error("Please wait while we check email availability")
+      }
+
+      if (emailError) {
+        throw new Error(emailError)
+      }
+
+      
       const passwordValidation = validatePassword(formData.password)
       if (passwordValidation) {
         setPasswordError(passwordValidation)
         setIsLoading(false)
-        return // Don't proceed with submission
+        return 
       }
 
       if (formData.nickname && formData.nickname.length > 16) {
@@ -249,7 +283,7 @@ function RegisterPage() {
         throw new Error(nicknameValidation)
       }
 
-      // Check if nickname uniqueness check is still in progress or has errors
+      
       if (nicknameChecking) {
         throw new Error("Please wait while we check nickname availability")
       }
@@ -258,13 +292,13 @@ function RegisterPage() {
         throw new Error(nicknameError)
       }
 
-      // Validate date of birth
+      
       const birthDate = new Date(formData.dateOfBirth);
       const today = new Date();
       const age = today.getFullYear() - birthDate.getFullYear();
       const monthDiff = today.getMonth() - birthDate.getMonth();
       
-      // Adjust age if birthday hasn't occurred this year
+      
       const adjustedAge = monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate()) 
         ? age - 1 
         : age;
@@ -281,12 +315,7 @@ function RegisterPage() {
         throw new Error('Your bio is too long');
       }
 
-      console.log("Form data before sending:", {
-        ...formData,
-        avatar: formData.avatar ? `${formData.avatar.substring(0, 50)}...` : 'No Avatar'
-      })
-
-      // Call register function from auth context
+      
       await register({
         email: formData.email.trim(),
         password: formData.password.trim(),
@@ -298,7 +327,7 @@ function RegisterPage() {
         avatar: formData.avatar.trim(),
       })
 
-      // Redirect to feed on success
+      
       router.push('/feed/all')
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -500,6 +529,19 @@ function RegisterPage() {
                           value={formData.email}
                           onChange={handleInputChange}
                         />
+                        {emailError && (
+                          <motion.div
+                            className="mt-2 flex items-start space-x-2 bg-gradient-to-r from-red-500/10 to-pink-500/10 backdrop-blur-sm rounded-xl p-3 border border-red-400/20"
+                            initial={{ opacity: 0, y: -5, scale: 0.95 }}
+                            animate={{ opacity: 1, y: 0, scale: 1 }}
+                            transition={{ type: 'spring', stiffness: 400, damping: 17 }}
+                          >
+                            <div className="w-4 h-4 rounded-full bg-red-400/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+                              <X className="w-3 h-3 text-red-400" />
+                            </div>
+                            <p className="text-red-300/90 text-xs leading-relaxed">{emailError}</p>
+                          </motion.div>
+                        )}
                       </div>
 
                       {/* Password Input */}
@@ -1112,7 +1154,7 @@ function RegisterPage() {
                 <div className="mb-3">
                   <button
                     type="submit"
-                    disabled={isLoading || nicknameChecking}
+                    disabled={isLoading || nicknameChecking || emailChecking}
                     onClick={(e) => { e.preventDefault(); handleSubmit(); }}
                     className="group relative w-full flex justify-center items-center py-4 px-6 text-lg font-semibold rounded-2xl text-white bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 hover:from-emerald-600 hover:via-teal-600 hover:to-cyan-600 focus:outline-none focus:ring-2 focus:ring-teal-400/50 transition-all duration-300 transform hover:scale-[1.02] hover:shadow-2xl hover:shadow-teal-500/25 disabled:opacity-70 disabled:cursor-not-allowed disabled:transform-none"
                   >
@@ -1127,6 +1169,11 @@ function RegisterPage() {
                         <>
                           <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
                           Checking nickname...
+                        </>
+                      ) : emailChecking ? (
+                        <>
+                          <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+                          Checking email...
                         </>
                       ) : (
                         <>

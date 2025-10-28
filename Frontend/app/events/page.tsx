@@ -5,7 +5,7 @@ import ProtectedRoute from '@/components/auth/ProtectedRoute'
 import { useToast } from '@/context/ToastContext'
 import { useRealTimeEvents } from '@/hooks'
 
-// Import dashboard components
+
 import CommunitySection from '@/components/groups/CommunitySection'
 import CreateGeneralEvent from '@/components/events/CreateGeneralEvent'
 import AppLayout from '@/components/layout/AppLayout'
@@ -15,13 +15,13 @@ function EventsPage() {
   const searchParams = useSearchParams()
   const { success } = useToast()
 
-  // Get event ID from URL params for deep linking
+  
   const eventId = searchParams?.get('event')
   
   const [showCreateEvent, setShowCreateEvent] = useState(false)
   const [eventsSubTab, setEventsSubTab] = useState('all')
 
-  // Use real-time events hook
+  
   const { 
     events, 
     loading: eventsLoading, 
@@ -32,7 +32,7 @@ function EventsPage() {
     delete: deleteEvent
   } = useRealTimeEvents()
 
-  // Update URL when event ID changes
+  
   useEffect(() => {
     if (eventId) {
       const newUrl = `/events?event=${eventId}`
@@ -51,7 +51,7 @@ function EventsPage() {
         onClose={() => setShowCreateEvent(false)}
         onEventCreated={() => {
           setShowCreateEvent(false)
-          success('Event created successfully!')
+          success('Event created!')
         }}
         createEvent={createEvent}
       />
@@ -73,7 +73,7 @@ function EventsPage() {
   )
 }
 
-// Wrap the entire component with ProtectedRoute
+
 function ProtectedEventsPage() {
   return (
     <ProtectedRoute>

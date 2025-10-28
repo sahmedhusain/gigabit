@@ -2,19 +2,8 @@
 import React, { useState } from 'react'
 import { X, Plus, Trash2, BarChart3, Calendar, CheckSquare } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
-
-interface CreatePollModalProps {
-  show: boolean
-  onClose: () => void
-  onCreatePoll: (pollData: {
-    title: string
-    description: string
-    options: string[]
-    allowMultipleChoices: boolean
-    expiresAt?: string
-  }) => Promise<void>
-  groupId?: number
-}
+import { CreatePollModalProps } from '@/types/polls'
+import { useToast } from '@/context/ToastContext'
 
 export default function CreatePollModal({
   show,
@@ -28,6 +17,8 @@ export default function CreatePollModal({
   const [allowMultipleChoices, setAllowMultipleChoices] = useState(false)
   const [expiresAt, setExpiresAt] = useState('')
   const [isCreating, setIsCreating] = useState(false)
+
+  const { success: showSuccessToast, error: showErrorToast } = useToast()
 
   const handleAddOption = () => {
     if (options.length < 10) {
@@ -51,12 +42,12 @@ export default function CreatePollModal({
     const validOptions = options.filter(opt => opt.trim() !== '')
     
     if (!title.trim()) {
-      alert('Please enter a poll title')
+      showErrorToast('Please enter a poll title')
       return
     }
 
     if (validOptions.length < 2) {
-      alert('Please provide at least 2 options')
+      showErrorToast('Please provide at least 2 options')
       return
     }
 
@@ -70,7 +61,8 @@ export default function CreatePollModal({
         expiresAt: expiresAt || undefined
       })
 
-      // Reset form
+      showSuccessToast('Poll created!')
+      
       setTitle('')
       setDescription('')
       setOptions(['', ''])
@@ -79,7 +71,7 @@ export default function CreatePollModal({
       onClose()
     } catch (error) {
       console.error('Failed to create poll:', error)
-      alert('Failed to create poll. Please try again.')
+      showErrorToast('Failed to create poll')
     } finally {
       setIsCreating(false)
     }

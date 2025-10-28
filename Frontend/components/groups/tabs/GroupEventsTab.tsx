@@ -7,11 +7,7 @@ import { useToast } from '@/context/ToastContext'
 import { useAuth } from '@/context/AuthContext'
 import { api, EventResponse, UpdateEventRequest } from '@/lib/api'
 import CreateGroupEvent from '../CreateGroupEvent'
-
-interface GroupEventsTabProps {
-  groupId: number
-  groupTitle: string
-}
+import { GroupEventsTabProps } from '@/types/groups'
 
 const GroupEventsTab: React.FC<GroupEventsTabProps> = ({ groupId, groupTitle }) => {
   const [events, setEvents] = useState<EventResponse[]>([])
@@ -81,43 +77,40 @@ const GroupEventsTab: React.FC<GroupEventsTabProps> = ({ groupId, groupTitle }) 
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [dropdownOpen]);
 
-  // Handle event response
+  
   const handleEventResponse = async (eventId: number, response: 'going' | 'not_going') => {
     try {
       await api.respondToEvent(eventId, response)
       success(`Event response updated to ${response.replace('_', ' ')}!`)
       refetchEvents()
-    } catch (error) {
-      console.error('Failed to respond to event:', error)
-      showError('Failed to update event response. Please try again.')
+    } catch {
+      showError('Failed to update event response. Please try again.');
     }
   }
 
-  // Handle event deletion
+  
   const handleDeleteEvent = async (eventId: number) => {
     try {
       await api.cancelEvent(eventId, { cancel_reason: 'Event cancelled by organizer' });
-      success('Event cancelled successfully!');
+      success('Event cancelled!');
       refetchEvents();
-    } catch (error) {
-      console.error('Failed to cancel event:', error);
+    } catch {
       showError('Failed to cancel event. Please try again.');
     }
   }
 
-  // Handle event cancellation
+  
   const handleCancelEvent = async (eventId: number) => {
     try {
       await api.cancelEvent(eventId, { cancel_reason: cancelReason });
-      success('Event cancelled successfully!');
+      success('Event cancelled!');
       refetchEvents();
-    } catch (error) {
-      console.error('Failed to cancel event:', error);
+    } catch {
       showError('Failed to cancel event. Please try again.');
     }
   }
 
-  // Handle event editing
+  
   const handleEditEvent = async (eventId: number) => {
     try {
       const eventDateTime = new Date(`${editDate}T${editTime}`);
@@ -127,15 +120,14 @@ const GroupEventsTab: React.FC<GroupEventsTabProps> = ({ groupId, groupTitle }) 
       };
 
       await api.updateEvent(eventId, eventData);
-      success('Event updated successfully!');
+      success('Event updated!');
       refetchEvents();
       setShowEditModal(false);
       setSelectedEvent(null);
       setEditLocation('');
       setEditDate('');
       setEditTime('');
-    } catch (error) {
-      console.error('Failed to update event:', error);
+    } catch {
       showError('Failed to update event. Please try again.');
     }
   }
@@ -289,7 +281,7 @@ const GroupEventsTab: React.FC<GroupEventsTabProps> = ({ groupId, groupTitle }) 
             
             {events
               .sort((a, b) => {
-                // Sort by event date - upcoming events first, then past events
+                
                 const dateA = new Date(a.event_time);
                 const dateB = new Date(b.event_time);
                 const now = new Date();
@@ -297,12 +289,12 @@ const GroupEventsTab: React.FC<GroupEventsTabProps> = ({ groupId, groupTitle }) 
                 const aIsPast = dateA < now;
                 const bIsPast = dateB < now;
                 
-                // If both are upcoming or both are past, sort by date
+                
                 if (aIsPast === bIsPast) {
                   return aIsPast ? dateB.getTime() - dateA.getTime() : dateA.getTime() - dateB.getTime();
                 }
                 
-                // Upcoming events come first
+                
                 return aIsPast ? 1 : -1;
               })
               .map((event, index) => {
@@ -826,7 +818,7 @@ const GroupEventsTab: React.FC<GroupEventsTabProps> = ({ groupId, groupTitle }) 
                     try {
                       await handleEditEvent(selectedEvent.id);
                     } catch {
-                      // Error already handled in handleEditEvent
+                      
                     }
                   }}
                   className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"

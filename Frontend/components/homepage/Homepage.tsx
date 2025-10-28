@@ -8,15 +8,7 @@ import TermsPopup from '../ui/TermsPopup';
 import PrivacyPopup from '../ui/PrivacyPopup';
 import CookiesPopup from '../ui/CookiesPopup';
 import SupportPopup from '../ui/SupportPopup';
-
-interface FloatingElementProps {
-  children: React.ReactNode;
-  delay?: number;
-  duration?: number;
-  className?: string;
-  left?: string;
-  top?: string;
-}
+import { FloatingElementProps } from '@/types/homepage';
 
 const FloatingElement: React.FC<FloatingElementProps> = ({ 
   children, 

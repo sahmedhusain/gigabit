@@ -411,8 +411,9 @@ func (h *PostHandler) LikePost(w http.ResponseWriter, r *http.Request, postIDStr
 		// For group posts, get the post owner directly
 		postOwnerID, err := h.groupService.GetGroupPostOwner(uint(postID))
 		if err == nil {
-			log.Printf("DEBUG: Group post owner: %d, skipping notification for group post like", postOwnerID)
-			// Skip notification for group post likes as per requirement
+			log.Printf("DEBUG: Group post owner: %d, sending notification for group post like", postOwnerID)
+			// Send notification to post owner for group post likes
+			h.notificationService.NotifyGroupPostLiked(userID.(uint), postOwnerID, uint(postID), groupID)
 		} else {
 			log.Printf("DEBUG: Failed to get group post owner: %v", err)
 		}
@@ -575,7 +576,7 @@ func (h *PostHandler) CreateComment(w http.ResponseWriter, r *http.Request, post
 		err := h.postService.GetPostOwner(uint(postID), &postOwnerID)
 		if err == nil {
 			// For regular posts, send notification to post owner
-			h.notificationService.NotifyPostCommented(userID.(uint), postOwnerID, uint(postID))
+			h.notificationService.NotifyPostCommented(userID.(uint), postOwnerID, uint(postID), comment.ID)
 		}
 	}
 

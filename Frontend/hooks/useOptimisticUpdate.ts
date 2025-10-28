@@ -26,28 +26,28 @@ export function useOptimisticUpdate<T>(
         setIsLoading(true)
         setError(null)
         
-        // Apply optimistic update immediately
+        
         const newData = optimisticUpdate(data)
         previousData.current = data
         setData(newData)
         
-        // Perform the actual async operation
+        
         const result = await asyncOperation()
         
-        // If successful, call onSuccess callback with the optimistic data
+        
         if (options.onSuccess && newData !== null) {
           options.onSuccess(newData)
         }
         
         return result
       } catch (err: any) {
-        // Rollback optimistic update on error
+        
         if (previousData.current !== null) {
           setData(previousData.current)
         }
         setError(err.message || 'Operation failed')
         
-        // Call error callback with rollback data
+        
         options.onError?.(err, previousData.current ?? undefined)
         
         throw err

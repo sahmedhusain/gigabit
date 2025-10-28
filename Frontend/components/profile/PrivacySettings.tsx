@@ -5,7 +5,7 @@ import { Lock, Eye, EyeOff, Shield, Check, Users, Globe, X } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion';
 import { api } from '../../lib/api';
 
-// Public Profile Confirmation Modal
+
 const PublicConfirmModal = ({ show, onClose, onConfirm, isUpdating }: {
   show: boolean;
   onClose: () => void;
@@ -84,8 +84,8 @@ export default function PrivacySettings() {
       setIsPrivate(userData.is_private);
       setBirthdayPrivacy(userData.birthday_privacy || 'everyone');
       setGenderPrivacy(userData.gender_privacy || 'everyone');
-    } catch (error) {
-      console.error('Failed to fetch privacy settings:', error);
+    } catch {
+      
     } finally {
       setLoading(false);
     }
@@ -93,10 +93,10 @@ export default function PrivacySettings() {
 
   const handleTogglePrivacy = () => {
     if (isPrivate) {
-      // If currently private, show confirmation to make public
+      
       setShowPublicConfirm(true);
     } else {
-      // If currently public, directly make private (no confirmation needed)
+      
       updatePrivacySetting(true);
     }
   };
@@ -110,8 +110,8 @@ export default function PrivacySettings() {
       const result = await api.updateUserPrivacy(0, makePrivate); // userId not needed, will use authenticated user
       setIsPrivate(result.user.is_private);
       setMessage('Privacy settings updated successfully!');
-    } catch (error) {
-      console.error('Failed to update privacy settings:', error);
+    } catch {
+      
       setMessage('Failed to update privacy settings');
     } finally {
       setSaving(false);
@@ -126,8 +126,8 @@ export default function PrivacySettings() {
       await api.updateBirthdayPrivacy(value);
       setBirthdayPrivacy(value);
       setMessage('Birthday privacy updated successfully!');
-    } catch (error) {
-      console.error('Failed to update birthday privacy:', error);
+    } catch {
+      
       setMessage('Failed to update birthday privacy');
     } finally {
       setSaving(false);
@@ -142,8 +142,8 @@ export default function PrivacySettings() {
       await api.updateGenderPrivacy(value);
       setGenderPrivacy(value);
       setMessage('Gender privacy updated successfully!');
-    } catch (error) {
-      console.error('Failed to update gender privacy:', error);
+    } catch {
+      
       setMessage('Failed to update gender privacy');
     } finally {
       setSaving(false);
@@ -387,23 +387,33 @@ export default function PrivacySettings() {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-3 gap-3">
+                  <div className="grid grid-cols-2 gap-3">
                     {[
                       { value: 'everyone', label: 'Everyone', icon: Globe },
                       { value: 'friends', label: 'Friends', icon: Users },
-                      { value: 'followers', label: 'Followers Only', icon: Lock }
+                      { value: 'followers', label: 'Followers Only', icon: Lock },
+                      { value: 'only_me', label: 'Only Me', icon: EyeOff }
                     ].map((option) => (
                       <motion.button
                         key={option.value}
                         whileHover={{ scale: 1.02, y: -1 }}
                         whileTap={{ scale: 0.98 }}
                         onClick={() => handleBirthdayPrivacyChange(option.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault()
+                            handleBirthdayPrivacyChange(option.value)
+                          }
+                        }}
                         disabled={saving}
-                        className={`p-4 rounded-xl border-2 transition-all duration-300 backdrop-blur-xl ${
+                        tabIndex={saving ? -1 : 0}
+                        aria-pressed={birthdayPrivacy === option.value}
+                        aria-label={`Set birthday privacy to ${option.label}`}
+                        className={`p-4 rounded-xl border-2 transition-all duration-300 backdrop-blur-xl focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2 focus:ring-offset-slate-800 ${
                           birthdayPrivacy === option.value
                             ? 'bg-gradient-to-r from-blue-500/20 to-cyan-500/20 border-blue-400 shadow-lg shadow-blue-500/20'
                             : 'bg-white/5 border-white/20 hover:bg-white/10 hover:border-blue-400/50'
-                        }`}
+                        } ${saving ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
                       >
                         <div className="flex flex-col items-center space-y-2">
                           <option.icon className={`w-5 h-5 ${
@@ -442,23 +452,33 @@ export default function PrivacySettings() {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-3 gap-3">
+                  <div className="grid grid-cols-2 gap-3">
                     {[
                       { value: 'everyone', label: 'Everyone', icon: Globe },
                       { value: 'friends', label: 'Friends', icon: Users },
-                      { value: 'followers', label: 'Followers Only', icon: Lock }
+                      { value: 'followers', label: 'Followers Only', icon: Lock },
+                      { value: 'only_me', label: 'Only Me', icon: EyeOff }
                     ].map((option) => (
                       <motion.button
                         key={option.value}
                         whileHover={{ scale: 1.02, y: -1 }}
                         whileTap={{ scale: 0.98 }}
                         onClick={() => handleGenderPrivacyChange(option.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault()
+                            handleGenderPrivacyChange(option.value)
+                          }
+                        }}
                         disabled={saving}
-                        className={`p-4 rounded-xl border-2 transition-all duration-300 backdrop-blur-xl ${
+                        tabIndex={saving ? -1 : 0}
+                        aria-pressed={genderPrivacy === option.value}
+                        aria-label={`Set gender privacy to ${option.label}`}
+                        className={`p-4 rounded-xl border-2 transition-all duration-300 backdrop-blur-xl focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2 focus:ring-offset-slate-800 ${
                           genderPrivacy === option.value
                             ? 'bg-gradient-to-r from-blue-500/20 to-cyan-500/20 border-blue-400 shadow-lg shadow-blue-500/20'
                             : 'bg-white/5 border-white/20 hover:bg-white/10 hover:border-blue-400/50'
-                        }`}
+                        } ${saving ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
                       >
                         <div className="flex flex-col items-center space-y-2">
                           <option.icon className={`w-5 h-5 ${

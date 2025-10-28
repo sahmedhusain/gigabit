@@ -1,19 +1,18 @@
 'use client'
 import { useState, useEffect, useRef } from 'react'
 import { ChevronDown, Users, Calendar, MessageCircle, FileText, User, Filter } from 'lucide-react'
-import { useSearchResults, SearchResult } from '@/hooks/useSearch'
+import { useSearchResults } from '@/hooks/useSearch'
+import { SearchResult } from '@/types/hooks'
+
 import { api } from '@/lib/api'
 import { useAuth } from '@/context/AuthContext'
+import { GroupData } from '@/types/search'
 import UserSearchResult from '@/components/search/UserSearchResult'
 import GroupSearchResult from '@/components/search/GroupSearchResult'
 import EventSearchResult from '@/components/search/EventSearchResult'
 import PostSearchResult from '@/components/search/PostSearchResult'
 import MessageSearchResult from '@/components/search/MessageSearchResult'
-
-interface SearchResultsProps {
-  filter: string
-  query: string
-}
+import { SearchResultsProps } from '@/types/search'
 
 const filterOptions = [
   { key: 'all', label: 'All', icon: Filter },
@@ -25,7 +24,7 @@ const filterOptions = [
 ]
 
 export default function SearchResults({ filter, query }: SearchResultsProps) {
-    // Get current user
+    
     const { user } = useAuth();
 
   const [activeFilter, setActiveFilter] = useState(filter)
@@ -46,13 +45,10 @@ export default function SearchResults({ filter, query }: SearchResultsProps) {
     totalCount 
   } = useSearchResults()
 
-  // Fetch user groups for filtering events
+  
   useEffect(() => {
     if (user) {
       api.getUserGroups(user.id).then(data => {
-        interface GroupData {
-          id: number;
-        }
         setUserGroups(data.groups.map((g: GroupData) => g.id))
       }).catch(err => {
         console.error('Failed to fetch user groups:', err)
@@ -60,10 +56,10 @@ export default function SearchResults({ filter, query }: SearchResultsProps) {
     }
   }, [user])
 
-  // Filter out events for groups where user is not a member
+  
   const filteredResults = results.filter((result: SearchResult) => {
     if (result.type === 'event') {
-      // Check if event has a group and user is member
+      
       const metadata = result.metadata as { group_id?: number | string; group?: { id?: number }; event?: { group_id?: number } }
       const groupId = metadata?.group_id || metadata?.group?.id || metadata?.event?.group_id
       const numGroupId = groupId ? Number(groupId) : null
@@ -88,7 +84,7 @@ export default function SearchResults({ filter, query }: SearchResultsProps) {
     }
   }, [query, activeFilter, searchAll])
 
-  // Check if there are more results available
+  
   useEffect(() => {
     if (results.length > 0 && totalCount > results.length) {
       setHasMoreResults(true)
@@ -103,7 +99,7 @@ export default function SearchResults({ filter, query }: SearchResultsProps) {
     setIsLoadingMore(true)
     const nextPage = currentPage + 1
     
-    // Save current scroll position
+    
     const scrollContainer = resultsContainerRef.current
     const scrollTop = scrollContainer?.scrollTop || 0
     
@@ -111,7 +107,7 @@ export default function SearchResults({ filter, query }: SearchResultsProps) {
       await searchAll(query, activeFilter, nextPage, 20, true)
       setCurrentPage(nextPage)
       
-      // Restore scroll position after DOM updates
+      
       requestAnimationFrame(() => {
         if (scrollContainer) {
           scrollContainer.scrollTop = scrollTop
@@ -124,7 +120,7 @@ export default function SearchResults({ filter, query }: SearchResultsProps) {
     }
   }
 
-  // Close dropdown when clicking outside
+  
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (searchRef.current && !searchRef.current.contains(event.target as Node)) {

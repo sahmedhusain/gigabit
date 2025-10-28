@@ -8,7 +8,8 @@ import { useAuth } from '@/context/AuthContext'
 import { useWebSocket } from '@/context/WebSocketContext'
 import { useToast } from '@/context/ToastContext'
 import { useConnectionStatus, useOptimisticUpdate } from '@/hooks'
-import { api, APIPost, Comment as CommentType, NetworkError, User } from '@/lib/api'
+import { api, NetworkError, User } from '@/lib/api'
+import { APIPost, Comment as CommentType } from '@/types/posts'
 import { getAvatarUrl, getUserInitials } from '@/utils/avatarUtils'
 import Image from 'next/image'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -32,11 +33,11 @@ function PostDetailPage() {
   const { success, error } = useToast()
   const { isConnected: connectionStatus } = useConnectionStatus()
 
-  // Get navigation context from URL params
+  
   const from = searchParams?.get('from')
   const subTab = searchParams?.get('subTab')
 
-  // State
+  
   const [post, setPost] = useState<APIPost | null>(null)
   const [comments, setComments] = useState<CommentWithUser[]>([])
   const [isLoadingPost, setIsLoadingPost] = useState(true)
@@ -60,7 +61,7 @@ function PostDetailPage() {
   const [selectedPostForShare, setSelectedPostForShare] = useState<APIPost | null>(null)
   const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null)
 
-    // Real-time optimistic updates for likes
+    
     const { performUpdate: performOptimisticUpdate, isLoading: likePending } = useOptimisticUpdate(
         post ? { ...post, is_liked: post.is_liked, like_count: post.like_count } : null,
         {
@@ -68,7 +69,7 @@ function PostDetailPage() {
         }
     )
 
-    // Format time ago
+    
     const formatTimeAgo = (dateString: string) => {
         const date = new Date(dateString)
         const now = new Date()
@@ -82,7 +83,7 @@ function PostDetailPage() {
         return date.toLocaleDateString()
     }
 
-    // Fetch post details
+    
     const fetchPost = useCallback(async () => {
         if (!id) return
 
@@ -91,7 +92,7 @@ function PostDetailPage() {
             const post = await api.getPost(Number(id), commentSort)
             setPost(post)
 
-            // Convert comments to include timeAgo
+            
             if (post.comments) {
                 const commentsWithTime: CommentWithUser[] = post.comments.map(comment => ({
                     ...comment,
@@ -121,7 +122,7 @@ function PostDetailPage() {
         }
     }, [id, error, from, subTab, searchParams, router, commentSort])
 
-    // Handle like post with optimistic updates
+    
     const handleLikePost = async () => {
         if (!post || !user || likePending) return
 
@@ -132,16 +133,12 @@ function PostDetailPage() {
             like_count: post.is_liked ? post.like_count - 1 : post.like_count + 1
         }
 
-        // Use optimistic update hook
+        
         await performOptimisticUpdate(() => optimisticPost, async () => {
             try {
-                if (wasLiked) {
-                    await api.unlikePost(post.id)
-                } else {
-                    await api.likePost(post.id)
-                }
+                await api.toggleLike(post, !wasLiked)
 
-                // Send WebSocket message for real-time updates
+                
                 if (isConnected) {
                     sendMessage({
                         type: 'like',
@@ -151,16 +148,16 @@ function PostDetailPage() {
                     })
                 }
 
-                // Update local state with the optimistic data
+                
                 setPost(optimisticPost)
             } catch (err) {
                 console.error('Error toggling like:', err)
-                throw err // Let the hook handle the error
+                throw err 
             }
         })
     }
 
-    // Handle bookmark post
+    
     const handleBookmarkPost = async () => {
         if (!post || !user) return
 
@@ -177,13 +174,13 @@ function PostDetailPage() {
                 await api.toggleBookmark(post.id)
             }
 
-            // Update local state
+            
             setPost(optimisticPost)
 
             success(wasBookmarked ? 'Post removed from bookmarks' : 'Post bookmarked successfully')
         } catch (err) {
             console.error('Error toggling bookmark:', err)
-            // Revert optimistic update on error
+            
             setPost(prev => prev ? { ...prev, is_bookmarked: wasBookmarked } : null)
             if (err instanceof NetworkError) {
                 error('Failed to update bookmark. Please try again.')
@@ -193,7 +190,7 @@ function PostDetailPage() {
         }
     }
 
-    // Delete post functions
+    
     const canDeletePost = () => {
         return user && post && user.id === post.user.id
     }
@@ -209,9 +206,9 @@ function PostDetailPage() {
         setIsDeleting(true)
         try {
             await api.deletePost(post.id)
-            success('Post deleted successfully')
+            success('Post deleted!')
             
-            // Navigate back after deletion
+            
             if (from === 'feed' && subTab) {
                 router.push(`/feed/${subTab}`)
             } else if (from === 'activity' && subTab) {
@@ -231,7 +228,7 @@ function PostDetailPage() {
         }
     }
 
-    // Delete comment functions
+    
     const canDeleteComment = (comment: CommentWithUser) => {
         return user && (user.id === comment.user.id || (post && user.id === post.user.id))
     }
@@ -254,7 +251,7 @@ function PostDetailPage() {
         }
     }
 
-    // Manage Privacy handlers
+    
     const handleManagePrivacy = async (post: APIPost) => {
         setSelectedPostForPrivacy(post)
         setShowManagePrivacy(true)
@@ -271,14 +268,14 @@ function PostDetailPage() {
                 specific_user_ids: selectedUsers
             })
 
-            // Update local post state
+            
             setPost(prev => prev ? {
                 ...prev,
                 privacy,
                 specific_user_ids: selectedUsers
             } : null)
 
-            success('Post privacy updated successfully!')
+            success('Post privacy updated!')
             setShowManagePrivacy(false)
             setSelectedPostForPrivacy(null)
         } catch (err) {
@@ -326,11 +323,11 @@ function PostDetailPage() {
                 throw new Error(errorData.error || 'Failed to delete comment')
             }
 
-            // Remove comment from local state
+            
             setComments(prev => prev.filter(comment => comment.id !== commentId))
-            success('Comment deleted successfully')
+            success('Comment deleted!')
 
-            // TODO: Send WebSocket message for real-time updates when supported
+            
         } catch (err) {
             console.error('Failed to delete comment:', err)
             error('Failed to delete comment. Please try again.')
@@ -339,7 +336,7 @@ function PostDetailPage() {
         }
     }
 
-    // Handle comment submission via WebSocket
+    
   const handleSubmitComment = async () => {
     if (!newComment.trim() && !newCommentImage) return
     if (!post || !user) return
@@ -369,7 +366,7 @@ function PostDetailPage() {
         }
       }
 
-      // Create comment via HTTP API
+      
       const token = localStorage.getItem('token')
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/api/posts/${post.id}/comments`, {
         method: 'POST',
@@ -389,7 +386,7 @@ function PostDetailPage() {
         throw new Error(errorData.error || 'Failed to create comment')
       }
 
-      // Clear the input (optimistically)
+      
       setNewComment('')
       setNewCommentImage(null)
       setIsCommentModalOpen(false)
@@ -409,12 +406,12 @@ function PostDetailPage() {
       // Navigate to own profile route
       router.push(`/profile/${userId}`) // or router.push('/dashboard') to go to dashboard profile tab
     } else {
-      // Navigate to other user's profile page
+      
       router.push(`/profile/${userId}`)
     }
   }
 
-  // ImagePreviewModal handlers
+  
   const handleImagePreviewOpen = (url: string) => {
     setImagePreviewUrl(url);
   };
@@ -423,7 +420,7 @@ function PostDetailPage() {
     setImagePreviewUrl(null);
   };
 
-    // WebSocket message listener
+    
     useEffect(() => {
         if (!isConnected || !post) return
 
@@ -431,10 +428,10 @@ function PostDetailPage() {
             switch (message.type) {
                 case 'comment_update':
                     if (message.post_id === Number(post.id) && message.action === 'create') {
-                        // Add new comment to the list only if it doesn't already exist
+                        
                         if (message.data) {
                             setComments(prev => {
-                                // Check if comment already exists
+                                
                                 const exists = prev.some(comment => comment.id === message.data.id)
                                 if (exists) return prev
 
@@ -462,12 +459,12 @@ function PostDetailPage() {
                                     timeAgo: 'Just now'
                                 }
 
-                                // Insert new comment in correct position based on current sort
+                                
                                 if (commentSort === 'newest') {
-                                    // Newest first: add to beginning
+                                    
                                     return [newComment, ...prev]
                                 } else {
-                                    // Oldest first: add to end
+                                    
                                     return [...prev, newComment]
                                 }
                             })
@@ -493,7 +490,7 @@ function PostDetailPage() {
         return removeListener
     }, [isConnected, addMessageListener, post, commentSort])
 
-    // Load post on component mount and when sort changes
+    
     useEffect(() => {
         fetchPost()
     }, [fetchPost, commentSort])
@@ -667,7 +664,7 @@ function PostDetailPage() {
           {/* Post Image */}
           {post.image_url && (
             <div className="mb-6 flex justify-center">
-              <div className="inline-block border border-white/20 rounded-2xl overflow-hidden cursor-pointer" onClick={() => handleImagePreviewOpen(post.image_url!.startsWith('http') ? post.image_url! : `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}${post.image_url}`)}>
+              <div className="inline-block border border-white/20 rounded-2xl overflow-hidden">
                 <Image
                   src={post.image_url.startsWith('http') ?
                     post.image_url :
@@ -677,7 +674,15 @@ function PostDetailPage() {
                   width={640}
                   height={256}
                   unoptimized={post.image_url.includes('/svg')}
-                  className="max-h-64 sm:max-h-80 md:max-h-96 object-contain hover:scale-105 transition-transform duration-500 rounded-2xl"
+                  className="max-h-64 sm:max-h-80 md:max-h-96 object-contain hover:scale-105 transition-transform duration-500 rounded-2xl cursor-pointer focus:outline-none focus:ring-2 focus:ring-emerald-400/50 focus:ring-offset-2 focus:ring-offset-slate-900"
+                  tabIndex={0}
+                  onClick={() => handleImagePreviewOpen(post.image_url!.startsWith('http') ? post.image_url! : `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}${post.image_url}`)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault()
+                      handleImagePreviewOpen(post.image_url!.startsWith('http') ? post.image_url! : `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}${post.image_url}`)
+                    }
+                  }}
                 />
               </div>
             </div>
@@ -939,7 +944,29 @@ function PostDetailPage() {
                               whileHover={{ scale: 1.02 }}
                               transition={{ type: 'spring', stiffness: 300, damping: 20 }}
                             >
-                              <div className="relative inline-block overflow-hidden rounded-2xl border border-white/20 shadow-lg group-hover/image:shadow-emerald-500/20 transition-shadow duration-300">
+                              <div
+                                className="relative inline-block overflow-hidden rounded-2xl border border-white/20 shadow-lg group-hover/image:shadow-emerald-500/20 transition-shadow duration-300 cursor-pointer focus:outline-none focus:ring-2 focus:ring-emerald-400/50 focus:ring-offset-2 focus:ring-offset-slate-900"
+                                tabIndex={0}
+                                onClick={() => {
+                                  if (comment.image_url) {
+                                    handleImagePreviewOpen(comment.image_url.startsWith('http') ?
+                                      comment.image_url :
+                                      `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}${comment.image_url}`
+                                    )
+                                  }
+                                }}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter' || e.key === ' ') {
+                                    e.preventDefault()
+                                    if (comment.image_url) {
+                                      handleImagePreviewOpen(comment.image_url.startsWith('http') ?
+                                        comment.image_url :
+                                        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}${comment.image_url}`
+                                      )
+                                    }
+                                  }
+                                }}
+                              >
                                 <Image
                                   src={comment.image_url.startsWith('http') ?
                                     comment.image_url :
@@ -949,18 +976,14 @@ function PostDetailPage() {
                                   width={400}
                                   height={300}
                                   unoptimized={true}
-                                  className="max-w-full max-h-72 object-contain hover:scale-105 cursor-pointer transition-transform duration-500 rounded-2xl"
-                                  onClick={() => comment.image_url && handleImagePreviewOpen(comment.image_url.startsWith('http') ?
-                                    comment.image_url :
-                                    `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}${comment.image_url}`
-                                  )}
+                                  className="max-w-full max-h-72 object-contain hover:scale-105 transition-transform duration-500 rounded-2xl"
                                   onError={(e) => {
                                     const target = e.target as HTMLImageElement;
                                     target.style.display = 'none';
                                   }}
                                 />
                                 {/* Image overlay effect */}
-                                <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-transparent opacity-0 group-hover/image:opacity-100 transition-opacity duration-300 rounded-2xl" />
+                                <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-2xl" />
                               </div>
                             </motion.div>
                           )}
@@ -1143,7 +1166,7 @@ function PostDetailPage() {
                         animate={{ opacity: 1, y: 0 }}
                       >
                         <div className="flex items-center justify-between mb-3">
-                          <span className="text-white text-sm font-semibold">Selected Image:</span>
+                          <span className="text-white text-sm font-semibold">Image Preview:</span>
                           <motion.button
                             onClick={() => setNewCommentImage(null)}
                             title="Remove image"
@@ -1154,14 +1177,23 @@ function PostDetailPage() {
                             <X className="w-4 h-4" />
                           </motion.button>
                         </div>
-                        <div className="flex items-center space-x-4">
-                          <div className="w-14 h-14 bg-white/20 rounded-xl flex items-center justify-center">
-                            <ImageIcon className="w-7 h-7 text-white/70" />
+                        <div className="flex items-start space-x-4">
+                          <div className="relative w-20 h-20 bg-white/20 rounded-xl overflow-hidden flex-shrink-0">
+                            <Image
+                              src={URL.createObjectURL(newCommentImage)}
+                              alt="Image preview"
+                              fill
+                              className="object-cover"
+                              unoptimized={true}
+                            />
                           </div>
                           <div className="flex-1 min-w-0">
                             <p className="text-white text-sm font-medium truncate">{newCommentImage.name}</p>
                             <p className="text-white/60 text-xs">
                               {(newCommentImage.size / 1024 / 1024).toFixed(2)} MB
+                            </p>
+                            <p className="text-white/50 text-xs mt-1">
+                              Click image to view full preview
                             </p>
                           </div>
                         </div>

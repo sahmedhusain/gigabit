@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect, ReactNode } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
 import { useWebSocket } from '@/context/WebSocketContext'
@@ -7,27 +7,12 @@ import { useSidebarData } from '@/context/SidebarDataContext'
 import { useNotifications } from '@/hooks'
 import { api } from '@/lib/api'
 
-// Import layout components
+
 import TopBar from '@/components/layout/TopBar'
 import Sidebar from '@/components/layout/Sidebar'
 import RightSidebar from '@/components/layout/RightSidebar'
 import AnimatedBackground from '@/components/ui/AnimatedBackground'
-
-interface AppLayoutProps {
-  children: ReactNode
-  activeTab?: string
-  onTabChange?: (tab: string) => void
-  feedSubTab?: string
-  setFeedSubTab?: (tab: string) => void
-  activitySubTab?: string
-  setActivitySubTab?: (tab: string) => void
-  chatSubTab?: string
-  setChatSubTab?: (tab: string) => void
-  eventsSubTab?: string
-  setEventsSubTab?: (tab: string) => void
-  tempPostSubTab?: string
-  onTempPostClose?: () => void
-}
+import { AppLayoutProps } from '@/types/layout'
 
 export default function AppLayout({ 
   children, 
@@ -49,23 +34,23 @@ export default function AppLayout({
   const { onlineUsers } = useWebSocket()
   const { unread: liveUnreadCount } = useNotifications()
 
-  // Use sidebar data from context
+  
   const { followers, following, chats } = useSidebarData()
 
-  // Layout state
+  
   const [activeTab, setActiveTab] = useState(initialActiveTab)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [isMobileRightSidebarOpen, setIsMobileRightSidebarOpen] = useState(false)
   const [isSidebarCollapsed] = useState(false)
   const [postsCount, setPostsCount] = useState(0)
 
-  // Fetch posts count when user changes
+  
   useEffect(() => {
     const fetchPostsCount = async () => {
       if (user?.id) {
         try {
-          const response = await api.getUserPosts(user.id) // Use default limit to get posts array
-          setPostsCount(response.posts.length) // Use actual posts count like profile page
+          const response = await api.getUserPosts(user.id) 
+          setPostsCount(response.posts.length) 
         } catch (error) {
           console.error('Failed to fetch posts count:', error)
           setPostsCount(0)
@@ -75,7 +60,7 @@ export default function AppLayout({
     fetchPostsCount()
   }, [user?.id])
 
-  // Current User Processing
+  
   const currentUser = user ? {
     id: user.id,
     name: `${user.first_name} ${user.last_name}`,
@@ -101,7 +86,7 @@ export default function AppLayout({
     if (onTabChange) {
       onTabChange(newTab)
     } else {
-      // Default navigation logic
+      
       router.push(`/${newTab}`)
     }
   }
@@ -114,7 +99,7 @@ export default function AppLayout({
     handleTabChange('discover')
   }
 
-  // Calculate unread counts (conversation count, not message count)
+  
   const chatUnreadAll = (chats || []).filter(c => (c.unread || 0) > 0).length
   const chatUnreadDirect = (chats || []).filter(c => !c.isGroup && (c.unread || 0) > 0).length
   const chatUnreadGroups = (chats || []).filter(c => c.isGroup && (c.unread || 0) > 0).length

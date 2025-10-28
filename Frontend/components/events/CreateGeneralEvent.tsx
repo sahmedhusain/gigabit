@@ -6,13 +6,7 @@ import { useAuth } from '@/context/AuthContext'
 import { useToast } from '@/context/ToastContext'
 import { useGroups } from '@/hooks/useGroups'
 import { api } from '@/lib/api'
-
-interface CreateGeneralEventProps {
-  show: boolean
-  onClose: () => void
-  onEventCreated?: () => void
-  createEvent?: (eventGroupId: number, eventData: { title: string; description: string; event_time: string }) => Promise<{ message: string }>
-}
+import { CreateGeneralEventProps } from '@/types/events'
 
 export default function CreateGeneralEvent({
   show,
@@ -44,13 +38,13 @@ export default function CreateGeneralEvent({
 
   useEffect(() => {
     if (show && eligibleGroups.length === 1) {
-      // Auto-select if there's only one eligible group
+      
       setSelectedGroupId(eligibleGroups[0].id.toString())
     }
   }, [show, eligibleGroups])
 
   const handleCreateEvent = async () => {
-    // Validation
+    
     if (!eventTitle.trim()) {
       setError('Event title is required')
       return
@@ -86,7 +80,7 @@ export default function CreateGeneralEvent({
       return
     }
 
-    // Combine date and time
+    
     const eventDateTime = new Date(`${eventDate}T${eventTime}`)
     
     if (eventDateTime <= new Date()) {
@@ -111,7 +105,7 @@ export default function CreateGeneralEvent({
         await api.createEvent(parseInt(selectedGroupId), eventData)
       }
       
-      success('Event created successfully!')
+      success('Event created!')
       
       // Reset form
       setEventTitle('')
@@ -141,7 +135,7 @@ export default function CreateGeneralEvent({
 
   if (!show) return null
 
-  // Get tomorrow's date as minimum date
+  
   const tomorrow = new Date()
   tomorrow.setDate(tomorrow.getDate() + 1)
   const minDate = tomorrow.toISOString().split('T')[0]
@@ -163,7 +157,7 @@ export default function CreateGeneralEvent({
             exit={{ opacity: 0, scale: 0.9, y: 20 }}
             transition={{ duration: 0.3, ease: 'easeOut' }}
           >
-            {/* Header */}
+            {}
             <motion.div
               className="relative flex-shrink-0 p-6 lg:p-8 pb-4 bg-gradient-to-r from-white/10 to-white/5 border-b border-white/20"
               initial={{ y: -20, opacity: 0 }}

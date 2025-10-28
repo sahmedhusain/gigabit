@@ -3,7 +3,7 @@ import { User, FollowRequestItem, GroupInvitationItem, PostResponse } from './ty
 
 declare module './client' {
   interface ApiClient {
-    // User endpoints
+    
     getUsers(): Promise<{ users: User[] }>;
     getProfile(userId: number): Promise<User>;
     updateUserStatus(status: string): Promise<User>;

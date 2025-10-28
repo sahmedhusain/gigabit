@@ -6,19 +6,9 @@ import { useAuth } from '@/context/AuthContext'
 import { useToast } from '@/context/ToastContext'
 import { useConnectionStatus } from '@/hooks'
 import { useWebSocket } from '@/context/WebSocketContext'
-import FollowHandler, { FollowStatus, getFollowStatusFromAPI } from '../profile/FollowHandler'
+import FollowHandler, { getFollowStatusFromAPI } from '../profile/FollowHandler'
 import Image from 'next/image'
-
-interface UserWithFollowStatus extends UserType {
-  followStatus: FollowStatus
-  status: 'online' | 'busy' | 'away' | 'invisible' | 'offline'
-  lastStatusChange?: string
-}
-
-interface UsersSidebarProps {
-  className?: string
-  onUserClick?: (user: UserType) => void
-}
+import { UserWithFollowStatus, UsersSidebarProps, FollowStatus } from '@/types/sidebar'
 
 export default function UsersSidebar({ className = '', onUserClick }: UsersSidebarProps) {
   const { user: currentUser } = useAuth()
@@ -45,14 +35,14 @@ export default function UsersSidebar({ className = '', onUserClick }: UsersSideb
       const allUsers = usersResponse.users || []
       const followingUsers = followingResponse.following || []
       
-      // Create a set of following user IDs for quick lookup
+      
       const followingIds = new Set(followingUsers.map((u: UserType) => u.id))
       
-      // Filter out current user and add follow status and real-time status
+      
       const usersWithStatus: UserWithFollowStatus[] = allUsers
         .filter((u: UserType) => u.id !== currentUser.id)
         .map((u: UserType) => {
-          // Get real-time status from WebSocket data
+          
           const onlineUser = onlineUsers.find(ou => ou.user_id === u.id)
           const status = onlineUser ? onlineUser.status : 'offline'
           
@@ -79,7 +69,7 @@ export default function UsersSidebar({ className = '', onUserClick }: UsersSideb
     void fetchUsersAndFollowing()
   }, [fetchUsersAndFollowing])
 
-  // Listen for real-time status updates
+  
   useEffect(() => {
     const cleanup = addMessageListener((message) => {
       if (message.type === 'user_status' && message.data?.user_id) {
@@ -98,7 +88,7 @@ export default function UsersSidebar({ className = '', onUserClick }: UsersSideb
     return cleanup
   }, [addMessageListener])
 
-  // Update user statuses when onlineUsers changes
+  
   useEffect(() => {
     setUsers(prev => prev.map(u => {
       const onlineUser = onlineUsers.find(ou => ou.user_id === u.id)
@@ -115,16 +105,16 @@ export default function UsersSidebar({ className = '', onUserClick }: UsersSideb
 
 
   const handleFollowStatusChange = (userId: number, newStatus: FollowStatus) => {
-    // Update the user's follow status in the list
+    
     setUsers(prev => prev.map(u => 
       u.id === userId 
         ? { ...u, followStatus: newStatus }
         : u
     ))
 
-    // Update following list based on new status
+    
     if (newStatus.isFollowing) {
-      // Add to following list if not already there
+      
       setFollowing(prev => {
         const isAlreadyFollowing = prev.some(u => u.id === userId)
         if (isAlreadyFollowing) return prev
@@ -133,7 +123,7 @@ export default function UsersSidebar({ className = '', onUserClick }: UsersSideb
         return userToAdd ? [...prev, userToAdd] : prev
       })
     } else if (!newStatus.isPending) {
-      // Remove from following list if unfollowed (not just pending)
+      
       setFollowing(prev => prev.filter(u => u.id !== userId))
     }
   }
@@ -241,7 +231,7 @@ export default function UsersSidebar({ className = '', onUserClick }: UsersSideb
                     title="Send message"
                     disabled={!isConnected}
                     onClick={() => {
-                      // TODO: Implement messaging
+                      
                       warning('Messaging feature coming soon!')
                     }}
                   >

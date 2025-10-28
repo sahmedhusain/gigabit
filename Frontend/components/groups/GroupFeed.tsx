@@ -18,18 +18,18 @@ export default function GroupFeed({ groupId }: Props) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   
-  // Real-time hooks
+  
   const { isConnected } = useConnectionStatus()
 
-  // Listen for real-time group post updates
+  
   useEffect(() => {
     if (!isConnected) return
 
-    // Note: This is a simplified implementation. In a real app, you'd use the WebSocket context
-    // For now, we'll rely on manual refresh
+    
+    
     
     return () => {
-      // Cleanup if needed
+      
     }
   }, [isConnected, groupId])
 
@@ -63,19 +63,19 @@ export default function GroupFeed({ groupId }: Props) {
       like_count: post.is_liked ? post.like_count - 1 : post.like_count + 1
     }
 
-    // Immediately update UI
+    
     setPosts(prev => prev.map(p =>
       p.id === postId ? optimisticPost : p
     ))
 
     try {
       if (post.is_liked) {
-        await api.unlikePost(postId)
+        await api.unlikeGroupPost(parseInt(groupId), postId)
       } else {
-        await api.likePost(postId)
+        await api.likeGroupPost(parseInt(groupId), postId)
       }
     } catch {
-      // Revert on error
+      
       setPosts(prev => prev.map(p =>
         p.id === postId ? post : p
       ))

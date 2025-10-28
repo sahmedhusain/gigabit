@@ -4,14 +4,15 @@ import { useState, useEffect } from 'react';
 import { Shield, Trash2, Eye, EyeOff, Lock, Check, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { API_BASE_URL } from '@/lib/api';
+import { AccountSettingsProps } from '@/types/profile';
 
-// Password validation function from registration form
+
 function validatePassword(password: string) {
   const upper = /[A-Z]/
   const lower = /[a-z]/
   const number = /[0-9]/
   const space = /\s/
-  // Allow only ASCII printable characters (excluding space, but including common symbols)
+  
   const allowedChars = /^[a-zA-Z0-9!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?`~]+$/
 
   const errors = []
@@ -47,19 +48,6 @@ function validatePassword(password: string) {
   }
 
   return null
-}
-
-interface AccountSettingsProps {
-  showDeleteModal?: boolean;
-  setShowDeleteModal?: (show: boolean) => void;
-  deleteCountdown?: number;
-  setDeleteCountdown?: (countdown: number) => void;
-  setDeletePasswordError?: (error: string) => void;
-  deleteConfirmation?: string;
-  setDeleteConfirmation?: (confirmation: string) => void;
-  deletePassword?: string;
-  setDeletePassword?: (password: string) => void;
-  deletePasswordError?: string;
 }
 
 export default function AccountSettings({
@@ -163,7 +151,7 @@ export default function AccountSettings({
     if (field === 'new_password') {
       const value = changePasswordData.new_password;
       if (value.trim()) {
-        // Check if new password is the same as current password
+        
         if (value === changePasswordData.current_password) {
           setPasswordErrors(prev => ({ ...prev, new: 'New password cannot be the same as current password' }));
           setPasswordValidations(prev => ({ ...prev, new: false }));
@@ -175,7 +163,7 @@ export default function AccountSettings({
         if (validation) {
           setPasswordErrors(prev => ({ ...prev, new: validation }));
         } else {
-          // Clear error if password is now valid
+          
           setPasswordErrors(prev => ({ ...prev, new: '' }));
         }
       } else {
@@ -213,17 +201,17 @@ export default function AccountSettings({
       hasErrors = true;
     }
 
-    // Check if new password is provided
+    
     if (!changePasswordData.new_password.trim()) {
       errors.new = 'New password is required';
       hasErrors = true;
     } else {
-      // Check if new password is the same as current password
+      
       if (changePasswordData.new_password === changePasswordData.current_password) {
         errors.new = 'New password cannot be the same as current password';
         hasErrors = true;
       } else {
-        // Validate new password format
+        
         const passwordValidation = validatePassword(changePasswordData.new_password);
         if (passwordValidation) {
           errors.new = passwordValidation;
@@ -232,7 +220,7 @@ export default function AccountSettings({
       }
     }
 
-    // Check if confirm password matches
+    
     if (!changePasswordData.confirm_password.trim()) {
       errors.confirm = 'Please confirm your new password';
       hasErrors = true;
@@ -246,7 +234,7 @@ export default function AccountSettings({
       return;
     }
 
-    // Show confirmation modal
+    
     setShowPasswordConfirmModal(true);
   };
 
@@ -286,7 +274,7 @@ export default function AccountSettings({
           localStorage.setItem('token', data.new_token);
         }
       } else {
-        // Handle specific error messages from backend
+        
         if (response.status === 401 && data.message?.includes('Current password is incorrect')) {
           setPasswordErrors(prev => ({ ...prev, current: 'Current password is incorrect' }));
         } else if (response.status === 400 && data.message?.includes('Password must')) {
@@ -295,8 +283,7 @@ export default function AccountSettings({
           setMessage(data.message || 'Failed to change password');
         }
       }
-    } catch (error) {
-      console.error('Failed to change password:', error);
+    } catch {
       setMessage('Failed to change password');
     } finally {
       setSaving(false);

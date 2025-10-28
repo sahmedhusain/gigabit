@@ -12,7 +12,7 @@ export function useRealTimePosts() {
   const [unreadCount, setUnreadCount] = useState(0)
   const lastFetchTime = useRef<number>(Date.now())
 
-  // WebSocket subscription for real-time updates
+  
   const { isConnected } = useWebSocketSubscription({
     messageTypes: ['post_update', 'like_update', 'comment_update', 'like'],
     onMessage: (message) => {
@@ -23,7 +23,7 @@ export function useRealTimePosts() {
           if (message.data) {
             if (message.action === 'created' && message.data.post) {
               const newPost = message.data.post as APIPost
-              // Only show as unread if not from current user and newer than last fetch
+              
               if (newPost.user_id !== user?.id && now > lastFetchTime.current) {
                 setUnreadCount(prev => prev + 1)
               }
@@ -80,7 +80,7 @@ export function useRealTimePosts() {
 
       setPosts(Array.isArray(postsData) ? postsData : [])
       lastFetchTime.current = Date.now()
-      setUnreadCount(0) // Reset unread count on manual fetch
+      setUnreadCount(0) 
     } catch (err: any) {
       console.error('Failed to fetch posts:', err)
       setError(err.message || 'Failed to fetch posts')
@@ -93,7 +93,7 @@ export function useRealTimePosts() {
   const createPost = useCallback(async (postData: any) => {
     try {
       const response = await api.createPost(postData)
-      // Refresh posts to get the real data with correct ID
+      
       await fetchPosts()
       return response
     } catch (err: any) {
@@ -102,52 +102,48 @@ export function useRealTimePosts() {
     }
   }, [user, fetchPosts])
 
-  const likePost = useCallback(async (postId: number) => {
-    // Find the current post to determine the optimistic update
-    const currentPost = posts.find(post => post.id === postId)
+  const likePost = useCallback(async (post: APIPost) => {
+    
+    const currentPost = posts.find(p => p.id === post.id)
     if (!currentPost) return
 
     const willBeLiked = !currentPost.is_liked
 
-    // Apply optimistic update immediately
-    setPosts(currentPosts => currentPosts.map(post =>
-      post.id === postId
+    
+    setPosts(currentPosts => currentPosts.map(p =>
+      p.id === post.id
         ? {
-          ...post,
+          ...p,
           is_liked: willBeLiked,
           like_count: willBeLiked
-            ? post.like_count + 1
-            : Math.max(0, post.like_count - 1)
+            ? p.like_count + 1
+            : Math.max(0, p.like_count - 1)
         }
-        : post
+        : p
     ))
 
     try {
-      // Call the appropriate API method based on the new state
-      if (willBeLiked) {
-        await api.likePost(postId)
-      } else {
-        await api.unlikePost(postId)
-      }
+      
+      await api.toggleLike(post, willBeLiked)
     } catch (error) {
       console.error('Failed to toggle like:', error)
 
-      // Rollback the optimistic update on error
-      setPosts(currentPosts => currentPosts.map(post =>
-        post.id === postId
+      
+      setPosts(currentPosts => currentPosts.map(p =>
+        p.id === post.id
           ? {
-            ...post,
+            ...p,
             is_liked: currentPost.is_liked,
             like_count: currentPost.like_count
           }
-          : post
+          : p
       ))
       throw error
     }
   }, [posts])
 
   const deletePost = useCallback(async (postId: number) => {
-    // Apply optimistic update immediately
+    
     const originalPosts = posts
     setPosts(currentPosts => currentPosts.filter(post => post.id !== postId))
 
@@ -155,7 +151,7 @@ export function useRealTimePosts() {
       await api.deletePost(postId)
     } catch (error) {
       console.error('Failed to delete post:', error)
-      // Rollback the optimistic update on error
+      
       setPosts(originalPosts)
       throw error
     }
@@ -169,7 +165,7 @@ export function useRealTimePosts() {
     setUnreadCount(0)
   }, [])
 
-  // Initial load
+  
   useEffect(() => {
     fetchPosts()
   }, [fetchPosts])

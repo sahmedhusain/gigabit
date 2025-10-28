@@ -4,19 +4,7 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Trash2, AlertTriangle, Lock, Shield, Clock, X } from 'lucide-react';
 import { API_BASE_URL } from '@/lib/api';
-
-interface DeleteAccountModalProps {
-  showDeleteModal: boolean;
-  setShowDeleteModal: (show: boolean) => void;
-  deleteConfirmation: string;
-  setDeleteConfirmation: (confirmation: string) => void;
-  deletePassword: string;
-  setDeletePassword: (password: string) => void;
-  deleteCountdown: number;
-  setDeleteCountdown: (countdown: number) => void;
-  deletePasswordError: string;
-  setDeletePasswordError: (error: string) => void;
-}
+import { DeleteAccountModalProps } from '@/types/profile';
 
 export default function DeleteAccountModal({
   showDeleteModal,
@@ -32,7 +20,7 @@ export default function DeleteAccountModal({
 }: DeleteAccountModalProps) {
   const [deleting, setDeleting] = useState(false);
 
-  // Countdown timer effect
+  
   useEffect(() => {
     let interval: NodeJS.Timeout;
     if (showDeleteModal && deleteCountdown > 0) {
@@ -65,14 +53,14 @@ export default function DeleteAccountModal({
       });
 
       if (deleteResponse.ok) {
-        // Clear local storage and redirect
+        
         localStorage.removeItem('token');
         setTimeout(() => {
           window.location.href = '/login';
         }, 2000);
       } else {
         const error = await deleteResponse.json();
-        // Check if it's a password error
+        
         if ((deleteResponse.status === 401 && error.error?.toLowerCase().includes('password')) || error.error?.toLowerCase().includes('invalid password') || error.error?.toLowerCase().includes('wrong password')) {
           setDeletePasswordError('Password is incorrect');
         } else {
@@ -82,8 +70,8 @@ export default function DeleteAccountModal({
           setDeletePasswordError('');
         }
       }
-    } catch (error) {
-      console.error('Failed to delete account:', error);
+    } catch {
+      
       setShowDeleteModal(false);
       setDeleteConfirmation('');
       setDeleteCountdown(5);

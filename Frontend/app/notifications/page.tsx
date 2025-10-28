@@ -7,10 +7,10 @@ import { useWebSocket } from '@/context/WebSocketContext';
 import { useToast } from '@/context/ToastContext';
 import { useNotifications } from '@/hooks';
 
-// Import AppLayout instead of individual components
+
 import AppLayout from '@/components/layout/AppLayout';
 
-// Import dashboard components
+
 import NotificationsPage from '@/components/notifications/NotificationsPage';
 
 function NotificationsPageComponent() {
@@ -19,9 +19,9 @@ function NotificationsPageComponent() {
   const { } = useToast();
   const { } = useNotifications();
 
-  // Fetch data when component loads
+  
   useEffect(() => {
-    // Notifications are handled by the useNotifications hook
+    
   }, [user]);
 
   return (
@@ -31,7 +31,7 @@ function NotificationsPageComponent() {
   );
 }
 
-// Wrap the entire component with ProtectedRoute
+
 function ProtectedNotificationsPage() {
   return (
     <ProtectedRoute>

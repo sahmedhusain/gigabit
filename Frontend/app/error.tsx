@@ -15,7 +15,7 @@ export default function Error({
   const router = useRouter();
 
   useEffect(() => {
-    console.error('Application error:', error);
+
   }, [error]);
 
   return (

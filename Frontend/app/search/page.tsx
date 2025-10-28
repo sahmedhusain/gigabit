@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import ProtectedRoute from '@/components/auth/ProtectedRoute'
-// Import dashboard components
+
 import SearchPage from '@/components/search/SearchPage'
 import AppLayout from '@/components/layout/AppLayout'
 
@@ -12,7 +12,7 @@ function SearchPageRoute() {
 
   const [query] = useState(searchParams?.get('q') || '')
 
-  // Update URL when search query changes
+  
   useEffect(() => {
     if (query) {
       const newUrl = `/search?q=${encodeURIComponent(query)}`
@@ -50,7 +50,7 @@ function SearchPageRoute() {
   )
 }
 
-// Wrap the entire component with ProtectedRoute
+
 function ProtectedSearchPage() {
   return (
     <ProtectedRoute>

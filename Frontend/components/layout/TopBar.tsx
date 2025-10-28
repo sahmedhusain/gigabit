@@ -6,33 +6,7 @@ import { useRouter, usePathname, useSearchParams } from 'next/navigation'
 import { api, getToken } from '@/lib/api'
 import Image from 'next/image'
 
-interface TopBarProps {
-  isMobileMenuOpen: boolean
-  setIsMobileMenuOpen: (open: boolean) => void
-  activeTab: string
-  onNotificationsClick: () => void
-  unreadCount: number
-  onDiscoverClick: () => void
-  isMobileRightSidebarOpen: boolean
-  setIsMobileRightSidebarOpen: (open: boolean) => void
-}
-
-interface SearchSuggestion {
-  type: 'user' | 'event' | 'group' | 'post' | 'tag' | 'message' | 'chat'
-  id: number | string
-  title: string
-  subtitle: string
-  image?: string
-  description?: string
-  url: string
-  metadata?: Record<string, unknown>
-}
-
-interface SearchHistoryItem {
-  query: string
-  timestamp: number
-  resultCount: number
-}
+import { TopBarProps, SearchSuggestion, SearchHistoryItem } from '@/types/layout'
 
 export default function TopBar({
   isMobileMenuOpen,
@@ -48,7 +22,7 @@ export default function TopBar({
   const pathname = usePathname()
   const searchParams = useSearchParams()
   
-  // Helper function to get initials from a name string
+  
   const getInitialsFromName = (name: string | undefined): string => {
     if (!name) return '?'
     const trimmed = name.trim()
@@ -82,11 +56,11 @@ export default function TopBar({
     { id: 'message', label: 'Messages', icon: MessageCircle }
   ]
 
-  // Sync search state with URL when on search page
+  
   useEffect(() => {
     if (pathname && pathname.startsWith('/search/')) {
       const pathParts = pathname.split('/')
-      const urlFilter = pathParts[2] // e.g., 'groups' from '/search/groups'
+      const urlFilter = pathParts[2] 
       const urlQuery = searchParams?.get('q') || ''
       
       // Map URL filter to our filter IDs
@@ -106,19 +80,19 @@ export default function TopBar({
         setSelectedFilter(mappedFilter)
       }
       
-      // Only sync the query if the user hasn't actively focused on the input
-      // or if the URL query is different from what's currently displayed
+      
+      
       if (!hasUserFocused && urlQuery !== searchQuery) {
         setSearchQuery(urlQuery)
       }
     } else {
-      // Reset when not on search page
-      // Don't reset hasUserFocused here as it prevents suggestions from showing on other pages
-      // setHasUserFocused(false)
+      
+      
+      
     }
   }, [pathname, searchParams, hasUserFocused, searchQuery, selectedFilter])
 
-  // Load recent searches, search history, and popular searches from localStorage
+  
   useEffect(() => {
     const storedRecent = localStorage.getItem('recentSearches')
     if (storedRecent) {
@@ -140,7 +114,7 @@ export default function TopBar({
     }
   }, [])
 
-  // Close suggestions when clicking outside
+  
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
@@ -183,7 +157,7 @@ export default function TopBar({
       if (response.ok) {
         const data = await response.json()
         let results: SearchSuggestion[] = data.suggestions || []
-        // Filter by selected type if not 'all'
+        
         const typeMap: Record<string, string> = { all: 'all', users: 'user', events: 'event', groups: 'group', posts: 'post', tags: 'tag', message: 'message', chat: 'chat' }
         const targetType = typeMap[selectedFilter] || selectedFilter
         if (targetType !== 'all') {
@@ -200,7 +174,7 @@ export default function TopBar({
     }
   }, [selectedFilter, hasUserFocused, addToSearchHistory])
 
-  // Fetch search suggestions with debounce
+  
   useEffect(() => {
     if (debounceTimerRef.current) {
       clearTimeout(debounceTimerRef.current)
@@ -239,7 +213,7 @@ export default function TopBar({
 
     // Unified navigation for chats and messages - same as ChatsSection
     if (suggestion.type === 'chat') {
-      // Directly open conversation by id
+      
       const conversationId = Number(suggestion.id)
       const meta = suggestion.metadata as Record<string, unknown> | undefined
       const chatType = meta?.chatType as string || 'private'
@@ -249,7 +223,7 @@ export default function TopBar({
     }
 
     if (suggestion.type === 'message') {
-      // Get conversation ID and message ID from metadata (same as ChatsSection)
+      
       const meta = suggestion.metadata as Record<string, unknown> | undefined
       const conversationId = meta?.conversationId ? Number(meta.conversationId) : Number(suggestion.id)
       const messageId = Number(suggestion.id)
@@ -266,16 +240,16 @@ export default function TopBar({
       const isMember = !!gmeta?.isMember
       
       if (joinable && !isMember) {
-        // Row has a Join button; prevent navigation on title click
+        
         return
       }
       
       if (!isMember) {
-        // Prevent navigation for non-member groups
+        
         return
       }
       
-      // For member groups, navigate to chat using group parameter
+      
       if (isMember) {
         const groupId = Number(suggestion.id)
         router.push(`/chats/all?group=${groupId}`)
@@ -283,7 +257,7 @@ export default function TopBar({
       }
     }
 
-    // Default: navigate to provided URL
+    
     router.push(suggestion.url)
   }
 
@@ -292,20 +266,20 @@ export default function TopBar({
     setShowRecentSearches(false)
     setSelectedSuggestionIndex(-1)
     
-    // Check if we're already on a search page with the same query
+    
     const isOnSearchPage = pathname && pathname.startsWith('/search/')
     const currentUrlQuery = searchParams?.get('q') || ''
     const currentUrlFilter = pathname?.split('/')[2] || 'all'
     
     if (isOnSearchPage && currentUrlQuery === query && currentUrlFilter === selectedFilter) {
-      // Already on the correct search page, just close the UI
+      
       return
     }
     
-    // Navigate to search page with the selected filter
+    
     router.push(`/search/${selectedFilter}?q=${encodeURIComponent(query)}`)
     
-    // Only clear searchQuery if we're not on a search page
+    
     if (!isOnSearchPage) {
       setSearchQuery('')
     }
@@ -320,30 +294,30 @@ export default function TopBar({
     if (e.key === 'Enter') {
       e.preventDefault()
       
-      // If there are suggestions and one is selected, use that
+      
       if (showSuggestions && selectedSuggestionIndex >= 0 && suggestions[selectedSuggestionIndex]) {
         handleSuggestionClick(suggestions[selectedSuggestionIndex])
         return
       }
       
-      // If there are recent searches showing and one is selected, use that
+      
       if (showRecentSearches && selectedSuggestionIndex >= 0 && recentSearches[selectedSuggestionIndex]) {
         handleRecentSearchClick(recentSearches[selectedSuggestionIndex])
         return
       }
       
-      // Otherwise, redirect to search page with the current query
+      
       if (searchQuery.trim().length >= 2) {
         const trimmedQuery = searchQuery.trim()
         addToRecentSearches(trimmedQuery)
         
-        // Check if we're already on a search page with the same query
+        
         const isOnSearchPage = pathname && pathname.startsWith('/search/')
         const currentUrlQuery = searchParams?.get('q') || ''
         const currentUrlFilter = pathname?.split('/')[2] || 'all'
         
         if (isOnSearchPage && currentUrlQuery === trimmedQuery && currentUrlFilter === selectedFilter) {
-          // Already on the correct search page, just close the UI
+          
           setSuggestions([])
           setShowSuggestions(false)
           setShowRecentSearches(false)
@@ -351,10 +325,10 @@ export default function TopBar({
           return
         }
         
-        // Navigate to the search page
+        
         router.push(`/search/${selectedFilter}?q=${encodeURIComponent(trimmedQuery)}`)
         
-        // Only clear searchQuery if we're not on a search page (to allow URL sync to work)
+        
         if (!isOnSearchPage) {
           setSearchQuery('')
         }
@@ -422,24 +396,24 @@ export default function TopBar({
   const handleFilterSelect = (filterId: string) => {
     setSelectedFilter(filterId)
     setShowFilterDropdown(false)
-    // Re-trigger search with new filter
+    
     if (searchQuery.length >= 2) {
       fetchSuggestions(searchQuery)
     }
   }
 
-  // Generate dynamic placeholder text
+  
   const getSearchPlaceholder = () => {
     const currentFilter = searchFilters.find(f => f.id === selectedFilter)
     const filterLabel = currentFilter?.label.toLowerCase() || 'everything'
     
-    // If we're on a search page with a query, show that in the placeholder
+    
     if (pathname && pathname.startsWith('/search/') && searchParams?.get('q')) {
       const query = searchParams?.get('q')
       return `"${query}" in ${filterLabel}`
     }
     
-    // Otherwise show the standard search placeholder
+    
     return `Search ${selectedFilter === 'all' ? 'everything' : filterLabel}...`
   }
 
@@ -451,7 +425,7 @@ export default function TopBar({
   return (
         <header className="topbar-layout">
       <div className="flex items-center justify-between h-16 px-4">
-  {/* Left section: Menu button (mobile) */}
+  {}
   <div className="flex items-center space-x-4 flex-1">
           <button
             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
@@ -461,7 +435,7 @@ export default function TopBar({
           </button>
         </div>
 
-        {/* Center Search Bar with adjacent buttons */}
+        {}
   <div className="flex justify-center items-center space-x-3">
           <div ref={searchRef} className="relative max-w-2xl w-full">
             <div className="flex items-center border-2 border-white/30 rounded-2xl transition-all duration-300 focus-within:border-white/50">
@@ -656,7 +630,7 @@ export default function TopBar({
                         onClick={() => {
                           addToRecentSearches(searchQuery)
                           
-                          // Check if we're already on a search page with the same query
+                          
                           const isOnSearchPage = pathname && pathname.startsWith('/search/')
                           const currentUrlQuery = searchParams?.get('q') || ''
                           const currentUrlFilter = pathname?.split('/')[2] || 'all'
@@ -665,7 +639,7 @@ export default function TopBar({
                             router.push(`/search/${selectedFilter}?q=${encodeURIComponent(searchQuery)}`)
                           }
                           
-                          // Only clear searchQuery if we're not on a search page
+                          
                           if (!isOnSearchPage) {
                             setSearchQuery('')
                           }
@@ -706,7 +680,7 @@ export default function TopBar({
                         router.push(`/search/${selectedFilter}?q=${encodeURIComponent(searchQuery)}`)
                       }
                       
-                      // Only clear searchQuery if we're not on a search page
+                      
                       if (!isOnSearchPage) {
                         setSearchQuery('')
                       }

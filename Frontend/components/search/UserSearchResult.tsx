@@ -2,16 +2,13 @@
 import { User, UserCheck } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
-import { SearchResult } from '@/hooks/useSearch'
 
-interface UserSearchResultProps {
-  result: SearchResult
-}
+import { UserSearchResultProps } from '@/types/search'
 
 export default function UserSearchResult({ result }: UserSearchResultProps) {
   const router = useRouter()
 
-  // Helper function to get initials from a name string
+  
   const getInitialsFromName = (name: string | undefined): string => {
     if (!name) return '?'
     const trimmed = name.trim()

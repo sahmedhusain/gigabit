@@ -1,31 +1,22 @@
 'use client';
 
-import { Component, ReactNode } from 'react';
+import { Component } from 'react';
 import ErrorPage from './ErrorPage';
+import { ErrorBoundaryProps, ErrorBoundaryState } from '@/types/ui';
 
-interface Props {
-  children: ReactNode;
-  fallback?: ReactNode;
-}
-
-interface State {
-  hasError: boolean;
-  error?: Error;
-}
-
-export default class ErrorBoundary extends Component<Props, State> {
-  constructor(props: Props) {
+export default class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  constructor(props: ErrorBoundaryProps) {
     super(props);
     this.state = { hasError: false };
   }
 
-  static getDerivedStateFromError(error: Error): State {
+  static getDerivedStateFromError(error: Error): ErrorBoundaryState {
     return { hasError: true, error };
   }
 
-  componentDidCatch(error: Error, errorInfo: unknown) {
-    // Keep errorInfo as unknown and log safely
-    console.error('ErrorBoundary caught an error:', error, errorInfo);
+  componentDidCatch(error: Error) {
+    
+    
     this.setState({ error });
   }
 

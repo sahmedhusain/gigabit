@@ -2,20 +2,10 @@
 import React, { useState } from 'react'
 import { Users, Clock, CheckCircle, BarChart3, Trash2, StopCircle, AlertTriangle } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { PollResponse } from '@/lib/api'
 import { getUserInitials } from '@/utils/avatarUtils'
 import { useToast } from '@/context/ToastContext'
 import Image from 'next/image'
-
-interface PollCardProps {
-  poll: PollResponse
-  onVote: (pollId: number, optionIds: number[]) => Promise<void>
-  onUnvote: (pollId: number) => Promise<void>
-  onDelete?: (pollId: number) => Promise<void>
-  onExpire?: (pollId: number) => Promise<void>
-  canManage?: boolean // Whether current user can delete/expire this poll
-  hideCounts?: boolean // Whether to hide vote counts
-}
+import { PollCardProps } from '@/types/polls'
 
 export default function PollCard({ poll, onVote, onUnvote, onDelete, onExpire, canManage = false, hideCounts = false }: PollCardProps) {
   const [selectedOptions, setSelectedOptions] = useState<number[]>(poll.user_votes || [])
@@ -25,9 +15,9 @@ export default function PollCard({ poll, onVote, onUnvote, onDelete, onExpire, c
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [showExpireConfirm, setShowExpireConfirm] = useState(false)
 
-  const { error: showErrorToast } = useToast()
+  const { success: showSuccessToast, error: showErrorToast } = useToast()
 
-  // Update selectedOptions when poll changes
+  
   React.useEffect(() => {
     setSelectedOptions(poll.user_votes || [])
   }, [poll.user_votes])
@@ -39,6 +29,7 @@ export default function PollCard({ poll, onVote, onUnvote, onDelete, onExpire, c
     try {
       await onDelete(poll.id)
       setShowDeleteConfirm(false)
+      showSuccessToast('Poll deleted!')
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to delete poll'
       showErrorToast(errorMessage)
@@ -54,6 +45,7 @@ export default function PollCard({ poll, onVote, onUnvote, onDelete, onExpire, c
     try {
       await onExpire(poll.id)
       setShowExpireConfirm(false)
+      showSuccessToast('Poll expired!')
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to expire poll'
       showErrorToast(errorMessage)
@@ -73,24 +65,26 @@ export default function PollCard({ poll, onVote, onUnvote, onDelete, onExpire, c
 
     setSelectedOptions(newSelection)
 
-    // Vote immediately
+    
     if (newSelection.length > 0) {
       setIsVoting(true)
       try {
         await onVote(poll.id, newSelection)
+        showSuccessToast('Vote recorded!')
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Failed to vote'
         showErrorToast(errorMessage)
-        // Revert selection on error
+        
         setSelectedOptions(poll.user_votes || [])
       } finally {
         setIsVoting(false)
       }
     } else {
-      // If no options selected, unvote
+      
       setIsVoting(true)
       try {
         await onUnvote(poll.id)
+        showSuccessToast('Vote removed!')
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Failed to unvote'
         showErrorToast(errorMessage)
@@ -121,6 +115,7 @@ export default function PollCard({ poll, onVote, onUnvote, onDelete, onExpire, c
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4 }}
+      data-poll-id={poll.id}
     >
       {/* Subtle gradient overlay */}
       <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/5 via-transparent to-teal-500/5 rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
@@ -244,7 +239,7 @@ export default function PollCard({ poll, onVote, onUnvote, onDelete, onExpire, c
 
                 <div className="relative flex items-center justify-between">
                   <div className="flex items-center space-x-3 flex-1">
-                    {/* Checkbox/Radio indicator - only show if poll is not expired */}
+                    {}
                     {!isExpired && (
                       <div className={`w-5 h-5 rounded-${poll.allow_multiple_choices ? 'lg' : 'full'} border-2 flex-shrink-0 transition-all duration-300 flex items-center justify-center shadow-lg ${
                         isSelected || isUserVote

@@ -21,21 +21,22 @@ type Notification struct {
 }
 
 type NotificationResponse struct {
-	ID           uint         `json:"id"`
-	UserID       uint         `json:"user_id"`
-	ActorID      uint         `json:"actor_id"`
-	Type         string       `json:"type"`
-	EntityType   string       `json:"entity_type"`
-	EntityID     uint         `json:"entity_id"`
-	Title        string       `json:"title"`
-	Message      string       `json:"message"`
-	IsRead       bool         `json:"is_read"`
-	RedirectURL  string       `json:"redirect_url"`
-	RedirectType string       `json:"redirect_type"`
-	CreatedAt    time.Time    `json:"created_at"`
-	UpdatedAt    time.Time    `json:"updated_at"`
-	Actor        UserResponse `json:"actor"`
-	Data         interface{}  `json:"data,omitempty"` // Additional data based on type
+	ID           uint           `json:"id"`
+	UserID       uint           `json:"user_id"`
+	ActorID      uint           `json:"actor_id"`
+	Type         string         `json:"type"`
+	EntityType   string         `json:"entity_type"`
+	EntityID     uint           `json:"entity_id"`
+	Title        string         `json:"title"`
+	Message      string         `json:"message"`
+	IsRead       bool           `json:"is_read"`
+	RedirectURL  string         `json:"redirect_url"`
+	RedirectType string         `json:"redirect_type"`
+	CreatedAt    time.Time      `json:"created_at"`
+	UpdatedAt    time.Time      `json:"updated_at"`
+	Actor        UserResponse   `json:"actor"`
+	Group        *GroupResponse `json:"group,omitempty"` // For group-related notifications
+	Data         interface{}    `json:"data,omitempty"`  // Additional data based on type
 }
 
 type CreateNotificationRequest struct {
@@ -89,18 +90,14 @@ const (
 	NotificationJoinRequest    = "join_request"
 	NotificationJoinAccepted   = "join_accepted"
 	NotificationEventCreated   = "event_created"
-	NotificationNewMessage     = "new_message"
+	NotificationMessage        = "message"
 	NotificationPostLiked      = "post_liked"
 	NotificationPostCommented  = "post_commented"
 	NotificationEventReminder  = "event_reminder"
 	NotificationGroupPost      = "group_post"
 	NotificationImageShared    = "image_shared"
 	NotificationPostShared     = "post_shared"
-	NotificationNewPost        = "new_post"
 	NotificationNewPoll        = "new_poll"
 	NotificationPollVoted      = "poll_voted"
 	NotificationEventResponse  = "event_response"
-	NotificationCommentReplied = "comment_replied"
-	NotificationGroupMessage   = "group_message"
-	NotificationPrivateMessage = "private_message"
 )

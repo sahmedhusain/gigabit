@@ -16,7 +16,7 @@ function SettingsPage() {
   const [activeTab, setActiveTab] = useState('profile');
   const router = useRouter();
 
-  // Modal state for account settings
+  
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteConfirmation, setDeleteConfirmation] = useState('');
   const [deletePassword, setDeletePassword] = useState('');
@@ -205,7 +205,7 @@ function SettingsPage() {
   );
 }
 
-// Wrap the entire component with ProtectedRoute
+
 export default function ProtectedSettingsPage() {
   return (
     <ProtectedRoute>

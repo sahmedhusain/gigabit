@@ -6,31 +6,7 @@ import { useToast } from '@/context/ToastContext'
 import { getAvatarUrl, getGroupInitials } from '@/utils/avatarUtils'
 import Image from 'next/image'
 import { motion, AnimatePresence } from 'framer-motion'
-
-interface SharePopupProps {
-  postId: number
-  isOpen: boolean
-  onClose: () => void
-  onShareSuccess?: () => void
-}
-
-interface ChatItem {
-  id: number | string
-  type: 'private' | 'group' | 'following'
-  name?: string
-  avatar?: string | null
-  lastMessage?: string
-  lastMessageTime?: string
-  timestamp?: string
-  unread?: number
-  isGroup?: boolean
-  participantId?: number
-  lastMessageSenderId?: number
-  groupStatus?: string
-  groupPrivacy?: string
-  groupRole?: string
-  groupId?: number
-}
+import { SharePopupProps, ChatItem } from '@/types/ui'
 
 export default function SharePopup({ postId, isOpen, onClose, onShareSuccess }: SharePopupProps) {
   const { success, error } = useToast()
@@ -49,7 +25,7 @@ export default function SharePopup({ postId, isOpen, onClose, onShareSuccess }: 
     if (chat.type === 'group') {
       return getGroupInitials(chat.name || 'Group')
     } else {
-      // For private chats and following users, use first two letters of name
+      
       return (chat.name || 'User').slice(0, 2).toUpperCase()
     }
   }
@@ -100,12 +76,12 @@ export default function SharePopup({ postId, isOpen, onClose, onShareSuccess }: 
   const handleSearchChange = (query: string) => {
     setSearchQuery(query)
 
-    // Clear existing timeout
+    
     if (searchTimeout) {
       clearTimeout(searchTimeout)
     }
 
-    // Set new timeout for debounced search
+    
     const timeout = setTimeout(() => {
       if (query.trim().length >= 2) {
         performSearch(query)

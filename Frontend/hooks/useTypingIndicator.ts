@@ -2,20 +2,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useWebSocketSubscription } from './useWebSocketSubscription'
 import { useAuth } from '@/context/AuthContext'
-
-export interface TypingUser {
-  user_id: number
-  username: string
-  timestamp: number
-}
-
-export interface TypingIndicatorOptions {
-  intervalMs?: number
-  stopDelayMs?: number
-  debounceMs?: number
-  maxDisplayUsers?: number
-  includeOwnTyping?: boolean
-}
+import { TypingUser, TypingIndicatorOptions } from '@/types/hooks'
 
 export function useTypingIndicator(
   conversationId: number | string,
@@ -24,17 +11,17 @@ export function useTypingIndicator(
 ) {
   const { user } = useAuth()
   const {
-    intervalMs = 5000, // Re-emit every 5 seconds
-    stopDelayMs = 3000, // Stop 3 seconds after last keystroke
+    intervalMs = 5000, 
+    stopDelayMs = 3000, 
     debounceMs = 300,
     maxDisplayUsers = 3,
-    includeOwnTyping = false // Default to false
+    includeOwnTyping = false 
   } = options
 
   const [typingUsers, setTypingUsers] = useState<TypingUser[]>([])
   const [isTyping, setIsTyping] = useState(false)
   
-  // Timers and intervals
+  
   const lastKeystrokeRef = useRef<number>(0)
   const debounceTimeout = useRef<NodeJS.Timeout | null>(null)
   const stopTypingTimeout = useRef<NodeJS.Timeout | null>(null)
@@ -44,20 +31,17 @@ export function useTypingIndicator(
   const { send, isConnected } = useWebSocketSubscription({
     messageTypes: ['typing'],
     onMessage: (message) => {
-      console.log('🔤 Received message:', message)
       if (message.type === 'typing' && message.data) {
         const { user_id, username, action } = message.data
         
-        // Filter out own typing indicator unless includeOwnTyping is true
+        
         if (!includeOwnTyping && user_id === user?.id) return
 
-        // Check if this typing event is for our conversation
+        
         const isRelevant = conversationType === 'private' 
           ? (message.to === user?.id && message.from === user_id) || 
             (message.from === user?.id && message.to === user_id)
           : message.group_id === conversationId
-
-        console.log('🔤 Typing relevance check:', { conversationType, conversationId, message, isRelevant, includeOwnTyping })
 
         if (!isRelevant) return
 
@@ -65,12 +49,12 @@ export function useTypingIndicator(
         
         if (action === 'start') {
           setTypingUsers(prev => {
-            // Remove existing entry for this user and add/update it
+            
             const filtered = prev.filter(tu => tu.user_id !== user_id)
             return [
               ...filtered,
               { user_id, username: username || `User ${user_id}`, timestamp: now }
-            ].slice(0, maxDisplayUsers) // Limit displayed users
+            ].slice(0, maxDisplayUsers) 
           })
         } else if (action === 'stop') {
           setTypingUsers(prev => prev.filter(tu => tu.user_id !== user_id))
@@ -87,7 +71,7 @@ export function useTypingIndicator(
     })
   }, [stopDelayMs])
 
-  // Setup cleanup interval to remove stale typing users
+  
   useEffect(() => {
     cleanupInterval.current = setInterval(cleanupStaleTyping, 1000)
     
@@ -98,7 +82,7 @@ export function useTypingIndicator(
     }
   }, [cleanupStaleTyping])
 
-  // Send typing start message
+  
   const sendTypingStart = useCallback(() => {
     if (!isConnected || !user) return
 
@@ -118,11 +102,10 @@ export function useTypingIndicator(
       message.group_id = conversationId as number
     }
 
-    console.log('🔤 SENDING typing START:', { conversationType, conversationId, message })
     send(message)
   }, [isConnected, user, conversationId, conversationType, send])
 
-  // Send typing stop message
+  
   const sendTypingStop = useCallback(() => {
     if (!isConnected || !user) return
 
@@ -142,44 +125,43 @@ export function useTypingIndicator(
       message.group_id = conversationId as number
     }
 
-    console.log('🔤 SENDING typing STOP:', { conversationType, conversationId, message })
     send(message)
   }, [isConnected, user, conversationId, conversationType, send])
 
-  // Handle typing state transitions
+  
   const handleTyping = useCallback(() => {
     if (!isConnected) return
 
-    // Update last keystroke time
+    
     lastKeystrokeRef.current = Date.now()
 
-    // Clear existing debounce
+    
     if (debounceTimeout.current) {
       clearTimeout(debounceTimeout.current)
     }
 
-    // Clear existing stop timeout
+    
     if (stopTypingTimeout.current) {
       clearTimeout(stopTypingTimeout.current)
     }
 
-    // If not already typing, send start and setup interval
+    
     if (!isTyping) {
       setIsTyping(true)
       sendTypingStart()
 
-      // Setup interval to re-send typing every 5 seconds
+      
       resendInterval.current = setInterval(() => {
         sendTypingStart()
       }, intervalMs)
     }
 
-    // Setup timeout to stop typing 3 seconds after last keystroke
+    
     stopTypingTimeout.current = setTimeout(() => {
       setIsTyping(false)
       sendTypingStop()
 
-      // Clear the re-send interval
+      
       if (resendInterval.current) {
         clearInterval(resendInterval.current)
         resendInterval.current = null
@@ -187,10 +169,10 @@ export function useTypingIndicator(
     }, stopDelayMs)
   }, [isConnected, isTyping, intervalMs, stopDelayMs, sendTypingStart, sendTypingStop])
 
-  // Cleanup on unmount or conversation change
+  
   useEffect(() => {
     return () => {
-      // Clear all timers
+      
       if (debounceTimeout.current) {
         clearTimeout(debounceTimeout.current)
       }
@@ -204,7 +186,7 @@ export function useTypingIndicator(
         clearInterval(cleanupInterval.current)
       }
 
-      // Send stop if still typing
+      
       if (isTyping) {
         sendTypingStop()
       }

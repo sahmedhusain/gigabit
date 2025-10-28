@@ -30,12 +30,13 @@ import { useConnectionStatus } from '@/hooks'
 import { useToast } from '@/context/ToastContext'
 import { useAuth } from '@/context/AuthContext'
 import { useWebSocket } from '@/context/WebSocketContext'
-import { FollowStatus } from '../profile/FollowHandler'
-import { User, api, GroupResponse, FollowRequestItem, GroupInvitationItem } from '@/lib/api'
+import { FollowStatus } from '@/types/profile'
+import { DiscoverUser, DiscoverGroup, GroupJoinRequest, RequestItem, ViewMode, ActiveTab, UserFilter, GroupFilter, RequestType } from '@/types/search'
+import { User, api, FollowRequestItem, GroupInvitationItem } from '@/lib/api'
 import FollowHandler from '../profile/FollowHandler'
 import { getUserInitials, getGroupInitials } from '@/utils/avatarUtils'
 
-// Letter Avatar Component with Chat Style
+
 function LetterAvatar({
   name,
   className = ''
@@ -58,71 +59,6 @@ function LetterAvatar({
   )
 }
 
-interface DiscoverUser extends User {
-  followStatus: FollowStatus & { isFollowedBy: boolean }
-  isOnline: boolean
-}
-
-interface DiscoverGroup extends GroupResponse {
-  joinStatus: 'none' | 'sent' | 'requested' | 'member' | 'rejected'
-}
-
-interface GroupJoinRequest {
-  id: number
-  group: GroupResponse
-  user: User
-  requested_at: string
-  status: 'pending' | 'accepted' | 'declined'
-}
-
-
-
-type RequestItem = {
-  request_id: number
-  user: {
-    id: number
-    first_name?: string
-    last_name?: string
-    avatar?: string
-    nickname?: string
-  }
-  requested_at: string
-  type: 'follow'
-  direction?: 'incoming' | 'outgoing'
-} | {
-  request_id: number
-  user: {
-    id: number
-    first_name?: string
-    last_name?: string
-    avatar?: string
-    nickname?: string
-  }
-  requested_at: string
-  type: 'group_join'
-  group: GroupResponse
-  direction?: 'incoming' | 'outgoing'
-} | {
-  request_id: number
-  user: {
-    id: number
-    first_name?: string
-    last_name?: string
-    avatar?: string
-    nickname?: string
-  }
-  requested_at: string
-  type: 'group_invitation'
-  group: GroupResponse
-  direction?: 'incoming' | 'outgoing'
-}
-
-type ViewMode = 'grid' | 'list'
-type ActiveTab = 'users' | 'groups' | 'requests'
-type UserFilter = 'all' | 'following' | 'not_following' | 'pending'
-type GroupFilter = 'all' | 'member' | 'not_member' | 'requested' | 'sent' | 'rejected'
-type RequestType = 'all' | 'incoming' | 'outgoing'
-
 export default function DiscoverPage() {
   const { user: currentUser } = useAuth()
   const { success, error, warning } = useToast()
@@ -142,7 +78,7 @@ export default function DiscoverPage() {
   const [groupFilter, setGroupFilter] = useState<GroupFilter>('all')
   const [requestType, setRequestType] = useState<RequestType>('all')
 
-  // Data state
+  
   const [users, setUsers] = useState<DiscoverUser[]>([])
   const [groups, setGroups] = useState<DiscoverGroup[]>([])
   const [followRequests, setFollowRequests] = useState<{
@@ -158,15 +94,15 @@ export default function DiscoverPage() {
     outgoing: GroupJoinRequest[]
   }>({ incoming: [], outgoing: [] })
 
-  // Confirmation modal states
+  
   const [showUnfollowConfirm, setShowUnfollowConfirm] = useState<{ userId: number; userName: string } | null>(null)
 
-  // Filtered data
+  
   const [filteredUsers, setFilteredUsers] = useState<DiscoverUser[]>([])
   const [filteredGroups, setFilteredGroups] = useState<DiscoverGroup[]>([])
   const [filteredRequests, setFilteredRequests] = useState<RequestItem[]>([])
 
-  // Initialize active tab from URL parameter
+  
   useEffect(() => {
     const tabParam = searchParams?.get('tab')
     if (tabParam === 'groups') {
@@ -178,7 +114,7 @@ export default function DiscoverPage() {
     }
   }, [searchParams])
 
-  // Fetch users
+  
   const fetchUsers = useCallback(async () => {
     if (!currentUser) return
 
@@ -187,7 +123,7 @@ export default function DiscoverPage() {
         api.getUsers()
       ])
 
-      // Get follow status for each user to determine mutual follows
+      
       const followStatusPromises = usersResponse.users
         .filter(u => u.id !== currentUser.id)
         .map(user => api.getFollowStatus(user.id).catch(() => ({ is_following: false, is_pending: false, is_followed_by: false, status: 'not_following' })))
@@ -219,18 +155,18 @@ export default function DiscoverPage() {
               isFollowedBy,
               status
             },
-            isOnline: Math.random() > 0.5 // Mock online status
+            isOnline: Math.random() > 0.5 
           }
         })
 
       setUsers(discoverUsers)
     } catch (err) {
       console.error('Failed to fetch users:', err)
-      error('Failed to load users')
+      error('Failed to load users!')
     }
   }, [currentUser, error])
 
-  // Fetch groups
+  
   const fetchGroups = useCallback(async () => {
     if (!currentUser) return
 
@@ -243,22 +179,22 @@ export default function DiscoverPage() {
       const userGroupIds = new Set(userGroupsResponse.groups ? userGroupsResponse.groups.map(g => g.id) : [])
       const userGroupRoles = new Map(userGroupsResponse.groups ? userGroupsResponse.groups.map(g => [g.id, g.role]) : [])
 
-      const publicGroups: DiscoverGroup[] = allGroupsResponse.groups
-        .filter(group => group.privacy === 'public')
+      const discoverableGroups: DiscoverGroup[] = (allGroupsResponse.groups || [])
+        .filter(group => group.privacy === 'public' || (group.privacy === 'private' && userGroupIds.has(group.id)))
         .map(group => ({
           ...group,
           joinStatus: group.member_status || (userGroupIds.has(group.id) ? 'member' : 'none'),
           role: userGroupRoles.get(group.id)
         }))
 
-      setGroups(publicGroups)
+      setGroups(discoverableGroups)
     } catch (err) {
       console.error('Failed to fetch groups:', err)
-      error('Failed to load groups')
+      error('Failed to load groups!')
     }
   }, [currentUser, error])
 
-  // Fetch requests
+  
   const fetchRequests = useCallback(async () => {
     if (!currentUser) return
 
@@ -270,7 +206,7 @@ export default function DiscoverPage() {
         api.getOutgoingGroupJoinRequests()
       ])
 
-      // Get group requests for groups where user is admin
+      
       const adminGroups = groups.filter(group => group.role === 'admin' || group.role === 'creator')
 
       const groupRequestsPromises = adminGroups
@@ -284,7 +220,7 @@ export default function DiscoverPage() {
         if (response.requests) {
           response.requests.forEach(request => {
             incomingGroupRequests.push({
-              id: Math.random(), // Mock ID
+              id: Math.random(), 
               group,
               user: request.user,
               requested_at: request.requested_at,
@@ -294,9 +230,9 @@ export default function DiscoverPage() {
         }
       })
 
-      // Process outgoing group join requests
+      
       const outgoingGroupRequests: GroupJoinRequest[] = (outgoingGroupJoinRequestsResponse.requests || [])
-        .filter((request: GroupInvitationItem) => request.group) // Filter out requests with no group
+        .filter((request: GroupInvitationItem) => request.group) 
         .map((request: GroupInvitationItem) => ({
           id: request.id,
           group: request.group,
@@ -305,13 +241,13 @@ export default function DiscoverPage() {
           status: 'pending'
         }))
 
-      // Process group invitations
+      
       const incomingGroupInvitations: GroupJoinRequest[] = (groupInvitationsResponse.invitations || [])
-        .filter((invitation: GroupInvitationItem) => invitation.inviter) // Filter out invitations with no user
+        .filter((invitation: GroupInvitationItem) => invitation.inviter) 
         .map((invitation: GroupInvitationItem) => ({
           id: invitation.id,
           group: invitation.group,
-          user: invitation.inviter, // The user who sent the invitation
+          user: invitation.inviter, 
           requested_at: invitation.created_at,
           status: 'pending'
         }))
@@ -340,7 +276,7 @@ export default function DiscoverPage() {
     }
   }, [currentUser, groups])
 
-  // Load data
+  
   useEffect(() => {
     const loadData = async () => {
       setIsLoading(true)
@@ -351,14 +287,14 @@ export default function DiscoverPage() {
     loadData()
   }, [fetchUsers, fetchGroups])
 
-  // Load requests when groups are loaded
+  
   useEffect(() => {
     if (groups.length > 0) {
       fetchRequests()
     }
   }, [groups, fetchRequests])
 
-  // Filter data based on search and filters
+  
   useEffect(() => {
     if (activeTab === 'users') {
       let filtered = users.filter(user =>
@@ -413,7 +349,7 @@ export default function DiscoverPage() {
       const requests = requestType === 'incoming'
         ? [
             ...(followRequests.incoming || [])
-              .filter(r => r.user) // Filter out requests with no user
+              .filter(r => r.user) 
               .map(r => ({
                 request_id: r.user.id,
                 user: r.user,
@@ -421,7 +357,7 @@ export default function DiscoverPage() {
                 type: 'follow' as const
               })),
             ...(groupRequests.incoming || [])
-              .filter(r => r.user) // Filter out requests with no user
+              .filter(r => r.user) 
               .map(r => ({
                 request_id: r.id,
                 user: r.user,
@@ -430,7 +366,7 @@ export default function DiscoverPage() {
                 group: r.group
               })),
             ...(groupInvitations.incoming || [])
-              .filter(r => r.user) // Filter out requests with no user
+              .filter(r => r.user) 
               .map(r => ({
                 request_id: r.id,
                 user: r.user,
@@ -442,7 +378,7 @@ export default function DiscoverPage() {
         : requestType === 'outgoing'
         ? [
             ...(followRequests.outgoing || [])
-              .filter(r => r.user) // Filter out requests with no user
+              .filter(r => r.user) 
               .map(r => ({
                 request_id: r.request_id || r.user.id,
                 user: r.user,
@@ -450,7 +386,7 @@ export default function DiscoverPage() {
                 type: 'follow' as const
               })),
             ...(groupRequests.outgoing || [])
-              .filter(r => r.user) // Filter out requests with no user
+              .filter(r => r.user) 
               .map(r => ({
                 request_id: r.id,
                 user: r.user,
@@ -459,7 +395,7 @@ export default function DiscoverPage() {
                 group: r.group
               })),
             ...(groupInvitations.outgoing || [])
-              .filter(r => r.user) // Filter out requests with no user
+              .filter(r => r.user) 
               .map(r => ({
                 request_id: r.id,
                 user: r.user,
@@ -469,7 +405,7 @@ export default function DiscoverPage() {
               }))
           ]
         : [
-            // All requests
+            
             ...(followRequests.incoming || [])
               .filter(r => r.user)
               .map(r => ({
@@ -542,16 +478,16 @@ export default function DiscoverPage() {
     }
   }, [users, groups, followRequests, groupRequests, groupInvitations, searchQuery, activeTab, userFilter, groupFilter, requestType])
 
-  // Handle unfollow confirmation
+  
   const handleUnfollowConfirm = (userId: number, userName: string) => {
     setShowUnfollowConfirm({ userId, userName })
   }
 
-  // Handle confirmed unfollow
+  
   const handleConfirmedUnfollow = async () => {
     if (!showUnfollowConfirm) return
 
-    // Update the follow status directly
+    
     setUsers(prevUsers =>
       prevUsers.map(user =>
         user.id === showUnfollowConfirm.userId
@@ -560,7 +496,7 @@ export default function DiscoverPage() {
       )
     )
 
-    // Send unfollow WebSocket message
+    
     sendMessage({
       type: 'unfollow' as const,
       to: showUnfollowConfirm.userId,
@@ -568,14 +504,14 @@ export default function DiscoverPage() {
       data: {
         user_id: showUnfollowConfirm.userId,
         user_name: showUnfollowConfirm.userName,
-        is_private: false // We don't have this info in the discover context
+        is_private: false 
       }
     })
 
     setShowUnfollowConfirm(null)
   }
 
-  // Handle follow status change
+  
   const handleFollowStatusChange = (userId: number, status: FollowStatus) => {
     setUsers(prevUsers =>
       prevUsers.map(user =>
@@ -586,12 +522,12 @@ export default function DiscoverPage() {
     )
   }
 
-  // Handle user click
+  
   const handleUserClick = (userId: number) => {
     router.push(`/profile/${userId}`)
   }
 
-  // Handle group join
+  
   const handleJoinGroup = async (groupId: number) => {
     if (!isConnected) {
       warning('Connection required to join groups')
@@ -607,18 +543,18 @@ export default function DiscoverPage() {
             : group
         )
       )
-      success('Join request sent! Waiting for approval.')
+      success('Join request sent!')
     } catch {
-      error('Failed to send join request')
+      error('Failed to send request!')
     }
   }
 
-  // Handle open group
+  
   const handleOpenGroup = (groupId: number) => {
     router.push(`/chats/all?group=${groupId}`)
   }
 
-  // Handle cancel join request
+  
   const handleCancelJoinRequest = async (groupId: number) => {
     if (!isConnected) {
       warning('Connection required to cancel join request')
@@ -640,7 +576,7 @@ export default function DiscoverPage() {
     }
   }
 
-  // Handle follow request response
+  
   const handleFollowRequestResponse = async (userId: number, action: 'accept' | 'decline') => {
     try {
       await api.respondToFollowRequest(userId, action)
@@ -654,7 +590,7 @@ export default function DiscoverPage() {
     }
   }
 
-  // Handle group invitation response
+  
   const handleGroupInvitationResponse = async (groupId: number, action: 'accept' | 'decline') => {
     try {
       if (action === 'accept') {
@@ -686,7 +622,7 @@ export default function DiscoverPage() {
     }
   }
 
-  // Handle group join request response
+  
   const handleGroupJoinRequestResponse = async (groupId: number, userId: number, action: 'accept' | 'decline') => {
     try {
       await api.respondToJoinRequest(groupId, userId, action)
@@ -700,7 +636,7 @@ export default function DiscoverPage() {
     }
   }
 
-  // Handle cancel follow request
+  
   const handleCancelFollowRequest = async (userId: number) => {
     if (!isConnected) {
       warning('Connection required to cancel follow request')
@@ -708,9 +644,9 @@ export default function DiscoverPage() {
     }
 
     try {
-      // Use DELETE unfollow endpoint to cancel an outgoing follow request
-      // Try DELETE first (current server expects this for cancelling your outgoing request).
-      // If the server returns not-found or doesn't support this semantic, fall back to the PUT 'remove' action.
+      
+      
+      
       console.debug('Attempting to cancel outgoing follow request (DELETE) for user:', userId)
       await api.unfollowUser(userId)
       setFollowRequests(prev => ({
@@ -718,35 +654,12 @@ export default function DiscoverPage() {
         outgoing: prev.outgoing.filter(r => r.user.id !== userId)
       }))
       success('Follow request cancelled!')
-    } catch (_err) {
-      // If unfollow returned 404/not found, some servers expect a PUT remove action where the follower id
-      // is in the URL and the authenticated user is the target (remove follower). Try the alternate path.
-      console.debug('unfollowUser failed, attempting fallback respondToFollowRequest remove. error=', _err)
-      interface ApiError {
-        status?: number;
-        statusCode?: number;
-      }
-      const apiError = _err as ApiError;
-      const status = apiError?.status || apiError?.statusCode || (_err instanceof Error && (_err as ApiError).status)
-      if (status === 404) {
-        try {
-          await api.respondToFollowRequest(userId, 'remove')
-          setFollowRequests(prev => ({
-            ...prev,
-            outgoing: prev.outgoing.filter(r => r.user.id !== userId)
-          }))
-          success('Follow request cancelled!')
-          return
-        } catch (err2) {
-          console.error('Fallback respondToFollowRequest remove failed:', err2)
-        }
-      }
-
+    } catch {
       error('Failed to cancel follow request')
     }
   }
 
-  // Handle cancel group join request
+  
   const handleCancelGroupJoinRequest = async (groupId: number) => {
     if (!isConnected) {
       warning('Connection required to cancel join request')
@@ -754,7 +667,7 @@ export default function DiscoverPage() {
     }
 
     try {
-      // Use existing leaveGroup method to cancel request
+      
       await api.leaveGroup(groupId)
       setGroupRequests(prev => ({
         ...prev,
@@ -773,7 +686,7 @@ export default function DiscoverPage() {
     }
   }
 
-  // Handle cancel group invitation
+  
   const handleCancelGroupInvitation = async (groupId: number, userId: number) => {
     if (!isConnected) {
       warning('Connection required to cancel invitation')
@@ -781,7 +694,7 @@ export default function DiscoverPage() {
     }
 
     try {
-      // For now, just remove from local state since API method may not exist
+      
       setGroupInvitations(prev => ({
         ...prev,
         outgoing: prev.outgoing.filter(r => r.group.id !== groupId && r.user.id !== userId)
@@ -792,7 +705,7 @@ export default function DiscoverPage() {
     }
   }
 
-  // Loading state
+  
   if (isLoading) {
     return (
       <div className="flex-1 min-w-0 max-h-screen overflow-hidden">
@@ -1088,7 +1001,7 @@ export default function DiscoverPage() {
   )
 }
 
-// Users Section Component
+
 function UsersSection({
   users,
   viewMode,
@@ -1292,7 +1205,7 @@ function UsersSection({
   )
 }
 
-// Groups Section Component
+
 function GroupsSection({
   groups,
   viewMode,
@@ -1345,6 +1258,16 @@ function GroupsSection({
             <>
               {/* Badges - repositioned for better visibility */}
               <div className="absolute top-4 right-4 flex flex-col gap-2 z-10">
+                {group.privacy === 'private' && group.joinStatus === 'member' && (
+                  <motion.span
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold bg-gradient-to-r from-purple-500/20 to-pink-500/20 text-purple-300 border border-purple-400/30 backdrop-blur-sm shadow-lg"
+                  >
+                    <Lock className="w-3 h-3 mr-1.5" />
+                    Private
+                  </motion.span>
+                )}
                 {group.joinStatus === 'sent' && (
                   <motion.span
                     initial={{ scale: 0 }}
@@ -1475,12 +1398,31 @@ function GroupsSection({
                 className="flex items-center space-x-2 group-hover:text-blue-400 transition-colors duration-300"
                 whileHover={{ scale: 1.05 }}
               >
-                <Eye className="w-4 h-4" />
-                <span className="font-medium">Public</span>
+                {group.privacy === 'private' ? (
+                  <>
+                    <Lock className="w-4 h-4" />
+                    <span className="font-medium">Private</span>
+                  </>
+                ) : (
+                  <>
+                    <Eye className="w-4 h-4" />
+                    <span className="font-medium">Public</span>
+                  </>
+                )}
               </motion.div>
 
               {viewMode === 'list' && (
                 <div className="flex flex-col gap-1 ml-1">
+                  {group.privacy === 'private' && group.joinStatus === 'member' && (
+                    <motion.span
+                      initial={{ scale: 0 }}
+                      animate={{ scale: 1 }}
+                      className="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold bg-gradient-to-r from-purple-500/20 to-pink-500/20 text-purple-300 border border-purple-400/30 backdrop-blur-sm shadow-lg"
+                    >
+                      <Lock className="w-3 h-3 mr-1" />
+                      Private
+                    </motion.span>
+                  )}
                   {group.joinStatus === 'sent' && (
                     <motion.span
                       initial={{ scale: 0 }}
@@ -1634,7 +1576,7 @@ function GroupsSection({
   )
 }
 
-// Requests Section Component
+
 function RequestsSection({
   requests,
   requestType,
@@ -1817,23 +1759,23 @@ function RequestsSection({
                       const dateStr = request.requested_at
                       if (!dateStr) return 'Date unavailable'
 
-                      // Try different date parsing strategies
+                      
                       let date: Date | null = null
 
-                      // Strategy 1: Direct Date constructor (ISO format)
+                      
                       date = new Date(dateStr)
                       if (isNaN(date.getTime())) {
-                        // Strategy 2: Replace space with 'T' for ISO-like format
+                        
                         const isoStr = dateStr.replace(' ', 'T')
                         date = new Date(isoStr)
                       }
                       if (isNaN(date.getTime())) {
-                        // Strategy 3: Try parsing as YYYY-MM-DD HH:mm:ss
+                        
                         const match = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})\s+(\d{2}):(\d{2}):(\d{2})/)
                         if (match) {
                           date = new Date(
                             parseInt(match[1]),
-                            parseInt(match[2]) - 1, // Month is 0-indexed
+                            parseInt(match[2]) - 1, 
                             parseInt(match[3]),
                             parseInt(match[4]),
                             parseInt(match[5]),
@@ -1842,13 +1784,13 @@ function RequestsSection({
                         }
                       }
                       if (isNaN(date.getTime())) {
-                        // Strategy 4: Try parsing as DD/MM/YYYY or MM/DD/YYYY
+                        
                         const parts = dateStr.split(/[/\-]/)
                         if (parts.length === 3) {
-                          // Assume MM/DD/YYYY format
+                          
                           date = new Date(parseInt(parts[2]), parseInt(parts[0]) - 1, parseInt(parts[1]))
                           if (isNaN(date.getTime())) {
-                            // Try DD/MM/YYYY format
+                            
                             date = new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]))
                           }
                         }

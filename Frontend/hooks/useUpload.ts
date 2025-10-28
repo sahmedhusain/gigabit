@@ -1,18 +1,7 @@
 'use client'
 import { useCallback, useMemo, useRef, useState } from 'react'
 import { API_BASE_URL, getToken } from '@/lib/api'
-
-export interface UploadResult {
-  filename: string
-  url: string
-  size?: number
-  mime_type?: string
-}
-
-export interface UseUploadOptions {
-  maxSizeMB?: number
-  allowedMimeTypes?: string[]
-}
+import { UploadResult, UseUploadOptions } from '@/types/hooks'
 
 export function useUpload(options: UseUploadOptions = {}) {
   const { maxSizeMB = 10, allowedMimeTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp'] } = options
@@ -31,7 +20,7 @@ export function useUpload(options: UseUploadOptions = {}) {
   }, [maxSizeMB, allowedMimeTypes])
 
   const buildImageUrl = useCallback((filename: string) => {
-    // Use the API route that serves images
+    
     return `${API_BASE_URL}/api/images/${encodeURIComponent(filename)}`
   }, [])
 

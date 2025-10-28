@@ -2,29 +2,23 @@
 import { useState, useMemo } from 'react'
 import { 
   Bell, 
-  Heart, 
-  MessageCircle, 
-  Users, 
-  Calendar, 
-  UserPlus, 
-  Mail, 
-  Check, 
   CheckCheck, 
   Trash2, 
-  Search, 
   AlertCircle,
   Clock,
-  FileText,
-  BarChart3,
-  CheckCircle,
-  Reply,
-  MessageSquare,
-  Send
+  Filter,
+  ArrowUpDown,
+  Eye,
+  X
 } from 'lucide-react'
+import Image from 'next/image'
 import { useNotifications } from '@/hooks/useNotifications'
 import { useRouter } from 'next/navigation'
+import { NotificationFilters } from '@/types/notifications'
+import { NotificationResponse } from '@/types/notification-data'
+import { useToast } from '@/context/ToastContext'
 
-// Utility function for formatting time
+
 function formatTimeAgo(dateString: string) {
   const date = new Date(dateString)
   const now = new Date()
@@ -38,8 +32,46 @@ function formatTimeAgo(dateString: string) {
   return date.toLocaleDateString()
 }
 
-interface NotificationFilters {
-  timeframe: 'all' | 'today' | 'week' | 'month'
+function getNotificationDisplayInfo(notification: NotificationResponse) {
+  // Priority: Group avatar > User avatar > Initials
+  let avatar: string | null = null
+  let initials: string = ''
+  let displayName: string = ''
+  let isGroupNotification = false
+
+  // Check if this is a group-related notification
+  const groupRelatedTypes = [
+    'group_invite', 'join_request', 'join_accepted', 'group_post', 
+    'event_created', 'new_poll', 'group_message', 'post_shared', 'image_shared'
+  ]
+  isGroupNotification = groupRelatedTypes.includes(notification.type) || 
+                       (notification.group !== undefined && notification.group !== null)
+
+  if (isGroupNotification && notification.group?.avatar) {
+    // Use group avatar
+    avatar = notification.group.avatar.startsWith('http') 
+      ? notification.group.avatar 
+      : notification.group.avatar.startsWith('/avatars/')
+      ? notification.group.avatar
+      : `http://localhost:8080/api/uploads/${notification.group.avatar}`
+    initials = notification.group.title.substring(0, 2).toUpperCase()
+    displayName = notification.group.title
+  } else if (notification.actor?.avatar) {
+    // Use user avatar
+    avatar = notification.actor.avatar.startsWith('http') 
+      ? notification.actor.avatar 
+      : notification.actor.avatar.startsWith('/avatars/')
+      ? notification.actor.avatar
+      : `http://localhost:8080/api/uploads/${notification.actor.avatar}`
+    initials = `${notification.actor.first_name.charAt(0)}${notification.actor.last_name.charAt(0)}`.toUpperCase()
+    displayName = `${notification.actor.first_name} ${notification.actor.last_name}`
+  } else {
+    // Fallback to initials
+    initials = `${notification.actor?.first_name?.charAt(0) || '?'}${notification.actor?.last_name?.charAt(0) || '?'}`.toUpperCase()
+    displayName = notification.actor ? `${notification.actor.first_name} ${notification.actor.last_name}` : 'Unknown User'
+  }
+
+  return { avatar, initials, displayName, isGroupNotification }
 }
 
 export default function NotificationsPage() {
@@ -57,120 +89,56 @@ export default function NotificationsPage() {
     loadMore
   } = useNotifications()
 
-  const [searchTerm, setSearchTerm] = useState('')
+  const { success } = useToast()
+
   const [filters, setFilters] = useState<NotificationFilters>({
-    timeframe: 'all'
+    type: 'all',
+    sortBy: 'newest'
   })
-  const [selectedNotifications, setSelectedNotifications] = useState<Set<number>>(new Set())
+  const handleClearAll = () => {
+    const count = notifications.length
+    // Delete all notifications without individual toasts
+    notifications.forEach(notification => {
+      deleteNotification(notification.id, false)
+    })
+    // Show single toast notification
+    success(`Cleared ${count} notification${count !== 1 ? 's' : ''}`)
+  }
+
   const router = useRouter()
 
-  // Filter and search notifications
+  
   const filteredNotifications = useMemo(() => {
     let filtered = notifications
 
-    // Filter by timeframe
-    if (filters.timeframe !== 'all') {
-      const now = new Date()
-      const filterTime = new Date()
-      
-      if (filters.timeframe === 'today') {
-        filterTime.setHours(0, 0, 0, 0)
-      } else if (filters.timeframe === 'week') {
-        filterTime.setDate(now.getDate() - 7)
-      } else if (filters.timeframe === 'month') {
-        filterTime.setMonth(now.getMonth() - 1)
+    // Filter by type
+    if (filters.type !== 'all') {
+      const typeGroups: Record<string, string[]> = {
+        social: ['follow_request', 'follow_accepted'],
+        groups: ['group_invite', 'join_request', 'join_accepted', 'group_post'],
+        events: ['event_created', 'event_reminder', 'event_response'],
+        posts: ['post_liked', 'post_commented', 'image_shared', 'post_shared'],
+        messages: ['message'],
+        polls: ['new_poll', 'poll_voted']
       }
       
-      filtered = filtered.filter(n => new Date(n.created_at) >= filterTime)
+      filtered = filtered.filter(n => typeGroups[filters.type]?.includes(n.type))
     }
 
-    // Search filter
-    if (searchTerm) {
-      filtered = filtered.filter(n => 
-        n.message.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        `${n.actor.first_name} ${n.actor.last_name}`.toLowerCase().includes(searchTerm.toLowerCase())
-      )
-    }
+    // Sort by newest/oldest
+    filtered = filtered.sort((a, b) => {
+      const dateA = new Date(a.created_at).getTime()
+      const dateB = new Date(b.created_at).getTime()
+      return filters.sortBy === 'newest' ? dateB - dateA : dateA - dateB
+    })
 
     return filtered
-  }, [notifications, filters, searchTerm])
-
-  // Get notification icon and color based on type
-  const getNotificationIcon = (type: string) => {
-    switch (type) {
-      case 'like':
-      case 'post_liked':
-        return <Heart className="w-5 h-5 text-red-400" />
-      case 'comment':
-      case 'post_commented':
-        return <MessageCircle className="w-5 h-5 text-blue-400" />
-      case 'follow':
-      case 'follow_request':
-        return <UserPlus className="w-5 h-5 text-emerald-400" />
-      case 'follow_accepted':
-        return <CheckCircle className="w-5 h-5 text-green-400" />
-      case 'event_invite':
-      case 'event_reminder':
-      case 'event_created':
-        return <Calendar className="w-5 h-5 text-blue-400" />
-      case 'event_response':
-        return <CheckCircle className="w-5 h-5 text-purple-400" />
-      case 'message':
-      case 'new_message':
-        return <Mail className="w-5 h-5 text-cyan-400" />
-      case 'group_invite':
-      case 'join_request':
-      case 'group_join':
-        return <Users className="w-5 h-5 text-orange-400" />
-      case 'join_accepted':
-        return <CheckCircle className="w-5 h-5 text-green-400" />
-      case 'new_post':
-        return <FileText className="w-5 h-5 text-indigo-400" />
-      case 'new_poll':
-        return <BarChart3 className="w-5 h-5 text-teal-400" />
-      case 'poll_voted':
-        return <CheckCircle className="w-5 h-5 text-lime-400" />
-      case 'comment_replied':
-        return <Reply className="w-5 h-5 text-pink-400" />
-      case 'group_message':
-        return <MessageSquare className="w-5 h-5 text-violet-400" />
-      case 'private_message':
-        return <Send className="w-5 h-5 text-cyan-400" />
-      case 'group_post':
-      case 'group_post_liked':
-        return <FileText className="w-5 h-5 text-amber-400" />
-      case 'image_shared':
-      case 'post_shared':
-        return <Send className="w-5 h-5 text-rose-400" />
-      default:
-        return <Bell className="w-5 h-5 text-gray-400" />
-    }
-  }
-
-  // Bulk actions
-  const handleSelectAll = () => {
-    if (selectedNotifications.size === filteredNotifications.length) {
-      setSelectedNotifications(new Set())
-    } else {
-      setSelectedNotifications(new Set(filteredNotifications.map(n => n.id)))
-    }
-  }
-
-  const handleBulkMarkAsRead = () => {
-    selectedNotifications.forEach(id => markAsRead(id))
-    setSelectedNotifications(new Set())
-  }
-
-  const handleBulkDelete = () => {
-    selectedNotifications.forEach(id => deleteNotification(id))
-    setSelectedNotifications(new Set())
-  }
-
+  }, [notifications, filters])
   if (loading) {
     return (
       <div className="flex-1 min-w-0 max-h-screen overflow-hidden">
         <div className="bg-white/5 backdrop-blur-xl rounded-3xl border border-white/10 shadow-2xl max-h-[calc(100vh-8rem)] flex flex-col overflow-hidden">
-          {/* Fixed Header */}
+          {}
           <div className="flex-shrink-0 p-6 border-b border-white/10">
             <div className="flex items-center justify-between">
               <div>
@@ -184,13 +152,13 @@ export default function NotificationsPage() {
               </div>
             </div>
 
-            {/* Search Bar Skeleton */}
+            {}
             <div className="relative mt-4">
               <div className="w-full h-12 bg-white/10 rounded-xl animate-pulse"></div>
             </div>
           </div>
           
-          {/* Content Skeleton */}
+          {}
           <div className="flex-1 overflow-y-auto p-6 min-h-0">
             <div className="space-y-4">
               {[...Array(6)].map((_, i) => (
@@ -244,81 +212,53 @@ export default function NotificationsPage() {
                   <span className="font-medium">Mark All Read</span>
                 </button>
               )}
-            </div>
-          </div>
-
-          {/* Search and Filters */}
-          <div className="flex flex-col sm:flex-row gap-4 mt-4">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-white/40 w-5 h-5" />
-              <input
-                type="text"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Search notifications..."
-                className="w-full pl-10 pr-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500/50 transition-all duration-300 backdrop-blur-sm"
-              />
-            </div>
-            
-            <div className="flex gap-2">
-              <select
-                value={filters.timeframe}
-                onChange={(e) => setFilters(prev => ({ ...prev, timeframe: e.target.value as NotificationFilters['timeframe'] }))}
-                className="px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all duration-300 backdrop-blur-sm min-w-[120px]"
-                aria-label="Filter by timeframe"
-              >
-                <option value="all" className="bg-gray-800">All Time</option>
-                <option value="today" className="bg-gray-800">Today</option>
-                <option value="week" className="bg-gray-800">This Week</option>
-                <option value="month" className="bg-gray-800">This Month</option>
-              </select>
-
-              {selectedNotifications.size > 0 && (
-                <div className="flex gap-2">
-                  <button
-                    onClick={handleBulkMarkAsRead}
-                    className="flex items-center space-x-2 px-4 py-3 bg-emerald-500/20 text-emerald-400 rounded-xl border border-emerald-500/30 hover:bg-emerald-500/30 transition-all duration-300"
-                    aria-label="Mark selected notifications as read"
-                  >
-                    <Check className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={handleBulkDelete}
-                    className="flex items-center space-x-2 px-4 py-3 bg-red-500/20 text-red-400 rounded-xl border border-red-500/30 hover:bg-red-500/30 transition-all duration-300"
-                    aria-label="Delete selected notifications"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
+              {notifications.length > 0 && (
+                <button
+                  onClick={handleClearAll}
+                  className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-red-500/20 to-pink-500/20 text-red-400 rounded-xl border border-red-500/30 hover:bg-red-500/30 transition-all duration-300"
+                >
+                  <X className="w-4 h-4" />
+                  <span className="font-medium">Clear All</span>
+                </button>
               )}
             </div>
           </div>
 
-          {/* Bulk Actions */}
-          {filteredNotifications.length > 0 && (
-            <div className="flex items-center justify-between mt-4 pt-4 border-t border-white/10">
-              <div className="flex items-center space-x-4">
-                <label className="flex items-center space-x-2 text-white/70">
-                  <input
-                    type="checkbox"
-                    checked={selectedNotifications.size === filteredNotifications.length && filteredNotifications.length > 0}
-                    onChange={handleSelectAll}
-                    className="rounded border-white/30 bg-white/10 text-emerald-500 focus:ring-emerald-500/50"
-                  />
-                  <span className="text-sm">Select All ({filteredNotifications.length})</span>
-                </label>
-                {selectedNotifications.size > 0 && (
-                  <span className="text-sm text-emerald-400 font-medium">
-                    {selectedNotifications.size} selected
-                  </span>
-                )}
-              </div>
-              
-              <div className="text-sm text-white/50">
-                {filteredNotifications.length} of {notifications.length} notifications
-              </div>
+          {/* Filters */}
+          <div className="flex gap-3 mt-4">
+            <div className="relative">
+              <Filter className="absolute left-3 top-1/2 transform -translate-y-1/2 text-emerald-400 w-4 h-4" />
+              <select
+                value={filters.type}
+                onChange={(e) => setFilters(prev => ({ ...prev, type: e.target.value as NotificationFilters['type'] }))}
+                className="pl-9 pr-4 py-2.5 bg-white/10 border border-white/20 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all duration-300 backdrop-blur-sm text-sm font-medium"
+                aria-label="Filter by type"
+              >
+                <option value="all" className="bg-gray-800">All Types</option>
+                <option value="social" className="bg-gray-800">Social</option>
+                <option value="groups" className="bg-gray-800">Groups</option>
+                <option value="events" className="bg-gray-800">Events</option>
+                <option value="posts" className="bg-gray-800">Posts</option>
+                <option value="messages" className="bg-gray-800">Messages</option>
+                <option value="polls" className="bg-gray-800">Polls</option>
+              </select>
             </div>
-          )}
+
+            <div className="relative">
+              <ArrowUpDown className="absolute left-3 top-1/2 transform -translate-y-1/2 text-emerald-400 w-4 h-4" />
+              <select
+                value={filters.sortBy}
+                onChange={(e) => setFilters(prev => ({ ...prev, sortBy: e.target.value as NotificationFilters['sortBy'] }))}
+                className="pl-9 pr-4 py-2.5 bg-white/10 border border-white/20 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all duration-300 backdrop-blur-sm text-sm font-medium"
+                aria-label="Sort by"
+              >
+                <option value="newest" className="bg-gray-800">Newest</option>
+                <option value="oldest" className="bg-gray-800">Oldest</option>
+              </select>
+            </div>
+          </div>
+
+
         </div>
 
         {/* Scrollable Content Area */}
@@ -342,19 +282,8 @@ export default function NotificationsPage() {
               </div>
               <h3 className="text-2xl font-bold text-white mb-3">No notifications found</h3>
               <p className="text-white/70 mb-6 max-w-md mx-auto">
-                {searchTerm 
-                  ? `No notifications found matching "${searchTerm}"`
-                  : 'No notifications match the selected filters'
-                }
+                No notifications match the selected filters
               </p>
-              {searchTerm && (
-                <button
-                  onClick={() => setSearchTerm('')}
-                  className="px-6 py-3 bg-white/10 hover:bg-white/20 text-white rounded-xl transition-all duration-300 border border-white/20"
-                >
-                  Clear search
-                </button>
-              )}
             </div>
           ) : (
             <div className="space-y-3">
@@ -365,119 +294,13 @@ export default function NotificationsPage() {
                     !notification.is_read ? 'border-emerald-500/30 bg-emerald-500/5' : ''
                   }`}
                   onClick={() => {
-                    // Handle redirection based on notification type and redirect_url
+                    // Use backend-provided redirect URL and type
                     if (notification.redirect_url) {
-                      // Use the backend-provided redirect URL
                       router.push(notification.redirect_url);
                     } else {
-                      // Fallback redirection based on type and redirect_type
-                      switch (notification.redirect_type || notification.type) {
-                        case 'profile':
-                        case 'follow_request':
-                        case 'follow_accepted':
-                          router.push(`/profile/${notification.actor.id}`);
-                          break;
-                        case 'post':
-                        case 'post_liked':
-                        case 'post_commented':
-                        case 'comment_replied':
-                        case 'new_post':
-                        case 'post_shared':
-                        case 'image_shared':
-                          // Try to extract post ID from various patterns
-                          const postPatterns = [
-                            /post (\d+)/i,
-                            /post\/(\d+)/i,
-                            /#(\d+)/
-                          ];
-                          let postId = null;
-                          for (const pattern of postPatterns) {
-                            const match = notification.message.match(pattern);
-                            if (match) {
-                              postId = match[1];
-                              break;
-                            }
-                          }
-                          if (postId) {
-                            router.push(`/post/${postId}`);
-                          } else {
-                            // Fallback to actor's profile
-                            router.push(`/profile/${notification.actor.id}`);
-                          }
-                          break;
-                        case 'poll':
-                        case 'new_poll':
-                        case 'poll_voted':
-                          // Try to extract poll ID
-                          const pollMatch = notification.message.match(/poll (\d+)/i) || 
-                                          notification.message.match(/poll\/(\d+)/i);
-                          if (pollMatch) {
-                            router.push(`/poll/${pollMatch[1]}`);
-                          } else {
-                            router.push(`/profile/${notification.actor.id}`);
-                          }
-                          break;
-                        case 'event':
-                        case 'event_created':
-                        case 'event_response':
-                        case 'event_invite':
-                        case 'event_reminder':
-                          // Try to extract event ID
-                          const eventMatch = notification.message.match(/event (\d+)/i) || 
-                                           notification.message.match(/event\/(\d+)/i);
-                          if (eventMatch) {
-                            router.push(`/event/${eventMatch[1]}`);
-                          } else {
-                            router.push(`/events`);
-                          }
-                          break;
-                        case 'group':
-                        case 'group_invite':
-                        case 'join_request':
-                        case 'join_accepted':
-                        case 'group_message':
-                        case 'group_post':
-                        case 'group_post_liked':
-                          // Try to extract group ID
-                          const groupPatterns = [
-                            /group (\d+)/i,
-                            /group\/(\d+)/i,
-                            /#(\d+)/
-                          ];
-                          let groupId = null;
-                          for (const pattern of groupPatterns) {
-                            const match = notification.message.match(pattern);
-                            if (match) {
-                              groupId = match[1];
-                              break;
-                            }
-                          }
-                          if (groupId) {
-                            router.push(`/group/${groupId}`);
-                          } else {
-                            router.push(`/profile/${notification.actor.id}`);
-                          }
-                          break;
-                        case 'chat':
-                        case 'private_message':
-                        case 'new_message':
-                          // Navigate to private chat using unified URL
-                          router.push(`/chats/all?chat=${notification.actor.id}`);
-                          break;
-                        case 'group_chat':
-                        case 'group_message':
-                          // Try to extract group ID for group chat
-                          const groupChatMatch = notification.message.match(/group (\d+)/i);
-                          if (groupChatMatch) {
-                            router.push(`/chats/all?group=${groupChatMatch[1]}`);
-                          } else {
-                            router.push(`/chats/all`);
-                          }
-                          break;
-                        default:
-                          // Default to actor's profile
-                          router.push(`/profile/${notification.actor.id}`);
-                      }
+                      // Minimal fallback for edge cases where redirect_url is not set
+                      console.warn('Notification missing redirect_url:', notification);
+                      router.push(`/profile/${notification.actor.id}`);
                     }
                     
                     // Mark as read if not already read
@@ -487,30 +310,28 @@ export default function NotificationsPage() {
                   }}
                 >
                   <div className="flex items-start space-x-4">
-                    {/* Selection Checkbox */}
-                    <div className="flex-shrink-0 pt-1">
-                      <input
-                        type="checkbox"
-                        checked={selectedNotifications.has(notification.id)}
-                        onChange={(e) => {
-                          const newSelected = new Set(selectedNotifications)
-                          if (e.target.checked) {
-                            newSelected.add(notification.id)
-                          } else {
-                            newSelected.delete(notification.id)
-                          }
-                          setSelectedNotifications(newSelected)
-                        }}
-                        className="rounded border-white/30 bg-white/10 text-emerald-500 focus:ring-emerald-500/50"
-                        aria-label={`Select notification from ${notification.actor.first_name} ${notification.actor.last_name}`}
-                      />
-                    </div>
-
-                    {/* Notification Icon */}
+                    {/* Avatar */}
                     <div className="flex-shrink-0">
-                      <div className="w-12 h-12 bg-gradient-to-br from-emerald-500/20 to-teal-500/20 rounded-full flex items-center justify-center border border-emerald-500/30">
-                        {getNotificationIcon(notification.type)}
-                      </div>
+                      {(() => {
+                        const { avatar, initials, displayName, isGroupNotification } = getNotificationDisplayInfo(notification)
+                        return avatar ? (
+                          <Image
+                            src={avatar}
+                            alt={`${displayName} avatar`}
+                            width={48}
+                            height={48}
+                            className="w-12 h-12 rounded-full border-2 border-emerald-500/30 object-cover"
+                          />
+                        ) : (
+                          <div className={`w-12 h-12 rounded-full border-2 flex items-center justify-center text-white font-bold text-sm ${
+                            isGroupNotification 
+                              ? 'bg-gradient-to-br from-orange-500 to-red-500 border-orange-500/30'
+                              : 'bg-gradient-to-br from-emerald-500 to-teal-500 border-emerald-500/30'
+                          }`}>
+                            {initials}
+                          </div>
+                        )
+                      })()}
                     </div>
 
                     {/* Notification Content */}
@@ -518,15 +339,29 @@ export default function NotificationsPage() {
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
                           <p className="text-white font-medium leading-relaxed">
-                            <span 
-                              className="text-emerald-400 font-semibold cursor-pointer hover:text-emerald-300 transition-colors duration-200"
-                              onClick={() => {
-                                router.push(`/profile/${notification.actor.id}`)
-                              }}
-                            >
-                              {notification.actor.first_name} {notification.actor.last_name}
-                            </span>{' '}
-                            {notification.message}
+                            {(() => {
+                              const { displayName, isGroupNotification } = getNotificationDisplayInfo(notification)
+                              return (
+                                <>
+                                  <span 
+                                    className={`font-semibold cursor-pointer hover:opacity-80 transition-colors duration-200 ${
+                                      isGroupNotification ? 'text-orange-400' : 'text-emerald-400'
+                                    }`}
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      if (isGroupNotification && notification.group) {
+                                        router.push(`/chats/all?group=${notification.group.id}`)
+                                      } else {
+                                        router.push(`/profile/${notification.actor.id}`)
+                                      }
+                                    }}
+                                  >
+                                    {displayName}
+                                  </span>{' '}
+                                  {notification.message}
+                                </>
+                              )
+                            })()}
                           </p>
                           <div className="flex items-center space-x-3 mt-2 text-sm text-white/50">
                             <div className="flex items-center space-x-1">
@@ -543,22 +378,30 @@ export default function NotificationsPage() {
                         </div>
 
                         {/* Action Buttons */}
-                        <div className="flex items-center space-x-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                        <div className="flex items-center space-x-2 opacity-0 group-hover:opacity-100 transition-all duration-300">
                           {!notification.is_read && (
                             <button
-                              onClick={() => markAsRead(notification.id)}
-                              className="p-2 text-white/50 hover:text-emerald-400 hover:bg-emerald-500/20 rounded-lg transition-all duration-300"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                markAsRead(notification.id)
+                              }}
+                              className="flex items-center space-x-1 px-3 py-2 bg-gradient-to-r from-emerald-500/20 to-teal-500/20 text-emerald-400 rounded-lg border border-emerald-500/30 hover:bg-emerald-500/30 hover:border-emerald-500/50 transition-all duration-300 text-sm font-medium"
                               title="Mark as read"
                             >
-                              <Check className="w-4 h-4" />
+                              <Eye className="w-4 h-4" />
+                              <span>Read</span>
                             </button>
                           )}
                           <button
-                            onClick={() => deleteNotification(notification.id)}
-                            className="p-2 text-white/50 hover:text-red-400 hover:bg-red-500/20 rounded-lg transition-all duration-300"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              deleteNotification(notification.id)
+                            }}
+                            className="flex items-center space-x-1 px-3 py-2 bg-gradient-to-r from-red-500/20 to-pink-500/20 text-red-400 rounded-lg border border-red-500/30 hover:bg-red-500/30 hover:border-red-500/50 transition-all duration-300 text-sm font-medium"
                             title="Delete notification"
                           >
                             <Trash2 className="w-4 h-4" />
+                            <span>Delete</span>
                           </button>
                         </div>
                       </div>

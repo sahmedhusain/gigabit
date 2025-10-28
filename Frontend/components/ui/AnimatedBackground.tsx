@@ -5,7 +5,7 @@ export default function AnimatedBackground() {
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
   const [themeLoaded, setThemeLoaded] = useState(false);
   
-  // Detect theme changes
+  
   useEffect(() => {
     const savedTheme = localStorage.getItem('backgroundTheme') || 'system';
     
@@ -18,7 +18,7 @@ export default function AnimatedBackground() {
     
     setThemeLoaded(true);
 
-    // Listen for system theme changes
+    
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
     const handleChange = (e: MediaQueryListEvent) => {
       const savedTheme = localStorage.getItem('backgroundTheme') || 'system';
@@ -31,7 +31,7 @@ export default function AnimatedBackground() {
     return () => mediaQuery.removeEventListener('change', handleChange);
   }, []);
 
-  // Enhanced particle system with different types
+  
   const [particles] = useState(() => {
     const icons = [Wifi, Zap, MessageCircle, Users, Share2, Heart, Activity, Radio];
     const colors = [
@@ -55,8 +55,8 @@ export default function AnimatedBackground() {
         duration: 4 + Math.random() * 4,
         icon: IconComponent,
         color: colors[Math.floor(Math.random() * colors.length)],
-        size: Math.random() > 0.7 ? 'w-4 h-4' : 'w-3 h-3', // Some larger particles
-        animation: Math.random() > 0.5 ? 'animate-bounce' : 'animate-pulse' // Different animations
+        size: Math.random() > 0.7 ? 'w-4 h-4' : 'w-3 h-3', 
+        animation: Math.random() > 0.5 ? 'animate-bounce' : 'animate-pulse' 
       };
     });
   });
@@ -65,7 +65,7 @@ export default function AnimatedBackground() {
 
   return (
     <>
-      {/* Animated Background Elements */}
+      {}
       <div className="absolute inset-0">
         <div className={`absolute top-1/4 left-1/4 w-96 h-96 rounded-full blur-3xl animate-pulse ${
           isDark ? 'bg-emerald-700/20' : 'bg-emerald-400/15'
@@ -81,7 +81,7 @@ export default function AnimatedBackground() {
         }`}></div>
       </div>
 
-      {/* Enhanced Floating Particles - Social Network & Tech Theme */}
+      {}
       {themeLoaded && (
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
           {particles.map((particle) => {

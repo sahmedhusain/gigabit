@@ -4,15 +4,13 @@ import { Plus, BarChart3 } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { useWebSocket } from '@/context/WebSocketContext'
 import { useAuth } from '@/context/AuthContext'
-import { api, PollResponse } from '@/lib/api'
+import { api } from '@/lib/api'
+import { PollResponse } from '@/types/polls'
 import CreatePollModal from '@/components/polls/CreatePollModal'
 import PollCard from '@/components/polls/PollCard'
+import { GroupPollsTabProps } from '@/types/groups'
 
-interface GroupPollsTabProps {
-  groupId?: number
-}
-
-const GroupPollsTab: React.FC<GroupPollsTabProps> = ({ groupId }) => {
+const GroupPollsTab: React.FC<GroupPollsTabProps> = ({ groupId, highlightPollId }) => {
   const [polls, setPolls] = useState<PollResponse[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [showCreateModal, setShowCreateModal] = useState(false)
@@ -30,7 +28,7 @@ const GroupPollsTab: React.FC<GroupPollsTabProps> = ({ groupId }) => {
     } catch (error: unknown) {
       const err = error as Error;
       console.warn('Failed to fetch polls, endpoint may not be implemented:', err.message)
-      // Set empty polls array instead of throwing
+      
       setPolls([])
     } finally {
       setIsLoading(false)
@@ -43,7 +41,7 @@ const GroupPollsTab: React.FC<GroupPollsTabProps> = ({ groupId }) => {
       const roleData = await api.getUserRole(groupId)
       setUserRole(roleData)
       
-      // Fetch group data to get permissions
+      
       const groupData = await api.getGroup(groupId)
       setGroupPermissions({
         create_polls: groupData.create_polls
@@ -60,12 +58,30 @@ const GroupPollsTab: React.FC<GroupPollsTabProps> = ({ groupId }) => {
     }
   }, [groupId, fetchPolls, fetchUserRole])
 
-  // WebSocket listener for real-time poll updates
+  // Highlight poll when highlightPollId is provided
+  useEffect(() => {
+    if (highlightPollId && polls.length > 0) {
+      const pollElement = document.querySelector(`[data-poll-id="${highlightPollId}"]`) as HTMLElement
+      if (pollElement) {
+        // Scroll to the poll
+        pollElement.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        
+        // Add highlight effect
+        pollElement.classList.add('ring-2', 'ring-emerald-400', 'ring-offset-2', 'ring-offset-transparent')
+        
+        // Remove highlight after 3 seconds
+        setTimeout(() => {
+          pollElement.classList.remove('ring-2', 'ring-emerald-400', 'ring-offset-2', 'ring-offset-transparent')
+        }, 3000)
+      }
+    }
+  }, [highlightPollId, polls])
+
+  
   useEffect(() => {
     const cleanup = addMessageListener((message) => {
       if ((message.type === 'poll_update' || message.type === 'poll_vote_update') && message.GroupID === groupId) {
-        console.log('Received poll update via WebSocket:', message)
-        // Refresh polls to show the latest data
+        
         fetchPolls()
       }
     })
@@ -90,7 +106,7 @@ const GroupPollsTab: React.FC<GroupPollsTabProps> = ({ groupId }) => {
         expires_at: pollData.expiresAt ? new Date(pollData.expiresAt).toISOString() : undefined
       })
 
-      // Refetch polls to ensure data is fresh
+      
       await fetchPolls()
     } catch (error) {
       console.error('Failed to create poll:', error)
@@ -101,7 +117,7 @@ const GroupPollsTab: React.FC<GroupPollsTabProps> = ({ groupId }) => {
   const handleVote = async (pollId: number, optionIds: number[]) => {
     try {
       await api.votePoll(pollId, optionIds)
-      // Refetch polls to ensure data is fresh
+      
       await fetchPolls()
     } catch (error) {
       console.error('Failed to vote:', error)
@@ -112,7 +128,7 @@ const GroupPollsTab: React.FC<GroupPollsTabProps> = ({ groupId }) => {
   const handleUnvote = async (pollId: number) => {
     try {
       await api.unvotePoll(pollId)
-      // Refetch polls to ensure data is fresh
+      
       await fetchPolls()
     } catch (error) {
       console.error('Failed to unvote:', error)
@@ -123,7 +139,7 @@ const GroupPollsTab: React.FC<GroupPollsTabProps> = ({ groupId }) => {
   const handleDeletePoll = async (pollId: number) => {
     try {
       await api.deletePoll(pollId)
-      // Refetch polls to ensure data is fresh
+      
       await fetchPolls()
     } catch (error) {
       console.error('Failed to delete poll:', error)
@@ -134,7 +150,7 @@ const GroupPollsTab: React.FC<GroupPollsTabProps> = ({ groupId }) => {
   const handleExpirePoll = async (pollId: number) => {
     try {
       await api.expirePoll(pollId)
-      // Refetch polls to ensure data is fresh
+      
       await fetchPolls()
     } catch (error) {
       console.error('Failed to expire poll:', error)
@@ -144,15 +160,15 @@ const GroupPollsTab: React.FC<GroupPollsTabProps> = ({ groupId }) => {
 
   const canManagePoll = (poll: PollResponse) => {
     if (!user) return false
-    // User can manage if they are the creator
+    
     if (poll.user_id === user.id) return true
-    // User can manage if they are a group admin or creator
+    
     if (userRole?.is_admin_or_creator) return true
     return false
   }
 
-  // Check if user has voted in all polls
-  const hasVotedInAllPolls = polls.length > 0 && polls.every(poll => poll.user_votes && poll.user_votes.length > 0)
+  
+  const hasVotedInAllPolls = polls && polls.length > 0 && polls.every(poll => poll.user_votes && poll.user_votes.length > 0)
 
   const canCreatePolls = () => {
     if (!groupPermissions) return false

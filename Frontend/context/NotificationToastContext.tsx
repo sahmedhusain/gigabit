@@ -3,14 +3,8 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react'
 import { useWebSocket } from './WebSocketContext'
 import { useAuth } from './AuthContext'
-import { ToastNotification } from '@/components/notifications/NotificationToast'
-
-interface NotificationToastContextType {
-  notifications: ToastNotification[]
-  addNotification: (notification: Omit<ToastNotification, 'id' | 'timestamp'>) => void
-  removeNotification: (id: number) => void
-  clearAll: () => void
-}
+import { ToastNotification } from '@/types/notifications'
+import { NotificationToastContextType } from '@/types/contexts'
 
 const NotificationToastContext = createContext<NotificationToastContextType | undefined>(undefined)
 
@@ -18,7 +12,7 @@ export const NotificationToastProvider: React.FC<{ children: React.ReactNode }> 
   const [notifications, setNotifications] = useState<ToastNotification[]>([])
   const { addMessageListener, isConnected } = useWebSocket()
   const { user } = useAuth()
-  // Track if user is on a chat route to suppress chat toasts
+  
   const [isOnChatRoute, setIsOnChatRoute] = useState(false)
   const notificationIdCounter = React.useRef(1)
 
@@ -141,7 +135,7 @@ export const NotificationToastProvider: React.FC<{ children: React.ReactNode }> 
           break
 
         case 'private_message':
-          // Handle direct private messages
+          
           if (!isOnChatRoute && message.data && message.from !== user.id) {
             const sender = message.data.sender
             addNotification({
@@ -156,7 +150,7 @@ export const NotificationToastProvider: React.FC<{ children: React.ReactNode }> 
           break
 
         case 'group_message':
-          // Handle group messages
+          
           if (!isOnChatRoute && message.data && message.from !== user.id) {
             const sender = message.data.sender
             addNotification({
@@ -171,7 +165,7 @@ export const NotificationToastProvider: React.FC<{ children: React.ReactNode }> 
           break
 
         case 'like':
-          // Handle post likes
+          
           if (message.data?.post_id && message.from !== user.id) {
             addNotification({
               type: 'like',
@@ -183,7 +177,7 @@ export const NotificationToastProvider: React.FC<{ children: React.ReactNode }> 
           break
 
         case 'comment_update':
-          // Handle new comments
+          
           if (message.action === 'create' && message.data?.post_id && message.from !== user.id) {
             const commenter = message.data.user
             addNotification({
@@ -198,11 +192,11 @@ export const NotificationToastProvider: React.FC<{ children: React.ReactNode }> 
           break
 
         case 'follow_update':
-          // Suppress toasts for sender; structured notifications will arrive via 'notification'
+          
           break
 
         case 'group_update':
-          // Handle group invitations and join requests
+          
           if (message.data && message.from !== user.id) {
             const { action, group_id, group_name } = message.data
             if (action === 'invite') {
@@ -224,7 +218,7 @@ export const NotificationToastProvider: React.FC<{ children: React.ReactNode }> 
           break
 
         case 'event_update':
-          // Handle event notifications
+          
           if (message.data && message.from !== user.id) {
             const { action, event_id, event_name } = message.data
             if (action === 'created') {

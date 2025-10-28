@@ -1,16 +1,13 @@
 'use client'
 import { Clock, ExternalLink } from 'lucide-react'
 import { useRouter } from 'next/navigation'
-import { SearchResult } from '@/hooks/useSearch'
 import Image from 'next/image'
-interface PostSearchResultProps {
-  result: SearchResult
-}
+import { PostSearchResultProps } from '@/types/search'
 
 export default function PostSearchResult({ result }: PostSearchResultProps) {
   const router = useRouter()
 
-  // Helper function to get initials from name
+  
   const getInitialsFromName = (name: string) => {
     if (!name || !name.trim()) return 'U'
     const parts = name.trim().split(/\s+/)
@@ -22,7 +19,7 @@ export default function PostSearchResult({ result }: PostSearchResultProps) {
   }
 
   const handleClick = () => {
-    // Navigate to individual post page
+    
     router.push(result.url)
   }
 
@@ -119,7 +116,7 @@ export default function PostSearchResult({ result }: PostSearchResultProps) {
                 <div className="w-2 h-2 bg-orange-400 rounded-full"></div>
                 <span className="text-orange-300 text-xs font-medium">Post</span>
               </div>
-              {/* Likes and comments intentionally hidden in search results */}
+              {}
             </div>
           </div>
         </div>

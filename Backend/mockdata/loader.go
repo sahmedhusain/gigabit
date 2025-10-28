@@ -45,7 +45,6 @@ func LoadMockData(db *sql.DB) error {
 		"poll_votes.sql",
 		"events.sql",
 		"event_responses.sql",
-		"notifications.sql",
 	}
 
 	mockDataDir := "mockdata"

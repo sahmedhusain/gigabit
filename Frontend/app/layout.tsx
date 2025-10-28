@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import ClientProviders from "@/components/providers/ClientProviders";
+import ClientProviders from "@/providers/ClientProviders";
 
 export const metadata: Metadata = {
   title: "Gigabit",

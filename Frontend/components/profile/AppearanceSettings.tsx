@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { Palette, Home, Check, Monitor, Moon, Sun, Globe, Users, Heart, Calendar, Search, User, UserPlus, Bell, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useBackgroundTheme } from '@/components/ui/BackgroundThemeProvider';
+import { useBackgroundTheme } from '@/providers/BackgroundThemeProvider';
 
 export default function AppearanceSettings() {
   const { setTheme: setBackgroundTheme } = useBackgroundTheme();
@@ -13,7 +13,7 @@ export default function AppearanceSettings() {
   const [selectedThemePreference, setSelectedThemePreference] = useState('system');
   const messageRef = useRef<HTMLDivElement>(null);
 
-  // Load saved settings on component mount
+  
   useEffect(() => {
     const savedRoute = localStorage.getItem('defaultRoute');
     if (savedRoute) {
@@ -24,7 +24,7 @@ export default function AppearanceSettings() {
     setSelectedThemePreference(savedThemePreference);
   }, []);
 
-  // Listen for system theme changes to update the applied theme when system is selected
+  
   useEffect(() => {
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
     
@@ -37,7 +37,7 @@ export default function AppearanceSettings() {
 
     mediaQuery.addEventListener('change', handleSystemThemeChange);
     
-    // Set initial system theme if system is selected
+    
     if (selectedThemePreference === 'system') {
       const systemTheme = mediaQuery.matches ? 'dark' : 'light';
       setBackgroundTheme(systemTheme);
@@ -131,17 +131,16 @@ export default function AppearanceSettings() {
 
       setMessage('Appearance settings saved successfully!');
       
-      // Scroll to the message after a brief delay to ensure it's rendered
+      
       setTimeout(() => {
         messageRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }, 100);
       
       setTimeout(() => setMessage(''), 3000);
-    } catch (error) {
-      console.error('Failed to save settings:', error);
+    } catch {
       setMessage('Failed to save settings');
       
-      // Scroll to the message after a brief delay to ensure it's rendered
+      
       setTimeout(() => {
         messageRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }, 100);
@@ -154,7 +153,7 @@ export default function AppearanceSettings() {
     setSelectedThemePreference(themeId);
     
     if (themeId === 'system') {
-      // For system theme, detect system preference and apply it
+      
       const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
       setBackgroundTheme(systemTheme);
     } else {

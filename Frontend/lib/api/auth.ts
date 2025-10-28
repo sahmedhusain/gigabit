@@ -3,7 +3,7 @@ import { RegisterRequest, LoginRequest, AuthResponse, User } from './types';
 
 declare module './client' {
   interface ApiClient {
-    // Auth endpoints
+    
     register(data: RegisterRequest): Promise<AuthResponse>;
     login(data: LoginRequest): Promise<AuthResponse>;
     getMe(): Promise<User>;

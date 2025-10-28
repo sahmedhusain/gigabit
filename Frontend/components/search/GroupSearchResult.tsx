@@ -1,20 +1,17 @@
 'use client'
 import { Users, Lock, ExternalLink } from 'lucide-react'
 import { useRouter } from 'next/navigation'
-import { SearchResult } from '@/hooks/useSearch'
 import { useState, useEffect } from 'react'
 import { api } from '@/lib/api'
 import Image from 'next/image'
 import { getGroupInitials } from '@/utils/avatarUtils'
 
-interface GroupSearchResultProps {
-  result: SearchResult
-}
+import { GroupSearchResultProps } from '@/types/search'
 
 export default function GroupSearchResult({ result }: GroupSearchResultProps) {
   const router = useRouter()
   
-  // Initialize state from localStorage synchronously
+  
   const getInitialStates = () => {
     try {
       const persistedStates = localStorage.getItem('groupJoinStates')
@@ -39,7 +36,7 @@ export default function GroupSearchResult({ result }: GroupSearchResultProps) {
   const [joinedGroups, setJoinedGroups] = useState<Record<number, boolean>>(initialStates.joinedGroups)
   const [localMemberStatus, setLocalMemberStatus] = useState<Record<number, string | null>>(initialStates.localMemberStatus)
 
-  // Persist join states to localStorage whenever they change
+  
   useEffect(() => {
     const states = {
       memberStatus: localMemberStatus,
@@ -49,7 +46,7 @@ export default function GroupSearchResult({ result }: GroupSearchResultProps) {
     localStorage.setItem('groupJoinStates', JSON.stringify(states))
   }, [localMemberStatus, joinedGroups])
 
-  // Use local state if available, otherwise fall back to result metadata
+  
   const getMemberStatus = (groupId: number) => {
     return localMemberStatus[groupId] ?? result.metadata?.memberStatus
   }
@@ -61,10 +58,10 @@ export default function GroupSearchResult({ result }: GroupSearchResultProps) {
 
   const handleClick = () => {
     if (isMember) {
-      // If user is a member, go to chat or group page
+      
       router.push(result.url)
     }
-    // If not a member, do not redirect - user must join first
+    
   }
 
   const getStatusBadge = () => {
@@ -81,7 +78,7 @@ export default function GroupSearchResult({ result }: GroupSearchResultProps) {
         </span>
       )
     } else if (joinable) {
-      return null // Will show button instead
+      return null 
     } else if (isPrivate) {
       return (
         <span className="px-2 py-1 bg-gray-500/20 text-gray-300 text-xs rounded-full flex items-center space-x-1 border border-gray-500/30">
@@ -95,7 +92,7 @@ export default function GroupSearchResult({ result }: GroupSearchResultProps) {
 
   const getActionButton = () => {
     if (isMember) {
-      return null // Members don't need action buttons in search results
+      return null 
     }
 
     if (memberStatus === 'requested' || memberStatus === 'sent') {
@@ -105,12 +102,12 @@ export default function GroupSearchResult({ result }: GroupSearchResultProps) {
             e.stopPropagation()
             const groupId = Number(result.id)
             try {
-              // Optimistic update: immediately clear the request status
+              
               setLocalMemberStatus(prev => ({ ...prev, [groupId]: null }))
               setPendingJoin(prev => ({ ...prev, [groupId]: true }))
 
               await api.leaveGroup(groupId)
-              // State is already updated optimistically
+              
             } catch (err) {
               console.error('Cancel join request failed', err)
             } finally {
@@ -132,17 +129,17 @@ export default function GroupSearchResult({ result }: GroupSearchResultProps) {
             e.stopPropagation()
             const groupId = Number(result.id)
             try {
-              // Optimistic update: immediately set status to 'requested'
+              
               setLocalMemberStatus(prev => ({ ...prev, [groupId]: 'requested' }))
               setPendingJoin(prev => ({ ...prev, [groupId]: true }))
 
               await api.joinGroup(groupId)
               setJoinedGroups(prev => ({ ...prev, [groupId]: true }))
-              // State is already updated optimistically
+              
             } catch (err: unknown) {
-              // Handle "already requested" error gracefully
+              
               if (err instanceof Error && err.message?.includes('Already requested or member of this group')) {
-                // Update local state to reflect that request was already made
+                
                 setLocalMemberStatus(prev => ({ ...prev, [groupId]: 'requested' }))
               } else {
                 console.error('Join group failed', err)

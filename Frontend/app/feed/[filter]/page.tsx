@@ -17,7 +17,7 @@ import {
   AuthenticationError
 } from '@/lib/api'
 
-// Import dashboard components
+
 import CreatePost from '@/components/posts/CreatePost'
 import HomeFeed from '@/components/posts/HomeFeed'
 
@@ -32,7 +32,7 @@ function FeedFilterPage() {
 
   const [feedSubTab, setFeedSubTab] = useState<'all' | 'following' | 'friends'>(filter === 'following' || filter === 'friends' ? filter : 'all')
 
-  // Wrapper function to validate feed sub tab
+  
   const handleSetFeedSubTab = (tab: string) => {
     if (tab === 'all' || tab === 'following' || tab === 'friends') {
       setFeedSubTab(tab)
@@ -41,7 +41,7 @@ function FeedFilterPage() {
   const [sortOrder, setSortOrder] = useState<'newest' | 'oldest'>((searchParams?.get('sort') as 'newest' | 'oldest') || 'newest')
   const [showCreatePost, setShowCreatePost] = useState(false)
 
-  // Post Creation State
+  
   const [newPostContent, setNewPostContent] = useState('')
   const [newPostImage, setNewPostImage] = useState<File | null>(null)
   const [postPrivacy, setPostPrivacy] = useState<'public' | 'followers' | 'friends' | 'listed'>('public')
@@ -49,14 +49,14 @@ function FeedFilterPage() {
   const [availableUsers, setAvailableUsers] = useState<{ id: number; email: string; first_name: string; last_name: string; avatar?: string; nickname?: string; display_name?: string; }[]>([])
   const [loadingUsers, setLoadingUsers] = useState(false)
 
-  // Data State
+  
   const [posts, setPosts] = useState<Post[]>([])
   const [, setIsLoadingPosts] = useState(true)
 
-  // Ref for scroll position management
+  
   const resultsContainerRef = useRef<HTMLDivElement>(null)
 
-  // Pagination state for each feed type
+  
   const [paginationState, setPaginationState] = useState<{
     following: { currentPage: number; hasMoreResults: boolean; isLoadingMore: boolean };
     friends: { currentPage: number; hasMoreResults: boolean; isLoadingMore: boolean };
@@ -67,16 +67,16 @@ function FeedFilterPage() {
     all: { currentPage: 0, hasMoreResults: true, isLoadingMore: false }
   })
 
-  // Update URL when filter changes
+  
   useEffect(() => {
     if (feedSubTab !== filter) {
       router.replace(`/feed/${feedSubTab}`)
     }
   }, [feedSubTab, filter, router])
 
-  // Fetch available users (followers) for listed privacy
+  
   const fetchAvailableUsers = useCallback(async () => {
-    if (availableUsers.length > 0) return // Already fetched
+    if (availableUsers.length > 0) return 
 
     try {
       setLoadingUsers(true)
@@ -90,7 +90,7 @@ function FeedFilterPage() {
     }
   }, [user?.id, error, availableUsers.length])
 
-  // Fetch users when privacy changes to 'listed' or when create post modal opens
+  
   useEffect(() => {
     if (showCreatePost && postPrivacy === 'listed') {
       fetchAvailableUsers()
@@ -108,19 +108,18 @@ function FeedFilterPage() {
         setIsLoadingPosts(true)
       }
 
-      console.log('Fetching feed posts...')
       let response: unknown
 
       switch (feedSubTab) {
         case 'following':
-          // Fetch posts from users the current user is following
+          
           response = await api.getFollowingFeed(20, page * 20)
           break
         case 'friends':
-          // Fetch posts from friends (mutual follows)
+          
           response = await api.getFriendsFeed(20, page * 20)
           break
-        default: // 'all'
+        default: 
           response = await api.getAllFeed(20, page * 20)
       }
 
@@ -225,28 +224,27 @@ function FeedFilterPage() {
     const removeListener = addMessageListener((message) => {
       switch (message.type) {
         case 'post_update':
-          console.log('Post update received:', message.data)
-          fetchFeedPosts()
-          break
+          fetchFeedPosts();
+          break;
 
         case 'like':
-          // Update like count in real-time for other users
+          
           if (message.data?.post_id && message.data?.user_id !== user?.id) {
             setPosts(prevPosts =>
               prevPosts.map(post =>
                 post.id === message.data.post_id
                   ? {
-                    ...post,
-                    likes: message.data.like_count || post.likes
-                  }
+                      ...post,
+                      likes: message.data.like_count || post.likes,
+                    }
                   : post
               )
-            )
+            );
           }
-          break
+          break;
 
         default:
-          console.log('Received WebSocket message:', message)
+          break;
       }
     })
 
@@ -306,7 +304,7 @@ function FeedFilterPage() {
 
       const postData: CreatePostRequest = {
         content: newPostContent,
-        privacy: postPrivacy, // Use the privacy value directly (public, followers, friends, listed)
+        privacy: postPrivacy, 
         image_url: imageUrl
       }
 
@@ -320,7 +318,7 @@ function FeedFilterPage() {
       setPostPrivacy('public')
       setSelectedUsers([])
       setShowCreatePost(false)
-      success('Post created successfully!')
+      success('Post created!')
       fetchFeedPosts()
     } catch (err) {
       console.error('Error creating post:', err)
@@ -339,10 +337,8 @@ function FeedFilterPage() {
       const post = posts.find(p => p.id === postId)
       const wasLiked = post?.isLiked || false
 
-      if (wasLiked) {
-        await api.unlikePost(postId)
-      } else {
-        await api.likePost(postId)
+      if (post) {
+        await api.toggleLike(post, !wasLiked)
       }
 
       setPosts(posts.map(p =>
@@ -391,11 +387,11 @@ function FeedFilterPage() {
   const handleLoadMore = useCallback(() => {
     const currentState = paginationState[feedSubTab as keyof typeof paginationState]
     if (!currentState.isLoadingMore && currentState.hasMoreResults && resultsContainerRef.current) {
-      // Save current scroll position
+      
       const scrollTop = resultsContainerRef.current.scrollTop
 
       fetchFeedPosts(currentState.currentPage + 1, true).then(() => {
-        // Restore scroll position after new posts are loaded
+        
         requestAnimationFrame(() => {
           if (resultsContainerRef.current) {
             resultsContainerRef.current.scrollTop = scrollTop
@@ -456,7 +452,7 @@ function FeedFilterPage() {
   )
 }
 
-// Wrap the entire component with ProtectedRoute
+
 function ProtectedFeedFilterPage() {
   return (
     <ProtectedRoute>

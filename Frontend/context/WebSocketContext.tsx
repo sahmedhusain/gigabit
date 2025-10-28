@@ -1,45 +1,7 @@
 'use client'
 import React, { createContext, useContext, useEffect, useRef, useState, useCallback } from 'react'
 import { useAuth } from './AuthContext'
-
-// WebSocket message types
-export interface WebSocketMessage {
-  type: 'private_message' | 'group_message' | 'notification' | 'user_status' | 'typing' | 
-        'post_update' | 'comment_update' | 'like_update' | 'like' | 'follow_update' | 
-        'follow' | 'unfollow' | 'follow_request' | 'cancel_follow_request' | 'follow_status' |
-        'group_update' | 'event_update' | 'category_update' | 'follower_count_update' |
-        'poll_update' | 'poll_vote_update' | 'layout_sync' | 'ping' | 'pong' | 'error' |
-        'message_deleted' | 'shared_post' | 'image_shared'
-  from?: number
-  to?: number
-  group_id?: number
-  GroupID?: NumberConstructor
-  post_id?: number
-  event_id?: number
-  EventID?: number
-  poll_id?: number
-  PollID?: number
-  content?: string
-  action?: string
-  data?: any
-  message_id?: string
-  timestamp: number
-}
-
-export interface OnlineUser {
-  user_id: number
-  username: string
-  status: 'online' | 'busy' | 'away' | 'invisible' | 'offline'
-  last_status_change?: string
-}
-
-interface WebSocketContextType {
-  socket: WebSocket | null
-  isConnected: boolean
-  onlineUsers: OnlineUser[]
-  sendMessage: (message: Omit<WebSocketMessage, 'timestamp'>) => void
-  addMessageListener: (callback: (message: WebSocketMessage) => void) => () => void
-}
+import { WebSocketMessage, OnlineUser, WebSocketContextType, WebSocketProviderProps } from '@/types/contexts'
 
 const WebSocketContext = createContext<WebSocketContextType | undefined>(undefined)
 
@@ -49,10 +11,6 @@ export const useWebSocket = () => {
     throw new Error('useWebSocket must be used within a WebSocketProvider')
   }
   return context
-}
-
-interface WebSocketProviderProps {
-  children: React.ReactNode
 }
 
 export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }) => {
@@ -69,31 +27,26 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 
   const connect = useCallback(() => {
     if (!isAuthenticated || !user || socket?.readyState === WebSocket.CONNECTING) {
-      console.log('WebSocket connection skipped:', { isAuthenticated, user: !!user, socketState: socket?.readyState })
       return
     }
 
     const token = localStorage.getItem('token')
     if (!token) {
-      console.log('No token found in localStorage')
       return
     }
 
-    console.log('Attempting WebSocket connection...', { userId: user.id, tokenLength: token.length })
     const wsUrl = `ws://localhost:8080/api/ws?token=${encodeURIComponent(token)}`
-    console.log('WebSocket URL:', wsUrl.replace(/token=[^&]+/, 'token=***'))
     
     const newSocket = new WebSocket(wsUrl)
 
     newSocket.onopen = () => {
-      console.log('WebSocket connected successfully')
       setIsConnected(true)
       reconnectAttempts.current = 0
       
-      // Start heartbeat
+      
       startPingInterval(newSocket)
       
-      // Request initial online users list
+      
       const message: Omit<WebSocketMessage, 'timestamp'> = {
         type: 'user_status',
         data: { action: 'get_online_users' }
@@ -104,20 +57,12 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
     newSocket.onmessage = (event) => {
       try {
         const message: WebSocketMessage = JSON.parse(event.data)
-        console.log('🌐 [WebSocket] Received message:', {
-          type: message.type,
-          from: message.from,
-          to: message.to,
-          data: message.data,
-          timestamp: message.timestamp
-        })
         
-        // Handle different message types
+        
         switch (message.type) {
           case 'user_status':
             if (message.data?.online_users) {
-              // Handle initial online users list
-              console.log('Received initial online users:', message.data.online_users)
+              
               const usersWithStatus = message.data.online_users.map((user: any) => ({
                 user_id: user.user_id,
                 username: user.username || `User ${user.user_id}`,
@@ -126,18 +71,15 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
               }))
               setOnlineUsers(usersWithStatus)
             } else if (message.data?.user_id) {
-              // Handle individual user status update
-              console.log('Received user status update:', message.data)
+              
               setOnlineUsers(prev => {
                 const filtered = prev.filter(u => u.user_id !== message.data.user_id)
                 
-                // If status is offline, don't add the user back (they disconnected)
+                
                 if (message.data.status === 'offline') {
-                  console.log(`User ${message.data.user_id} went offline`)
                   return filtered
                 }
                 
-                console.log(`User ${message.data.user_id} status: ${message.data.status}`)
                 const newUser = {
                   user_id: message.data.user_id,
                   username: message.data.username || `User ${message.data.user_id}`,
@@ -150,7 +92,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
             break
           
           case 'ping':
-            // Respond to ping with pong
+            
             if (newSocket.readyState === WebSocket.OPEN) {
               newSocket.send(JSON.stringify({
                 type: 'pong',
@@ -160,7 +102,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
             break
             
           case 'pong':
-            // Clear pong timeout - connection is alive
+            
             if (pongTimeout.current) {
               clearTimeout(pongTimeout.current)
               pongTimeout.current = null
@@ -188,7 +130,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
           case 'image_shared':
           case 'message_deleted':
           default:
-            // Notify all listeners
+            
             messageListeners.current.forEach(callback => callback(message))
             break
         }
@@ -198,20 +140,14 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
     }
 
     newSocket.onclose = (event) => {
-      console.log('WebSocket disconnected:', {
-        code: event.code,
-        reason: event.reason,
-        wasClean: event.wasClean
-      })
       setIsConnected(false)
       setSocket(null)
       stopPingInterval()
       
-      // Attempt reconnection if not a manual close
+      
       if (event.code !== 1000 && reconnectAttempts.current < maxReconnectAttempts && isAuthenticated) {
         reconnectAttempts.current++
         const delay = Math.min(1000 * Math.pow(2, reconnectAttempts.current), 30000)
-        console.log(`Attempting to reconnect in ${delay}ms (attempt ${reconnectAttempts.current}/${maxReconnectAttempts})`)
         
         if (reconnectTimeout.current) {
           clearTimeout(reconnectTimeout.current)
@@ -224,15 +160,13 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 
     newSocket.onerror = (error) => {
       console.error('WebSocket error:', error)
-      console.log('WebSocket state:', newSocket.readyState)
-      console.log('WebSocket URL:', wsUrl)
     }
 
     setSocket(newSocket)
   }, [isAuthenticated, user, socket?.readyState])
 
   const startPingInterval = (ws: WebSocket) => {
-    // Clear existing intervals
+    
     if (pingInterval.current) {
       clearInterval(pingInterval.current)
       pingInterval.current = null
@@ -242,22 +176,20 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
       pongTimeout.current = null
     }
 
-    // Send ping every 25 seconds (more frequent for better detection)
+    
     pingInterval.current = setInterval(() => {
       if (ws.readyState === WebSocket.OPEN) {
-        console.log('Sending ping to server')
         ws.send(JSON.stringify({
           type: 'ping',
           from: user?.id,
           timestamp: Date.now()
         }))
 
-        // Set timeout for pong response (8 seconds - shorter for faster recovery)
+        
         if (pongTimeout.current) {
           clearTimeout(pongTimeout.current)
         }
         pongTimeout.current = setTimeout(() => {
-          console.log('No pong received within 8 seconds, closing connection for reconnect')
           ws.close(1001, 'Ping timeout')
         }, 8000)
       }
@@ -305,13 +237,13 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
   const addMessageListener = useCallback((callback: (message: WebSocketMessage) => void) => {
     messageListeners.current.push(callback)
     
-    // Return cleanup function
+    
     return () => {
       messageListeners.current = messageListeners.current.filter(cb => cb !== callback)
     }
   }, [])
 
-  // Connect when user is authenticated
+  
   useEffect(() => {
     if (isAuthenticated && user) {
       connect()
@@ -324,7 +256,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
     }
   }, [isAuthenticated, user])
 
-  // Cleanup on unmount
+  
   useEffect(() => {
     return () => {
       if (reconnectTimeout.current) {

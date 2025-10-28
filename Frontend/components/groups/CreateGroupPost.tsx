@@ -5,14 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useConnectionStatus } from '@/hooks'
 import { useToast } from '@/context/ToastContext'
 import { api } from '@/lib/api'
-
-interface CreateGroupPostProps {
-  show: boolean
-  onClose: () => void
-  groupId: number
-  groupTitle: string
-  onPostCreated?: () => void
-}
+import { CreateGroupPostProps } from '@/types/groups'
 
 export default function CreateGroupPost({
   show,
@@ -48,7 +41,7 @@ export default function CreateGroupPost({
 
       await api.createGroupPost(groupId, postData)
       
-      success('Group post created successfully!')
+      success('Group post created!')
 
       // Reset form
       setNewPostContent('')

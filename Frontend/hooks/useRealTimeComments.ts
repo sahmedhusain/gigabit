@@ -22,11 +22,11 @@ export function useRealTimeComments(postId: number) {
     }
   })
 
-  // WebSocket subscription for real-time comment updates
+  
   const { isConnected } = useWebSocketSubscription({
     messageTypes: ['comment_update'],
     onMessage: (message) => {
-      // Only handle comments for this specific post
+      
       if (message.post_id !== postId) return
 
       const now = Date.now()
@@ -34,7 +34,7 @@ export function useRealTimeComments(postId: number) {
       if (message.type === 'comment_update' && message.data) {
         if (message.action === 'created' && message.data.comment) {
           const newComment = message.data.comment as Comment
-          // Only show as new if not from current user and newer than last fetch
+          
           if (newComment.user_id !== user?.id && now > lastFetchTime.current) {
             setNewCommentsCount(prev => prev + 1)
           }
@@ -62,7 +62,7 @@ export function useRealTimeComments(postId: number) {
       
       setComments(Array.isArray(commentsData) ? commentsData : [])
       lastFetchTime.current = Date.now()
-      setNewCommentsCount(0) // Reset new comments count on manual fetch
+      setNewCommentsCount(0) 
     } catch (err: any) {
       console.error('Failed to fetch comments:', err)
       setError(err.message || 'Failed to fetch comments')
@@ -80,9 +80,9 @@ export function useRealTimeComments(postId: number) {
     try {
       return await optimisticUpdate(
         (currentComments) => {
-          // Create optimistic comment
+          
           const optimisticComment: Comment = {
-            id: Date.now(), // Temporary ID
+            id: Date.now(), 
             user_id: user.id,
             post_id: postId,
             content: commentData.content,
@@ -94,7 +94,7 @@ export function useRealTimeComments(postId: number) {
         },
         async () => {
           const response = await api.createComment(postId, commentData)
-          // Refresh comments to get the real data with correct ID
+          
           await fetchComments()
           return response
         }
@@ -113,7 +113,7 @@ export function useRealTimeComments(postId: number) {
     setNewCommentsCount(0)
   }, [])
 
-  // Initial load when postId changes
+  
   useEffect(() => {
     if (postId) {
       fetchComments()

@@ -3,7 +3,7 @@ import { EventResponse, CreateEventRequest, UpdateEventRequest, CancelEventReque
 
 declare module './client' {
   interface ApiClient {
-    // Events endpoints
+    
     getUserEvents(): Promise<{ events: EventResponse[], count: number, limit: number, offset: number }>;
     getGroupEvents(groupId: number, limit?: number, offset?: number): Promise<{ events: EventResponse[], count: number, limit: number, offset: number }>;
     getEvent(eventId: number): Promise<EventResponse>;

@@ -1,7 +1,8 @@
 'use client'
 import Image from 'next/image'
 import { User, Lock, Globe, MessageSquare, Edit, Heart, MessageCircle, Send, Bookmark, MoreHorizontal, Trash2, EyeOff, UserPlus, UserMinus, X, UserX, Mail, Calendar, CalendarDays, FileText, Plus, Users, Search, Venus, Mars } from 'lucide-react'
-import { Post, api, CreatePostRequest, User as ApiUser } from '@/lib/api'
+import { Post } from '@/types/posts'
+import { api, CreatePostRequest, User as ApiUser } from '@/lib/api'
 import { useRealTimePosts, useFollowers, useConnectionStatus, useFollowerCounts } from '@/hooks'
 import { getAvatarUrl, getUserInitials } from '@/utils/avatarUtils'
 import { useRouter } from 'next/navigation'
@@ -9,83 +10,15 @@ import { useState, useEffect, useMemo } from 'react'
 import { useToast } from '@/context/ToastContext'
 import { useAuth } from '@/context/AuthContext'
 import { useWebSocket } from '@/context/WebSocketContext'
-import type { WebSocketMessage } from '@/context/WebSocketContext'
-import FollowHandler, { FollowStatus, getFollowStatusFromAPI } from './FollowHandler'
+import { WebSocketMessage } from '@/types/contexts'
+import FollowHandler, { getFollowStatusFromAPI } from './FollowHandler'
+import { FollowStatus } from '@/types/profile'
 import ManagePrivacy from './ManagePrivacy'
 import SharePopup from '../ui/SharePopup'
 import CreatePost from '../posts/CreatePost'
 import ImagePreviewModal from '../ui/ImagePreviewModal'
-
-interface UserOption {
-  id: number
-  display_name?: string
-  first_name: string
-  last_name: string
-  nickname?: string
-  email: string
-  avatar?: string
-}
+import { UserOption, FollowWebSocketData, ProfileSectionProps } from '@/types/profile'
 import { motion, AnimatePresence } from 'framer-motion'
-
-interface FollowWebSocketData {
-  user_id: number;
-  first_name?: string;
-  last_name?: string;
-  nickname?: string;
-  email?: string;
-  avatar?: string;
-  is_private?: boolean;
-  created_at?: string;
-  about_me?: string;
-  date_of_birth?: string;
-  follower_id: number;
-  follower_first_name?: string;
-  follower_last_name?: string;
-  follower_nickname?: string;
-  follower_email?: string;
-  follower_avatar?: string;
-  follower_is_private?: boolean;
-  follower_created_at?: string;
-  follower_about_me?: string;
-  follower_date_of_birth?: string;
-  is_followed_by?: boolean;
-  is_following_back?: boolean;
-  action: 'follow' | 'unfollow' | 'accept';
-}
-
-interface ProfileSectionProps {
-  currentUser: {
-    id: number
-    name: string
-    username: string
-    avatar?: string
-    isPrivate: boolean
-    email: string
-    firstName: string
-    lastName: string
-    dateOfBirth: string
-    nickname: string
-    aboutMe: string
-    gender?: string
-    memberSince: string
-    genderPrivacy?: string
-    birthdayPrivacy?: string
-    is_private?: boolean
-    first_name?: string
-    last_name?: string
-    is_deleted?: boolean
-  } | null
-  followers: unknown[]
-  following: unknown[]
-  posts: Post[]
-  isOwnProfile?: boolean
-  showPrivacyOverlay?: boolean
-  initialFollowerCount?: number
-  initialFollowingCount?: number
-  onPostLike?: (postId: number) => void
-  onPostBookmark?: (postId: number) => void
-  onPostPrivacyUpdate?: (postId: number, privacy: string) => void
-}
 
 export default function ProfileSection({
   currentUser,
@@ -109,7 +42,7 @@ export default function ProfileSection({
     following?.length || 0
   )
 
-  // Add follow status state management
+  
   const [followStatus, setFollowStatus] = useState<FollowStatus>({
     isFollowing: false,
     isPending: false,
@@ -117,30 +50,30 @@ export default function ProfileSection({
     status: 'not_following'
   })
 
-  // Sync localPosts with posts prop when not using callbacks
+  
   useEffect(() => {
     if (!onPostLike || !onPostBookmark) {
       setLocalPosts(posts)
     }
   }, [posts, onPostLike, onPostBookmark])
 
-  // Add privacy toggle state
+  
   const [showPrivacyConfirm, setShowPrivacyConfirm] = useState(false)
   const [showPrivateConfirm, setShowPrivateConfirm] = useState(false)
   const [isUpdatingPrivacy, setIsUpdatingPrivacy] = useState(false)
   const [currentPrivacySetting, setCurrentPrivacySetting] = useState(currentUser?.isPrivate || false)
   const { success, error } = useToast()
   
-  // Tab navigation state
+  
   const [activeTab, setActiveTab] = useState<'posts' | 'following' | 'followers'>('posts')
   const [tabData, setTabData] = useState<{ following: ApiUser[], followers: ApiUser[] }>({ following: [], followers: [] })
   const [isLoadingTabData, setIsLoadingTabData] = useState(false)
 
-  // Follow relationships state
+  
   const [followRelationships, setFollowRelationships] = useState<{[userId: number]: {isFollowing: boolean, isFollowedBy: boolean, isPending?: boolean}}>({})
   const [isUpdatingFollow, setIsUpdatingFollow] = useState<{[userId: number]: boolean}>({})
 
-  // Post management state
+  
   const [openMenu, setOpenMenu] = useState<{[postId: number]: boolean}>({})
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<{[postId: number]: boolean}>({})
   const [isDeleting, setIsDeleting] = useState<{[postId: number]: boolean}>({})
@@ -148,27 +81,27 @@ export default function ProfileSection({
   const [currentSelectedUsers, setCurrentSelectedUsers] = useState<{[postId: number]: number[]}>({})
 
 
-  // Local state for posts when callbacks are not provided
+  
   const [localPosts, setLocalPosts] = useState<Post[]>(posts)
 
-  // Share functionality state
+  
   const [sharePost, setSharePost] = useState<Post | null>(null)
 
-  // Confirmation modal states
+  
   const [showRemoveConfirm, setShowRemoveConfirm] = useState<{ userId: number; userName: string } | null>(null)
   const [showUnfollowConfirm, setShowUnfollowConfirm] = useState<{ userId: number; userName: string } | null>(null)
   const [showProfileUnfollowConfirm, setShowProfileUnfollowConfirm] = useState<{ userId: number; userName: string } | null>(null)
   const [showListUnfollowConfirm, setShowListUnfollowConfirm] = useState<{ userId: number; userName: string } | null>(null)
 
-  // Sorting and filtering state
+  
   const [sortOption, setSortOption] = useState<'latest' | 'oldest' | 'most_comments' | 'most_likes'>('latest')
   const [privacyFilter, setPrivacyFilter] = useState<'all' | 'public' | 'followers' | 'friends' | 'listed'>('all')
 
-  // Sorting state for following and followers
+  
   const [followingSort, setFollowingSort] = useState<'latest' | 'oldest'>('latest')
   const [followersSort, setFollowersSort] = useState<'latest' | 'oldest'>('latest')
 
-  // Create Post modal state
+  
   const [showCreatePost, setShowCreatePost] = useState(false)
   const [newPostContent, setNewPostContent] = useState('')
   const [newPostImage, setNewPostImage] = useState<File | null>(null)
@@ -177,7 +110,7 @@ export default function ProfileSection({
   const [availableUsers, ] = useState<UserOption[]>([])
   const [loadingUsers, setLoadingUsers] = useState(false)
 
-  // Image preview modal state
+  
   const [imagePreviewState, setImagePreviewState] = useState<{
     isOpen: boolean;
     imageUrl: string;
@@ -195,7 +128,7 @@ export default function ProfileSection({
   // Fetch follow status on mount for other users' profiles
   useEffect(() => {
     if (!isOwnProfile && currentUser) {
-      // Use HTTP API to get initial follow status
+      
       api.getFollowStatus(currentUser.id).then((status) => {
         setFollowStatus(getFollowStatusFromAPI(
           status.is_following,
@@ -208,7 +141,7 @@ export default function ProfileSection({
     }
   }, [isOwnProfile, currentUser])
 
-  // Listen for real-time follow updates to update lists
+  
   useEffect(() => {
     if (!currentUser) return
 
@@ -216,9 +149,9 @@ export default function ProfileSection({
       if (message.type === 'follow_update' && message.data) {
         const data = message.data as FollowWebSocketData
 
-        // Update following list if someone the current user follows/unfollows
+        
         if (data.action === 'follow' && data.follower_id === currentUser.id) {
-          // Current user followed someone - add to following list
+          
           const newUser: ApiUser = {
             id: data.user_id,
             first_name: data.first_name || '',
@@ -232,10 +165,10 @@ export default function ProfileSection({
             date_of_birth: data.date_of_birth || '',
             updated_at: new Date().toISOString(),
             gender: '', // Default empty
-            status: 'online', // Default
+            status: 'online', 
             last_status_change: new Date().toISOString(),
-            gender_privacy: 'everyone', // Default
-            birthday_privacy: 'everyone' // Default
+            gender_privacy: 'everyone', 
+            birthday_privacy: 'everyone' 
           }
           setTabData(prev => ({
             ...prev,
@@ -246,11 +179,11 @@ export default function ProfileSection({
             [data.user_id]: { 
               isFollowing: true, 
               isFollowedBy: data.is_followed_by || false,
-              isPending: false  // Following means request was accepted
+              isPending: false  
             }
           }))
         } else if (data.action === 'unfollow' && data.follower_id === currentUser.id) {
-          // Current user unfollowed someone - remove from following list
+          
           setTabData(prev => ({
             ...prev,
             following: prev.following.filter((user: Partial<ApiUser>) => user.id !== data.user_id)
@@ -262,9 +195,9 @@ export default function ProfileSection({
           })
         }
 
-        // Update followers list if someone follows/unfollows the current user
+        
         if (data.action === 'follow' && data.user_id === currentUser.id) {
-          // Someone followed current user - add to followers list
+          
           const newUser: ApiUser = {
             id: data.follower_id!,
             first_name: data.follower_first_name || '',
@@ -278,10 +211,10 @@ export default function ProfileSection({
             date_of_birth: data.follower_date_of_birth || '',
             updated_at: new Date().toISOString(),
             gender: '', // Default empty
-            status: 'online', // Default
+            status: 'online', 
             last_status_change: new Date().toISOString(),
-            gender_privacy: 'everyone', // Default
-            birthday_privacy: 'everyone' // Default
+            gender_privacy: 'everyone', 
+            birthday_privacy: 'everyone' 
           }
           setTabData(prev => ({
             ...prev,
@@ -292,11 +225,11 @@ export default function ProfileSection({
             [data.follower_id]: { 
               isFollowing: data.is_following_back || false, 
               isFollowedBy: true,
-              isPending: false  // If someone followed, they're not pending
+              isPending: false  
             }
           }))
         } else if (data.action === 'unfollow' && data.user_id === currentUser.id) {
-          // Someone unfollowed current user - remove from followers list
+          
           setTabData(prev => ({
             ...prev,
             followers: prev.followers.filter((user: Partial<ApiUser>) => user.id !== data.follower_id)
@@ -308,28 +241,28 @@ export default function ProfileSection({
           })
         }
 
-        // Handle accept action - when current user accepts a follow request
+        
         if (data.action === 'accept' && data.user_id === currentUser.id) {
-          // Current user accepted a follow request - update the relationship
+          
           setFollowRelationships(prev => ({
             ...prev,
             [data.follower_id]: { 
-              isFollowing: true,  // Now following
-              isFollowedBy: true, // They were already following (requesting)
-              isPending: false    // No longer pending
+              isFollowing: true,  
+              isFollowedBy: true, 
+              isPending: false    
             }
           }))
         }
 
-        // Handle accept action - when someone accepts current user's follow request
+        
         if (data.action === 'accept' && data.follower_id === currentUser.id) {
-          // Someone accepted current user's follow request - update the relationship
+          
           setFollowRelationships(prev => ({
             ...prev,
             [data.user_id]: { 
-              isFollowing: true,  // Now following
+              isFollowing: true,  
               isFollowedBy: data.is_followed_by || false,
-              isPending: false    // No longer pending
+              isPending: false    
             }
           }))
         }
@@ -339,26 +272,26 @@ export default function ProfileSection({
     return removeListener
   }, [currentUser, addMessageListener])
 
-  // Handle follow status changes
+  
   const handleFollowStatusChange = (newStatus: FollowStatus) => {
     setFollowStatus(newStatus)
   }
 
-  // Handle unfollow confirmation from profile header
+  
   const handleProfileUnfollowConfirm = (userId: number, userName: string) => {
     setShowProfileUnfollowConfirm({ userId, userName })
   }
 
-  // Handle unfollow confirmation from lists in other profiles
+  
   const handleListUnfollowConfirm = (userId: number, userName: string) => {
     setShowListUnfollowConfirm({ userId, userName })
   }
 
-  // Handle confirmed unfollow from profile header
+  
   const handleConfirmedProfileUnfollow = async () => {
     if (!showProfileUnfollowConfirm) return
 
-    // Update the follow status directly
+    
     const newStatus: FollowStatus = {
       isFollowing: false,
       isPending: false,
@@ -367,7 +300,7 @@ export default function ProfileSection({
     }
     setFollowStatus(newStatus)
 
-    // Send unfollow WebSocket message
+    
     sendMessage({
       type: 'unfollow' as const,
       to: showProfileUnfollowConfirm.userId,
@@ -382,11 +315,11 @@ export default function ProfileSection({
     setShowProfileUnfollowConfirm(null)
   }
 
-  // Handle confirmed unfollow from lists in other profiles
+  
   const handleConfirmedListUnfollow = async () => {
     if (!showListUnfollowConfirm) return
 
-    // Update the follow relationships directly
+    
     setFollowRelationships(prev => ({
       ...prev,
       [showListUnfollowConfirm.userId]: { 
@@ -396,7 +329,7 @@ export default function ProfileSection({
       }
     }))
 
-    // Send unfollow WebSocket message
+    
     sendMessage({
       type: 'unfollow' as const,
       to: showListUnfollowConfirm.userId,
@@ -404,14 +337,14 @@ export default function ProfileSection({
       data: {
         user_id: showListUnfollowConfirm.userId,
         user_name: showListUnfollowConfirm.userName,
-        is_private: false // We don't have this info in the list context
+        is_private: false 
       }
     })
 
     setShowListUnfollowConfirm(null)
   }
 
-  // Handle tab changes
+  
   const handleTabChange = async (tab: 'posts' | 'following' | 'followers') => {
     setActiveTab(tab)
 
@@ -420,7 +353,7 @@ export default function ProfileSection({
     }
   }
 
-  // Load data for tabs
+  
   const loadTabData = async (tab: 'following' | 'followers') => {
     if (!currentUser) return
 
@@ -430,11 +363,11 @@ export default function ProfileSection({
         const response = await api.getFollowers(currentUser.id)
         setTabData(prev => ({ ...prev, followers: response.followers || [] }))
 
-// Initialize follow relationships for followers
+
         const relationships: { [key: number]: {isFollowing: boolean, isFollowedBy: boolean, isPending?: boolean} } = {}
         if (response.followers && response.followers.length > 0) {
           if (isOwnProfile) {
-            // For own profile: check follow status for follow-back logic
+            
             const followStatusPromises = response.followers.map(async (user: ApiUser) => {
               try {
                 const followStatus = await api.getFollowStatus(user.id)
@@ -450,7 +383,7 @@ export default function ProfileSection({
               relationships[userId] = { isFollowing, isFollowedBy, isPending }
             })
           } else {
-            // For other profiles: check if current user follows these followers
+            
             const followStatusPromises = response.followers.map(async (user: ApiUser) => {
               try {
                 const followStatus = await api.getFollowStatus(user.id)
@@ -472,11 +405,11 @@ export default function ProfileSection({
         const response = await api.getFollowing(currentUser.id)
         setTabData(prev => ({ ...prev, following: response.following || [] }))
 
-        // Initialize follow relationships for following
+        
         const relationships: { [key: number]: {isFollowing: boolean, isFollowedBy: boolean, isPending?: boolean} } = {}
         if (response.following && response.following.length > 0) {
           if (isOwnProfile) {
-            // For own profile: check actual follow status for each user (including pending requests)
+            
             const followStatusPromises = response.following.map(async (user: ApiUser) => {
               try {
                 const followStatus = await api.getFollowStatus(user.id)
@@ -492,7 +425,7 @@ export default function ProfileSection({
               relationships[userId] = { isFollowing, isFollowedBy, isPending }
             })
           } else {
-            // For other profiles: check if current user follows these users they're following
+            
             const followStatusPromises = response.following.map(async (user: ApiUser) => {
               try {
                 const followStatus = await api.getFollowStatus(user.id)
@@ -519,23 +452,23 @@ export default function ProfileSection({
     }
   }
 
-  // Handle starting a chat
+  
   const handleStartChat = () => {
-    // Navigate to chats page with user parameter to start/open conversation
+    
     router.push(`/chats/all?user=${currentUser?.id}`)
   }
 
-  // Handle edit profile
+  
   const handleEditProfile = () => {
     router.push('/settings')
   }
 
-  // Handle user follow/unfollow
+  
   const handleUserFollowAction = async (userId: number, isCurrentlyFollowing: boolean) => {
-    // Convert userId to number if it's a string (from API response)
+    
     const numericUserId = typeof userId === 'string' ? parseInt(userId, 10) : userId
 
-    // Validate userId
+    
     if (!numericUserId || numericUserId <= 0 || !Number.isInteger(numericUserId)) {
       console.error('Invalid user ID:', userId)
       error('Invalid user ID')
@@ -547,50 +480,50 @@ export default function ProfileSection({
     setIsUpdatingFollow(prev => ({ ...prev, [numericUserId]: true }))
 
     try {
-      // Check if there's a pending follow request that needs to be cancelled
+      
       if (followRelationships[numericUserId]?.isPending) {
-        // Cancel pending follow request
+        
         await api.unfollowUser(numericUserId)
         setFollowRelationships(prev => ({ ...prev, [numericUserId]: { ...prev[numericUserId], isFollowing: false, isPending: false } }))
-        success(`Follow request cancelled`)
+        success('Request cancelled!')
       } else if (isCurrentlyFollowing) {
-        // Unfollow
+        
         await api.unfollowUser(numericUserId)
         setFollowRelationships(prev => ({ ...prev, [numericUserId]: { ...prev[numericUserId], isFollowing: false } }))
-        success(`Unfollowed user`)
+        success('Unfollowed!')
       } else {
-        // Follow/Follow back
+        
         const response = await api.sendFollowRequest(numericUserId)
         if (response.status === 'pending') {
-          // For private users, set as pending
+          
           setFollowRelationships(prev => ({ ...prev, [numericUserId]: { ...prev[numericUserId], isFollowing: false, isPending: true } }))
-          success(`Follow request sent`)
+          success('Request sent!')
         } else {
-          // For public users, set as following
+          
           setFollowRelationships(prev => ({ ...prev, [numericUserId]: { ...prev[numericUserId], isFollowing: true, isPending: false } }))
-          success(`Now following user`)
+          success('Following!')
         }
       }
     } catch (err: unknown) {
       console.error('Error updating follow status:', err)
       
-      // Handle ValidationError specifically
+      
       if (err instanceof Error && (err.name === 'ValidationError' || err.constructor?.name === 'ValidationError')) {
         error(err.message || 'Validation failed')
       } else {
-        error('Failed to update follow status')
+        error('Failed to update follow status!')
       }
     } finally {
       setIsUpdatingFollow(prev => ({ ...prev, [numericUserId]: false }))
     }
   }
 
-  // Handle remove follower
+  
   const handleRemoveFollower = async (userId: number) => {
-    // Convert userId to number if it's a string (from API response)
+    
     const numericUserId = typeof userId === 'string' ? parseInt(userId, 10) : userId
 
-    // Validate userId
+    
     if (!numericUserId || numericUserId <= 0 || !Number.isInteger(numericUserId)) {
       console.error('Invalid user ID:', userId)
       error('Invalid user ID')
@@ -602,99 +535,85 @@ export default function ProfileSection({
     setIsUpdatingFollow(prev => ({ ...prev, [numericUserId]: true }))
 
     try {
-      // Remove follower - delete the follow relationship
+      
       await api.respondToFollowRequest(numericUserId, 'remove')
       
-      // Remove from followers list locally
+      
       setTabData(prev => ({
         ...prev,
         followers: prev.followers.filter((user: Partial<ApiUser>) => user.id !== numericUserId)
       }))
       
-      success('Follower removed')
+      success('Follower removed!')
     } catch (err: unknown) {
       console.error('Error removing follower:', err)
       
-      // Handle ValidationError specifically
+      
       if (err instanceof Error && (err.name === 'ValidationError' || err.constructor?.name === 'ValidationError')) {
         error(err.message || 'Validation failed')
       } else {
-        error('Failed to remove follower. Please try again.')
+        error('Failed to remove follower!')
       }
     } finally {
       setIsUpdatingFollow(prev => ({ ...prev, [numericUserId]: false }))
     }
   }
 
-  // Check if current user is following a specific user
+  
 
 
-  // Check if current user can delete a post
+  
   const canDeletePost = (post: Post) => {
     return currentUserAuth && currentUserAuth.id === post.user.id
   }
 
-  // Check if current user can see the profile owner's gender based on privacy settings
+  
   const canSeeGender = () => {
-    console.log('canSeeGender called with:', {
-      gender: currentUser?.gender,
-      genderLower: currentUser?.gender?.toLowerCase(),
-      isOwnProfile,
-      followStatus
-    })
 
-    // Always hide "prefer not to say" gender in all profiles, regardless of privacy settings
-    // Make the check more robust by trimming whitespace and checking for variations
+    
+    
     const genderValue = currentUser?.gender?.toLowerCase()?.trim()
     const isPreferNotToSay = genderValue === 'prefer_not_to_say' ||
                             genderValue === '' ||
                             genderValue === ' '
 
-    console.log('Gender check:', { genderValue, isPreferNotToSay })
-
     if (isPreferNotToSay) {
-      console.log('Hiding gender - prefer not to say detected')
       return false
     }
 
     // Always show for own profile
     if (isOwnProfile) {
-      console.log('Showing gender - own profile')
       return true
     }
 
     // Don't show if gender is not set
     if (!currentUser?.gender) {
-      console.log('Hiding gender - no gender set')
       return false
     }
 
     const privacy = currentUser?.genderPrivacy || 'everyone'
-    console.log('Privacy setting:', privacy)
 
     switch (privacy) {
       case 'everyone':
-        console.log('Showing gender - everyone privacy')
         return true
       case 'followers only':
-        // Check if current user is following the profile owner
+        
         const canSee = followStatus.isFollowing
-        console.log('Followers only privacy - can see:', canSee, 'isFollowing:', followStatus.isFollowing)
         return canSee
       case 'friends':
-        // For friends privacy, we need to check if they are mutual followers (friends)
+        
         const canSeeFriends = followStatus.isFollowing && followStatus.isFollowedBy
-        console.log('Friends privacy - can see:', canSeeFriends, 'isFollowing:', followStatus.isFollowing, 'isFollowedBy:', followStatus.isFollowedBy)
         return canSeeFriends
+      case 'only_me':
+        return false
       default:
-        console.log('Hiding gender - default case')
         return false
     }
   }
 
-  // Check if current user can see the profile owner's birthday based on privacy settings
+  
   const canSeeBirthday = () => {
-    // Always show for own profile
+    
     if (isOwnProfile) return true
 
     const privacy = currentUser?.birthdayPrivacy || 'everyone'
@@ -703,17 +622,19 @@ export default function ProfileSection({
       case 'everyone':
         return true
       case 'followers only':
-        // Check if current user is following the profile owner
+        
         return followStatus.isFollowing
       case 'friends':
-        // For friends privacy, we need to check if they are mutual followers (friends)
+        
         return followStatus.isFollowing && followStatus.isFollowedBy
+      case 'only_me':
+        return false
       default:
         return false
     }
   }
 
-  // Get privacy icon for post
+  
   const getPrivacyIcon = (privacy: string) => {
     switch (privacy) {
       case 'public':
@@ -729,22 +650,22 @@ export default function ProfileSection({
     }
   }
 
-  // Handle delete post
+  
   const handleDeletePost = (postId: number) => {
     setShowDeleteConfirm(prev => ({ ...prev, [postId]: true }))
   }
 
-  // Confirm delete post
+  
   const confirmDeletePost = async (postId: number) => {
     setIsDeleting(prev => ({ ...prev, [postId]: true }))
     try {
       await api.deletePost(postId)
-      success('Post deleted successfully')
-      // Remove post from local state
-      window.location.reload() // Simple refresh for now
+      success('Post deleted!')
+      
+      window.location.reload() 
     } catch (err) {
       console.error('Failed to delete post:', err)
-      error('Failed to delete post. Please try again.')
+      error('Failed to delete post!')
     } finally {
       setIsDeleting(prev => ({ ...prev, [postId]: false }))
       setShowDeleteConfirm(prev => ({ ...prev, [postId]: false }))
@@ -752,7 +673,7 @@ export default function ProfileSection({
     }
   }
 
-  // Handle manage privacy
+  
   const handleManagePrivacy = async (postId: number) => {
     try {
       const postDetails = await api.getPost(postId)
@@ -773,20 +694,20 @@ export default function ProfileSection({
 
   const handleUpdatePrivacy = async (postId: number, privacy: 'public' | 'followers' | 'friends' | 'listed', selectedUsers: number[]) => {
     try {
-      // Get the current post to preserve its content
+      
       const currentPost = displayPosts.find(p => p.id === postId)
       
       await api.updatePost(postId, {
-        content: currentPost?.content, // Preserve current content
+        content: currentPost?.content, 
         privacy: privacy,
         specific_user_ids: selectedUsers
       })
 
-      // Update the post privacy in local state or call callback
+      
       if (onPostPrivacyUpdate) {
         onPostPrivacyUpdate(postId, privacy)
       } else {
-        // Update local state
+        
         setLocalPosts(prevPosts => prevPosts.map(p =>
           p.id === postId
             ? { ...p, privacy: privacy }
@@ -794,14 +715,14 @@ export default function ProfileSection({
         ))
       }
 
-      success('Post privacy updated successfully')
+      success('Privacy updated!')
     } catch (err) {
       console.error('Failed to update privacy:', err)
-      error('Failed to update privacy. Please try again.')
+      error('Failed to update privacy!')
     }
   }
 
-  // Handle create post
+  
   const handleCreatePost = async () => {
     if (!newPostContent.trim()) {
       error('Post content cannot be empty')
@@ -813,13 +734,13 @@ export default function ProfileSection({
       const postData: CreatePostRequest = {
         content: newPostContent,
         privacy: postPrivacy,
-        image_url: newPostImage ? 'uploaded-image-url' : undefined, // TODO: Handle image upload
+        image_url: newPostImage ? 'uploaded-image-url' : undefined, 
         specific_user_ids: selectedUsers.length > 0 ? selectedUsers : undefined
       }
 
       const newPost = await api.createPost(postData)
       
-      // Transform the API response to Post format
+      
       const postWithUser: Post = {
         id: newPost.id,
         user: {
@@ -842,9 +763,9 @@ export default function ProfileSection({
       
       setLocalPosts(prevPosts => [postWithUser, ...prevPosts])
       
-      success('Post created successfully!')
+      success('Post created!')
       
-      // Close the modal
+      
       setShowCreatePost(false)
       setNewPostContent('')
       setNewPostImage(null)
@@ -853,29 +774,27 @@ export default function ProfileSection({
       
     } catch (err) {
       console.error('Failed to create post:', err)
-      error('Failed to create post. Please try again.')
+      error('Failed to create post!')
     } finally {
       setLoadingUsers(false)
     }
   }
 
-  // Handle post like
+  
   const handlePostLike = async (postId: number) => {
     if (onPostLike) {
       onPostLike(postId)
     } else {
-      // Fallback to direct API calls and local state updates
+      
       try {
         const post = displayPosts.find(p => p.id === postId)
         const wasLiked = post?.isLiked || false
 
-        if (wasLiked) {
-          await api.unlikePost(postId)
-        } else {
-          await api.likePost(postId)
+        if (post) {
+          await api.toggleLike(post, !wasLiked)
         }
 
-        // Update local state without mutating
+        
         setLocalPosts(prevPosts => prevPosts.map(p =>
           p.id === postId
             ? { ...p, isLiked: !wasLiked, likes: p.likes + (wasLiked ? -1 : 1) }
@@ -888,12 +807,12 @@ export default function ProfileSection({
     }
   }
 
-  // Handle post bookmark
+  
   const handlePostBookmark = async (postId: number) => {
     if (onPostBookmark) {
       onPostBookmark(postId)
     } else {
-      // Fallback to direct API calls and local state updates
+      
       try {
         const post = displayPosts.find(p => p.id === postId)
         const wasBookmarked = post?.isBookmarked || false
@@ -904,7 +823,7 @@ export default function ProfileSection({
           await api.toggleBookmark(postId)
         }
 
-        // Update local state without mutating
+        
         setLocalPosts(prevPosts => prevPosts.map(p =>
           p.id === postId
             ? { ...p, isBookmarked: !wasBookmarked }
@@ -917,18 +836,18 @@ export default function ProfileSection({
     }
   }
 
-  // Handle share click
+  
   const handleShareClick = (post: Post, e: React.MouseEvent) => {
     e.stopPropagation()
     setSharePost(post)
   }
 
   const handleUserClick = (user: Partial<ApiUser>) => {
-    // Navigate to user's profile
+    
     router.push(`/profile/${user.id}`)
   }
 
-  // Handle avatar click for image preview
+  
   const handleUserAvatarClick = (e: React.MouseEvent) => {
     e.stopPropagation()
     if (currentUser?.avatar && getAvatarUrl(currentUser.avatar)) {
@@ -940,7 +859,7 @@ export default function ProfileSection({
     }
   }
 
-  // Handle image preview close
+  
   const handleImagePreviewClose = () => {
     setImagePreviewState({
       isOpen: false,
@@ -968,7 +887,7 @@ export default function ProfileSection({
       // Call the API to update privacy setting
       await api.updateUserPrivacy(currentUser.id, makePrivate)
 
-      success(`Profile is now ${makePrivate ? 'private' : 'public'}`)
+      success(`Profile is now ${makePrivate ? 'private' : 'public'}!`)
 
       // Update the local privacy state to trigger re-render
       setCurrentPrivacySetting(makePrivate)
@@ -984,7 +903,7 @@ export default function ProfileSection({
 
     } catch (err: unknown) {
       console.error('Failed to update privacy setting:', err)
-      error('Failed to update privacy setting. Please try again.')
+      error('Failed to update privacy!')
     } finally {
       setIsUpdatingPrivacy(false)
       setShowPrivacyConfirm(false)
@@ -1097,7 +1016,7 @@ export default function ProfileSection({
         key={post.id}
         className={`bg-gradient-to-br from-white/10 via-white/5 to-transparent backdrop-blur-xl rounded-3xl border border-white/20 shadow-2xl p-4 mb-4 hover:shadow-emerald-500/10 transition-all duration-500 group cursor-pointer animate-fade-in animate-slide-in-from-bottom ${animationDelay}`}
         onClick={(e) => {
-          // Don't navigate if clicking on interactive elements
+          
           if ((e.target as HTMLElement).closest('button')) {
             return
           }
@@ -1269,7 +1188,7 @@ export default function ProfileSection({
             <button
               onClick={(e) => {
                 e.stopPropagation()
-                // Navigate to post detail for comments
+                
                 handlePostClick(post.id)
               }}
               className="flex items-center justify-center space-x-2 px-4 py-2 text-white/70 hover:text-white hover:bg-gradient-to-r from-white/10 to-white/5 border border-white/10 rounded-2xl transition-all duration-300 hover:scale-105 cursor-pointer"
@@ -1336,7 +1255,7 @@ export default function ProfileSection({
                     unoptimized={getAvatarUrl(currentUser?.avatar)!.includes('/svg')}
                     className="w-full h-full object-cover transition-all duration-500 group-hover:scale-110 group-hover:rotate-1"
                     onError={(e) => {
-                      // Fallback to default User icon on error
+                      
                       const target = e.target as HTMLImageElement;
                       target.style.display = 'none';
                       target.nextElementSibling?.classList.remove('hidden');
@@ -1922,7 +1841,7 @@ export default function ProfileSection({
                                       followRelationships[user.id]?.isFollowedBy || false
                                     )}
                                     onStatusChange={(newStatus) => {
-                                      // Update local follow relationships
+                                      
                                       setFollowRelationships(prev => ({
                                         ...prev,
                                         [user.id!]: { 
@@ -2177,7 +2096,7 @@ export default function ProfileSection({
                                       followRelationships[user.id!]?.isFollowedBy || false
                                     )}
                                     onStatusChange={(newStatus) => {
-                                      // Update local follow relationships
+                                      
                                       setFollowRelationships(prev => ({
                                         ...prev,
                                         [user.id!]: { 
@@ -2403,7 +2322,7 @@ export default function ProfileSection({
           onClose={() => setShowManagePrivacy(prev => ({ ...prev, [post.id]: false }))}
           currentPrivacy={post.privacy as 'public' | 'followers' | 'friends' | 'listed'}
           currentSelectedUsers={currentSelectedUsers[post.id] || []}
-          availableUsers={[]} // TODO: Fetch available users for privacy management
+          availableUsers={[]} 
           loadingUsers={false}
           onUpdatePrivacy={(privacy: 'public' | 'followers' | 'friends' | 'listed', selectedUsers: number[]) => handleUpdatePrivacy(post.id, privacy, selectedUsers)}
         />
@@ -2416,12 +2335,12 @@ export default function ProfileSection({
           isOpen={true}
           onClose={() => setSharePost(null)}
           onShareSuccess={() => {
-            // Update share count locally
+            
             if (onPostLike && onPostBookmark) {
-              // If using callbacks, the parent will handle the update
-              // For now, we'll just close the modal
+              
+              
             } else {
-              // Update local state
+              
               setLocalPosts(prevPosts => prevPosts.map(p =>
                 p.id === sharePost.id
                   ? { ...p, shares: p.shares + 1 }
@@ -2429,7 +2348,7 @@ export default function ProfileSection({
               ))
             }
             setSharePost(null)
-            success('Post shared successfully!')
+            success('Post shared!')
           }}
         />
       )}
@@ -2509,7 +2428,7 @@ export default function ProfileSection({
                 <p className="text-white/70 text-sm mb-6">
                   Are you sure you want to unfollow <span className="text-white font-medium">{showUnfollowConfirm.userName}</span>? 
                   {(() => {
-                    // Find the user in the following list to check if they have a private profile
+                    
                     const userInFollowing = tabData.following.find((user: Partial<ApiUser>) => user.id === showUnfollowConfirm.userId)
                     return userInFollowing?.is_private ? 
                       ' This user has a private profile, so you will no longer be able to see their posts.' : 

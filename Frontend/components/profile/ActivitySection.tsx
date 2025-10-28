@@ -1,7 +1,7 @@
 'use client'
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { Heart, MessageSquare, Bookmark, Send, User, Image as ImageIcon, MoreHorizontal, Trash2, ArrowUp, ArrowDown, Globe, Lock, EyeOff } from 'lucide-react'
-import { Post, Comment } from '@/lib/api'
+import { Post, Comment } from '@/types/posts'
 import { useRouter } from 'next/navigation'
 import { useToast } from '@/context/ToastContext'
 import Image from 'next/image'
@@ -11,19 +11,7 @@ import { api } from '@/lib/api'
 import { AnimatePresence, motion } from 'framer-motion'
 import ManagePrivacy from './ManagePrivacy'
 import SharePopup from '../ui/SharePopup'
-
-interface ActivitySectionProps {
-  activitySubTab: string
-  posts: Post[]
-  onPostLike: (postId: number) => void
-  onPostBookmark?: (postId: number) => void
-  sortOrder?: 'newest' | 'oldest'
-  setSortOrder?: (sort: 'newest' | 'oldest') => void
-  hasMoreResults?: boolean
-  isLoadingMore?: boolean
-  onLoadMore?: () => void
-  resultsContainerRef?: React.RefObject<HTMLDivElement | null>
-}
+import { ActivitySectionProps } from '@/types/profile'
 
 export default function ActivitySection({
   activitySubTab,
@@ -41,19 +29,19 @@ export default function ActivitySection({
   const { success, error } = useToast()
   const { user } = useAuth()
 
-  // Three-dot menu state
+  
   const [openMenu, setOpenMenu] = useState<{[key: number]: boolean}>({})
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<{[key: number]: boolean}>({})
   const [isDeleting, setIsDeleting] = useState<{[key: number]: boolean}>({})
 
-  // Manage Privacy state
+  
   const [showManagePrivacy, setShowManagePrivacy] = useState(false)
   const [selectedPostForPrivacy, setSelectedPostForPrivacy] = useState<Post | null>(null)
   const [currentSelectedUsers, setCurrentSelectedUsers] = useState<number[]>([])
   const [availableUsers, setAvailableUsers] = useState<{ id: number; email: string; first_name: string; last_name: string; avatar?: string; nickname?: string; display_name?: string; }[]>([])
   const [loadingUsers, setLoadingUsers] = useState(false)
 
-  // Comment modal state
+  
   const [isCommentModalOpen, setIsCommentModalOpen] = useState(false)
   const [selectedPostForComment, setSelectedPostForComment] = useState<Post | null>(null)
   const [newComment, setNewComment] = useState('')
@@ -101,12 +89,12 @@ export default function ActivitySection({
     setIsDeleting(prev => ({ ...prev, [postId]: true }))
     try {
       await api.deletePost(postId)
-      success('Post deleted successfully')
-      // Optionally refresh posts or remove from local state
-      window.location.reload() // Simple refresh for now
+      success('Post deleted!')
+      
+      window.location.reload() 
     } catch (err) {
       console.error('Failed to delete post:', err)
-      error('Failed to delete post. Please try again.')
+      error('Failed to delete post!')
     } finally {
       setIsDeleting(prev => ({ ...prev, [postId]: false }))
       setShowDeleteConfirm(prev => ({ ...prev, [postId]: false }))
@@ -142,7 +130,7 @@ export default function ActivitySection({
         }
       }
 
-      // Create comment via HTTP API
+      
       const token = localStorage.getItem('token')
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/api/posts/${selectedPostForComment.id}/comments`, {
         method: 'POST',
@@ -162,7 +150,7 @@ export default function ActivitySection({
         throw new Error(errorData.error || 'Failed to create comment')
       }
 
-      // Clear the input and close modal
+      
       setNewComment('')
       setNewCommentImage(null)
       setIsCommentModalOpen(false)
@@ -170,7 +158,7 @@ export default function ActivitySection({
       success('Comment posted!')
     } catch (err) {
       console.error('Error submitting comment:', err)
-      error('Failed to post comment. Please try again.')
+      error('Failed to post comment!')
     } finally {
       setIsSubmittingComment(false)
     }
@@ -196,7 +184,7 @@ export default function ActivitySection({
     setShowManagePrivacy(true)
     setOpenMenu(prev => ({ ...prev, [post.id]: false }))
 
-    // Fetch post details to get selected users for listed privacy
+    
     if (post.privacy === 'listed') {
       try {
         const postDetails = await api.getPost(post.id)
@@ -218,19 +206,19 @@ export default function ActivitySection({
         privacy,
         specific_user_ids: selectedUsers
       })
-      success('Privacy settings updated successfully!')
+      success('Privacy settings updated!')
       setShowManagePrivacy(false)
       setSelectedPostForPrivacy(null)
-      // Optionally refresh posts or update local state
-      window.location.reload() // Simple refresh for now
+      
+      window.location.reload() 
     } catch (err) {
       console.error('Failed to update privacy:', err)
-      error('Failed to update privacy settings. Please try again.')
+      error('Failed to update privacy!')
     }
   }
 
   const fetchAvailableUsers = useCallback(async () => {
-    if (availableUsers.length > 0) return // Already fetched
+    if (availableUsers.length > 0) return 
 
     try {
       setLoadingUsers(true)
@@ -244,7 +232,7 @@ export default function ActivitySection({
     }
   }, [user, availableUsers.length, error])
 
-  // Fetch users when Manage Privacy modal opens
+  
   useEffect(() => {
     if (showManagePrivacy) {
       fetchAvailableUsers()
@@ -252,12 +240,18 @@ export default function ActivitySection({
   }, [showManagePrivacy, fetchAvailableUsers])
 
 
-  // Mock data for demonstration - in real app, this would come from API
+  
   const likedPosts = posts.filter(post => post.isLiked)
-  const commentedPosts = posts.slice(0, 3) // Mock commented posts
-  const savedPosts = posts.slice(0, 2) // Mock saved posts
+  const commentedPosts = useMemo(() => {
+    return [...posts].sort((a, b) => {
+      const dateA = new Date(a.created_at).getTime()
+      const dateB = new Date(b.created_at).getTime()
+      return sortOrder === 'newest' ? dateB - dateA : dateA - dateB
+    })
+  }, [posts, sortOrder])
+  const savedPosts = useMemo(() => posts.slice(0, 2), [posts]) 
 
-  // Fetch comments for commented posts
+  
   const fetchCommentsForCommentedPosts = useCallback(async () => {
     if (activitySubTab !== 'commented') return
 
@@ -270,21 +264,21 @@ export default function ActivitySection({
           const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/api/posts/${post.id}/comments?limit=50&offset=0`, {
             method: 'GET',
             headers: {
-              ...(localStorage.getItem('token') ? { Authorization: `localStorage.getItem('token')` } : {})
+              ...(localStorage.getItem('token') ? { Authorization: `Bearer ${localStorage.getItem('token')}` } : {})
             },
             credentials: 'include'
           })
 
           if (response.ok) {
             const data = await response.json()
-            // Filter to only current user's comments and sort by created_at descending to get most recent first
+            
             const userComments = (data.comments || []).filter((comment: Comment) => comment.user.id === user?.id)
             const sortedUserComments = userComments.sort((a: Comment, b: Comment) => 
               new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
             )
             commentsMap[post.id] = sortedUserComments
 
-            // Count user's comments on this post
+            
             userCommentCountsMap[post.id] = sortedUserComments.length
           }
         } catch (error) {
@@ -299,7 +293,7 @@ export default function ActivitySection({
     }
   }, [activitySubTab, commentedPosts, user])
 
-  // Fetch comments for commented posts when tab is active
+  
   useEffect(() => {
     if (activitySubTab === 'commented') {
       fetchCommentsForCommentedPosts()
@@ -610,17 +604,18 @@ export default function ActivitySection({
       }
     }
 
-    // Apply sorting
-    postsToShow = postsToShow.sort((a, b) => {
-      const dateA = new Date(a.created_at).getTime()
-      const dateB = new Date(b.created_at).getTime()
+    if (activitySubTab !== 'commented') {
+      postsToShow = postsToShow.sort((a, b) => {
+        const dateA = new Date(a.created_at).getTime()
+        const dateB = new Date(b.created_at).getTime()
 
-      if (sortOrder === 'newest') {
-        return dateB - dateA // Newest first
-      } else {
-        return dateA - dateB // Oldest first
-      }
-    })
+        if (sortOrder === 'newest') {
+          return dateB - dateA 
+        } else {
+          return dateA - dateB 
+        }
+      })
+    }
 
     if (postsToShow.length === 0) {
       return (

@@ -1,35 +1,6 @@
 'use client'
 import { useState, useCallback, useEffect, useRef } from 'react'
-
-export interface SearchOptions<T> {
-  minQueryLength?: number
-  debounceMs?: number
-  placeholder?: string
-  onSearch?: (query: string) => Promise<T[]>
-  onError?: (error: any) => void
-  onClear?: () => void
-  filterFn?: (items: T[], query: string) => T[]
-}
-
-export interface SearchResult {
-  type: 'user' | 'group' | 'event' | 'post' | 'message' | 'chat' | 'tag'
-  id: string | number
-  title: string
-  subtitle?: string
-  image?: string
-  description?: string
-  url: string
-  metadata?: any
-}
-
-export interface SearchResponse {
-  results: SearchResult[]
-  count: number
-  query: string
-  filter?: string
-  page?: number
-  limit?: number
-}
+import { SearchOptions, SearchResult, SearchResponse } from '@/types/hooks'
 
 export function useSearch<T>(
   searchFunction: (query: string) => Promise<T[]>,
@@ -217,7 +188,7 @@ export function useSearchResults() {
       setCurrentQuery(query)
       setCurrentFilter(filter)
 
-      // Cancel previous request
+      
       if (abortController.current) {
         abortController.current.abort()
       }
@@ -312,7 +283,7 @@ export function useSearchResults() {
     }
   }, [])
 
-  // Cleanup on unmount
+  
   useEffect(() => {
     return () => {
       if (abortController.current) {

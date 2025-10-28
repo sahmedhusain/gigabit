@@ -3,7 +3,7 @@ import { GroupResponse, CreateGroupRequest, Member, PostResponse, EventResponse,
 
 declare module './client' {
   interface ApiClient {
-    // Groups endpoints
+    
     getUserGroups(userId: number): Promise<{ groups: GroupResponse[], count: number, limit: number, offset: number }>;
     getAllGroups(limit?: number, offset?: number): Promise<{ groups: GroupResponse[], count: number, limit: number, offset: number }>;
     getGroup(groupId: number): Promise<GroupResponse>;
@@ -24,6 +24,10 @@ declare module './client' {
     getGroupPosts(groupId: number, limit?: number, offset?: number): Promise<{ posts: PostResponse[], count: number }>;
     createGroupPost(groupId: number, data: CreatePostRequest): Promise<PostResponse>;
     deleteGroupPost(groupId: number, postId: number): Promise<{ message: string }>;
+    likeGroupPost(groupId: number, postId: number): Promise<{ success: boolean }>;
+    unlikeGroupPost(groupId: number, postId: number): Promise<{ success: boolean }>;
+    dislikeGroupPost(groupId: number, postId: number): Promise<{ success: boolean }>;
+    undislikeGroupPost(groupId: number, postId: number): Promise<{ success: boolean }>;
     createGroupEvent(groupId: number, data: { title: string; description: string; event_time: string }): Promise<EventResponse>;
     getPendingJoinRequests(groupId: number): Promise<{ requests: Array<{ user: User; requested_at: string }> }>;
     respondToJoinRequest(groupId: number, userId: number, action: 'accept' | 'decline'): Promise<{ message: string }>;
@@ -166,6 +170,30 @@ ApiClient.prototype.createGroupPost = async function(groupId: number, data: Crea
 
 ApiClient.prototype.deleteGroupPost = async function(groupId: number, postId: number): Promise<{ message: string }> {
   return this.request<{ message: string }>(`/api/groups/${groupId}/posts/${postId}`, {
+    method: 'DELETE',
+  });
+};
+
+ApiClient.prototype.likeGroupPost = async function(groupId: number, postId: number): Promise<{ success: boolean }> {
+  return this.request<{ success: boolean }>(`/api/groups/${groupId}/posts/${postId}/like`, {
+    method: 'POST',
+  });
+};
+
+ApiClient.prototype.unlikeGroupPost = async function(groupId: number, postId: number): Promise<{ success: boolean }> {
+  return this.request<{ success: boolean }>(`/api/groups/${groupId}/posts/${postId}/like`, {
+    method: 'DELETE',
+  });
+};
+
+ApiClient.prototype.dislikeGroupPost = async function(groupId: number, postId: number): Promise<{ success: boolean }> {
+  return this.request<{ success: boolean }>(`/api/groups/${groupId}/posts/${postId}/dislike`, {
+    method: 'POST',
+  });
+};
+
+ApiClient.prototype.undislikeGroupPost = async function(groupId: number, postId: number): Promise<{ success: boolean }> {
+  return this.request<{ success: boolean }>(`/api/groups/${groupId}/posts/${postId}/dislike`, {
     method: 'DELETE',
   });
 };

@@ -3,19 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { api, type PostResponse } from '@/lib/api'
 import { useToast } from '@/context/ToastContext'
 import { useWebSocket } from '@/context/WebSocketContext'
-
-export interface FeedItem {
-  id: number
-  user: { name: string; username: string; avatar: string }
-  content: string
-  image?: string
-  likes: number
-  comments: number
-  shares: number
-  timeAgo: string
-  privacy: string
-  isLiked: boolean
-}
+import { FeedItem } from '@/types/hooks'
 
 function formatTimeAgo(dateString: string) {
   const date = new Date(dateString)
@@ -86,19 +74,19 @@ export function useFeed(options: { pageSize?: number; autoRefresh?: boolean } = 
     await fetchPage(false)
   }, [hasMore, isLoading, fetchPage])
 
-  // Auto refresh on realtime updates
+  
   useEffect(() => {
     if (!options.autoRefresh) return
     const remove = addMessageListener((msg) => {
       if (msg.type === 'post_update' || msg.type === 'like_update' || msg.type === 'like') {
-        // Light refresh
+        
         refresh()
       }
     })
     return remove
   }, [addMessageListener, options.autoRefresh, isConnected, refresh])
 
-  // Initial load
+  
   useEffect(() => {
     fetchPage(true)
   }, [])

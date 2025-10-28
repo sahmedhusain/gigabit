@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import ProtectedRoute from '@/components/auth/ProtectedRoute'
-import ChatWindow from '@/components/chat/ChatWindow'
+import ChatWindow from '@/components/chat/window/ChatWindow'
 import { useAuth } from '@/context/AuthContext'
 import { useWebSocket } from '@/context/WebSocketContext'
 import { useToast } from '@/context/ToastContext'
@@ -15,7 +15,7 @@ import {
 } from '@/lib/api'
 import { formatConversationPreview } from '@/utils/chatUtils'
 
-// Import dashboard components
+
 import TopBar from '@/components/layout/TopBar'
 import Sidebar from '@/components/layout/Sidebar'
 import RightSidebar from '@/components/layout/RightSidebar'
@@ -32,10 +32,10 @@ function ChatsPage() {
   const { items: _liveNotifications, unread: liveUnreadCount } = useNotifications()
   const { conversations: liveConversations } = useConversations()
 
-  // Get filter from URL params
+  
   const filterParam = searchParams?.get('filter') || 'all'
   const chatId = searchParams?.get('chat')
-  // Support deep link params from search suggestions (legacy)
+  
   const groupParam = searchParams?.get('group')
   const userParam = searchParams?.get('user')
   const highlightMessageParam = searchParams?.get('message')
@@ -47,7 +47,7 @@ function ChatsPage() {
   const [showCreateGroup, setShowCreateGroup] = useState(false)
   const [showCreateDirectMessage, setShowCreateDirectMessage] = useState(false)
 
-  // Data State
+  
   const [chats, setChats] = useState<Chat[]>([])
   const [_groups, setGroups] = useState<Group[]>([])
   const [_isLoadingChats, setIsLoadingChats] = useState(false)
@@ -56,7 +56,7 @@ function ChatsPage() {
   const [following, setFollowing] = useState<{ id: number; email: string; first_name: string; last_name: string; avatar?: string; nickname?: string; }[]>([])
   const [isLoadingFollowers, setIsLoadingFollowers] = useState(false)
 
-  // Chat window state
+  
   const [openChatWindow, setOpenChatWindow] = useState<{
     conversationId: number
     type: 'private' | 'group',
@@ -67,7 +67,7 @@ function ChatsPage() {
     highlightMessageId?: number
   } | null>(null)
 
-  // Current User Processing
+  
   const currentUser = user ? {
     id: user.id,
     name: `${user.first_name} ${user.last_name}`,
@@ -88,10 +88,10 @@ function ChatsPage() {
     lastStatusChange: user.last_status_change
   } : null
 
-  // Update URL when filter or open chat changes (preserve deep-link params for highlight)
+  
   useEffect(() => {
     const params = new URLSearchParams()
-    // lock to /chats/all as per requirement, but preserve filter in param for state
+    
     params.set('filter', chatSubTab)
     if (openChatWindow && openChatWindow.conversationId) {
       if (openChatWindow.type === 'group') {
@@ -103,7 +103,7 @@ function ChatsPage() {
     if (openChatWindow?.highlightMessageId || highlightMessageParam) {
       params.set('message', (openChatWindow?.highlightMessageId || highlightMessageParam)!.toString())
     }
-    // Preserve user parameter if it exists
+    
     if (userParam) {
       params.set('user', userParam)
     }
@@ -138,7 +138,7 @@ function ChatsPage() {
           ? `${conversation.participant?.first_name || ''} ${conversation.participant?.last_name || ''}`.trim() || 'Unknown User'
           : conversation.group?.title || 'Unknown Group'
         
-        // Check if participant is online for private conversations
+        
         const isOnline = conversation.type === 'private' && conversation.participant?.id
           ? getUserStatus(conversation.participant.id) === 'online'
           : false
@@ -156,8 +156,8 @@ function ChatsPage() {
           participantId: conversation.participant?.id,
           participantAvatar: conversation.participant?.avatar,
           lastMessageSenderId: conversation.last_message?.sender_id,
-          // Store the actual group/participant ID for API calls
-          // For group chats, keep the raw group id so we can fetch group data or resolve conversation id
+          
+          
           groupId: conversation.group?.id
         }
       }))
@@ -218,7 +218,7 @@ function ChatsPage() {
     }
   }, [user])
 
-  // Fetch data when component loads
+  
   useEffect(() => {
     if (user) {
       fetchConversations()
@@ -227,12 +227,12 @@ function ChatsPage() {
     }
   }, [user, fetchConversations, fetchFollowers, fetchGroups])
 
-  // Open chat from URL params after conversations are loaded
+  
   useEffect(() => {
     if (chats.length > 0 && !openChatWindow) {
       let chatToOpen = null
       if (chatId) {
-        // Find private chat
+        
         chatToOpen = chats.find(c => c.id === parseInt(chatId) && c.type === 'private')
         if (chatToOpen) {
           setOpenChatWindow({
@@ -244,7 +244,7 @@ function ChatsPage() {
           })
         }
       } else if (groupParam) {
-        // Find group chat
+        
         chatToOpen = chats.find(c => c.groupId === parseInt(groupParam) || c.id === parseInt(groupParam))
         if (chatToOpen) {
           setOpenChatWindow({
@@ -259,12 +259,12 @@ function ChatsPage() {
     }
   }, [chats, chatId, groupParam, highlightMessageParam, openChatWindow])
 
-  // Update chat online status when online users change
+  
   useEffect(() => {
     if (chats.length > 0) {
       setChats(prevChats => 
         prevChats.map(chat => {
-          if (chat.isGroup) return chat // Groups don't have online status
+          if (chat.isGroup) return chat 
           
           const isOnline = chat.participantId 
             ? getUserStatus(chat.participantId) === 'online'
@@ -278,32 +278,32 @@ function ChatsPage() {
 
   const handleStartDirectMessage = async (userId: number, userName: string) => {
     try {
-      // Get existing conversations to check if one already exists
+      
       const conversationsData = await api.getConversations()
       
-      // Find existing conversation with this user
+      
       const existingConversation = conversationsData.conversations.find(
         conv => conv.type === 'private' && conv.participant?.id === userId
       )
       
-      // Open existing conversation or create a new one by opening chat window
-      // (conversation will be created automatically when first message is sent)
+      
+      
       setOpenChatWindow({
-        conversationId: existingConversation?.id || 0, // 0 for new conversation
+        conversationId: existingConversation?.id || 0, 
         type: 'private',
         name: userName,
         participantId: userId
       })
       
-      // Close the create direct message modal
+      
       setShowCreateDirectMessage(false)
       
-      // Refresh conversations list
+      
       if (existingConversation) {
         fetchConversations()
       }
       
-      success(`Started conversation with ${userName}`)
+      success('Conversation started!')
     } catch (err) {
       console.error('Error starting direct message:', err)
       if (err instanceof NetworkError) {
@@ -326,13 +326,13 @@ function ChatsPage() {
     router.push('/discover')
   }
 
-  // Calculate unread counts (conversation count, not message count)
+  
   const chatUnreadAll = (chats || []).filter(c => (c.unread || 0) > 0).length
   const chatUnreadDirect = (chats || []).filter(c => !c.isGroup && (c.unread || 0) > 0).length
   const chatUnreadGroups = (chats || []).filter(c => c.isGroup && (c.unread || 0) > 0).length
 
-  // Mark intentionally unused values as used so the linter doesn't complain.
-  // These values are kept for clarity and future use but aren't referenced in this view.
+  
+  
   void _isConnected
   void _addMessageListener
   void _liveNotifications
@@ -424,17 +424,9 @@ function ChatsPage() {
                 <ChatsSection
                   chatSubTab={chatSubTab}
                   onChatClick={(chat) => {
-                    console.log('🖱️ [ChatsPage] Chat clicked:', chat)
-                    const conversationId = chat.conversationId
-                    const participantId = chat.type === 'private' ? chat.participantId : undefined
+                    const conversationId = chat.conversationId;
+                    const participantId = chat.type === 'private' ? chat.participantId : undefined;
 
-                    console.log('📤 [ChatsPage] Opening chat window with:', {
-                      conversationId,
-                      type: chat.type,
-                      name: chat.name,
-                      participantId
-                    })
-                    
                     setOpenChatWindow({
                       conversationId: conversationId,
                       type: chat.type,
@@ -474,7 +466,7 @@ function ChatsPage() {
   )
 }
 
-// Wrap the entire component with ProtectedRoute
+
 function ProtectedChatsPage() {
   return (
     <ProtectedRoute>

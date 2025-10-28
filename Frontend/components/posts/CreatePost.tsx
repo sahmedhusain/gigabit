@@ -6,32 +6,7 @@ import { useOptimisticUpdate, useConnectionStatus, useUpload } from '@/hooks'
 import { useToast } from '@/context/ToastContext'
 import Image from 'next/image'
 import { getAvatarUrl, getUserInitials } from '@/utils/avatarUtils'
-
-interface UserOption {
-  id: number
-  display_name?: string
-  first_name: string
-  last_name: string
-  nickname?: string
-  email: string
-  avatar?: string
-}
-
-interface CreatePostProps {
-  show: boolean
-  onClose: () => void
-  newPostContent: string
-  setNewPostContent: (content: string) => void
-  newPostImage: File | null
-  setNewPostImage: (image: File | null) => void
-  postPrivacy: 'public' | 'followers' | 'friends' | 'listed'
-  setPostPrivacy: (privacy: 'public' | 'followers' | 'friends' | 'listed') => void
-  selectedUsers: number[]
-  setSelectedUsers: (users: number[]) => void
-  availableUsers: UserOption[]
-  loadingUsers: boolean
-  onCreatePost: () => void
-}
+import { CreatePostProps } from '@/types/posts'
 
 export default function CreatePost({
   show,
@@ -55,8 +30,8 @@ export default function CreatePost({
 
   const { isLoading, performUpdate } = useOptimisticUpdate(null, {
     onSuccess: () => {
-      success('Post created successfully!')
-      // Reset form
+      success('Post created!')
+      
       setNewPostContent('')
       setNewPostImage(null)
       setPostPrivacy('public')

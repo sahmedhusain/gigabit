@@ -3,18 +3,7 @@ import { createContext, useContext, useState, useEffect, ReactNode } from 'react
 import { useAuth } from './AuthContext'
 import { useWebSocket } from './WebSocketContext'
 import { api } from '@/lib/api'
-
-interface SidebarData {
-  followers: { id: number; email: string; first_name: string; last_name: string; avatar?: string; nickname?: string; }[]
-  following: { id: number; email: string; first_name: string; last_name: string; avatar?: string; nickname?: string; }[]
-  chats: any[]
-  groups: any[]
-  isLoadingChats: boolean
-  isLoadingGroups: boolean
-  refetchFollowers: () => void
-  refetchChats: () => void
-  refetchGroups: () => void
-}
+import { SidebarData } from '@/types/contexts'
 
 const SidebarDataContext = createContext<SidebarData | undefined>(undefined)
 
@@ -22,7 +11,7 @@ export function SidebarDataProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth()
   const { isConnected, onlineUsers, addMessageListener } = useWebSocket()
 
-  // Data state
+  
   const [followers, setFollowers] = useState<{ id: number; email: string; first_name: string; last_name: string; avatar?: string; nickname?: string; }[]>([])
   const [following, setFollowing] = useState<{ id: number; email: string; first_name: string; last_name: string; avatar?: string; nickname?: string; }[]>([])
   const [chats, setChats] = useState<any[]>([])
@@ -30,7 +19,7 @@ export function SidebarDataProvider({ children }: { children: ReactNode }) {
   const [isLoadingChats, setIsLoadingChats] = useState(false)
   const [isLoadingGroups, setIsLoadingGroups] = useState(false)
 
-  // Data loaded flags to prevent re-fetching
+  
   const [followersLoaded, setFollowersLoaded] = useState(false)
   const [chatsLoaded, setChatsLoaded] = useState(false)
   const [groupsLoaded, setGroupsLoaded] = useState(false)
@@ -127,7 +116,7 @@ export function SidebarDataProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  // Fetch data when user changes
+  
   useEffect(() => {
     if (user) {
       if (!followersLoaded) {
@@ -140,7 +129,7 @@ export function SidebarDataProvider({ children }: { children: ReactNode }) {
         fetchGroups()
       }
     } else {
-      // Reset data when user logs out
+      
       setFollowers([])
       setFollowing([])
       setChats([])
@@ -151,14 +140,13 @@ export function SidebarDataProvider({ children }: { children: ReactNode }) {
     }
   }, [user])
 
-  // WebSocket real-time updates
+  
   useEffect(() => {
     if (!isConnected || !user) return
 
     const removeListener = addMessageListener((message) => {
       switch (message.type) {
         case 'notification':
-          console.log('New notification received:', message.data)
           break
         case 'follow_update':
         case 'follow':
@@ -166,20 +154,16 @@ export function SidebarDataProvider({ children }: { children: ReactNode }) {
         case 'follow_request':
         case 'cancel_follow_request':
         case 'follower_count_update':
-          console.log('Follow update received:', message.data)
           fetchFollowers()
           break
         case 'private_message':
         case 'group_message':
-          console.log('Chat message received:', message.data)
           fetchConversations()
           break
         case 'group_update':
-          console.log('Group update received:', message.data)
           fetchGroups()
           break
         default:
-          console.log('Received WebSocket message:', message)
       }
     })
 

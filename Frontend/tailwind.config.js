@@ -1,4 +1,3 @@
-/** @type {import('tailwindcss').Config} */
 module.exports = {
   content: [
     './pages/**/*.{js,ts,jsx,tsx,mdx}',
@@ -32,10 +31,8 @@ module.exports = {
     function({ addUtilities }) {
       addUtilities({
         '.scrollbar-hide': {
-          /* Firefox */
-          'scrollbar-width': 'none',
-          /* Safari and Chrome */
-          '&::-webkit-scrollbar': {
+                    'scrollbar-width': 'none',
+                    '&::-webkit-scrollbar': {
             display: 'none'
           }
         }

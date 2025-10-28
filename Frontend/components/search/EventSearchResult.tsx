@@ -1,17 +1,14 @@
 'use client'
 import { Calendar, Clock, MapPin, Users, ExternalLink } from 'lucide-react'
 import { useRouter } from 'next/navigation'
-import { SearchResult } from '@/hooks/useSearch'
 
-interface EventSearchResultProps {
-  result: SearchResult
-}
+import { EventSearchResultProps } from '@/types/search'
 
 export default function EventSearchResult({ result }: EventSearchResultProps) {
   const router = useRouter()
 
   const handleClick = () => {
-    // Navigate to events page and highlight the specific event
+    
     const eventId = result.id
     router.push(`/events/all?event=${eventId}`)
   }

@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter, useParams, useSearchParams } from 'next/navigation'
 import ProtectedRoute from '@/components/auth/ProtectedRoute'
-import ChatWindow from '@/components/chat/ChatWindow'
+import ChatWindow from '@/components/chat/window/ChatWindow'
 import { useAuth } from '@/context/AuthContext'
 import { useWebSocket } from '@/context/WebSocketContext'
 import { useToast } from '@/context/ToastContext'
@@ -15,10 +15,10 @@ import {
   ConversationResponse
 } from '@/lib/api'
 
-// Import AppLayout instead of individual components
+
 import AppLayout from '@/components/layout/AppLayout'
 
-// Import dashboard components
+
 import ChatsSection from '@/components/chat/ChatsSection'
 import CreateGroup from '@/components/groups/CreateGroup'
 import CreateDirectMessage from '@/components/chat/CreateDirectMessage'
@@ -34,17 +34,19 @@ function ChatsFilterPage() {
   const { items: _liveNotifications, unread: _liveUnreadCount } = useNotifications()
   const { conversations: _liveConversations } = useConversations()
 
-  // Get URL parameters
+  
   const chatId = searchParams?.get('chat')
   const groupId = searchParams?.get('group')
   const userParam = searchParams?.get('user')
   const highlightMessageParam = searchParams?.get('message')
+  const tabParam = searchParams?.get('tab')
+  const highlightPollParam = searchParams?.get('highlight')
 
   const [chatSubTab, setChatSubTab] = useState(filter === 'groups' ? 'group' : filter || 'all')
   const [showCreateGroup, setShowCreateGroup] = useState(false)
   const [showCreateDirectMessage, setShowCreateDirectMessage] = useState(false)
 
-  // Data State
+  
   const [chats, setChats] = useState<Chat[]>([])
   const [conversations, setConversations] = useState<ConversationResponse[]>([])
   const [_groups, setGroups] = useState<Group[]>([])
@@ -53,7 +55,7 @@ function ChatsFilterPage() {
   const [following, setFollowing] = useState<{ id: number; email: string; first_name: string; last_name: string; avatar?: string; nickname?: string; }[]>([])
   const [isLoadingFollowers, setIsLoadingFollowers] = useState(false)
 
-  // Chat window state
+  
   const [openChatWindow, setOpenChatWindow] = useState<{
     conversationId: number
     type: 'private' | 'group',
@@ -64,9 +66,10 @@ function ChatsFilterPage() {
     userRole?: 'creator' | 'admin' | 'member'
     initialTab?: string
     highlightMessageId?: number
+    highlightPollId?: number
   } | null>(null)
 
-  // Current User Processing
+  
   const _currentUser = user ? {
     id: user.id,
     name: `${user.first_name} ${user.last_name}`,
@@ -84,7 +87,7 @@ function ChatsFilterPage() {
     following: 0
   } : null
 
-  // Trending topics
+  
   const _trendingTopics = [
     '#SocialNetwork', '#TechNews', '#WebDev', '#AI', '#Startups',
     '#React', '#TypeScript', '#NodeJS', '#Python', '#DevOps'
@@ -212,26 +215,26 @@ function ChatsFilterPage() {
     }
   }, [user])
 
-  // Update URL when filter changes - allow private/groups tabs, redirect others to /chats/all
+  
   useEffect(() => {
     if (filter !== 'all' && filter !== 'private' && filter !== 'groups') {
       router.replace('/chats/all')
     }
   }, [filter, router])
 
-  // Open chat from URL parameter - respect current filter tab
+  
   useEffect(() => {
     if (openChatWindow && openChatWindow.conversationId) {
       const param = openChatWindow.type === 'group' ? 'group' : 'chat'
-      // If we're on the 'all' tab, use /chats/all with query params for deep linking
+      
       if (filter === 'all') {
         router.replace(`/chats/all?${param}=${openChatWindow.conversationId}`)
       } else {
-        // If we're on private/groups tabs, stay on current path but add query params
+        
         router.replace(`/chats/${filter}?${param}=${openChatWindow.conversationId}`)
       }
     } else {
-      // When closing chat, remove query params but stay on current filter
+      
       if (filter === 'all') {
         router.replace('/chats/all')
       } else {
@@ -240,7 +243,7 @@ function ChatsFilterPage() {
     }
   }, [openChatWindow, router, filter])
 
-  // Fetch data when component loads
+  
   useEffect(() => {
     if (user) {
       fetchConversations()
@@ -249,12 +252,12 @@ function ChatsFilterPage() {
     }
   }, [user, fetchConversations, fetchFollowers, fetchGroups])
 
-  // Update chat online status when online users change
+  
   useEffect(() => {
     if (chats.length > 0) {
       setChats(prevChats =>
         prevChats.map(chat => {
-          if (chat.isGroup) return chat // Groups don't have online status
+          if (chat.isGroup) return chat 
 
           const isOnline = chat.participantId
             ? onlineUsers.some(u => u.user_id === chat.participantId && u.status === 'online')
@@ -266,13 +269,13 @@ function ChatsFilterPage() {
     }
   }, [onlineUsers, chats.length])
 
-  // Open chat from URL parameters
+  
   useEffect(() => {
-    // Direct conversation open via ?chat=
+    
     if (chatId) {
       const id = parseInt(chatId)
       if (!isNaN(id)) {
-        // If chats already loaded, try to find details; otherwise open with minimal info
+        
         const chat = chats.find(c => c.id === id)
         setOpenChatWindow({
           conversationId: id,
@@ -286,24 +289,26 @@ function ChatsFilterPage() {
       }
     }
 
-    // Direct group open via ?group=
+    
     if (groupId) {
       const id = parseInt(groupId)
       if (!isNaN(id)) {
-        // If chats already loaded, try to find details; otherwise open with minimal info
+        
         const chat = chats.find(c => c.isGroup && c.groupId === id)
         setOpenChatWindow({
-          conversationId: chat?.id || id, // Use conversation ID if found, otherwise use group ID
+          conversationId: chat?.id || id, 
           type: 'group',
           name: chat?.name || 'Group Chat',
           groupId: id,
-          highlightMessageId: highlightMessageParam ? parseInt(highlightMessageParam) : undefined
+          initialTab: tabParam || 'chat',
+          highlightMessageId: highlightMessageParam ? parseInt(highlightMessageParam) : undefined,
+          highlightPollId: highlightPollParam ? parseInt(highlightPollParam) : undefined
         })
         return
       }
     }
 
-    // Open direct message via ?user=
+    
     if (userParam) {
       const participantId = parseInt(userParam)
       if (!isNaN(participantId)) {
@@ -317,7 +322,7 @@ function ChatsFilterPage() {
         })
       }
     }
-  }, [chatId, groupId, chats, userParam, highlightMessageParam])
+  }, [chatId, groupId, chats, userParam, highlightMessageParam, highlightPollParam, tabParam])
 
 
 
@@ -325,21 +330,21 @@ function ChatsFilterPage() {
     const onlineUser = onlineUsers.find(u => u.user_id === userId)
     if (!onlineUser) return 'offline'
     if (onlineUser.status === 'invisible' || onlineUser.status === 'offline') return 'offline'
-    return onlineUser.status // 'online', 'busy', 'away'
+    return onlineUser.status 
   }
 
   const handleStartDirectMessage = async (userId: number, userName: string) => {
     try {
-      // Check if there's already an existing conversation
+      
       const conversationsData = await api.getConversations()
 
-      // Find existing conversation with this user
+      
       const existingConversation = conversationsData.conversations.find(
         conv => conv.type === 'private' && conv.participant?.id === userId
       )
 
       if (existingConversation) {
-        // Open existing conversation
+        
         setOpenChatWindow({
           conversationId: existingConversation.id,
           type: 'private',
@@ -347,25 +352,25 @@ function ChatsFilterPage() {
           participantId: userId
         })
       } else {
-        // Create a temporary conversation ID for the chat window
-        // The actual conversation will be created when the first message is sent
+        
+        
         const tempConversationId = `temp_private_${userId}_${Date.now()}`
 
         setOpenChatWindow({
-          conversationId: parseInt(tempConversationId.split('_')[2]), // Use userId as conversation ID temporarily
+          conversationId: parseInt(tempConversationId.split('_')[2]), 
           type: 'private',
           name: userName,
           participantId: userId
         })
 
-        // Refresh conversations after opening chat to get any updates
+        
         await fetchConversations()
       }
 
-      // Close the create direct message modal
+      
       setShowCreateDirectMessage(false)
 
-      success(`Started conversation with ${userName}`)
+      success('Conversation started!')
     } catch (err) {
       console.error('Error starting direct message:', err)
       if (err instanceof NetworkError) {
@@ -380,13 +385,13 @@ function ChatsFilterPage() {
     router.push(`/${newTab}`)
   }
 
-  // Calculate unread counts (conversation count, not message count)
+  
   const _chatUnreadAll = (chats || []).filter(c => (c.unread || 0) > 0).length
   const _chatUnreadDirect = (chats || []).filter(c => !c.isGroup && (c.unread || 0) > 0).length
   const _chatUnreadGroups = (chats || []).filter(c => c.isGroup && (c.unread || 0) > 0).length
 
-  // Mark intentionally unused values as used so the linter doesn't complain.
-  // These values are kept for clarity and future use but aren't referenced in this view.
+  
+  
   void isConnected
   void _liveNotifications
   void _liveUnreadCount
@@ -429,7 +434,7 @@ function ChatsFilterPage() {
         onGroupCreated={() => {
           fetchGroups()
           setShowCreateGroup(false)
-          success('Group created successfully!')
+          success('Group created!')
         }}
       />
 
@@ -437,11 +442,12 @@ function ChatsFilterPage() {
         <ChatWindow
           conversationId={openChatWindow.conversationId}
           conversationType={openChatWindow.type}
-          chatType={openChatWindow.type} // Explicitly set chatType to trigger tabbed interface for groups
+          chatType={openChatWindow.type} 
           participantName={openChatWindow.name}
           participantId={openChatWindow.participantId}
           groupId={openChatWindow.type === 'group' ? (openChatWindow.groupId || openChatWindow.conversationId) : undefined}
           highlightMessageId={openChatWindow.highlightMessageId}
+          highlightPollId={openChatWindow.highlightPollId}
           initialTab={openChatWindow.initialTab}
           onClose={() => setOpenChatWindow(null)}
         />
@@ -451,7 +457,7 @@ function ChatsFilterPage() {
           onChatClick={async (chat) => {
             if (chat.type === 'group') {
               try {
-                // For groups, we need to fetch group details to get membership info
+                
                 const groupId = chat.groupId || chat.conversationId
                 
                 const groupInfo = await api.getGroup(groupId)
@@ -464,12 +470,13 @@ function ChatsFilterPage() {
                   groupId: groupId,
                   isGroupMember: groupInfo.is_member,
                   userRole: groupInfo.role || 'member',
-                  initialTab: chat.initialTab,
-                  highlightMessageId: chat.highlightMessageId
+                  initialTab: tabParam || chat.initialTab,
+                  highlightMessageId: highlightMessageParam ? parseInt(highlightMessageParam) : chat.highlightMessageId,
+                  highlightPollId: highlightPollParam ? parseInt(highlightPollParam) : undefined
                 })
               } catch (err) {
                 console.error('Error fetching group info:', err)
-                // Fallback to basic group window
+                
                 setOpenChatWindow({
                   conversationId: chat.conversationId,
                   type: chat.type,
@@ -478,8 +485,9 @@ function ChatsFilterPage() {
                   groupId: chat.groupId || chat.conversationId,
                   isGroupMember: true,
                   userRole: 'member',
-                  initialTab: chat.initialTab,
-                  highlightMessageId: chat.highlightMessageId
+                  initialTab: tabParam || chat.initialTab,
+                  highlightMessageId: highlightMessageParam ? parseInt(highlightMessageParam) : chat.highlightMessageId,
+                  highlightPollId: highlightPollParam ? parseInt(highlightPollParam) : undefined
                 })
               }
             } else {
@@ -487,9 +495,10 @@ function ChatsFilterPage() {
                 conversationId: chat.conversationId,
                 type: chat.type,
                 name: chat.name,
-                  participantId: chat.participantId,
-                  initialTab: chat.initialTab,
-                  highlightMessageId: chat.highlightMessageId
+                participantId: chat.participantId,
+                initialTab: chat.initialTab,
+                highlightMessageId: chat.highlightMessageId,
+                highlightPollId: undefined
               })
             }
           }}
@@ -504,7 +513,7 @@ function ChatsFilterPage() {
   )
 }
 
-// Wrap the entire component with ProtectedRoute
+
 function ProtectedChatsFilterPage() {
   return (
     <ProtectedRoute>

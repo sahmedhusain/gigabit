@@ -1,25 +1,10 @@
 'use client'
 import { useState, useCallback, useRef, useEffect } from 'react'
-
-export interface CacheOptions<T> {
-  maxAge?: number // milliseconds
-  maxSize?: number // maximum number of cached items
-  keyGenerator?: (params: any) => string
-  onCacheHit?: (key: string, data: T) => void
-  onCacheMiss?: (key: string) => void
-  onCacheInvalidate?: (key: string) => void
-}
-
-interface CacheEntry<T> {
-  data: T
-  timestamp: number
-  accessCount: number
-  lastAccessed: number
-}
+import { CacheOptions, CacheEntry } from '@/types/hooks'
 
 export function useCache<T>(options: CacheOptions<T> = {}) {
   const {
-    maxAge = 5 * 60 * 1000, // 5 minutes default
+    maxAge = 5 * 60 * 1000, 
     maxSize = 100,
     keyGenerator = (params: any) => JSON.stringify(params),
     onCacheHit,
@@ -42,7 +27,7 @@ export function useCache<T>(options: CacheOptions<T> = {}) {
     const now = Date.now()
     const entries = Array.from(cache.current.entries())
     
-    // Remove expired entries
+    
     entries.forEach(([key, entry]) => {
       if (!isValidEntry(entry)) {
         cache.current.delete(key)
@@ -50,7 +35,7 @@ export function useCache<T>(options: CacheOptions<T> = {}) {
       }
     })
 
-    // If still over size limit, remove least recently used
+    
     if (cache.current.size > maxSize) {
       const sortedEntries = Array.from(cache.current.entries())
         .sort(([, a], [, b]) => a.lastAccessed - b.lastAccessed)
@@ -77,7 +62,7 @@ export function useCache<T>(options: CacheOptions<T> = {}) {
       const entry = cache.current.get(key)!
       
       if (isValidEntry(entry)) {
-        // Update access information
+        
         entry.accessCount++
         entry.lastAccessed = Date.now()
         
@@ -86,18 +71,18 @@ export function useCache<T>(options: CacheOptions<T> = {}) {
         
         return Promise.resolve(entry.data)
       } else {
-        // Remove expired entry
+        
         cache.current.delete(key)
         onCacheInvalidate?.(key)
       }
     }
 
-    // Cache miss - fetch data
+    
     setCacheStats(prev => ({ ...prev, misses: prev.misses + 1 }))
     onCacheMiss?.(key)
 
     return fetchFunction(params).then(data => {
-      // Store in cache
+      
       const now = Date.now()
       cache.current.set(key, {
         data,
@@ -106,7 +91,7 @@ export function useCache<T>(options: CacheOptions<T> = {}) {
         lastAccessed: now
       })
 
-      // Clean up cache if needed
+      
       evictOldEntries()
 
       return data
@@ -173,11 +158,11 @@ export function useCache<T>(options: CacheOptions<T> = {}) {
     return true
   }, [isValidEntry])
 
-  // Cleanup expired entries periodically
+  
   useEffect(() => {
     const interval = setInterval(() => {
       evictOldEntries()
-    }, maxAge / 4) // Check every quarter of the max age
+    }, maxAge / 4) 
 
     return () => clearInterval(interval)
   }, [maxAge, evictOldEntries])

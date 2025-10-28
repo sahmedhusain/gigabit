@@ -9,6 +9,7 @@ import { Eye, EyeOff, Mail, Lock, ArrowRight, X } from 'lucide-react'
 import { motion } from 'framer-motion'
 import TermsPopup from '@/components/ui/TermsPopup'
 import PrivacyPopup from '@/components/ui/PrivacyPopup'
+import { NetworkError, ValidationError, AuthenticationError } from '@/lib/api/types'
 
 function LoginPage() {
   const router = useRouter()
@@ -42,22 +43,31 @@ function LoginPage() {
         throw new Error('Please fill in all fields')
       }
 
-      // Call login function from auth context
+      
       await login(formData.email, formData.password)
 
-      // Redirect to user's preferred default route on success
+      
       const defaultRoute = localStorage.getItem('defaultRoute') || '/feed/all';
       router.push(defaultRoute)
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      setError(msg || 'Login failed. Please try again.')
+      let errorMessage = 'Login failed. Please try again.';
+      
+      if (err instanceof AuthenticationError || err instanceof NetworkError) {
+        errorMessage = 'Wrong email or password';
+      } else if (err instanceof ValidationError) {
+        errorMessage = err.message;
+      } else if (err instanceof Error) {
+        errorMessage = err.message;
+      }
+      
+      setError(errorMessage);
     } finally {
       setIsLoading(false)
     }
   }
 
   const [year, setYear] = useState<number | null>(null);
-  // Set year on client only to avoid hydration mismatch
+  
   React.useEffect(() => {
     setYear(new Date().getFullYear());
   }, []);

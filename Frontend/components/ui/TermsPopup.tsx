@@ -1,11 +1,7 @@
 'use client'
 import { X } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
-
-interface TermsPopupProps {
-  isOpen: boolean
-  onClose: () => void
-}
+import { TermsPopupProps } from '@/types/ui'
 
 export default function TermsPopup({ isOpen, onClose }: TermsPopupProps) {
   if (!isOpen) return null

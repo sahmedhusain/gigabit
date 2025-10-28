@@ -21,7 +21,7 @@ function FilteredSearchPageRoute() {
     }
   }, [searchParams, query])
 
-  // Update URL when search query changes
+  
   useEffect(() => {
     if (query) {
       const newUrl = `/search/${filter}?q=${encodeURIComponent(query)}`
@@ -39,7 +39,7 @@ function FilteredSearchPageRoute() {
   )
 }
 
-// Wrap the entire component with ProtectedRoute
+
 function ProtectedFilteredSearchPage() {
   return (
     <ProtectedRoute>

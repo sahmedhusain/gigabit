@@ -2,10 +2,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
-
-interface ProtectedRouteProps {
-  children: React.ReactNode
-}
+import { ProtectedRouteProps } from '@/types/auth'
 
 export default function ProtectedRoute({ children }: ProtectedRouteProps) {
   const { isAuthenticated, isLoading } = useAuth()

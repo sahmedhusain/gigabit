@@ -19,46 +19,7 @@ import {
   MessageSquare
 } from 'lucide-react'
 
-interface SidebarProps {
-  isMobileMenuOpen: boolean
-  setIsMobileMenuOpen: (open: boolean) => void
-  activeTab: string
-  setActiveTab: (tab: string) => void
-  feedSubTab: string
-  setFeedSubTab: (subTab: string) => void
-  activitySubTab: string
-  setActivitySubTab: (subTab: string) => void
-  chatSubTab: string
-  setChatSubTab: (subTab: string) => void
-  eventsSubTab: string
-  setEventsSubTab: (subTab: string) => void
-  tempPostSubTab?: string
-  onTempPostClose?: () => void
-  chatUnreadAll?: number
-  chatUnreadDirect?: number
-  chatUnreadGroups?: number
-}
-
-interface MenuItem {
-  id: string
-  label: string
-  icon: React.ComponentType<React.SVGProps<SVGSVGElement>>
-  description: string
-  color: string
-  count?: number | string
-  onClick: () => void
-  isActive: boolean
-  isTemp?: boolean
-  onClose?: () => void
-}
-
-interface MenuSection {
-  id: 'chats' | 'feed' | 'activity' | 'events'
-  title: string
-  icon: React.ReactNode
-  description: string
-  items: MenuItem[]
-}
+import { SidebarProps, MenuSection } from '@/types/layout'
 
 export default function Sidebar({
   isMobileMenuOpen,
@@ -84,7 +45,7 @@ export default function Sidebar({
     null
   )
 
-  // Disable collapse functionality entirely
+  
   const isCollapsed = false
 
   const menuSections: MenuSection[] = [
@@ -128,7 +89,7 @@ export default function Sidebar({
           onClick: () => {
             router.push('/chats/groups')
           },
-          // Accept both singular 'group' and plural 'groups'
+          
           isActive: activeTab === 'chats' && (typeof chatSubTab !== 'undefined' ? (chatSubTab === 'groups' || chatSubTab === 'group') : false)
         }
       ]
@@ -147,7 +108,7 @@ export default function Sidebar({
           color: 'from-emerald-500 to-teal-600',
           count: undefined,
           onClick: () => {
-            // Stay on current page
+            
           },
           isActive: true,
           isTemp: true,
@@ -281,7 +242,7 @@ export default function Sidebar({
     }
   ]
 
-  // formatTime and getUserGreeting were removed because they're not used in this component.
+  
 
   return (
     <>
@@ -352,7 +313,7 @@ export default function Sidebar({
                           onClick={() => {
                             const willExpand = expandedSection !== section.id
                             setExpandedSection(willExpand ? section.id : null)
-                            // Navigate to first sub-route by default
+                            
                             if (section.id === 'chats') {
                               router.push('/chats/all')
                             } else if (section.id === 'feed') {

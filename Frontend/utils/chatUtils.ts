@@ -1,5 +1,6 @@
 "use client";
 import { ConversationResponse, Group, GroupResponse, User } from "@/lib/api";
+import { ChatItem } from "@/types/chat";
 
 export interface UnifiedChatItem {
   id: string | number;
@@ -18,9 +19,10 @@ export interface UnifiedChatItem {
   groupPrivacy?: Group["privacy"] | GroupResponse["privacy"];
   groupRole?: Group["role"] | GroupResponse["role"];
   groupId?: number;
+  joinedAt?: string;
 }
 
-export function normalizeConversation(conv: any): UnifiedChatItem {
+export function normalizeConversation(conv: any, currentUserId?: number): UnifiedChatItem {
   const isGroup = conv.type === "group";
   const name = isGroup
     ? conv.group?.title || conv.group?.Title || "Group"
@@ -44,6 +46,15 @@ export function normalizeConversation(conv: any): UnifiedChatItem {
   const groupPrivacy = conv.group?.privacy || conv.group?.Privacy;
   const groupRole = conv.group?.role || conv.group?.Role;
 
+  // Find current user's join time for groups
+  let joinedAt: string | undefined;
+  if (isGroup && currentUserId && conv.group?.members) {
+    const currentUserMember = conv.group.members.find((member: any) => member.user?.id === currentUserId || member.user?.ID === currentUserId);
+    if (currentUserMember) {
+      joinedAt = currentUserMember.joined_at || currentUserMember.JoinedAt;
+    }
+  }
+
   return {
     id: conv.id || conv.ID,
     type: conv.type || conv.Type,
@@ -61,6 +72,7 @@ export function normalizeConversation(conv: any): UnifiedChatItem {
     groupPrivacy,
     groupRole,
     groupId: conv.group?.id || conv.group?.ID,
+    joinedAt,
   };
 }
 
@@ -125,3 +137,159 @@ export function mergeAndSortChats(
 
   return combined;
 }
+
+
+
+export const parseTimestamp = (timestamp: string | number | undefined | null): number => {
+  if (!timestamp) return 0;
+  if (typeof timestamp === 'number') {
+    
+    if (timestamp > 1e11) return timestamp; 
+    return timestamp * 1000; 
+  }
+  
+  const date = new Date(timestamp);
+  return isNaN(date.getTime()) ? 0 : date.getTime();
+};
+
+export const sortChatsByLastMessage = (chats: UnifiedChatItem[]): UnifiedChatItem[] => {
+  return chats.sort((a, b) => {
+    
+    const aLastMessageTime = parseTimestamp(a.lastMessageTime || a.timestamp);
+    const bLastMessageTime = parseTimestamp(b.lastMessageTime || b.timestamp);
+
+    
+    if (aLastMessageTime > 0 && bLastMessageTime > 0) {
+      return bLastMessageTime - aLastMessageTime;
+    }
+
+    
+    if (aLastMessageTime > 0 && bLastMessageTime === 0) return -1;
+    if (bLastMessageTime > 0 && aLastMessageTime === 0) return 1;
+
+    
+    return bLastMessageTime - aLastMessageTime;
+  });
+};
+
+export const filterUniqueChats = (chats: UnifiedChatItem[]): UnifiedChatItem[] => {
+  return chats.filter((chat, index, self) =>
+    self.findIndex(c => c.id === chat.id) === index
+  );
+};
+
+export const calculateChatStats = (
+  chats: UnifiedChatItem[],
+  searchResultsLength: number,
+  searchQuery: string,
+  getUserStatus: (userId: number) => string
+) => {
+  if (searchQuery.trim() && searchResultsLength > 0) {
+    return {
+      online: 0, 
+      total: searchResultsLength,
+      unread: 0 
+    };
+  }
+
+  const uniqueChats = filterUniqueChats(chats);
+  return {
+    online: uniqueChats.filter(chat => chat.type === 'private' && chat.participantId && getUserStatus(chat.participantId) !== 'offline').length,
+    total: uniqueChats.length,
+    unread: uniqueChats.filter(chat => (chat.unread || 0) > 0).length
+  };
+};
+
+export const getChatIdNumber = (chat: ChatItem | UnifiedChatItem): number => {
+  const id = chat.id;
+  if (typeof id === 'string') {
+    return parseInt(id.replace(/\D/g, '')) || 0;
+  }
+  return id || 0;
+};
+
+export const findChatById = (chats: (ChatItem | UnifiedChatItem)[], conversationId: number): ChatItem | UnifiedChatItem | undefined => {
+  return chats.find(c => {
+    const chatIdNum = getChatIdNumber(c);
+    return chatIdNum === conversationId;
+  });
+};
+
+export const getTypingKey = (chat: ChatItem, currentUserId?: number): string | null => {
+  // For groups, look up by group key
+  if (chat.groupId) {
+    return `group_${chat.groupId}`;
+  }
+  // For private chats, calculate the key
+  if (chat.participantId && currentUserId) {
+    return String(Math.min(chat.participantId, currentUserId) * 1000000 + Math.max(chat.participantId, currentUserId));
+  }
+  return null;
+};
+
+// Chat utility functions
+
+// Parse various timestamp formats robustly: ISO strings, milliseconds, or seconds
+export const parseDate = (value: string | number | undefined | null): Date => {
+  if (!value && value !== 0) return new Date(0)
+  const raw = typeof value === 'number' ? value : String(value).trim()
+
+  if (/^\d+$/.test(String(raw))) {
+    const n = Number(raw)
+    
+    const asMs = new Date(n)
+    if (asMs.getFullYear() >= 2000) return asMs
+
+    
+    const asSeconds = new Date(n * 1000)
+    if (asSeconds.getFullYear() >= 2000) return asSeconds
+
+    
+    const asMicros = new Date(Math.floor(n / 1000))
+    if (asMicros.getFullYear() >= 2000) return asMicros
+
+    
+    if (asSeconds.getTime() !== 0) return asSeconds
+    
+    console.warn('parseDate: suspicious numeric date value', value, '->', asMs)
+    return asMs
+  }
+
+  
+  const d = new Date(String(raw))
+  if (isNaN(d.getTime())) {
+    
+    console.warn('parseDate: failed to parse date', value)
+    return new Date(0)
+  }
+  return d
+}
+
+export const formatLastOnlineTime = (lastStatusChange: string | number | undefined | null): string => {
+  const date = parseDate(lastStatusChange)
+  const now = new Date()
+
+  
+  const dateDate = new Date(date.getFullYear(), date.getMonth(), date.getDate())
+  const todayDate = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const yesterdayDate = new Date(todayDate)
+  yesterdayDate.setDate(yesterdayDate.getDate() - 1)
+
+  let timeString = ''
+  if (dateDate.getTime() === todayDate.getTime()) {
+    timeString = date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true })
+  } else if (dateDate.getTime() === yesterdayDate.getTime()) {
+    timeString = `yesterday ${date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true })}`
+  } else {
+    timeString = date.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true
+    })
+  }
+
+  return `last seen ${timeString}`
+};

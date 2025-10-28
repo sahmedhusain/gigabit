@@ -7,10 +7,7 @@ import { useOnlineStatus } from '@/hooks'
 import { api, Member } from '@/lib/api'
 import { getUserInitials } from '@/utils/avatarUtils'
 import Image from 'next/image'
-
-interface GroupMembersTabProps {
-  groupId: number
-}
+import { GroupMembersTabProps } from '@/types/groups'
 
 const GroupMembersTab: React.FC<GroupMembersTabProps> = ({ groupId }) => {
   const [members, setMembers] = useState<Member[]>([])
@@ -18,7 +15,7 @@ const GroupMembersTab: React.FC<GroupMembersTabProps> = ({ groupId }) => {
   const { user } = useAuth()
   const { onlineUsers } = useOnlineStatus()
 
-  // Fetch group members
+  
   useEffect(() => {
     const fetchMembers = async () => {
       try {
@@ -35,7 +32,7 @@ const GroupMembersTab: React.FC<GroupMembersTabProps> = ({ groupId }) => {
     fetchMembers()
   }, [groupId])
 
-  // Get role icon
+  
   const getRoleIcon = (role?: string) => {
     switch (role) {
       case 'creator':
@@ -47,7 +44,7 @@ const GroupMembersTab: React.FC<GroupMembersTabProps> = ({ groupId }) => {
     }
   }
 
-  // Get role label
+  
   const getRoleLabel = (role?: string) => {
     switch (role) {
       case 'creator':
@@ -59,7 +56,7 @@ const GroupMembersTab: React.FC<GroupMembersTabProps> = ({ groupId }) => {
     }
   }
 
-  // Get role color
+  
   const getRoleColor = (role?: string) => {
     switch (role) {
       case 'creator':
@@ -71,7 +68,7 @@ const GroupMembersTab: React.FC<GroupMembersTabProps> = ({ groupId }) => {
     }
   }
 
-  // Format join date
+  
   const formatJoinDate = (dateString?: string) => {
     if (!dateString) return 'Recently joined'
     const date = new Date(dateString)
@@ -82,7 +79,7 @@ const GroupMembersTab: React.FC<GroupMembersTabProps> = ({ groupId }) => {
     })
   }
 
-  // Sort members by role priority
+  
   const sortedMembers = [...members].sort((a, b) => {
     const roleOrder = { creator: 0, admin: 1, member: 2 }
     const aOrder = roleOrder[a.role as keyof typeof roleOrder] ?? 3
@@ -116,7 +113,7 @@ const GroupMembersTab: React.FC<GroupMembersTabProps> = ({ groupId }) => {
         ) : (
           <div className="space-y-3">
             {sortedMembers.map((member, index) => {
-              // Check if member is online
+              
               const isMemberOnline = onlineUsers.some(u => u.user_id === member.user.id && u.status === 'online')
               
               return (

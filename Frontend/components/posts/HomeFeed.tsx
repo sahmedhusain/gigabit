@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react'
 import { Heart, Globe, Lock, EyeOff, MessageSquare, Sparkles, Bookmark, Send, MoreHorizontal, User, Image as ImageIcon, Trash2, ArrowUp, ArrowDown } from 'lucide-react'
 import CreatePost from './CreatePost'
 import ManagePrivacy from '../profile/ManagePrivacy'
-import { Post } from '@/lib/api'
+import { Post } from '@/types/posts'
 import { Plus } from 'lucide-react'
 import { useRealTimePosts } from '@/hooks/useRealTimePosts'
 import { useDocumentTitle } from '@/hooks/useDocumentTitle'
@@ -15,32 +15,7 @@ import { useAuth } from '@/context/AuthContext'
 import { api } from '@/lib/api'
 import { motion, AnimatePresence } from 'framer-motion'
 import SharePopup from '../ui/SharePopup'
-
-interface HomeFeedProps {
-  posts: Post[]
-  onPostLike: (postId: number) => void
-  onPostBookmark?: (postId: number) => void
-  showCreatePost: boolean
-  setShowCreatePost: (show: boolean) => void
-  newPostContent: string
-  setNewPostContent: (content: string) => void
-  newPostImage: File | null
-  setNewPostImage: (image: File | null) => void
-  postPrivacy: 'public' | 'followers' | 'friends' | 'listed'
-  setPostPrivacy: (privacy: 'public' | 'followers' | 'friends' | 'listed') => void
-  selectedUsers: number[]
-  setSelectedUsers: (users: number[]) => void
-  availableUsers: { id: number; email: string; first_name: string; last_name: string; avatar?: string; nickname?: string; display_name?: string; }[]
-  loadingUsers: boolean
-  onCreatePost: () => Promise<void>
-  feedSubTab: string
-  sortOrder: 'newest' | 'oldest'
-  setSortOrder: (sort: 'newest' | 'oldest') => void
-  hasMoreResults?: boolean
-  isLoadingMore?: boolean
-  onLoadMore?: () => void
-  resultsContainerRef?: React.RefObject<HTMLDivElement | null>
-}
+import { HomeFeedProps } from '@/types/posts'
 
 export default function HomeFeed({
   posts,
@@ -68,10 +43,10 @@ export default function HomeFeed({
   resultsContainerRef
 }: HomeFeedProps) {
   const router = useRouter()
-  // Feed filter state
+  
   const [isLoadingPosts] = useState(false)
 
-  // Comment modal state
+  
   const [isCommentModalOpen, setIsCommentModalOpen] = useState(false)
   const [selectedPostForComment, setSelectedPostForComment] = useState<Post | null>(null)
   const [newComment, setNewComment] = useState('')
@@ -108,7 +83,7 @@ export default function HomeFeed({
     setUnread(unreadCount)
   }, [unreadCount, setPageTitle, setUnread])
 
-  // Mark posts as read when user scrolls or interacts
+  
   useEffect(() => {
     const handleScroll = () => {
       if (unreadCount > 0) {
@@ -132,7 +107,7 @@ export default function HomeFeed({
   }, [unreadCount, markAsRead])
 
   const handlePostClick = (postId: number, e: React.MouseEvent) => {
-    // Don't navigate if clicking on interactive elements
+    
     if ((e.target as HTMLElement).closest('button')) {
       return
     }
@@ -164,9 +139,9 @@ export default function HomeFeed({
     setIsDeleting(prev => ({ ...prev, [postId]: true }))
     try {
       await api.deletePost(postId)
-      success('Post deleted successfully')
-      // Optionally refresh posts or remove from local state
-      window.location.reload() // Simple refresh for now
+      success('Post deleted!')
+      
+      window.location.reload() 
     } catch (err) {
       console.error('Failed to delete post:', err)
       error('Failed to delete post. Please try again.')
@@ -179,7 +154,7 @@ export default function HomeFeed({
 
   const handleManagePrivacy = async (postId: number) => {
     try {
-      // Fetch the post details to get current selected users
+      
       const postDetails = await api.getPost(postId)
       setCurrentSelectedUsers(prev => ({
         ...prev,
@@ -187,7 +162,7 @@ export default function HomeFeed({
       }))
     } catch (err) {
       console.error('Failed to fetch post details:', err)
-      // Set empty array as fallback
+      
       setCurrentSelectedUsers(prev => ({
         ...prev,
         [postId]: []
@@ -203,8 +178,8 @@ export default function HomeFeed({
         privacy: privacy,
         specific_user_ids: selectedUsers
       })
-      success('Post privacy updated successfully')
-      // Refresh the page to show updated privacy
+      success('Post privacy updated!')
+      
       window.location.reload()
     } catch (err) {
       console.error('Failed to update privacy:', err)
@@ -240,7 +215,7 @@ export default function HomeFeed({
         }
       }
 
-      // Create comment via HTTP API
+      
       const token = localStorage.getItem('token')
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/api/posts/${selectedPostForComment.id}/comments`, {
         method: 'POST',
@@ -260,7 +235,7 @@ export default function HomeFeed({
         throw new Error(errorData.error || 'Failed to create comment')
       }
 
-      // Clear the input and close modal
+      
       setNewComment('')
       setNewCommentImage(null)
       setIsCommentModalOpen(false)
@@ -289,32 +264,32 @@ export default function HomeFeed({
     }
   }
 
-  // Filter and sort posts based on active filter and sort order
+  
   const filteredPosts = () => {
     let filtered = posts
 
-    // Apply filter
+    
     switch (feedSubTab) {
       case 'following':
-        filtered = posts // Filter posts from users the current user follows
+        filtered = posts 
         break
       case 'friends':
-        filtered = posts // Filter posts from mutual followers
+        filtered = posts 
         break
       default:
-        filtered = posts // All posts
+        filtered = posts 
         break
     }
 
-    // Apply sorting
+    
     return filtered.sort((a, b) => {
       const dateA = new Date(a.created_at).getTime()
       const dateB = new Date(b.created_at).getTime()
 
       if (sortOrder === 'newest') {
-        return dateB - dateA // Newest first
+        return dateB - dateA 
       } else {
-        return dateA - dateB // Oldest first
+        return dateA - dateB 
       }
     })
   }
@@ -799,7 +774,7 @@ export default function HomeFeed({
                 {newCommentImage && (
                   <div className="bg-white/10 border border-white/20 rounded-2xl p-4">
                     <div className="flex items-center justify-between mb-3">
-                      <span className="text-white text-sm font-semibold">Selected Image:</span>
+                      <span className="text-white text-sm font-semibold">Image Preview:</span>
                       <button
                         onClick={() => setNewCommentImage(null)}
                         title="Remove image"
@@ -808,14 +783,23 @@ export default function HomeFeed({
                         <span className="text-lg">×</span>
                       </button>
                     </div>
-                    <div className="flex items-center space-x-4">
-                      <div className="w-14 h-14 bg-white/20 rounded-xl flex items-center justify-center">
-                        <ImageIcon className="w-7 h-7 text-white/70" />
+                    <div className="flex items-start space-x-4">
+                      <div className="relative w-20 h-20 bg-white/20 rounded-xl overflow-hidden flex-shrink-0">
+                        <Image
+                          src={URL.createObjectURL(newCommentImage)}
+                          alt="Image preview"
+                          fill
+                          className="object-cover"
+                          unoptimized={true}
+                        />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-white text-sm font-medium truncate">{newCommentImage?.name}</p>
+                        <p className="text-white text-sm font-medium truncate">{newCommentImage.name}</p>
                         <p className="text-white/60 text-xs">
-                          {(newCommentImage?.size / 1024 / 1024).toFixed(2)} MB
+                          {(newCommentImage.size / 1024 / 1024).toFixed(2)} MB
+                        </p>
+                        <p className="text-white/50 text-xs mt-1">
+                          Click image to view full preview
                         </p>
                       </div>
                     </div>
@@ -923,8 +907,8 @@ export default function HomeFeed({
             setSelectedPostForShare(null)
           }}
           onShareSuccess={() => {
-            // Optionally refresh posts or update share count locally
-            // For now, we'll just close the popup
+            
+            
           }}
         />
       )}

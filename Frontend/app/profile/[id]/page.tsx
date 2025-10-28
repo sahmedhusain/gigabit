@@ -6,7 +6,8 @@ import AppLayout from '@/components/layout/AppLayout'
 import ProfileSection from '@/components/profile/ProfileSection'
 import { useAuth } from '@/context/AuthContext'
 import { useToast } from '@/context/ToastContext'
-import { api, User, Post } from '@/lib/api'
+import { api, User } from '@/lib/api'
+import { Post } from '@/types/posts'
 
 function ProfilePage() {
   const params = useParams()
@@ -27,10 +28,8 @@ function ProfilePage() {
     const wasLiked = post?.isLiked || false
 
     try {
-      if (wasLiked) {
-        await api.unlikePost(postId)
-      } else {
-        await api.likePost(postId)
+      if (post) {
+        await api.toggleLike(post, !wasLiked)
       }
 
       setUserPosts(userPosts.map((p) =>
@@ -92,44 +91,43 @@ function ProfilePage() {
     try {
       setIsLoading(true)
 
-      // First try to get basic profile info
+      
       try {
         const profileData = await api.getProfile(userIdNum)
         setProfileUser(profileData)
-        console.log('Profile data:', profileData)
-        // Check if profile data includes follower/following counts
+        
         const profileDataRec = profileData as unknown as Record<string, unknown>
         if (profileDataRec['follower_count'] !== undefined) {
-          // followerCount not used, skip setting
+          
         }
         if (profileDataRec['following_count'] !== undefined) {
-          // followingCount not used, skip setting
+          
         }
 
-        // Get follow status between current user and profile user
+        
         if (currentUser && currentUser.id !== userIdNum) {
           try {
             const followStatusData = await api.getFollowStatus(userIdNum)
-            // Determine if privacy overlay should be shown
+            
             setShowPrivacyOverlay(profileData.is_private && !followStatusData.is_following)
           } catch (followError) {
             console.warn('Failed to get follow status:', followError)
-            // If we can't get follow status, assume not following for privacy overlay
+            
             setShowPrivacyOverlay(profileData.is_private)
           }
         } else {
-          // Own profile or no current user
+          
           setShowPrivacyOverlay(false)
         }
 
-        // get more data
+        
         const [postsResponse, followersResponse, followingResponse] = await Promise.allSettled([
           api.getUserPosts(userIdNum),
           api.getFollowers(userIdNum),
           api.getFollowing(userIdNum)
         ])
 
-        // Handle posts response (can fail for private profiles)
+        
         if (postsResponse.status === 'fulfilled') {
           setUserPosts(postsResponse.value.posts || [])
         } else {
@@ -137,36 +135,36 @@ function ProfilePage() {
           setUserPosts([])
         }
 
-        // Handle followers response - always extract count even if followers list is restricted
+        
         if (followersResponse.status === 'fulfilled') {
           const followersData = followersResponse.value.followers || []
           setFollowers(followersData)
-          // followerCount not used, skip setting
+          
         } else {
           console.warn('Failed to load followers:', followersResponse.reason)
           setFollowers([])
         }
 
-        // Handle following response - always extract count even if following list is restricted
+        
         if (followingResponse.status === 'fulfilled') {
           const followingData = followingResponse.value.following || []
           setFollowing(followingData)
-          // followingCount not used, skip setting
+          
         } else {
           console.warn('Failed to load following:', followingResponse.reason)
           setFollowing([])
         }
 
-        // Remove the incorrect follow status logic - let FollowHandler handle it
+        
       } catch (profileError: unknown) {
         console.error('Profile fetch failed:', profileError)
 
         const profileErr = profileError as Record<string, unknown>
 
-        // Check if it's a private profile error
+        
         if (profileErr['status'] === 403) {
 
-          // Try to get basic user info from the users list
+          
           try {
             const usersResponse = await api.getUsers()
             const targetUser = (usersResponse.users as unknown[]).find((u: unknown) => {
@@ -175,16 +173,16 @@ function ProfilePage() {
             })
 
             if (targetUser) {
-              // Create a basic user object for private profile display
+              
               const basicUser = {
                 ...(targetUser as User),
-                is_private: true // Ensure it's marked as private
+                is_private: true 
               }
               setProfileUser(basicUser)
 
-              setShowPrivacyOverlay(true) // Always show overlay for private profiles when we can't access full data
+              setShowPrivacyOverlay(true) 
 
-              // Don't try to fetch posts for private profiles
+              
               setUserPosts([])
             } else {
               error('User not found.')

@@ -375,9 +375,10 @@ func (h *UserHandler) UpdateBirthdayPrivacy(w http.ResponseWriter, r *http.Reque
 		"everyone":  true,
 		"friends":   true,
 		"followers": true,
+		"only_me":   true,
 	}
 	if !validSettings[req.BirthdayPrivacy] {
-		writeError(w, http.StatusBadRequest, "Invalid birthday privacy setting. Must be one of: everyone, friends, followers")
+		writeError(w, http.StatusBadRequest, "Invalid birthday privacy setting. Must be one of: everyone, friends, followers, only_me")
 		return
 	}
 
@@ -421,9 +422,10 @@ func (h *UserHandler) UpdateGenderPrivacy(w http.ResponseWriter, r *http.Request
 		"everyone":  true,
 		"friends":   true,
 		"followers": true,
+		"only_me":   true,
 	}
 	if !validSettings[req.GenderPrivacy] {
-		writeError(w, http.StatusBadRequest, "Invalid gender privacy setting. Must be one of: everyone, friends, followers")
+		writeError(w, http.StatusBadRequest, "Invalid gender privacy setting. Must be one of: everyone, friends, followers, only_me")
 		return
 	}
 

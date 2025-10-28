@@ -9,11 +9,7 @@ import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import { getAvatarUrl, getUserInitials } from '@/utils/avatarUtils'
 import { useToast } from '@/context/ToastContext'
-
-interface GroupPostsTabProps {
-  groupId: number
-  groupTitle: string
-}
+import { GroupPostsTabProps } from '@/types/groups'
 
 const GroupPostsTab: React.FC<GroupPostsTabProps> = ({ groupId, groupTitle }) => {
   const [posts, setPosts] = useState<PostResponse[]>([])
@@ -29,31 +25,28 @@ const GroupPostsTab: React.FC<GroupPostsTabProps> = ({ groupId, groupTitle }) =>
   const router = useRouter()
   const { success, error: showError } = useToast()
 
-  // Fetch group posts
+  
   useEffect(() => {
     const fetchPosts = async () => {
       if (!user) {
-        console.log('User not authenticated, skipping posts fetch')
         setIsLoading(false)
         return
       }
 
       try {
         setIsLoading(true)
-        console.log('Fetching posts for group:', groupId, 'User:', user.id)
         
-        // Fetch user role to check if admin or creator
+        
         const roleResponse = await api.getUserRole(groupId)
         setIsAdminOrCreator(roleResponse.is_admin_or_creator)
         
-        // Fetch group data to get permissions
+        
         const groupData = await api.getGroup(groupId)
         setGroupPermissions({
           create_posts: groupData.create_posts
         })
         
         const response = await api.getGroupPosts(groupId)
-        console.log('Group posts response:', response)
         setPosts(response.posts || [])
       } catch (error) {
         console.error('Failed to fetch group posts:', error)
@@ -61,7 +54,7 @@ const GroupPostsTab: React.FC<GroupPostsTabProps> = ({ groupId, groupTitle }) =>
           console.error('Error details:', error.message)
         }
         
-        // Check if it's an authentication or permission error
+        
         const errorMessage = error instanceof Error ? error.message : String(error)
         if (errorMessage.includes('401') || errorMessage.includes('Unauthorized')) {
           console.error('Authentication error - user may need to log in again')
@@ -71,7 +64,7 @@ const GroupPostsTab: React.FC<GroupPostsTabProps> = ({ groupId, groupTitle }) =>
           console.error('Server error - there may be an issue with the backend')
         }
         
-        setPosts([]) // Set empty array on error
+        setPosts([]) 
       } finally {
         setIsLoading(false)
       }
@@ -82,7 +75,7 @@ const GroupPostsTab: React.FC<GroupPostsTabProps> = ({ groupId, groupTitle }) =>
     }
   }, [groupId, user])
 
-  // Close menu when clicking outside
+  
   useEffect(() => {
     const handleClickOutside = () => {
       if (openMenuPostId !== null) {
@@ -94,9 +87,9 @@ const GroupPostsTab: React.FC<GroupPostsTabProps> = ({ groupId, groupTitle }) =>
     return () => document.removeEventListener('click', handleClickOutside)
   }, [openMenuPostId])
 
-  // Handle post created
+  
   const handlePostCreated = async () => {
-    // Refetch posts to get complete data with user info
+    
     try {
       const response = await api.getGroupPosts(groupId)
       setPosts(response.posts || [])
@@ -105,26 +98,26 @@ const GroupPostsTab: React.FC<GroupPostsTabProps> = ({ groupId, groupTitle }) =>
     }
   }
 
-  // Handle delete post
+  
   const handleDeletePost = async (postId: number) => {
     setPostToDelete(postId)
     setShowDeleteConfirm(true)
     setOpenMenuPostId(null)
   }
 
-  // Confirm delete post
+  
   const confirmDeletePost = async () => {
     if (!postToDelete) return
 
     setIsDeleting(true)
     try {
-      // Delete from database via API (using group-specific endpoint)
+      
       await api.deleteGroupPost(groupId, postToDelete)
       
-      // Update UI by removing the post
+      
       setPosts(posts.filter(p => p.id !== postToDelete))
       
-      success('Post deleted successfully!')
+      success('Post deleted!')
       setShowDeleteConfirm(false)
       setPostToDelete(null)
     } catch (error) {
@@ -135,24 +128,24 @@ const GroupPostsTab: React.FC<GroupPostsTabProps> = ({ groupId, groupTitle }) =>
     }
   }
 
-  // Cancel delete
+  
   const cancelDelete = () => {
     setShowDeleteConfirm(false)
     setPostToDelete(null)
   }
 
-  // Check if user can create posts
+  
   const canCreatePosts = () => {
     if (!groupPermissions) return false
     return groupPermissions.create_posts === 'all_members' || isAdminOrCreator
   }
 
-  // Check if user can delete post (post creator or group admin/creator)
+  
   const canDeletePost = (post: PostResponse) => {
     return user?.id === post.user.id || isAdminOrCreator
   }
 
-  // Format time
+  
   const formatTime = (dateString: string) => {
     const date = new Date(dateString)
     const now = new Date()
@@ -247,11 +240,11 @@ const GroupPostsTab: React.FC<GroupPostsTabProps> = ({ groupId, groupTitle }) =>
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: index * 0.1 }}
               onClick={(e) => {
-                // Don't navigate if clicking on interactive elements
+                
                 if ((e.target as HTMLElement).closest('button')) {
                   return
                 }
-                // For now, just prevent navigation since group posts don't have individual pages
+                
                 e.stopPropagation()
               }}
             >
@@ -395,11 +388,11 @@ const GroupPostsTab: React.FC<GroupPostsTabProps> = ({ groupId, groupTitle }) =>
                       e.stopPropagation()
                       try {
                         if (post.is_liked) {
-                          await api.unlikePost(post.id)
+                          await api.unlikeGroupPost(groupId, post.id)
                         } else {
-                          await api.likePost(post.id)
+                          await api.likeGroupPost(groupId, post.id)
                         }
-                        // Update the post in the local state
+                        
                         setPosts(posts.map(p =>
                           p.id === post.id
                             ? {
@@ -413,6 +406,7 @@ const GroupPostsTab: React.FC<GroupPostsTabProps> = ({ groupId, groupTitle }) =>
                         ))
                       } catch (error) {
                         console.error('Failed to toggle like:', error)
+                        showError('Failed to update like')
                       }
                     }}
                     className={`flex items-center justify-center space-x-2 px-4 py-2 rounded-2xl transition-all duration-300 hover:scale-105 ${
@@ -431,11 +425,11 @@ const GroupPostsTab: React.FC<GroupPostsTabProps> = ({ groupId, groupTitle }) =>
                       e.stopPropagation()
                       try {
                         if (post.is_disliked) {
-                          await api.undislikePost(post.id)
+                          await api.undislikeGroupPost(groupId, post.id)
                         } else {
-                          await api.dislikePost(post.id)
+                          await api.dislikeGroupPost(groupId, post.id)
                         }
-                        // Update the post in the local state
+                        
                         setPosts(posts.map(p =>
                           p.id === post.id
                             ? {
@@ -449,6 +443,7 @@ const GroupPostsTab: React.FC<GroupPostsTabProps> = ({ groupId, groupTitle }) =>
                         ))
                       } catch (error) {
                         console.error('Failed to toggle dislike:', error)
+                        showError('Failed to update dislike')
                       }
                     }}
                     className={`flex items-center justify-center space-x-2 px-4 py-2 rounded-2xl transition-all duration-300 hover:scale-105 ${

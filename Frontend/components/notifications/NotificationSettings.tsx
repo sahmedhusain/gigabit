@@ -9,21 +9,12 @@ import { playNotificationSound, SoundTheme } from '@/lib/notificationSounds';
 import { api } from '@/lib/api';
 import { ChatItem } from '@/types/chat';
 import Image from 'next/image';
-
-interface NotificationSettings {
-  sound_enabled: boolean;
-  sound_theme: SoundTheme;
-  browser_push_enabled: boolean;
-  quiet_hours_enabled: boolean;
-  quiet_hours_start: string;
-  quiet_hours_end: string;
-  muted_conversations: Array<{id: number, type: 'private' | 'group'}>;
-}
+import { NotificationSettings as NotificationSettingsType } from '@/types/notifications';
 
 export default function NotificationSettings() {
   const { user } = useAuth();
   const { isConnected } = useConnectionStatus();
-  const [settings, setSettings] = useState<NotificationSettings>({
+  const [settings, setSettings] = useState<NotificationSettingsType>({
     sound_enabled: true,
     sound_theme: 'classic',
     browser_push_enabled: true,
@@ -55,9 +46,8 @@ export default function NotificationSettings() {
         quiet_hours_end: response.quiet_hours_end,
         muted_conversations: response.muted_conversations || []
       });
-    } catch (err) {
-      console.error('Error fetching notification settings:', err);
-      // Fallback to localStorage if API fails
+    } catch {
+      
       const saved = localStorage.getItem('notificationSettings');
       if (saved) {
         setSettings(JSON.parse(saved));
@@ -74,9 +64,8 @@ export default function NotificationSettings() {
     try {
       const response = await api.getChats();
       setConversations(response.chats);
-    } catch (err) {
-      console.error('Error fetching conversations:', err);
-      // Don't show error message for conversations, just log it
+    } catch {
+      
     } finally {
       setLoadingConversations(false);
     }
@@ -111,10 +100,9 @@ export default function NotificationSettings() {
 
       setMessage('Notification settings updated successfully!');
       setSaveStatus('saved');
-      // reset saved state after a short delay so UI returns to normal
+      
       setTimeout(() => setSaveStatus('idle'), 2500);
-    } catch (err) {
-      console.error('Error saving notification settings:', err);
+    } catch {
       setMessage('Failed to update notification settings');
       setSaveStatus('error');
       setTimeout(() => setSaveStatus('idle'), 2500);
@@ -123,9 +111,9 @@ export default function NotificationSettings() {
     }
   };
 
-  const updateSetting = <K extends keyof NotificationSettings>(
+  const updateSetting = <K extends keyof NotificationSettingsType>(
     key: K,
-    value: NotificationSettings[K]
+    value: NotificationSettingsType[K]
   ) => {
     setSettings(prev => ({ ...prev, [key]: value }));
   };
@@ -136,8 +124,7 @@ export default function NotificationSettings() {
     setTestingSound(true);
     try {
       await playNotificationSound(theme, 0.5);
-    } catch (error) {
-      console.warn('Failed to test sound:', error);
+    } catch {
     } finally {
       setTimeout(() => setTestingSound(false), 1000);
     }
@@ -147,13 +134,13 @@ export default function NotificationSettings() {
     setSettings(prev => {
       const isMuted = prev.muted_conversations.some(muted => muted.id === conversationId && muted.type === conversationType);
       if (isMuted) {
-        // Unmute: remove from muted list
+        
         return {
           ...prev,
           muted_conversations: prev.muted_conversations.filter(muted => !(muted.id === conversationId && muted.type === conversationType))
         };
       } else {
-        // Mute: add to muted list
+        
         return {
           ...prev,
           muted_conversations: [...prev.muted_conversations, { id: conversationId, type: conversationType }]
@@ -163,9 +150,9 @@ export default function NotificationSettings() {
   };
 
   const hasChanges = () => {
-    // Get saved settings from localStorage as backup
+    
     const saved = localStorage.getItem('notificationSettings');
-    if (!saved) return true; // If no saved settings, consider it as having changes
+    if (!saved) return true; 
 
     try {
       const savedSettings = JSON.parse(saved);
@@ -179,7 +166,7 @@ export default function NotificationSettings() {
         JSON.stringify(settings.muted_conversations) !== JSON.stringify(savedSettings.muted_conversations)
       );
     } catch {
-      return true; // If parsing fails, consider it as having changes
+      return true; 
     }
   };
 

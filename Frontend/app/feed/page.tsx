@@ -7,9 +7,9 @@ import HomeFeed from '@/components/posts/HomeFeed'
 import CreatePost from '@/components/posts/CreatePost'
 import { useAuth } from '@/context/AuthContext'
 import { useToast } from '@/context/ToastContext'
-import { api, NetworkError, AuthenticationError, ValidationError, PostResponse } from '@/lib/api'
+import { api, NetworkError, AuthenticationError, ValidationError, PostResponse, ApiClient, CreatePostRequest } from '@/lib/api'
 import { getToken } from '@/lib/api'
-import { ApiClient, CreatePostRequest, Post } from '@/lib/api'
+import { Post } from '@/types/posts'
 
 function FeedPage() {
   const router = useRouter()
@@ -17,14 +17,14 @@ function FeedPage() {
   const { user } = useAuth()
   const { success, error } = useToast()
 
-  // Get filter from URL params
+  
   const filterParam = searchParams?.get('filter') || 'all'
   const sortParam = searchParams?.get('sort') || 'newest'
   const [feedSubTab, setFeedSubTab] = useState(filterParam)
   const [sortOrder, setSortOrder] = useState<'newest' | 'oldest'>(sortParam as 'newest' | 'oldest')
   const [showCreatePost, setShowCreatePost] = useState(false)
 
-  // Post Creation State
+  
   const [newPostContent, setNewPostContent] = useState('')
   const [newPostImage, setNewPostImage] = useState<File | null>(null)
   const [postPrivacy, setPostPrivacy] = useState<'public' | 'followers' | 'friends' | 'listed'>('public')
@@ -32,16 +32,16 @@ function FeedPage() {
   const [availableUsers, setAvailableUsers] = useState<{ id: number; email: string; first_name: string; last_name: string; avatar?: string; nickname?: string; display_name?: string; }[]>([])
   const [loadingUsers, setLoadingUsers] = useState(false)
 
-  // Data State
+  
   const [posts, setPosts] = useState<Post[]>([])
   const [currentPage, setCurrentPage] = useState(0)
   const [hasMoreResults, setHasMoreResults] = useState(true)
   const [isLoadingMore, setIsLoadingMore] = useState(false)
 
-  // Scroll position preservation
+  
   const resultsContainerRef = useRef<HTMLDivElement>(null)
 
-  // Update URL when filter or sort changes
+  
   useEffect(() => {
     const params = new URLSearchParams()
     if (feedSubTab !== 'all') params.set('filter', feedSubTab)
@@ -55,7 +55,6 @@ function FeedPage() {
       if (append) {
         setIsLoadingMore(true)
       }
-      console.log('Fetching feed posts with params...', { page, append, filter: feedSubTab })
       let response: { posts: PostResponse[]; limit: number; offset: number }
       if (feedSubTab === 'following') {
         response = await api.getFollowingFeed(20, page * 20)
@@ -110,9 +109,9 @@ function FeedPage() {
     } catch (err) {
       console.error('Error fetching posts:', err)
       if (err instanceof NetworkError) {
-        error('Failed to load posts. Please check your connection.')
+        error('Failed to load posts!')
       } else if (err instanceof AuthenticationError) {
-        error('Please log in again to continue.')
+        error('Login required!')
       } else {
         error('Unable to load posts right now.')
       }
@@ -205,7 +204,7 @@ function FeedPage() {
 
       const postData: CreatePostRequest = {
         content: newPostContent,
-        privacy: postPrivacy, // Use the privacy value directly (public, followers, friends, listed)
+        privacy: postPrivacy, 
         image_url: imageUrl
       }
 
@@ -219,14 +218,14 @@ function FeedPage() {
       setPostPrivacy('public')
       setSelectedUsers([])
       setShowCreatePost(false)
-      success('Post created successfully!')
+      success('Post created!')
       fetchFeedPosts()
     } catch (err: unknown) {
       console.error('Error creating post:', err)
       if (err instanceof ValidationError) {
         error(err.message)
       } else if (err instanceof NetworkError) {
-        error('Failed to create post. Please try again.')
+        error('Failed to create post!')
       } else if (err instanceof Error) {
         error(err.message)
       } else {
@@ -240,10 +239,8 @@ function FeedPage() {
       const post = posts.find((p: Post) => p.id === postId)
       const wasLiked = post?.isLiked || false
 
-      if (wasLiked) {
-        await api.unlikePost(postId)
-      } else {
-        await api.likePost(postId)
+      if (post) {
+        await api.toggleLike(post, !wasLiked)
       }
 
       setPosts(posts.map((p: Post) =>
@@ -258,7 +255,7 @@ function FeedPage() {
           ? { ...p, isLiked: !p.isLiked, likes: p.likes + (p.isLiked ? -1 : 1) }
           : p
       ))
-      error('Unable to update like right now.')
+      error('Failed to update like!')
     }
   }
 
@@ -285,7 +282,7 @@ function FeedPage() {
           ? { ...p, isBookmarked: !p.isBookmarked }
           : p
       ))
-      error('Unable to update bookmark right now.')
+      error('Failed to update bookmark!')
     }
   }
 
@@ -340,7 +337,7 @@ function FeedPage() {
   )
 }
 
-// Wrap the entire component with ProtectedRoute
+
 export default function ProtectedFeedPage() {
   return (
     <ProtectedRoute>

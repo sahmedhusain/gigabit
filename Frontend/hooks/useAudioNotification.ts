@@ -1,12 +1,6 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
-
-export interface AudioNotificationOptions {
-  volume?: number
-  enabled?: boolean
-  soundUrl?: string
-  vibrationPattern?: number[]
-}
+import { AudioNotificationOptions } from '@/types/hooks'
 
 export function useAudioNotification(options: AudioNotificationOptions = {}) {
   const {
@@ -20,13 +14,13 @@ export function useAudioNotification(options: AudioNotificationOptions = {}) {
   const [permission, setPermission] = useState<NotificationPermission>('default')
   const [audio, setAudio] = useState<HTMLAudioElement | null>(null)
 
-  // Initialize audio and check permissions
+  
   useEffect(() => {
-    // Check if audio is supported
+    
     const audioSupported = typeof Audio !== 'undefined'
     setIsSupported(audioSupported)
 
-    // Initialize audio
+    
     if (audioSupported) {
       const audioElement = new Audio(soundUrl)
       audioElement.volume = volume
@@ -34,7 +28,7 @@ export function useAudioNotification(options: AudioNotificationOptions = {}) {
       setAudio(audioElement)
     }
 
-    // Check notification permission
+    
     if ('Notification' in window) {
       setPermission(Notification.permission)
     }
@@ -60,7 +54,7 @@ export function useAudioNotification(options: AudioNotificationOptions = {}) {
     if (!enabled || !audio || !isSupported) return
 
     try {
-      // Reset audio to beginning
+      
       audio.currentTime = 0
       await audio.play()
     } catch (error) {
@@ -89,7 +83,7 @@ export function useAudioNotification(options: AudioNotificationOptions = {}) {
       onClick?: () => void
     } = {}
   ) => {
-    // Request permission if needed
+    
     if (permission === 'default') {
       const newPermission = await requestPermission()
       if (newPermission !== 'granted') return
@@ -110,7 +104,7 @@ export function useAudioNotification(options: AudioNotificationOptions = {}) {
         notification.onclick = options.onClick
       }
 
-      // Auto close after 5 seconds unless requireInteraction is true
+      
       if (!options.requireInteraction) {
         setTimeout(() => {
           notification.close()
@@ -144,17 +138,17 @@ export function useAudioNotification(options: AudioNotificationOptions = {}) {
 
     if (!enabled) return
 
-    // Play sound
+    
     if (shouldPlaySound) {
       await playSound()
     }
 
-    // Vibrate
+    
     if (shouldVibrate) {
       vibrate()
     }
 
-    // Show browser notification
+    
     if (shouldShowNotification) {
       await showNotification(title, {
         body: message,

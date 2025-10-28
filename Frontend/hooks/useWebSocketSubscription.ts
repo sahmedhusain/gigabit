@@ -1,13 +1,8 @@
 'use client'
 import { useEffect, useRef, useCallback } from 'react'
-import { useWebSocket, WebSocketMessage } from '@/context/WebSocketContext'
-
-export interface SubscriptionOptions {
-  onMessage?: (message: WebSocketMessage) => void
-  messageTypes?: string[]
-  debounceMs?: number
-  autoReconnect?: boolean
-}
+import { useWebSocket } from '@/context/WebSocketContext'
+import { WebSocketMessage } from '@/types/contexts'
+import { SubscriptionOptions } from '@/types/hooks'
 
 export function useWebSocketSubscription(options: SubscriptionOptions = {}) {
   const { addMessageListener, isConnected, sendMessage } = useWebSocket()
@@ -27,7 +22,7 @@ export function useWebSocketSubscription(options: SubscriptionOptions = {}) {
   }, [onMessage, debounceMs])
 
   const messageHandler = useCallback((message: WebSocketMessage) => {
-    // Filter by message types if specified
+    
     if (messageTypes.length > 0 && !messageTypes.includes(message.type)) {
       return
     }

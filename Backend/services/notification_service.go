@@ -61,9 +61,20 @@ func (s *NotificationService) GetUserNotifications(userID uint, limit, offset in
 	query := `
 SELECT n.id, n.user_id, n.actor_id, n.type, n.entity_type, n.entity_id,
    n.title, n.message, n.redirect_url, n.redirect_type, n.is_read, n.created_at, n.updated_at,
-   u.first_name, u.last_name, u.avatar, u.nickname
+   u.first_name, u.last_name, u.avatar, u.nickname,
+   COALESCE(g.id, gm_conversation.group_id, 0) as group_id, 
+   COALESCE(g.name, gm_group.name) as group_name, 
+   COALESCE(g.avatar, gm_group.avatar) as group_avatar
 FROM notifications n
 LEFT JOIN users u ON n.actor_id = u.id
+LEFT JOIN groups g ON (
+    (n.type IN ('group_invite', 'join_request', 'join_accepted', 'group_post', 'event_created', 'new_poll') AND n.entity_id = g.id) OR
+    (n.type = 'post_shared' AND n.entity_type = 'group' AND n.entity_id = g.id) OR
+    (n.type = 'image_shared' AND n.entity_type = 'group' AND n.entity_id = g.id)
+)
+LEFT JOIN group_messages gm ON n.type = 'message' AND n.entity_type = 'group_message' AND n.entity_id = gm.id
+LEFT JOIN group_conversations gm_conversation ON gm.conversation_id = gm_conversation.id
+LEFT JOIN groups gm_group ON gm_conversation.group_id = gm_group.id
 WHERE n.user_id = ?
 ORDER BY n.created_at DESC
 LIMIT ? OFFSET ?
@@ -79,6 +90,7 @@ LIMIT ? OFFSET ?
 	for rows.Next() {
 		var notification models.NotificationResponse
 		var actor models.UserResponse
+		var group models.GroupResponse
 		var actorID sql.NullInt64
 		var entityType sql.NullString
 		var entityID sql.NullInt64
@@ -89,12 +101,16 @@ LIMIT ? OFFSET ?
 		var nickname sql.NullString
 		var firstName sql.NullString
 		var lastName sql.NullString
+		var groupID sql.NullInt64
+		var groupName sql.NullString
+		var groupAvatar sql.NullString
 
 		err := rows.Scan(
 			&notification.ID, &notification.UserID, &actorID, &notification.Type,
 			&entityType, &entityID, &title, &notification.Message,
 			&redirectURL, &redirectType, &notification.IsRead, &notification.CreatedAt, &notification.UpdatedAt,
 			&firstName, &lastName, &avatar, &nickname,
+			&groupID, &groupName, &groupAvatar,
 		)
 		if err != nil {
 			return nil, err
@@ -144,6 +160,25 @@ LIMIT ? OFFSET ?
 		}
 
 		notification.Actor = actor
+
+		// Set group information if available
+		if groupID.Valid && groupName.Valid {
+			group.ID = uint(groupID.Int64)
+			group.Title = groupName.String
+			if groupAvatar.Valid && groupAvatar.String != "" {
+				if strings.HasPrefix(groupAvatar.String, "http") {
+					group.Avatar = &groupAvatar.String
+				} else if strings.HasPrefix(groupAvatar.String, "/avatars/") {
+					group.Avatar = &groupAvatar.String
+				} else if strings.HasPrefix(groupAvatar.String, "image:") {
+					group.Avatar = nil
+				} else {
+					avatarURL := fmt.Sprintf("http://localhost:8080/api/uploads/%s", groupAvatar.String)
+					group.Avatar = &avatarURL
+				}
+			}
+			notification.Group = &group
+		}
 
 		notification.Data = s.getNotificationData(notification.Type, notification.EntityType, notification.EntityID)
 
@@ -237,7 +272,7 @@ func (s *NotificationService) NotifyFollowRequest(followerID, followingID uint) 
 		EntityID:     followerID,
 		Title:        title,
 		Message:      message,
-		RedirectURL:  "/discover/requests",
+		RedirectURL:  "/discover/?tab=requests",
 		RedirectType: "discover",
 	}
 
@@ -284,8 +319,8 @@ func (s *NotificationService) NotifyGroupInvite(inviterID, invitedUserID, groupI
 		EntityID:     groupID,
 		Title:        "Group Invitation",
 		Message:      inviter.FirstName + " " + inviter.LastName + " invited you to join \"" + group.Title + "\"",
-		RedirectURL:  fmt.Sprintf("/groups/%d", groupID),
-		RedirectType: "group",
+		RedirectURL:  "/discover/?tab=requests",
+		RedirectType: "discover",
 	}
 
 	return s.CreateNotification(notification)
@@ -310,7 +345,33 @@ func (s *NotificationService) NotifyJoinRequest(requesterID, creatorID, groupID 
 		EntityID:     groupID,
 		Title:        "Join Request",
 		Message:      requester.FirstName + " " + requester.LastName + " wants to join \"" + group.Title + "\"",
-		RedirectURL:  fmt.Sprintf("/groups/%d/requests", groupID),
+		RedirectURL:  "/discover/?tab=requests",
+		RedirectType: "discover",
+	}
+
+	return s.CreateNotification(notification)
+}
+
+func (s *NotificationService) NotifyJoinAccepted(requesterID, creatorID, groupID uint) error {
+	creator, err := s.getUserInfo(creatorID)
+	if err != nil {
+		return err
+	}
+
+	group, err := s.getGroupInfo(groupID)
+	if err != nil {
+		return err
+	}
+
+	notification := &models.Notification{
+		UserID:       requesterID,
+		ActorID:      creatorID,
+		Type:         models.NotificationJoinAccepted,
+		EntityType:   "group",
+		EntityID:     groupID,
+		Title:        "Join Request Accepted",
+		Message:      creator.FirstName + " " + creator.LastName + " accepted your request to join \"" + group.Title + "\"",
+		RedirectURL:  fmt.Sprintf("/chats/all?group=%d", groupID),
 		RedirectType: "group",
 	}
 
@@ -343,8 +404,8 @@ func (s *NotificationService) NotifyEventCreated(creatorID, groupID, eventID uin
 			EntityID:     eventID,
 			Title:        "New Event",
 			Message:      creator.FirstName + " " + creator.LastName + " created event \"" + event.Title + "\"",
-			RedirectURL:  fmt.Sprintf("/events/%d", eventID),
-			RedirectType: "event",
+			RedirectURL:  fmt.Sprintf("/events/all?highlight=%d", eventID),
+			RedirectType: "events",
 		}
 
 		if err := s.CreateNotification(notification); err != nil {
@@ -359,6 +420,32 @@ func (s *NotificationService) NotifyEventCreated(creatorID, groupID, eventID uin
 	return nil
 }
 
+func (s *NotificationService) NotifyEventReminder(attendeeID, eventCreatorID, eventID uint) error {
+	event, err := s.getEventInfo(eventID)
+	if err != nil {
+		return err
+	}
+
+	creator, err := s.getUserInfo(eventCreatorID)
+	if err != nil {
+		return err
+	}
+
+	notification := &models.Notification{
+		UserID:       attendeeID,
+		ActorID:      eventCreatorID,
+		Type:         models.NotificationEventReminder,
+		EntityType:   "event",
+		EntityID:     eventID,
+		Title:        "Event Reminder",
+		Message:      "Reminder: You have an upcoming event \"" + event.Title + "\" created by " + creator.FirstName + " " + creator.LastName,
+		RedirectURL:  fmt.Sprintf("/events/all?highlight=%d", eventID),
+		RedirectType: "events",
+	}
+
+	return s.CreateNotification(notification)
+}
+
 func (s *NotificationService) NotifyNewMessage(senderID, receiverID uint, messageID uint, isGroup bool) error {
 	sender, err := s.getUserInfo(senderID)
 	if err != nil {
@@ -369,13 +456,13 @@ func (s *NotificationService) NotifyNewMessage(senderID, receiverID uint, messag
 	if isGroup {
 		// For group messages, we need group info - this method signature needs to be updated
 		// For now, use a generic approach
-		notificationType = models.NotificationGroupMessage
+		notificationType = models.NotificationMessage
 		title = "New Group Message"
 		message = "New message from " + sender.FirstName + " " + sender.LastName
 		redirectURL = "/chat" // Will be updated when group ID is available
 		redirectType = "chat"
 	} else {
-		notificationType = models.NotificationPrivateMessage
+		notificationType = models.NotificationMessage
 		title = "New Message"
 		message = "New message from " + sender.FirstName + " " + sender.LastName
 		redirectURL = fmt.Sprintf("/chats/all?chat=%d", senderID)
@@ -397,46 +484,157 @@ func (s *NotificationService) NotifyNewMessage(senderID, receiverID uint, messag
 	return s.CreateNotification(notification)
 }
 
-func (s *NotificationService) NotifyImageShared(senderID, receiverID uint, messageID uint) error {
-	sender, err := s.getUserInfo(senderID)
+func (s *NotificationService) notifyGroupPostShare(sharerID, groupID, postID uint, sharer models.UserResponse) error {
+	group, err := s.getGroupInfo(groupID)
 	if err != nil {
 		return err
 	}
 
+	// Get all group members except the sharer
+	members, err := s.getGroupMembers(groupID)
+	if err != nil {
+		return err
+	}
+
+	for _, member := range members {
+		if member.ID == sharerID {
+			continue // Don't notify the sharer
+		}
+
+		notification := &models.Notification{
+			UserID:       member.ID,
+			ActorID:      sharerID,
+			Type:         models.NotificationPostShared,
+			EntityType:   "post",
+			EntityID:     postID,
+			Title:        "Post Shared",
+			Message:      sharer.FirstName + " " + sharer.LastName + " shared a post in " + group.Title,
+			RedirectURL:  fmt.Sprintf("/chats/all?group=%d", groupID),
+			RedirectType: "chat",
+		}
+
+		if err := s.CreateNotification(notification); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (s *NotificationService) notifyPrivateImageShare(sharerID, receiverID, postID uint, sharer models.UserResponse) error {
 	notification := &models.Notification{
 		UserID:       receiverID,
-		ActorID:      senderID,
+		ActorID:      sharerID,
 		Type:         models.NotificationImageShared,
-		EntityType:   "message",
-		EntityID:     messageID,
+		EntityType:   "post",
+		EntityID:     postID,
 		Title:        "Image Shared",
-		Message:      sender.FirstName + " " + sender.LastName + " shared an image with you",
-		RedirectURL:  fmt.Sprintf("/chats/all?chat=%d", senderID),
+		Message:      sharer.FirstName + " " + sharer.LastName + " shared an image with you",
+		RedirectURL:  fmt.Sprintf("/chats/all?chat=%d", sharerID),
 		RedirectType: "chat",
 	}
 
 	return s.CreateNotification(notification)
 }
 
-func (s *NotificationService) NotifyPostShared(senderID, receiverID uint, messageID uint) error {
-	sender, err := s.getUserInfo(senderID)
+func (s *NotificationService) notifyGroupImageShare(sharerID, groupID, postID uint, sharer models.UserResponse) error {
+	group, err := s.getGroupInfo(groupID)
 	if err != nil {
 		return err
 	}
 
+	// Create a single notification for the group share (not individual per member)
+	// The notification will be visible to all group members
 	notification := &models.Notification{
-		UserID:       receiverID,
-		ActorID:      senderID,
-		Type:         models.NotificationPostShared,
-		EntityType:   "message",
-		EntityID:     messageID,
-		Title:        "Post Shared",
-		Message:      sender.FirstName + " " + sender.LastName + " shared a post with you",
-		RedirectURL:  fmt.Sprintf("/chats/all?chat=%d", senderID),
-		RedirectType: "chat",
+		UserID:       0, // Will be set per member
+		ActorID:      sharerID,
+		Type:         models.NotificationImageShared,
+		EntityType:   "group",
+		EntityID:     groupID,
+		Title:        "Image Shared",
+		Message:      sharer.FirstName + " " + sharer.LastName + " shared an image in \"" + group.Title + "\"",
+		RedirectURL:  fmt.Sprintf("/chats/all?group=%d", groupID),
+		RedirectType: "group",
 	}
 
-	return s.CreateNotification(notification)
+	// Get all group members except the sharer and send individual notifications
+	members, err := s.getGroupMembers(groupID)
+	if err != nil {
+		return err
+	}
+
+	for _, member := range members {
+		if member.ID == sharerID {
+			continue // Don't notify the sharer
+		}
+
+		// Create individual notification for each member
+		memberNotification := *notification
+		memberNotification.UserID = member.ID
+
+		if err := s.CreateNotification(&memberNotification); err != nil {
+			continue // Continue with other members even if one fails
+		}
+	}
+
+	return nil
+}
+
+func (s *NotificationService) NotifyImageShared(sharerID, postID uint, isGroup bool, groupID uint, receiverID uint) error {
+	// If postID is 0, it's an image message, not a post share, so skip ownership check
+	if postID > 0 {
+		// Get post owner to avoid notifying them
+		var postOwnerID uint
+		err := s.db.QueryRow("SELECT user_id FROM posts WHERE id = ?", postID).Scan(&postOwnerID)
+		if err != nil {
+			return fmt.Errorf("failed to get post owner: %w", err)
+		}
+
+		// Never notify the post owner about shares of their own content
+		if sharerID == postOwnerID {
+			return nil
+		}
+	}
+
+	sharer, err := s.getUserInfo(sharerID)
+	if err != nil {
+		return err
+	}
+
+	if isGroup {
+		// Notify all group members except the sharer
+		return s.notifyGroupImageShare(sharerID, groupID, postID, *sharer)
+	} else {
+		// Notify the private chat receiver
+		return s.notifyPrivateImageShare(sharerID, receiverID, postID, *sharer)
+	}
+}
+
+func (s *NotificationService) NotifyPostShared(sharerID, postID uint, isGroup bool, groupID uint, receiverID uint) error {
+	// Get post owner to avoid notifying them
+	var postOwnerID uint
+	err := s.db.QueryRow("SELECT user_id FROM posts WHERE id = ?", postID).Scan(&postOwnerID)
+	if err != nil {
+		return fmt.Errorf("failed to get post owner: %w", err)
+	}
+
+	// Never notify the post owner about shares of their own content
+	if sharerID == postOwnerID {
+		return nil
+	}
+
+	sharer, err := s.getUserInfo(sharerID)
+	if err != nil {
+		return err
+	}
+
+	if isGroup {
+		// Notify all group members except the sharer
+		return s.notifyGroupPostShare(sharerID, groupID, postID, *sharer)
+	} else {
+		// Notify the private chat receiver
+		return s.notifyPrivatePostShare(sharerID, receiverID, postID, *sharer)
+	}
 }
 
 func (s *NotificationService) NotifyPostLiked(likerID, postOwnerID, postID uint) error {
@@ -446,11 +644,29 @@ func (s *NotificationService) NotifyPostLiked(likerID, postOwnerID, postID uint)
 
 	fmt.Printf("DEBUG: NotifyPostLiked called - likerID: %d, postOwnerID: %d, postID: %d\n", likerID, postOwnerID, postID)
 
+	// Verify this is actually a regular post (not a group post)
+	// Note: We allow posts that exist in both tables to be treated as regular posts (prioritize regular posts)
+	var regularPostCount int
+	err := s.db.QueryRow("SELECT COUNT(*) FROM posts WHERE id = ?", postID).Scan(&regularPostCount)
+	if err != nil {
+		fmt.Printf("DEBUG: Failed to check if post is regular post: %v\n", err)
+		return err
+	}
+	if regularPostCount == 0 {
+		fmt.Printf("DEBUG: ERROR - NotifyPostLiked called for a post that doesn't exist in posts table! This should not happen.\n")
+		return fmt.Errorf("NotifyPostLiked called for a non-existent regular post")
+	}
+
 	liker, err := s.getUserInfo(likerID)
 	if err != nil {
 		fmt.Printf("DEBUG: Failed to get liker info: %v\n", err)
 		return err
 	}
+
+	// This is a regular post
+	message := liker.FirstName + " " + liker.LastName + " liked your post"
+	redirectURL := fmt.Sprintf("/post/%d", postID)
+	redirectType := "post"
 
 	notification := &models.Notification{
 		UserID:       postOwnerID,
@@ -459,9 +675,9 @@ func (s *NotificationService) NotifyPostLiked(likerID, postOwnerID, postID uint)
 		EntityType:   "post",
 		EntityID:     postID,
 		Title:        "Post Liked",
-		Message:      liker.FirstName + " " + liker.LastName + " liked your post",
-		RedirectURL:  fmt.Sprintf("/post/%d", postID),
-		RedirectType: "post",
+		Message:      message,
+		RedirectURL:  redirectURL,
+		RedirectType: redirectType,
 	}
 
 	err = s.CreateNotification(notification)
@@ -474,7 +690,81 @@ func (s *NotificationService) NotifyPostLiked(likerID, postOwnerID, postID uint)
 	return nil
 }
 
-func (s *NotificationService) NotifyPostCommented(commenterID, postOwnerID, postID uint) error {
+func (s *NotificationService) NotifyGroupPostLiked(likerID, postOwnerID, postID, groupID uint) error {
+	if likerID == postOwnerID {
+		return nil
+	}
+
+	fmt.Printf("DEBUG: NotifyGroupPostLiked called - likerID: %d, postOwnerID: %d, postID: %d, groupID: %d\n", likerID, postOwnerID, postID, groupID)
+
+	// Verify this is actually a group post
+	var groupPostCount int
+	var actualGroupID uint
+	err := s.db.QueryRow("SELECT COUNT(*), COALESCE(group_id, 0) FROM group_posts WHERE id = ?", postID).Scan(&groupPostCount, &actualGroupID)
+	if err != nil {
+		fmt.Printf("DEBUG: Failed to check if post is group post: %v\n", err)
+		return err
+	}
+	if groupPostCount == 0 {
+		fmt.Printf("DEBUG: ERROR - NotifyGroupPostLiked called for a post that doesn't exist in group_posts table! This should not happen.\n")
+		return fmt.Errorf("NotifyGroupPostLiked called for a non-existent group post")
+	}
+	if actualGroupID == 0 {
+		fmt.Printf("DEBUG: ERROR - NotifyGroupPostLiked called for a group post with invalid group_id! This should not happen.\n")
+		return fmt.Errorf("NotifyGroupPostLiked called for a group post with invalid group_id")
+	}
+	if actualGroupID != groupID {
+		fmt.Printf("DEBUG: WARNING - Group ID mismatch: expected %d, got %d. Using actual group ID.\n", groupID, actualGroupID)
+		groupID = actualGroupID // Use the correct group ID
+	}
+
+	liker, err := s.getUserInfo(likerID)
+	if err != nil {
+		fmt.Printf("DEBUG: Failed to get liker info: %v\n", err)
+		return err
+	}
+
+	// Get group name for the message
+	group, err := s.getGroupInfo(groupID)
+	var message string
+	var redirectURL string
+	var redirectType string
+
+	if err != nil {
+		fmt.Printf("DEBUG: Failed to get group info: %v\n", err)
+		// Fallback to regular post message if group info can't be retrieved
+		message = liker.FirstName + " " + liker.LastName + " liked your post"
+		redirectURL = fmt.Sprintf("/post/%d", postID)
+		redirectType = "post"
+	} else {
+		message = liker.FirstName + " " + liker.LastName + " liked your post in group \"" + group.Title + "\""
+		redirectURL = fmt.Sprintf("/chats/all?group=%d", groupID)
+		redirectType = "group"
+	}
+
+	notification := &models.Notification{
+		UserID:       postOwnerID,
+		ActorID:      likerID,
+		Type:         models.NotificationPostLiked,
+		EntityType:   "group_post",
+		EntityID:     postID,
+		Title:        "Post Liked",
+		Message:      message,
+		RedirectURL:  redirectURL,
+		RedirectType: redirectType,
+	}
+
+	err = s.CreateNotification(notification)
+	if err != nil {
+		fmt.Printf("DEBUG: Failed to create group post liked notification: %v\n", err)
+		return err
+	}
+
+	fmt.Printf("DEBUG: Group post liked notification created successfully\n")
+	return nil
+}
+
+func (s *NotificationService) NotifyPostCommented(commenterID, postOwnerID, postID uint, commentID uint) error {
 	if commenterID == postOwnerID {
 		return nil
 	}
@@ -492,7 +782,7 @@ func (s *NotificationService) NotifyPostCommented(commenterID, postOwnerID, post
 		EntityID:     postID,
 		Title:        "New Comment",
 		Message:      commenter.FirstName + " " + commenter.LastName + " commented on your post",
-		RedirectURL:  fmt.Sprintf("/post/%d", postID),
+		RedirectURL:  fmt.Sprintf("/post/%d#comment-%d", postID, commentID),
 		RedirectType: "post",
 	}
 
@@ -526,7 +816,7 @@ func (s *NotificationService) NotifyGroupPostCreated(posterID, groupID, postID u
 			EntityID:     postID,
 			Title:        "New Group Post",
 			Message:      poster.FirstName + " " + poster.LastName + " posted in \"" + group.Title + "\"",
-			RedirectURL:  fmt.Sprintf("/groups/%d", groupID),
+			RedirectURL:  fmt.Sprintf("/chats/all?group=%d", groupID),
 			RedirectType: "group",
 		}
 
@@ -537,40 +827,6 @@ func (s *NotificationService) NotifyGroupPostCreated(posterID, groupID, postID u
 
 	if failedCount > 0 {
 		fmt.Printf("Warning: %d/%d group post notifications failed to send\n", failedCount, len(memberIDs))
-	}
-
-	return nil
-}
-
-func (s *NotificationService) NotifyNewPost(posterID, postID uint) error {
-	poster, err := s.getUserInfo(posterID)
-	if err != nil {
-		return err
-	}
-
-	// Get followers of the poster
-	followerIDs, err := s.getFollowerIDs(posterID)
-	if err != nil {
-		return err
-	}
-
-	// Create notification for each follower
-	for _, followerID := range followerIDs {
-		notification := &models.Notification{
-			UserID:       followerID,
-			ActorID:      posterID,
-			Type:         models.NotificationNewPost,
-			EntityType:   "post",
-			EntityID:     postID,
-			Title:        "New Post",
-			Message:      poster.FirstName + " " + poster.LastName + " shared a new post",
-			RedirectURL:  fmt.Sprintf("/post/%d", postID),
-			RedirectType: "post",
-		}
-
-		if err := s.CreateNotification(notification); err != nil {
-			continue // Continue with other followers even if one fails
-		}
 	}
 
 	return nil
@@ -640,7 +896,7 @@ func (s *NotificationService) NotifyGroupPollCreated(creatorID, groupID, pollID 
 			EntityID:     pollID,
 			Title:        "New Group Poll",
 			Message:      creator.FirstName + " " + creator.LastName + " created a poll in \"" + group.Title + "\"",
-			RedirectURL:  fmt.Sprintf("/groups/%d", groupID),
+			RedirectURL:  fmt.Sprintf("/chats/all?group=%d&tab=polls&highlight=%d", groupID, pollID),
 			RedirectType: "group",
 		}
 
@@ -664,6 +920,13 @@ func (s *NotificationService) NotifyPollVoted(voterID, pollOwnerID, pollID uint)
 		return err
 	}
 
+	// Get group ID for the poll
+	var groupID uint
+	err = s.db.QueryRow("SELECT group_id FROM polls WHERE id = ?", pollID).Scan(&groupID)
+	if err != nil {
+		return fmt.Errorf("failed to get poll group: %w", err)
+	}
+
 	notification := &models.Notification{
 		UserID:       pollOwnerID,
 		ActorID:      voterID,
@@ -672,8 +935,8 @@ func (s *NotificationService) NotifyPollVoted(voterID, pollOwnerID, pollID uint)
 		EntityID:     pollID,
 		Title:        "Poll Vote",
 		Message:      voter.FirstName + " " + voter.LastName + " voted on your poll",
-		RedirectURL:  fmt.Sprintf("/poll/%d", pollID),
-		RedirectType: "poll",
+		RedirectURL:  fmt.Sprintf("/chats/all?group=%d&tab=polls&highlight=%d", groupID, pollID),
+		RedirectType: "group",
 	}
 
 	return s.CreateNotification(notification)
@@ -709,33 +972,8 @@ func (s *NotificationService) NotifyEventResponse(responderID, eventCreatorID, e
 		EntityID:     eventID,
 		Title:        "Event Response",
 		Message:      message,
-		RedirectURL:  fmt.Sprintf("/events/%d", eventID),
-		RedirectType: "event",
-	}
-
-	return s.CreateNotification(notification)
-}
-
-func (s *NotificationService) NotifyCommentReplied(replierID, originalCommenterID, postID, commentID uint) error {
-	if replierID == originalCommenterID {
-		return nil // Don't notify if replying to own comment
-	}
-
-	replier, err := s.getUserInfo(replierID)
-	if err != nil {
-		return err
-	}
-
-	notification := &models.Notification{
-		UserID:       originalCommenterID,
-		ActorID:      replierID,
-		Type:         models.NotificationCommentReplied,
-		EntityType:   "comment",
-		EntityID:     commentID,
-		Title:        "Comment Reply",
-		Message:      replier.FirstName + " " + replier.LastName + " replied to your comment",
-		RedirectURL:  fmt.Sprintf("/post/%d#comment-%d", postID, commentID),
-		RedirectType: "post",
+		RedirectURL:  fmt.Sprintf("/events/all?highlight=%d", eventID),
+		RedirectType: "events",
 	}
 
 	return s.CreateNotification(notification)
@@ -763,12 +1001,12 @@ func (s *NotificationService) NotifyGroupMessage(senderID, groupID, messageID ui
 		notification := &models.Notification{
 			UserID:       memberID,
 			ActorID:      senderID,
-			Type:         models.NotificationGroupMessage,
-			EntityType:   "message",
+			Type:         models.NotificationMessage,
+			EntityType:   "group_message",
 			EntityID:     messageID,
 			Title:        "New Group Message",
 			Message:      sender.FirstName + " " + sender.LastName + " sent a message in \"" + group.Title + "\"",
-			RedirectURL:  fmt.Sprintf("/chats/all?chat=%d", senderID),
+			RedirectURL:  fmt.Sprintf("/chats/all?group=%d", groupID),
 			RedirectType: "chat",
 		}
 
@@ -789,8 +1027,8 @@ func (s *NotificationService) NotifyPrivateMessage(senderID, receiverID, message
 	notification := &models.Notification{
 		UserID:       receiverID,
 		ActorID:      senderID,
-		Type:         models.NotificationPrivateMessage,
-		EntityType:   "message",
+		Type:         models.NotificationMessage,
+		EntityType:   "private_message",
 		EntityID:     messageID,
 		Title:        "New Message",
 		Message:      "New message from " + sender.FirstName + " " + sender.LastName,
@@ -813,6 +1051,29 @@ func (s *NotificationService) sendRealTimeNotification(notification *models.Noti
 		return
 	}
 
+	// Get group information for group-related notifications
+	var group *models.GroupResponse
+	if s.isGroupRelatedNotification(notification.Type) {
+		var groupID uint
+		switch notification.Type {
+		case models.NotificationGroupInvite, models.NotificationJoinRequest, models.NotificationJoinAccepted, models.NotificationGroupPost, models.NotificationEventCreated, models.NotificationNewPoll:
+			groupID = notification.EntityID
+		case models.NotificationMessage:
+			if notification.EntityType == "group_message" {
+				// For group messages, we need to get the group ID from the message
+				// This is a simplified approach - in a real implementation, you'd store group ID in the notification or look it up
+				// For now, we'll skip group info for messages to avoid complexity
+			}
+		case models.NotificationPostShared, models.NotificationImageShared:
+			if notification.EntityType == "group" {
+				groupID = notification.EntityID
+			}
+		}
+		if groupID > 0 {
+			group, _ = s.getGroupInfo(groupID)
+		}
+	}
+
 	notificationResponse := models.NotificationResponse{
 		ID:           notification.ID,
 		UserID:       notification.UserID,
@@ -828,6 +1089,7 @@ func (s *NotificationService) sendRealTimeNotification(notification *models.Noti
 		CreatedAt:    notification.CreatedAt,
 		UpdatedAt:    notification.UpdatedAt,
 		Actor:        *actor,
+		Group:        group,
 		Data:         s.getNotificationData(notification.Type, notification.EntityType, notification.EntityID),
 	}
 
@@ -844,29 +1106,83 @@ func (s *NotificationService) sendRealTimeNotification(notification *models.Noti
 	s.hub.SendToUser(notification.UserID, wsMessage)
 }
 
+func (s *NotificationService) isGroupRelatedNotification(notificationType string) bool {
+	groupTypes := []string{
+		models.NotificationGroupInvite,
+		models.NotificationJoinRequest,
+		models.NotificationJoinAccepted,
+		models.NotificationGroupPost,
+		models.NotificationEventCreated,
+		models.NotificationNewPoll,
+	}
+
+	for _, t := range groupTypes {
+		if notificationType == t {
+			return true
+		}
+	}
+
+	// Also check for shared content in groups
+	if notificationType == models.NotificationPostShared || notificationType == models.NotificationImageShared {
+		return true
+	}
+
+	return false
+}
+
 func (s *NotificationService) getUserInfo(userID uint) (*models.UserResponse, error) {
 	query := `SELECT first_name, last_name, avatar, nickname FROM users WHERE id = ?`
 
 	var user models.UserResponse
-	err := s.db.QueryRow(query, userID).Scan(&user.FirstName, &user.LastName, &user.Avatar, &user.Nickname)
+	var avatar sql.NullString
+	err := s.db.QueryRow(query, userID).Scan(&user.FirstName, &user.LastName, &avatar, &user.Nickname)
 	if err != nil {
 		return nil, err
 	}
 
 	user.ID = userID
+
+	// Process avatar URL like in the User.ToResponse() method
+	if avatar.Valid && avatar.String != "" {
+		if strings.HasPrefix(avatar.String, "http") {
+			user.Avatar = &avatar.String
+		} else if strings.HasPrefix(avatar.String, "/avatars/") {
+			user.Avatar = &avatar.String
+		} else if strings.HasPrefix(avatar.String, "image:") {
+			user.Avatar = nil
+		} else {
+			avatarURL := fmt.Sprintf("http://localhost:8080/api/uploads/%s", avatar.String)
+			user.Avatar = &avatarURL
+		}
+	}
+
 	return &user, nil
 }
 
 func (s *NotificationService) getGroupInfo(groupID uint) (*models.GroupResponse, error) {
-	query := `SELECT name, description FROM groups WHERE id = ?`
+	query := `SELECT name, description, avatar FROM groups WHERE id = ?`
 
 	var group models.GroupResponse
-	err := s.db.QueryRow(query, groupID).Scan(&group.Title, &group.Description)
+	var avatar sql.NullString
+	err := s.db.QueryRow(query, groupID).Scan(&group.Title, &group.Description, &avatar)
 	if err != nil {
 		return nil, err
 	}
 
 	group.ID = groupID
+	if avatar.Valid && avatar.String != "" {
+		if strings.HasPrefix(avatar.String, "http") {
+			group.Avatar = &avatar.String
+		} else if strings.HasPrefix(avatar.String, "/avatars/") {
+			group.Avatar = &avatar.String
+		} else if strings.HasPrefix(avatar.String, "image:") {
+			group.Avatar = nil
+		} else {
+			avatarURL := fmt.Sprintf("http://localhost:8080/api/uploads/%s", avatar.String)
+			group.Avatar = &avatarURL
+		}
+	}
+
 	return &group, nil
 }
 
@@ -929,6 +1245,58 @@ func (s *NotificationService) getFollowerIDs(userID uint) ([]uint, error) {
 	}
 
 	return followerIDs, nil
+}
+
+func (s *NotificationService) getGroupMembers(groupID uint) ([]models.UserResponse, error) {
+	query := `
+SELECT u.id, u.first_name, u.last_name, u.avatar, u.nickname, u.status
+FROM group_members gm
+JOIN users u ON gm.user_id = u.id
+WHERE gm.group_id = ? AND gm.status = 'member'
+ORDER BY gm.created_at ASC
+	`
+
+	rows, err := s.db.Query(query, groupID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var members []models.UserResponse
+	for rows.Next() {
+		var member models.UserResponse
+		var avatar *string
+		var nickname *string
+
+		err := rows.Scan(
+			&member.ID, &member.FirstName, &member.LastName, &avatar, &nickname, &member.Status,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		member.Avatar = avatar
+		member.Nickname = nickname
+		members = append(members, member)
+	}
+
+	return members, nil
+}
+
+func (s *NotificationService) notifyPrivatePostShare(sharerID, receiverID, postID uint, sharer models.UserResponse) error {
+	notification := &models.Notification{
+		UserID:       receiverID,
+		ActorID:      sharerID,
+		Type:         models.NotificationPostShared,
+		EntityType:   "post",
+		EntityID:     postID,
+		Title:        "Post Shared",
+		Message:      sharer.FirstName + " " + sharer.LastName + " shared a post with you",
+		RedirectURL:  fmt.Sprintf("/chats/all?chat=%d", sharerID),
+		RedirectType: "chat",
+	}
+
+	return s.CreateNotification(notification)
 }
 
 func (s *NotificationService) getNotificationData(notificationType, entityType string, entityID uint) interface{} {

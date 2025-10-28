@@ -1,17 +1,14 @@
 'use client'
 import { MessageCircle, Clock, Users, ExternalLink } from 'lucide-react'
 import { useRouter } from 'next/navigation'
-import { SearchResult } from '@/hooks/useSearch'
 import Image from 'next/image'
 
-interface MessageSearchResultProps {
-  result: SearchResult
-}
+import { MessageSearchResultProps } from '@/types/search'
 
 export default function MessageSearchResult({ result }: MessageSearchResultProps) {
   const router = useRouter()
 
-  // Helper function to get initials from name
+  
   const getInitialsFromName = (name: string) => {
     if (!name || !name.trim()) return 'U'
     const parts = name.trim().split(/\s+/)
@@ -23,7 +20,7 @@ export default function MessageSearchResult({ result }: MessageSearchResultProps
   }
 
   const handleClick = () => {
-    // Navigate to chats page with the specific conversation and message highlighted
+    
     const conversationId = result.metadata?.conversationId
     const messageId = result.id
     const messageType = result.metadata?.type as string || 'private'

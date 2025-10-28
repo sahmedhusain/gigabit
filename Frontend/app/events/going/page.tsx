@@ -6,7 +6,7 @@ import { useAuth } from '@/context/AuthContext'
 import { useToast } from '@/context/ToastContext'
 import { useRealTimeEvents } from '@/hooks'
 
-// Import dashboard components
+
 import CommunitySection from '@/components/groups/CommunitySection'
 import CreateGeneralEvent from '@/components/events/CreateGeneralEvent'
 import AppLayout from '@/components/layout/AppLayout'
@@ -27,12 +27,12 @@ function EventsGoingPage() {
     refetch: refetchEvents 
   } = useRealTimeEvents()
 
-  // Get event ID from URL params for deep linking
+  
   const eventId = searchParams?.get('event')
   
   const [showCreateEvent, setShowCreateEvent] = useState(false)
 
-  // Update URL when event ID changes
+  
   useEffect(() => {
     if (eventId) {
       const newUrl = `/events/going?event=${eventId}`
@@ -40,7 +40,7 @@ function EventsGoingPage() {
     }
   }, [eventId, router])
 
-  // Fetch data when component loads
+  
   useEffect(() => {
     if (user) {
       refetchEvents()
@@ -59,7 +59,7 @@ function EventsGoingPage() {
         onEventCreated={() => {
           refetchEvents()
           setShowCreateEvent(false)
-          success('Event created successfully!')
+          success('Event created!')
         }}
         createEvent={createEvent}
       />
@@ -81,7 +81,7 @@ function EventsGoingPage() {
   )
 }
 
-// Wrap the entire component with ProtectedRoute
+
 function ProtectedEventsGoingPage() {
   return (
     <ProtectedRoute>

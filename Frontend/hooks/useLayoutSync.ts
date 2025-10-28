@@ -2,28 +2,21 @@
 import { useEffect, useCallback } from 'react'
 import { useWebSocketSubscription } from './useWebSocketSubscription'
 import { useAuth } from '@/context/AuthContext'
-
-export interface LayoutSyncData {
-  component: 'sidebar' | 'topbar' | 'navigation' | 'settings'
-  action: 'update' | 'refresh' | 'toggle' | 'change'
-  data: any
-  timestamp: number
-}
+import { LayoutSyncData } from '@/types/hooks'
 
 export function useLayoutSync() {
   const { user } = useAuth()
 
-  // Subscribe to layout sync messages
+  
   const { send, isConnected } = useWebSocketSubscription({
     messageTypes: ['layout_sync'],
     onMessage: (message) => {
       if (message.type === 'layout_sync' && message.data && message.from === user?.id) {
-        // Only process layout sync messages from the same user (different tabs/windows)
+        
         const syncData: LayoutSyncData = message.data
         
-        console.log('Layout sync received:', syncData)
         
-        // Dispatch a custom event that layout components can listen to
+        
         window.dispatchEvent(new CustomEvent('layoutSync', {
           detail: syncData
         }))
@@ -31,7 +24,7 @@ export function useLayoutSync() {
     }
   })
 
-  // Function to broadcast layout changes to other tabs/windows
+  
   const broadcastLayoutChange = useCallback((syncData: Omit<LayoutSyncData, 'timestamp'>) => {
     if (!isConnected || !user) return
 
@@ -44,11 +37,10 @@ export function useLayoutSync() {
       }
     }
 
-    console.log('Broadcasting layout change:', message)
     send(message)
   }, [isConnected, user, send])
 
-  // Helper functions for specific layout components
+  
   const syncSidebarUpdate = useCallback((action: string, data?: any) => {
     broadcastLayoutChange({
       component: 'sidebar',
@@ -81,7 +73,7 @@ export function useLayoutSync() {
     })
   }, [broadcastLayoutChange])
 
-  // Hook to listen for layout sync events in components
+  
   const useLayoutSyncListener = useCallback((
     component: string,
     callback: (data: LayoutSyncData) => void
@@ -112,7 +104,7 @@ export function useLayoutSync() {
   }
 }
 
-// Simple hook for components to listen to layout sync events
+
 export function useLayoutSyncListener(
   component: 'sidebar' | 'topbar' | 'navigation' | 'settings',
   callback: (data: LayoutSyncData) => void

@@ -4,23 +4,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { X } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
-
-export interface ToastNotification {
-  id: number
-  type: 'like' | 'comment' | 'follow' | 'message' | 'group' | 'event' | 'general'
-  title: string
-  message: string
-  avatar?: string
-  actorName?: string
-  link?: string
-  timestamp: number
-}
-
-interface NotificationToastProps {
-  notification: ToastNotification
-  onClose: (id: number) => void
-  duration?: number
-}
+import { NotificationToastProps } from '@/types/notifications'
 
 const NotificationToast: React.FC<NotificationToastProps> = ({ 
   notification, 
@@ -31,7 +15,7 @@ const NotificationToast: React.FC<NotificationToastProps> = ({
   const [isExiting, setIsExiting] = useState(false)
   const [progress, setProgress] = useState(100)
 
-  // Helper function to get initials from actor name
+  
   const getInitialsFromName = (name: string | undefined): string => {
     if (!name) return '?'
     const trimmed = name.trim()
@@ -48,7 +32,7 @@ const NotificationToast: React.FC<NotificationToastProps> = ({
   }, [onClose, notification.id])
 
   useEffect(() => {
-    // Progress bar animation
+    
     const startTime = Date.now()
     const progressInterval = setInterval(() => {
       const elapsed = Date.now() - startTime
@@ -56,7 +40,7 @@ const NotificationToast: React.FC<NotificationToastProps> = ({
       setProgress(remaining)
     }, 50)
 
-    // Auto-dismiss timer
+    
     const timer = setTimeout(() => {
       handleClose()
     }, duration)

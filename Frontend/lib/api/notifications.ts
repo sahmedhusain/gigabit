@@ -3,7 +3,7 @@ import { NotificationResponse, NotificationSettings, NotificationSettingsRequest
 
 declare module './client' {
   interface ApiClient {
-    // Notifications endpoints
+    
     getNotifications(limit?: number, offset?: number): Promise<{ data: NotificationResponse[] }>;
     getUnreadNotificationCount(): Promise<{ unread_count: number }>;
     markNotificationAsRead(notificationIds: number[]): Promise<{ message: string; count: number }>;

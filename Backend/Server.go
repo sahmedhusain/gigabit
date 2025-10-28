@@ -737,7 +737,41 @@ func (s *Server) handleGroupRoute(groupHandler *handlers.GroupHandler, eventHand
 					writeError(w, http.StatusNotFound, "User ID required")
 				}
 			case "posts":
-				if len(parts) >= 3 {
+				if len(parts) >= 4 {
+					// Handle individual post actions: /api/groups/{groupID}/posts/{postID}/{action}
+					postID := parts[2]
+					action := parts[3]
+					switch action {
+					case "like":
+						switch r.Method {
+						case http.MethodPost:
+							authMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+								groupHandler.LikeGroupPost(w, r, groupID, postID)
+							})).ServeHTTP(w, r)
+						case http.MethodDelete:
+							authMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+								groupHandler.UnlikeGroupPost(w, r, groupID, postID)
+							})).ServeHTTP(w, r)
+						default:
+							writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
+						}
+					case "dislike":
+						switch r.Method {
+						case http.MethodPost:
+							authMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+								groupHandler.DislikeGroupPost(w, r, groupID, postID)
+							})).ServeHTTP(w, r)
+						case http.MethodDelete:
+							authMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+								groupHandler.UndislikeGroupPost(w, r, groupID, postID)
+							})).ServeHTTP(w, r)
+						default:
+							writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
+						}
+					default:
+						writeError(w, http.StatusNotFound, "Invalid post action")
+					}
+				} else if len(parts) >= 3 {
 					// Handle individual post operations: /api/groups/{groupID}/posts/{postID}
 					postID := parts[2]
 					switch r.Method {

@@ -12,7 +12,7 @@ import {
   LogOut,
   Zap,
   Dot,
-  User,
+  User as UserIcon,
   UserCheck,
   UserPlus,
   Mail,
@@ -24,104 +24,12 @@ import { useWebSocket } from '@/context/WebSocketContext'
 import { api, Event } from '@/lib/api'
 import { useToast } from '@/context/ToastContext'
 import { getAvatarUrl, getUserInitials, getGroupInitials } from '@/utils/avatarUtils'
-
-interface User {
-  id?: number
-  user_id?: number
-  username?: string
-  nickname?: string
-  name?: string
-  display_name?: string
-  first_name?: string
-  last_name?: string
-  avatar?: string
-  profile_image?: string
-  status?: string
-}
-
-// interface FollowRequest {
-//   id: number
-//   requester?: {
-//     id: number
-//     first_name?: string
-//     last_name?: string
-//     nickname?: string
-//     username?: string
-//     avatar?: string
-//   }
-//   created_at: string
-// }
-
-interface FollowRequest {
-  request_id: number
-  user: {
-    id: number
-    first_name?: string
-    last_name?: string
-    avatar?: string
-    nickname?: string
-  }
-  requested_at: string
-}
-
-interface GroupInvitation {
-  id: number
-  group?: {
-    id: number
-    title?: string
-    avatar?: string
-    creator?: {
-      id: number
-      first_name?: string
-      last_name?: string
-      avatar?: string
-    }
-  }
-  created_at: string
-  // backend-added fields to distinguish types
-  type?: 'invite' | 'join_request'
-  request_user?: {
-    id: number
-    first_name?: string
-    last_name?: string
-    avatar?: string
-    nickname?: string
-  } | null
-}
-
-interface RightSidebarProps {
-  onlineUsers: User[]
-  followingUsers?: User[]
-  followersUsers?: User[]
-  onUserClick: (user: User) => void
-  currentUser: {
-    id: number
-    name: string
-    username: string
-    avatar?: string
-    isPrivate: boolean
-    followers: number
-    following: number
-    posts: number
-    status: string
-    lastStatusChange: string
-  } | null
-  setActiveTab: (tab: string) => void
-  logout: () => void
-  isMobileOpen: boolean
-}
-
-interface StatusOption {
-  id: string
-  label: string
-  color: string
-  icon: React.ReactNode
-}
+import { User, FollowRequest, GroupInvitation, RightSidebarProps, StatusOption } from '@/types/sidebar'
 
 export default function RightSidebar({
   onlineUsers,
-  followingUsers = [], // Default to empty array
-  followersUsers = [], // Default to empty array
+  followingUsers = [], 
+  followersUsers = [], 
   onUserClick,
   currentUser,
   setActiveTab,
@@ -137,7 +45,7 @@ export default function RightSidebar({
   const [isClient, setIsClient] = useState(false)
   const [expandedSection, setExpandedSection] = useState<'calendar' | 'following' | 'invitations' | null>('calendar')
 
-  // Calendar state
+  
   const [selectedDate, setSelectedDate] = useState(new Date())
   const [calendarDate, setCalendarDate] = useState(new Date())
   const [showEventsSlideUp, setShowEventsSlideUp] = useState(false)
@@ -147,12 +55,12 @@ export default function RightSidebar({
   const [tempYear, setTempYear] = useState(new Date().getFullYear())
   const [tempMonth, setTempMonth] = useState(new Date().getMonth())
 
-  // Invitations state
+  
   const [followRequests, setFollowRequests] = useState<FollowRequest[]>([])
   const [groupInvitations, setGroupInvitations] = useState<GroupInvitation[]>([])
   const [loadingInvitations, setLoadingInvitations] = useState(false)
 
-  // Update time every minute and handle client-side hydration
+  
   useEffect(() => {
     setIsClient(true)
     const timer = setInterval(() => {
@@ -161,71 +69,69 @@ export default function RightSidebar({
     return () => clearInterval(timer)
   }, [])
 
-  // Set initial status from currentUser
+  
   useEffect(() => {
     if (currentUser?.status) {
       setUserStatus(currentUser.status)
     }
   }, [currentUser?.status])
 
-  // Fetch user events
+  
   useEffect(() => {
     const fetchEvents = async () => {
       if (!currentUser?.id) return
 
       try {
         const response = await api.getUserEvents()
-        // Filter only events where user is going
+        
         const goingEvents = response.events ? response.events.filter(event => event.user_response === 'going') : []
         setEvents(goingEvents)
-      } catch (err) {
-        console.error('Failed to fetch events:', err)
-        error('Failed to load events')
+      } catch {
+        error('Failed to fetch events!')
       }
     }
 
-    fetchEvents()
-  }, [currentUser?.id, error])
+    fetchEvents();
+  }, [currentUser?.id, error]);
 
-  // Fetch user invitations
+  
   useEffect(() => {
     const fetchInvitations = async () => {
-      if (!currentUser?.id) return
+      if (!currentUser?.id) return;
 
       try {
-        setLoadingInvitations(true)
+        setLoadingInvitations(true);
 
-        // Fetch follow requests
-        const followResponse = await api.getFollowRequests()
-        setFollowRequests(followResponse.requests || [])
+        
+        const followResponse = await api.getFollowRequests();
+        setFollowRequests(followResponse.requests || []);
 
-        // Fetch group invitations
-        const groupResponse = await api.getGroupInvitations()
-        setGroupInvitations(groupResponse.invitations || [])
+        
+        const groupResponse = await api.getGroupInvitations();
+        setGroupInvitations(groupResponse.invitations || []);
 
-      } catch (err) {
-        console.error('Failed to fetch invitations:', err)
-        error('Failed to load invitations')
+      } catch {
+        error('Failed to load invitations!')
       } finally {
-        setLoadingInvitations(false)
+        setLoadingInvitations(false);
       }
     }
 
-    fetchInvitations()
-  }, [currentUser?.id, error])
+    fetchInvitations();
+  }, [currentUser?.id, error]);
 
-  // Handle status change
+  
   const handleStatusChange = async (newStatus: string) => {
-    if (!currentUser?.id) return
+    if (!currentUser?.id) return;
 
     try {
-      // Call API to update status
-      await api.updateUserStatus(newStatus)
+      
+      await api.updateUserStatus(newStatus);
 
-      // Update local state
-      setUserStatus(newStatus)
+      
+      setUserStatus(newStatus);
 
-      // Send WebSocket message to broadcast status change
+      
       sendMessage({
         type: 'user_status',
         data: {
@@ -233,14 +139,13 @@ export default function RightSidebar({
           status: newStatus,
           timestamp: new Date().toISOString()
         }
-      })
+      });
 
-      success(`Status updated to ${statusOptions.find(s => s.id === newStatus)?.label}`)
-    } catch (err) {
-      console.error('Failed to update status:', err)
-      error('Failed to update status. Please try again.')
+      success('Status updated!');
+    } catch {
+      error('Failed to update status!')
     }
-  }
+  };
 
   const statusOptions: StatusOption[] = [
     { id: 'online', label: 'Online', color: 'bg-green-500', icon: <Dot className="w-3 h-3 animate-pulse" /> },
@@ -272,7 +177,7 @@ export default function RightSidebar({
     return 'Good evening'
   }
 
-  // Calendar navigation functions
+  
   const navigateMonth = (direction: 'prev' | 'next') => {
     setCalendarDate(prev => {
       const newDate = new Date(prev)
@@ -285,21 +190,21 @@ export default function RightSidebar({
     })
   }
 
-  // Initialize temp values when picker opens
+  
   const openMonthYearPicker = () => {
     setTempYear(calendarDate.getFullYear())
     setTempMonth(calendarDate.getMonth())
     setShowMonthYearPicker(true)
   }
 
-  // Apply temp values when done is pressed
+  
   const applyMonthYearSelection = () => {
     const newDate = new Date(tempYear, tempMonth, 1);
     setCalendarDate(newDate);
     setShowMonthYearPicker(false);
   }
 
-  // Close month/year picker when clicking outside
+  
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (showMonthYearPicker) {
@@ -314,12 +219,12 @@ export default function RightSidebar({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [showMonthYearPicker]);
 
-  // Transform events for calendar display
+  
   const getEventsForDate = (date: Date) => {
     return events
       .filter(event => {
         const eventDate = new Date(event.event_time)
-        // Compare dates in local timezone to avoid timezone shift issues
+        
         return eventDate.getFullYear() === date.getFullYear() &&
           eventDate.getMonth() === date.getMonth() &&
           eventDate.getDate() === date.getDate()
@@ -336,26 +241,26 @@ export default function RightSidebar({
       }))
   }
 
-  // Handle date click to show events slide-up
+  
   const handleDateClick = (date: Date) => {
     const eventsForDate = getEventsForDate(date)
     if (eventsForDate.length > 0) {
-      setSelectedDate(date) // Update selected date for greeting text
+      setSelectedDate(date) 
       setSlideUpDate(date)
       setShowEventsSlideUp(true)
     } else {
-      // Just update selected date for navigation, don't show slide-up
+      
       setSelectedDate(date)
     }
   }
 
-  // Close events slide-up
+  
   const closeEventsSlideUp = useCallback(() => {
     setShowEventsSlideUp(false)
     setSlideUpDate(null)
   }, [])
 
-  // Check if date has events
+  
   const hasEvents = (date: Date) => {
     return events.some(event => {
       const eventDate = new Date(event.event_time)
@@ -365,7 +270,7 @@ export default function RightSidebar({
     })
   }
 
-  // Close events slide-up when clicking outside
+  
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (showEventsSlideUp) {
@@ -387,10 +292,10 @@ export default function RightSidebar({
   return (
     <div className={`fixed-right-sidebar scrollbar-hide ${isMobileOpen ? 'mobile-open' : ''}`}>
       <div className="space-y-4 scrollbar-hide">
-        {/* User Profile Dropdown Container */}
+        {}
         <div className="rounded-2xl">
           <div className="p-4">
-            {/* User Profile Dropdown - Integrated */}
+            {}
             <button
               onClick={() => setProfileDropdownOpen(!isProfileDropdownOpen)}
               className="w-full group transition-all duration-300"
@@ -424,7 +329,7 @@ export default function RightSidebar({
                       );
                     })()}
                   </div>
-                  {/* Status indicator */}
+                  {}
                   <div className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-white flex items-center justify-center ${statusOptions.find(s => s.id === userStatus)?.color || 'bg-gray-500'
                     }`}>
                     {statusOptions.find(s => s.id === userStatus)?.icon}
@@ -456,14 +361,14 @@ export default function RightSidebar({
                   </div>
                 </div>
 
-                {/* Chevron removed */}
+                {}
               </div>
             </button>
 
-            {/* Enhanced Profile Dropdown - Inline */}
+            {}
             {isProfileDropdownOpen && (
               <div className="mt-4 space-y-3">
-                {/* Status Section */}
+                {}
                 <div className="bg-white/5 rounded-xl p-3 border border-white/10">
                   <p className="text-xs font-semibold text-white/70 mb-3 flex items-center">
                     <Zap className="w-3 h-3 mr-2 text-emerald-400" />
@@ -486,7 +391,7 @@ export default function RightSidebar({
                   </div>
                 </div>
 
-                {/* Navigation Links */}
+                {}
                 <div className="bg-white/5 rounded-xl p-3 border border-white/10 space-y-1">
                   <button
                     onClick={() => {
@@ -495,7 +400,7 @@ export default function RightSidebar({
                     }}
                     className="w-full text-left px-3 py-2 text-sm text-white/80 hover:bg-white/10 hover:text-white rounded-lg flex items-center space-x-3 transition-all duration-200 group"
                   >
-                    <User className="w-4 h-4 group-hover:text-emerald-400 transition-colors" />
+                    <UserIcon className="w-4 h-4 group-hover:text-emerald-400 transition-colors" />
                     <span>My Profile</span>
                     <ChevronRight className="w-3 h-3 ml-auto opacity-0 group-hover:opacity-100 transition-opacity" />
                   </button>
@@ -529,11 +434,11 @@ export default function RightSidebar({
           </div>
         </div>
 
-        {/* Time, Greeting, and Calendar Container */}
+        {}
         <div className={`sidebar-section bg-gradient-to-br from-blue-500/10 via-white/10 to-white/5 backdrop-blur-xl rounded-2xl border border-blue-400/20 shadow-xl ${expandedSection === 'calendar' ? 'expandable' : 'collapsed'
           }`}>
           <div className="p-4">
-            {/* Header with collapse toggle */}
+            {}
             <div
               className={`flex items-center justify-between cursor-pointer ${expandedSection === 'calendar' ? 'mb-4' : 'mb-2 h-16'}`}
               onClick={() => toggleSection('calendar')}
@@ -548,18 +453,18 @@ export default function RightSidebar({
               </div>
               <div className="flex items-center space-x-2">
                 <Calendar className="w-5 h-5 text-blue-400" />
-                {/* Chevrons removed */}
+                {}
               </div>
             </div>
 
-            {/* Greeting */}
+            {}
             <div className="text-center mb-4">
               <div className="text-white/80 text-sm">
                 {getUserGreeting()}, {currentUser?.name?.split(' ')[0] || 'User'}!
               </div>
               <div className="text-white/60 text-xs mt-1">
                 {(() => {
-                  // Count events for selected date using local date comparison
+                  
                   const selectedDateEvents = events.filter(event => {
                     const eventDate = new Date(event.event_time)
                     return eventDate.getFullYear() === selectedDate.getFullYear() &&
@@ -586,7 +491,7 @@ export default function RightSidebar({
 
             {expandedSection === 'calendar' && (
               <div className="section-content calendar-content flex flex-col flex-1 min-h-0">
-                {/* Calendar Header with Navigation */}
+                {}
                 <div className="flex items-center justify-between mb-3 pt-2 border-t border-white/10">
                   <h3 className="text-white font-bold text-base flex items-center">
                     Calendar
@@ -619,11 +524,11 @@ export default function RightSidebar({
                   </div>
                 </div>
 
-                {/* Month/Year Picker */}
+                {}
                 {showMonthYearPicker && (
                   <div className="mb-3 bg-white/5 rounded-xl p-3 border border-white/10 month-year-picker">
                     <div className="grid grid-cols-2 gap-3">
-                      {/* Year Selector */}
+                      {}
                       <div>
                         <label className="text-white/70 text-xs font-medium mb-2 block">Year</label>
                         <select
@@ -645,7 +550,7 @@ export default function RightSidebar({
                         </select>
                       </div>
 
-                      {/* Month Selector */}
+                      {}
                       <div>
                         <label className="text-white/70 text-xs font-medium mb-2 block">Month</label>
                         <select
@@ -668,7 +573,7 @@ export default function RightSidebar({
                       </div>
                     </div>
 
-                    {/* Quick Navigation Buttons */}
+                    {}
                     <div className="flex items-center justify-between mt-3 pt-3 border-t border-white/10">
                       <button
                         onClick={() => {
@@ -691,9 +596,9 @@ export default function RightSidebar({
                   </div>
                 )}
 
-                {/* Mini Calendar - Fixed size */}
+                {}
                 <div className="flex-shrink-0">
-                  {/* Calendar Header */}
+                  {}
                   <div className="grid grid-cols-7 gap-1 text-center mb-2">
                     {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((day, index) => (
                       <div key={index} className="text-white/60 text-xs font-medium py-1">
@@ -702,7 +607,7 @@ export default function RightSidebar({
                     ))}
                   </div>
 
-                  {/* Calendar Days */}
+                  {}
                   <div className="grid grid-cols-7 gap-1 mb-3">
                     {(() => {
                       const today = new Date();
@@ -746,24 +651,24 @@ export default function RightSidebar({
                         );
                       }
 
-                      return days.slice(0, 35); // Show 5 weeks
+                      return days.slice(0, 35); 
                     })()}
                   </div>
                 </div>
 
-                {/* Calendar is now non-scrollable - events shown in slide-up modal */}
+                {}
               </div>
             )}
 
-            {/* Events Slide-Up Modal - Positioned in overall calendar container */}
+            {}
             {showEventsSlideUp && slideUpDate && (
               <div className="events-overflow-modal transform transition-all duration-300 ease-out animate-slide-up">
                 <div className="bg-gradient-to-br from-slate-800 via-slate-900 to-gray-900 rounded-2xl shadow-2xl border border-slate-600/30 overflow-hidden backdrop-blur-sm">
-                  {/* Overlay for extra depth */}
+                  {}
                   <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-white/5 rounded-2xl"></div>
-                  {/* Content wrapper */}
+                  {}
                   <div className="relative z-10">
-                    {/* Header */}
+                    {}
                     <div className="flex items-center justify-between p-4 border-b border-white/20">
                       <div>
                         <h3 className="text-white font-bold text-base">
@@ -792,12 +697,12 @@ export default function RightSidebar({
                       </button>
                     </div>
 
-                    {/* Events List */}
+                    {}
                     <div className="max-h-60 overflow-y-auto scrollbar-hide p-4 space-y-3">
                       {(() => {
                         const eventsForDate = getEventsForDate(slideUpDate);
                         return eventsForDate.map((event) => {
-                          // Find the full event details
+                          
                           const fullEvent = events.find(e => e.id === event.id);
                           return (
                             <div 
@@ -851,7 +756,7 @@ export default function RightSidebar({
           </div>
         </div>
 
-        {/* Enhanced Following Users Section */}
+        {}
         <div className={`sidebar-section bg-gradient-to-br from-emerald-500/10 via-white/10 to-white/5 backdrop-blur-xl rounded-2xl border border-emerald-400/20 shadow-xl ${expandedSection === 'following' ? 'expandable' : 'collapsed'
           }`}>
           <div className="p-4">
@@ -874,13 +779,13 @@ export default function RightSidebar({
                     (user.user_id !== currentUser?.id)
                   );
 
-                  // Count online following users (users with status 'online')
+                  
                   const onlineCount = filteredFollowing.filter(user => {
                     const onlineUser = onlineUsers.find(u => u.user_id === (user.id || user.user_id))
                     return onlineUser?.status === 'online'
                   }).length;
 
-                  // Only show online indicator if there are online following users
+                  
                   if (onlineCount > 0) {
                     return (
                       <div className="flex items-center space-x-1">
@@ -893,7 +798,7 @@ export default function RightSidebar({
                   }
                   return null;
                 })()}
-                {/* Chevrons removed */}
+                {}
               </div>
             </div>
 
@@ -902,20 +807,20 @@ export default function RightSidebar({
                 <div className="flex-1 overflow-y-auto scrollbar-hide">
                   <div className="space-y-2">
                     {(() => {
-                      // Use only followingUsers
+                      
                       const filteredUsers = followingUsers.filter(user =>
                         (user.username !== currentUser?.username) &&
                         (user.id !== currentUser?.id) &&
                         (user.user_id !== currentUser?.id)
                       );
 
-                      // Create online users set for quick lookup
+                      
                       const onlineUserIds = new Set(onlineUsers.map(u => u.id || u.user_id));
 
-                      // Create followers set for mutual friendship detection
+                      
                       const followerIds = new Set(followersUsers.map(u => u.id || u.user_id));
 
-                      // Separate online and offline users
+                      
                       const onlineFollowing = filteredUsers.filter(user =>
                         onlineUserIds.has(user.id || user.user_id)
                       );
@@ -923,7 +828,7 @@ export default function RightSidebar({
                         !onlineUserIds.has(user.id || user.user_id)
                       );
 
-                      // Sort both groups by name
+                      
                       const sortByName = (a: User, b: User) => {
                         const nameA = (a.display_name || a.name || a.first_name + ' ' + a.last_name || a.username || '').toLowerCase();
                         const nameB = (b.display_name || b.name || b.first_name + ' ' + b.last_name || b.username || '').toLowerCase();
@@ -955,7 +860,7 @@ export default function RightSidebar({
                         );
                       }
 
-                      // Calculate users by status
+                      
                       const usersByStatus = {
                         online: sortedUsers.filter(user => {
                           const onlineUser = onlineUsers.find(u => u.user_id === (user.id || user.user_id))
@@ -977,7 +882,7 @@ export default function RightSidebar({
 
                       return (
                         <>
-                          {/* Online Users */}
+                          {}
                           {usersByStatus.online.length > 0 && (
                             <div className="mb-4">
                               <div className="flex items-center space-x-2 mb-3 px-2">
@@ -1042,7 +947,7 @@ export default function RightSidebar({
                             </div>
                           )}
 
-                          {/* Busy Users */}
+                          {}
                           {usersByStatus.busy.length > 0 && (
                             <div className="mb-4">
                               <div className="flex items-center space-x-2 mb-3 px-2">
@@ -1107,7 +1012,7 @@ export default function RightSidebar({
                             </div>
                           )}
 
-                          {/* Away Users */}
+                          {}
                           {usersByStatus.away.length > 0 && (
                             <div className="mb-4">
                               <div className="flex items-center space-x-2 mb-3 px-2">
@@ -1172,7 +1077,7 @@ export default function RightSidebar({
                             </div>
                           )}
 
-                          {/* Offline Users */}
+                          {}
                           {usersByStatus.offline.length > 0 && (
                             <div>
                               <div className="flex items-center space-x-2 mb-3 px-2">
@@ -1246,7 +1151,7 @@ export default function RightSidebar({
           </div>
         </div>
 
-        {/* Invitations Section */}
+        {}
         <div className={`sidebar-section bg-gradient-to-br from-orange-500/10 via-red-500/10 to-pink-500/10 backdrop-blur-xl rounded-2xl border border-orange-400/20 shadow-xl ${expandedSection === 'invitations' ? 'expandable' : 'collapsed'
           }`}>
           <div className="p-4">
@@ -1275,7 +1180,7 @@ export default function RightSidebar({
               </div>
             </div>
 
-            {/* Expanded State */}
+            {}
             {expandedSection === 'invitations' && (
               <div className={`section-content invitation-content flex-1 flex flex-col min-h-0 ${expandedSection === 'invitations' ? 'invitations-content-expanded' : ''}`}>
                 <div className="flex-1 overflow-y-auto scrollbar-hide">
@@ -1286,7 +1191,7 @@ export default function RightSidebar({
                       </div>
                     ) : (followRequests.length + groupInvitations.length) > 0 ? (
                       <>
-                        {/* Follow Requests */}
+                        {}
                         {followRequests.length > 0 && (
                           <div className="mb-4">
                             <div className="flex items-center space-x-2 mb-3 px-2">
@@ -1297,13 +1202,11 @@ export default function RightSidebar({
                             </div>
                             <div className="space-y-2">
                               {followRequests.map((request) => (
-                                console.log("Request:", request),
-                                console.log("Requester:", request.user?.avatar),
                                 <div
                                   key={`follow-${request.request_id}`}
                                   className="relative bg-gradient-to-br from-blue-500/10 via-cyan-500/10 to-teal-500/10 backdrop-blur-sm rounded-xl p-3 border border-blue-400/20 hover:border-blue-400/40 shadow-lg hover:shadow-blue-500/10 transition-all duration-300 group overflow-hidden"
                                 >
-                                  {/* Subtle background pattern */}
+                                  {}
                                   <div className="absolute inset-0 bg-gradient-to-br from-transparent via-white/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
 
                                   <div className="relative z-10">
@@ -1367,10 +1270,9 @@ export default function RightSidebar({
                                             if (!request.user?.id) return;
                                             await api.respondToFollowRequest(request.user.id, 'accept');
                                             setFollowRequests(prev => prev.filter(r => r.request_id !== request.request_id));
-                                            success('Follow request accepted');
-                                          } catch (err) {
-                                            console.error('Failed to accept follow request:', err);
-                                            error('Failed to accept follow request');
+                                            success('Request accepted!');
+                                          } catch {
+                                            error('Failed to accept request!');
                                           }
                                         }}
                                         className="flex items-center justify-center space-x-1 px-4 py-1.5 bg-gradient-to-r from-emerald-500 to-green-500 hover:from-emerald-400 hover:to-green-400 text-white rounded-lg text-xs font-semibold transition-all duration-300 shadow-md hover:shadow-emerald-500/25 hover:scale-105"
@@ -1385,10 +1287,10 @@ export default function RightSidebar({
                                             if (!request.user?.id) return;
                                             await api.respondToFollowRequest(request.user.id, 'decline');
                                             setFollowRequests(prev => prev.filter(r => r.request_id !== request.request_id));
-                                            success('Follow request declined');
-                                          } catch (err) {
-                                            console.error('Failed to decline follow request:', err);
-                                            error('Failed to decline follow request');
+                                            success('Request declined!');
+                                          } catch {
+                                            
+                                            error('Failed to decline request!');
                                           }
                                         }}
                                         className="flex items-center justify-center space-x-1 px-4 py-1.5 bg-gradient-to-r from-red-500 to-pink-500 hover:from-red-400 hover:to-pink-400 text-white rounded-lg text-xs font-semibold transition-all duration-300 shadow-md hover:shadow-red-500/25 hover:scale-105"
@@ -1404,7 +1306,7 @@ export default function RightSidebar({
                           </div>
                         )}
 
-                        {/* Group Invitations and Join Requests */}
+                        {}
                         {groupInvitations.length > 0 && (
                           <div>
                             <div className="flex items-center space-x-2 mb-3 px-2">
@@ -1419,7 +1321,7 @@ export default function RightSidebar({
                                   key={`group-${invitation.id}`}
                                   className="relative bg-gradient-to-br from-orange-500/10 via-red-500/10 to-pink-500/10 backdrop-blur-sm rounded-xl p-3 border border-orange-400/20 hover:border-orange-400/40 shadow-lg hover:shadow-orange-500/10 transition-all duration-300 group overflow-hidden"
                                 >
-                                  {/* Subtle background pattern */}
+                                  {}
                                   <div className="absolute inset-0 bg-gradient-to-br from-transparent via-white/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
 
                                   <div className="relative z-10">
@@ -1496,10 +1398,10 @@ export default function RightSidebar({
                                                 if (!invitation.group?.id || !invitation.request_user?.id) return;
                                                 await api.respondToJoinRequest(invitation.group.id, invitation.request_user.id, 'accept');
                                                 setGroupInvitations(prev => prev.filter(i => i.id !== invitation.id));
-                                                success('Join request accepted');
-                                              } catch (err) {
-                                                console.error('Failed to accept join request:', err);
-                                                error('Failed to accept join request');
+                                                success('Join accepted!');
+                                              } catch {
+                                                
+                                                error('Failed to accept join!');
                                               }
                                             }}
                                             className="flex items-center justify-center space-x-1 px-4 py-1.5 bg-gradient-to-r from-emerald-500 to-green-500 hover:from-emerald-400 hover:to-green-400 text-white rounded-lg text-xs font-semibold transition-all duration-300 shadow-md hover:shadow-emerald-500/25 hover:scale-105"
@@ -1514,10 +1416,10 @@ export default function RightSidebar({
                                                 if (!invitation.group?.id || !invitation.request_user?.id) return;
                                                 await api.respondToJoinRequest(invitation.group.id, invitation.request_user.id, 'decline');
                                                 setGroupInvitations(prev => prev.filter(i => i.id !== invitation.id));
-                                                success('Join request declined');
-                                              } catch (err) {
-                                                console.error('Failed to decline join request:', err);
-                                                error('Failed to decline join request');
+                                                success('Join declined!');
+                                              } catch {
+                                                
+                                                error('Failed to decline join!');
                                               }
                                             }}
                                             className="flex items-center justify-center space-x-1 px-4 py-1.5 bg-gradient-to-r from-red-500 to-pink-500 hover:from-red-400 hover:to-pink-400 text-white rounded-lg text-xs font-semibold transition-all duration-300 shadow-md hover:shadow-red-500/25 hover:scale-105"
@@ -1535,10 +1437,10 @@ export default function RightSidebar({
                                                 if (!invitation.group?.id) return;
                                                 await api.acceptGroupInvitation(invitation.group.id);
                                                 setGroupInvitations(prev => prev.filter(i => i.id !== invitation.id));
-                                                success('Group invitation accepted');
-                                              } catch (err) {
-                                                console.error('Failed to accept group invitation:', err);
-                                                error('Failed to accept group invitation');
+                                                success('Invitation accepted!');
+                                              } catch {
+                                                
+                                                error('Failed to accept invitation!');
                                               }
                                             }}
                                             className="flex items-center justify-center space-x-1 px-4 py-1.5 bg-gradient-to-r from-emerald-500 to-green-500 hover:from-emerald-400 hover:to-green-400 text-white rounded-lg text-xs font-semibold transition-all duration-300 shadow-md hover:shadow-emerald-500/25 hover:scale-105"
@@ -1553,10 +1455,10 @@ export default function RightSidebar({
                                                 if (!invitation.group?.id) return;
                                                 await api.declineGroupInvitation(invitation.group.id);
                                                 setGroupInvitations(prev => prev.filter(i => i.id !== invitation.id));
-                                                success('Group invitation declined');
-                                              } catch (err) {
-                                                console.error('Failed to decline group invitation:', err);
-                                                error('Failed to decline group invitation');
+                                                success('Invitation declined!');
+                                              } catch {
+                                                
+                                                error('Failed to decline invitation!');
                                               }
                                             }}
                                             className="flex items-center justify-center space-x-1 px-4 py-1.5 bg-gradient-to-r from-red-500 to-pink-500 hover:from-red-400 hover:to-pink-400 text-white rounded-lg text-xs font-semibold transition-all duration-300 shadow-md hover:shadow-red-500/25 hover:scale-105"

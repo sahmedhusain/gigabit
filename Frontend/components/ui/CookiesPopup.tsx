@@ -1,11 +1,7 @@
 'use client'
 import { X, Cookie } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
-
-interface CookiesPopupProps {
-  isOpen: boolean
-  onClose: () => void
-}
+import { CookiesPopupProps } from '@/types/ui'
 
 export default function CookiesPopup({ isOpen, onClose }: CookiesPopupProps) {
   if (!isOpen) return null

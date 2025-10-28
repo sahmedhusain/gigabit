@@ -242,13 +242,13 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	// Find user by email
 	user, err := h.userService.GetUserByEmail(req.Email)
 	if err != nil {
-		writeError(w, http.StatusUnauthorized, "Invalid credentials")
+		writeError(w, http.StatusUnauthorized, "Wrong email or password")
 		return
 	}
 
 	// Check password
 	if !utils.CheckPassword(req.Password, user.Password) {
-		writeError(w, http.StatusUnauthorized, "Invalid credentials")
+		writeError(w, http.StatusUnauthorized, "Wrong email or password")
 		return
 	}
 

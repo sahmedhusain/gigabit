@@ -1,9 +1,9 @@
 import { ApiClient } from './client';
-import { PollResponse, CreatePollRequest } from './types';
+import { PollResponse, CreatePollRequest } from '../../types/polls';
 
 declare module './client' {
   interface ApiClient {
-    // Poll endpoints
+    
     createPoll(data: CreatePollRequest): Promise<PollResponse>;
     getPoll(pollId: number): Promise<PollResponse>;
     getGroupPolls(groupId: number, limit?: number, offset?: number): Promise<PollResponse[]>;

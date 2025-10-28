@@ -2,11 +2,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useWebSocketSubscription } from './useWebSocketSubscription'
 import { useAuth } from '@/context/AuthContext'
-
-interface FollowerCounts {
-  followers_count: number
-  following_count: number
-}
+import { FollowerCounts } from '@/types/hooks'
 
 export function useFollowerCounts(initialFollowersCount = 0, initialFollowingCount = 0) {
   const { user } = useAuth()
@@ -15,14 +11,14 @@ export function useFollowerCounts(initialFollowersCount = 0, initialFollowingCou
     following_count: initialFollowingCount
   })
 
-  // WebSocket subscription for real-time follower count updates
+  
   const { isConnected } = useWebSocketSubscription({
     messageTypes: ['follower_count_update'],
     onMessage: (message) => {
       if (message.type === 'follower_count_update' && message.data) {
         const data = message.data
 
-        // Check if the update is for the current user
+        
         const userKey = `user_${user?.id}`
         if (data[userKey]) {
           const userCounts = data[userKey]
@@ -32,7 +28,7 @@ export function useFollowerCounts(initialFollowersCount = 0, initialFollowingCou
           })
         }
 
-        // Also check if the data directly contains user_id for current user
+        
         if (data.user_id === user?.id) {
           setFollowerCounts({
             followers_count: data.followers_count || 0,
@@ -43,7 +39,7 @@ export function useFollowerCounts(initialFollowersCount = 0, initialFollowingCou
     }
   })
 
-  // Update local state when initial values change
+  
   useEffect(() => {
     setFollowerCounts({
       followers_count: initialFollowersCount,

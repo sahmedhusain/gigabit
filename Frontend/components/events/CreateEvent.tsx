@@ -5,13 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useToast } from '@/context/ToastContext'
 import { useConnectionStatus } from '@/hooks'
 import { api } from '@/lib/api'
-
-interface CreateEventProps {
-  show: boolean
-  onClose: () => void
-  onEventCreated?: () => void
-  groupId: number
-}
+import { CreateEventProps } from '@/types/events'
 
 export default function CreateEvent({
   show,
@@ -67,7 +61,7 @@ export default function CreateEvent({
       return
     }
 
-    // Combine date and time
+    
     const eventDateTime = new Date(`${eventDate}T${eventTime}`)
 
     if (eventDateTime <= new Date()) {
@@ -88,7 +82,7 @@ export default function CreateEvent({
     try {
       await api.createEvent(groupId, eventData)
 
-      success('Event created successfully!')
+      success('Event created!')
 
       // Reset form
       setEventTitle('')

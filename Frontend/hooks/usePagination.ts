@@ -1,12 +1,6 @@
 'use client'
 import { useState, useCallback, useEffect, useRef } from 'react'
-
-export interface PaginationOptions {
-  initialPage?: number
-  initialLimit?: number
-  maxLimit?: number
-  preloadNextPage?: boolean
-}
+import { PaginationOptions } from '@/types/hooks'
 
 export function usePagination<T>(
   fetchFunction: (limit: number, offset: number) => Promise<{ data: T[], count: number }>,
@@ -28,9 +22,9 @@ export function usePagination<T>(
   const [hasNextPage, setHasNextPage] = useState(false)
   const [hasPreviousPage, setHasPreviousPage] = useState(false)
 
-  // Cache for preloaded data
+  
   const cache = useRef<Map<string, { data: T[], timestamp: number }>>(new Map())
-  const cacheExpiry = 5 * 60 * 1000 // 5 minutes
+  const cacheExpiry = 5 * 60 * 1000 
 
   const getCacheKey = useCallback((page: number, pageLimit: number) => {
     return `${page}-${pageLimit}`
@@ -45,7 +39,7 @@ export function usePagination<T>(
       const cacheKey = getCacheKey(page, pageLimit)
       const cachedData = cache.current.get(cacheKey)
 
-      // Check cache first
+      
       if (cachedData && isValidCache(cachedData.timestamp)) {
         return { data: cachedData.data, count: totalCount }
       }
@@ -53,7 +47,7 @@ export function usePagination<T>(
       const offset = (page - 1) * pageLimit
       const result = await fetchFunction(pageLimit, offset)
       
-      // Cache the result
+      
       cache.current.set(cacheKey, {
         data: result.data,
         timestamp: Date.now()
@@ -77,15 +71,15 @@ export function usePagination<T>(
         setCurrentPage(page)
         setLimit(pageLimit)
 
-        // Calculate pagination state
+        
         const totalPages = Math.ceil(result.count / pageLimit)
         setHasNextPage(page < totalPages)
         setHasPreviousPage(page > 1)
 
-        // Preload next page if enabled
+        
         if (preloadNextPage && page < totalPages) {
           fetchPage(page + 1, pageLimit).catch(() => {
-            // Silently ignore preload errors
+            
           })
         }
 
@@ -123,7 +117,7 @@ export function usePagination<T>(
   const changeLimit = useCallback(
     (newLimit: number) => {
       const validLimit = Math.min(newLimit, maxLimit)
-      // Recalculate page to maintain approximate position
+      
       const currentOffset = (currentPage - 1) * limit
       const newPage = Math.floor(currentOffset / validLimit) + 1
       loadPage(newPage, validLimit)
@@ -132,7 +126,7 @@ export function usePagination<T>(
   )
 
   const refresh = useCallback(() => {
-    // Clear cache for current page
+    
     const cacheKey = getCacheKey(currentPage, limit)
     cache.current.delete(cacheKey)
     loadPage(currentPage, limit)
@@ -155,10 +149,10 @@ export function usePagination<T>(
     setData(prev => prev.map(item => predicate(item) ? updater(item) : item))
   }, [])
 
-  // Initial load
+  
   useEffect(() => {
     loadPage(initialPage, initialLimit)
-  }, []) // Only run once on mount
+  }, []) 
 
   const totalPages = Math.ceil(totalCount / limit)
 

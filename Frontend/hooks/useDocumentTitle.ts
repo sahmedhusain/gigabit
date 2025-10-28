@@ -1,13 +1,6 @@
 'use client'
 import { useState, useEffect, useCallback, useRef } from 'react'
-
-export interface DocumentTitleOptions {
-  separator?: string
-  includeUnreadCount?: boolean
-  maxUnreadDisplay?: number
-  template?: string
-  showFavicon?: boolean
-}
+import { DocumentTitleOptions } from '@/types/hooks'
 
 export function useDocumentTitle(
   baseTitle: string = 'Gigabit',
@@ -47,7 +40,7 @@ export function useDocumentTitle(
     }
   }, [])
 
-  // Update document title
+  
   useEffect(() => {
     let title = baseTitle
     
@@ -65,7 +58,7 @@ export function useDocumentTitle(
     document.title = title
   }, [baseTitle, currentPage, unreadCount, isVisible, includeUnreadCount, maxUnreadDisplay, template, separator])
 
-  // Update favicon for unread notifications
+  
   useEffect(() => {
     if (!showFavicon) return
 
@@ -73,20 +66,20 @@ export function useDocumentTitle(
     if (!favicon) return
 
     if (unreadCount > 0 && !isVisible) {
-      // Create a canvas to draw notification badge
+      
       const canvas = document.createElement('canvas')
       canvas.width = 32
       canvas.height = 32
       const ctx = canvas.getContext('2d')
       
       if (ctx) {
-        // Draw red circle
+        
         ctx.fillStyle = '#ff4444'
         ctx.beginPath()
         ctx.arc(16, 16, 14, 0, 2 * Math.PI)
         ctx.fill()
         
-        // Draw count text
+        
         ctx.fillStyle = 'white'
         ctx.font = 'bold 16px Arial'
         ctx.textAlign = 'center'

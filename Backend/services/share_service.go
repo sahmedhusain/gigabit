@@ -44,7 +44,7 @@ func (s *ShareService) SharePost(userID uint, req *models.ShareRequest) error {
 					err = s.db.QueryRow("SELECT CASE WHEN participant1_id = ? THEN participant2_id ELSE participant1_id END FROM private_conversations WHERE id = ?", userID, convID).Scan(&otherUserID)
 				}
 				if err == nil {
-					if notifyErr := s.notificationService.NotifyPostShared(userID, otherUserID, messageID); notifyErr != nil {
+					if notifyErr := s.notificationService.NotifyPostShared(userID, req.PostID, false, 0, otherUserID); notifyErr != nil {
 						fmt.Printf("Failed to send post shared notification to user %d: %v\n", otherUserID, notifyErr)
 					}
 				}
@@ -60,7 +60,7 @@ func (s *ShareService) SharePost(userID uint, req *models.ShareRequest) error {
 			memberIDs, err := s.notificationService.GetGroupMemberIDs(groupID, userID)
 			if err == nil {
 				for _, memberID := range memberIDs {
-					if notifyErr := s.notificationService.NotifyPostShared(userID, memberID, messageID); notifyErr != nil {
+					if notifyErr := s.notificationService.NotifyPostShared(userID, req.PostID, true, groupID, memberID); notifyErr != nil {
 						fmt.Printf("Failed to send post shared notification to group member %d: %v\n", memberID, notifyErr)
 					}
 				}
@@ -84,7 +84,7 @@ func (s *ShareService) SharePost(userID uint, req *models.ShareRequest) error {
 			if err == nil {
 				s.broadcastSharedPost(userID, messageID, conversationID, 0, post)
 				// Create notification for the target user
-				if notifyErr := s.notificationService.NotifyPostShared(userID, targetUserID, messageID); notifyErr != nil {
+				if notifyErr := s.notificationService.NotifyPostShared(userID, req.PostID, false, 0, targetUserID); notifyErr != nil {
 					fmt.Printf("Failed to send post shared notification to user %d: %v\n", targetUserID, notifyErr)
 				}
 			}

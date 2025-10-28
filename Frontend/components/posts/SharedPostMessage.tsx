@@ -5,68 +5,42 @@ import Image from 'next/image'
 import { motion } from 'framer-motion'
 import { useRouter } from 'next/navigation'
 import { getAvatarUrl, getUserInitials } from '@/utils/avatarUtils'
-
-interface SharedPostMessageProps {
-  sharedPost: {
-    id: number
-    user_id: number
-    content: string
-    image_url?: string
-    privacy: string
-    created_at: string
-    user: {
-      id: number
-      email: string
-      first_name: string
-      last_name: string
-      avatar?: string
-      nickname?: string
-    }
-    like_count: number
-    comment_count: number
-    share_count: number
-  }
-  isCurrentUser: boolean
-  messageId: number
-  messageCreatedAt: string
-  canDelete?: boolean
-  onDeleteClick?: (messageId: number, event: React.MouseEvent) => void
-}
+import { SharedPostMessageProps } from '@/types/posts'
 
 const SharedPostMessage: React.FC<SharedPostMessageProps> = ({ sharedPost, isCurrentUser, messageId, messageCreatedAt, canDelete = false, onDeleteClick }) => {
   const router = useRouter()
 
-  // Parse various timestamp formats robustly: ISO strings, milliseconds, or seconds
+  
   const parseDate = (value: string | number | undefined | null): Date => {
     if (!value && value !== 0) return new Date(0)
     const raw = typeof value === 'number' ? value : String(value).trim()
 
-    // If purely numeric string, attempt to detect units (seconds, milliseconds, microseconds)
+    
     if (/^\d+$/.test(String(raw))) {
       const n = Number(raw)
-      // Try as milliseconds first
+      
       const asMs = new Date(n)
       if (asMs.getFullYear() >= 2000) return asMs
 
-      // Try as seconds
+      
       const asSeconds = new Date(n * 1000)
       if (asSeconds.getFullYear() >= 2000) return asSeconds
 
-      // Try as microseconds (divide by 1000)
+      
       const asMicros = new Date(Math.floor(n / 1000))
       if (asMicros.getFullYear() >= 2000) return asMicros
 
-      // Fallback: prefer asSeconds if it looks reasonable, else asMs
+      
       if (asSeconds.getTime() !== 0) return asSeconds
-      // Log suspicious value
+      
       console.warn('parseDate: suspicious numeric date value', value, '->', asMs)
       return asMs
     }
 
-    // Fallback: let Date parse ISO-like strings
+    
     const d = new Date(String(raw))
     if (isNaN(d.getTime())) {
-      // If parsing failed, log and return epoch 0
+      
       console.warn('parseDate: failed to parse date', value)
       return new Date(0)
     }

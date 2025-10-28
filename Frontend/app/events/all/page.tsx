@@ -6,7 +6,7 @@ import { useAuth } from '@/context/AuthContext'
 import { useToast } from '@/context/ToastContext'
 import { useRealTimeEvents } from '@/hooks'
 
-// Import dashboard components
+
 import CommunitySection from '@/components/groups/CommunitySection'
 import CreateGeneralEvent from '@/components/events/CreateGeneralEvent'
 import AppLayout from '@/components/layout/AppLayout'
@@ -27,13 +27,13 @@ function EventsAllPage() {
     refetch: refetchEvents 
   } = useRealTimeEvents()
 
-  // Get event ID from URL params for deep linking
+  
   const eventId = searchParams?.get('event')
   const [highlightedEventId, setHighlightedEventId] = useState<number | null>(null)
   
   const [showCreateEvent, setShowCreateEvent] = useState(false)
 
-  // Scroll to event from hash or query param
+  
   useEffect(() => {
     let id: number | null = null;
     const hash = window.location.hash;
@@ -49,14 +49,14 @@ function EventsAllPage() {
         if (element) {
           element.scrollIntoView({ behavior: 'smooth', block: 'center' });
           setHighlightedEventId(id);
-          // Remove highlight after animation
+          
           setTimeout(() => setHighlightedEventId(null), 3000);
         }
       }, 300);
     }
   }, [liveEvents, eventId]);
 
-  // Update URL when event ID changes
+  
   useEffect(() => {
     if (eventId) {
       const newUrl = `/events/all?event=${eventId}`
@@ -64,7 +64,7 @@ function EventsAllPage() {
     }
   }, [eventId, router])
 
-  // Fetch data when component loads
+  
   useEffect(() => {
     if (user) {
       refetchEvents()
@@ -83,7 +83,7 @@ function EventsAllPage() {
         onEventCreated={() => {
           refetchEvents()
           setShowCreateEvent(false)
-          success('Event created successfully!')
+          success('Event created!')
         }}
         createEvent={createEvent}
       />
@@ -106,7 +106,7 @@ function EventsAllPage() {
   )
 }
 
-// Wrap the entire component with ProtectedRoute
+
 function ProtectedEventsAllPage() {
   return (
     <ProtectedRoute>

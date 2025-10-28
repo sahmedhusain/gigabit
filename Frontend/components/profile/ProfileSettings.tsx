@@ -8,24 +8,24 @@ import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
 import { api, API_BASE_URL } from '@/lib/api';
 
-// Validation functions from registration form
+
 function validateNickname(nickname: string) {
-  if (!nickname) return null // nickname is optional
+  if (!nickname) return null 
   
-  // Allow only English letters (a-z, A-Z), numbers (0-9), underscore (_), hyphen (-), and dot (.)
+  
   const allowedCharsRegex = /^[a-zA-Z0-9._-]+$/
   
   if (!allowedCharsRegex.test(nickname)) {
     return "Nickname can only contain English letters, numbers, underscore (_), hyphen (-), and dot (.)"
   }
   
-  // Must start with a letter or number (not special characters)
+  
   const startsWithAlphanumeric = /^[a-zA-Z0-9]/
   if (!startsWithAlphanumeric.test(nickname)) {
     return "Nickname must start with a letter or number"
   }
   
-  // Must end with a letter or number (not special characters)
+  
   const endsWithAlphanumeric = /[a-zA-Z0-9]$/
   if (!endsWithAlphanumeric.test(nickname)) {
     return "Nickname must end with a letter or number"
@@ -34,12 +34,12 @@ function validateNickname(nickname: string) {
   return null
 }
 
-  // Uniqueness checking functions
+  
   const checkEmailUniqueness = async (email: string): Promise<{ available: boolean; message?: string }> => {
     try {
       return await api.checkEmailUniqueness(email);
-    } catch (error) {
-      console.error('Error checking email uniqueness:', error);
+    } catch {
+      
       return { available: false, message: 'This email is already used' };
     }
   };
@@ -47,8 +47,8 @@ function validateNickname(nickname: string) {
   const checkNicknameUniqueness = async (nickname: string): Promise<{ available: boolean; message?: string }> => {
     try {
       return await api.checkNicknameUniqueness(nickname);
-    } catch (error) {
-      console.error('Error checking nickname uniqueness:', error);
+    } catch {
+      
       return { available: false, message: 'This nickname is already used' };
     }
   };
@@ -94,7 +94,6 @@ export default function ProfileSettings() {
   const fetchUserProfile = async () => {
     try {
       const userData = await api.getMe();
-      console.log('Fetched user data:', userData);
       const initialData = {
         first_name: userData.first_name || '',
         last_name: userData.last_name || '',
@@ -105,11 +104,10 @@ export default function ProfileSettings() {
         avatar: userData.avatar || '',
         gender: userData.gender || '',
       };
-      console.log('Setting form data:', initialData);
       setFormData(initialData);
       setOriginalData(initialData);
-    } catch (error) {
-      console.error('Failed to fetch user profile:', error);
+    } catch {
+      
       setMessage('Failed to load profile data');
     } finally {
       setLoading(false);
@@ -161,16 +159,16 @@ export default function ProfileSettings() {
   const validateAllFields = async () => {
     const errors: Record<string, string> = {};
 
-    // Required fields validation
+    
     if (!formData.email) {
       errors.email = 'Email is required';
     } else {
-      // Email format validation
+      
       const emailRegex = /^[a-zA-Z0-9!#$%&'*+/=?^_`{|}~]+(\.[a-zA-Z0-9!#$%&'*+/=?^_`{|}~]+)*@[a-zA-Z0-9-]+(\.[a-zA-Z0-9-]+)*\.[a-zA-Z]{2,}$/;
       if (!emailRegex.test(formData.email)) {
         errors.email = 'Please enter a valid email address';
       } else if (formData.email !== originalData.email) {
-        // Check email uniqueness only if it has changed
+        
         setCheckingUniqueness(prev => ({ ...prev, email: true }));
         const emailCheck = await checkEmailUniqueness(formData.email);
         setCheckingUniqueness(prev => ({ ...prev, email: false }));
@@ -199,13 +197,13 @@ export default function ProfileSettings() {
     if (!formData.date_of_birth) {
       errors.date_of_birth = 'Date of birth is required';
     } else {
-      // Validate date of birth
+      
       const birthDate = new Date(formData.date_of_birth);
       const today = new Date();
       const age = today.getFullYear() - birthDate.getFullYear();
       const monthDiff = today.getMonth() - birthDate.getMonth();
       
-      // Adjust age if birthday hasn't occurred this year
+      
       const adjustedAge = monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate()) 
         ? age - 1 
         : age;
@@ -219,7 +217,7 @@ export default function ProfileSettings() {
       }
     }
 
-    // Nickname validation (optional but if provided, must be valid)
+    
     if (formData.nickname) {
       if (formData.nickname.length > 16) {
         errors.nickname = 'Nickname is too long';
@@ -228,7 +226,7 @@ export default function ProfileSettings() {
         if (nicknameValidation) {
           errors.nickname = nicknameValidation;
         } else if (formData.nickname !== originalData.nickname) {
-          // Check nickname uniqueness only if it has changed
+          
           setCheckingUniqueness(prev => ({ ...prev, nickname: true }));
           const nicknameCheck = await checkNicknameUniqueness(formData.nickname);
           setCheckingUniqueness(prev => ({ ...prev, nickname: false }));
@@ -239,7 +237,7 @@ export default function ProfileSettings() {
       }
     }
 
-    // About me validation
+    
     if (formData.about_me.length > 128) {
       errors.about_me = 'Your bio is too long';
     }
@@ -263,10 +261,7 @@ export default function ProfileSettings() {
       if (formData.avatar !== originalData.avatar) updateData.avatar_url = formData.avatar;
       if (formData.gender !== originalData.gender) updateData.gender = formData.gender;
 
-      console.log('Sending update data:', updateData);
-
       const updatedUser = await api.updateProfile(updateData);
-      console.log('Updated user:', updatedUser);
       const newData = {
         first_name: updatedUser.first_name || '',
         last_name: updatedUser.last_name || '',
@@ -282,8 +277,7 @@ export default function ProfileSettings() {
       setIsEditing(false);
       setMessage('Profile updated successfully!');
       setFieldErrors({});
-    } catch (error) {
-      console.error('Failed to update profile:', error);
+    } catch {
       setMessage('Failed to update profile');
     } finally {
       setSaving(false);
@@ -294,13 +288,13 @@ export default function ProfileSettings() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Validate file type
+    
     if (!file.type.startsWith('image/')) {
       setMessage('Please select a valid image file');
       return;
     }
 
-    // Validate file size (5MB limit)
+    
     if (file.size > 5 * 1024 * 1024) {
       setMessage('Image size must be less than 5MB');
       return;
@@ -327,8 +321,7 @@ export default function ProfileSettings() {
         const error = await response.json();
         setMessage(error.message || 'Failed to upload avatar');
       }
-    } catch (error) {
-      console.error('Failed to upload avatar:', error);
+    } catch {
       setMessage('Failed to upload avatar');
     }
   };
@@ -399,7 +392,7 @@ export default function ProfileSettings() {
           nickname: validation
         }));
       } else if (value && value !== originalData.nickname) {
-        // Check uniqueness for changed nickname
+        
         setCheckingUniqueness(prev => ({ ...prev, nickname: true }));
         try {
           const uniquenessCheck = await checkNicknameUniqueness(value);
@@ -408,8 +401,8 @@ export default function ProfileSettings() {
             ...prev,
             nickname: uniquenessCheck.available ? '' : (uniquenessCheck.message || 'This nickname is already in use')
           }));
-        } catch (error) {
-          console.error('Error checking nickname uniqueness:', error);
+        } catch {
+          
           setCheckingUniqueness(prev => ({ ...prev, nickname: false }));
           setFieldErrors(prev => ({
             ...prev,
@@ -433,7 +426,7 @@ export default function ProfileSettings() {
           email: 'Please enter a valid email address'
         }));
       } else if (value !== originalData.email) {
-        // Check uniqueness for changed email
+        
         setCheckingUniqueness(prev => ({ ...prev, email: true }));
         try {
           const uniquenessCheck = await checkEmailUniqueness(value);
@@ -442,8 +435,8 @@ export default function ProfileSettings() {
             ...prev,
             email: uniquenessCheck.available ? '' : (uniquenessCheck.message || 'This email is already in use')
           }));
-        } catch (error) {
-          console.error('Error checking email uniqueness:', error);
+        } catch {
+          
           setCheckingUniqueness(prev => ({ ...prev, email: false }));
           setFieldErrors(prev => ({
             ...prev,
@@ -465,7 +458,7 @@ export default function ProfileSettings() {
       const age = today.getFullYear() - birthDate.getFullYear();
       const monthDiff = today.getMonth() - birthDate.getMonth();
       
-      // Adjust age if birthday hasn't occurred this year
+      
       const adjustedAge = monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate()) 
         ? age - 1 
         : age;

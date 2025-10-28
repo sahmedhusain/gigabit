@@ -30,7 +30,7 @@ export default function ChatDropdown({
   const { onlineUsers } = useOnlineStatus()
   const { isConnected } = useConnectionStatus()
   
-  // Merge real-time conversation data with provided chats
+  
   const enhancedChats = chats.map(chat => {
     const unreadCount = getMessageUnread(chat.id)
     const onlineUser = chat.isGroup ? null : onlineUsers.find(user => user.username === chat.name)

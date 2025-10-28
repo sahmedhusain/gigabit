@@ -30,15 +30,9 @@ export class ApiErrorHandler {
   static handleError(error: unknown): void {
     if (isAxiosLikeError(error) && error.response) {
       const status = error.response.status ?? 0;
-      const message =
-        error.response.data?.error ||
-        error.message ||
-        "An unexpected error occurred";
       const code = error.response.data?.code;
 
-      const apiError: ApiError = { status, message, code };
-
-      console.error("API Error:", apiError);
+      
 
       switch (status) {
         case 400:
@@ -65,18 +59,13 @@ export class ApiErrorHandler {
           window.location.href = "/error/503";
           break;
         default:
-          console.error("Unhandled API error:", apiError);
+          
       }
     } else if (isAxiosLikeError(error) && error.request) {
-      console.error("Network error:", error.request);
+      
       window.location.href = "/error/503";
     } else {
-      const msg = isAxiosLikeError(error)
-        ? error.message
-        : error instanceof Error
-        ? error.message
-        : String(error);
-      console.error("Unexpected error:", msg);
+      
       window.location.href = "/error/500";
     }
   }

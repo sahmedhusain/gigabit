@@ -15,7 +15,7 @@ export default function RootPage() {
   const [minLoadingTimePassed, setMinLoadingTimePassed] = useState(false);
   const [isFreshLogin, setIsFreshLogin] = useState(false);
 
-  // Detect theme on mount
+  
   useEffect(() => {
     const savedTheme = localStorage.getItem('backgroundTheme') || 'system';
     
@@ -26,7 +26,7 @@ export default function RootPage() {
       setTheme(savedTheme as 'light' | 'dark');
     }
 
-    // Listen for system theme changes
+    
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
     const handleChange = (e: MediaQueryListEvent) => {
       const savedTheme = localStorage.getItem('backgroundTheme') || 'system';
@@ -39,7 +39,7 @@ export default function RootPage() {
     return () => mediaQuery.removeEventListener('change', handleChange);
   }, []);
 
-  // Check if this is a fresh login/registration
+  
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const freshLogin = sessionStorage.getItem('freshLogin') === 'true';
@@ -47,12 +47,12 @@ export default function RootPage() {
     }
   }, []);
 
-  // Ensure minimum loading time of 2 seconds for fresh logins
+  
   useEffect(() => {
     if (isFreshLogin) {
       const timer = setTimeout(() => {
         setMinLoadingTimePassed(true);
-        // Clear the fresh login flag
+        
         if (typeof window !== 'undefined') {
           sessionStorage.removeItem('freshLogin');
         }
@@ -66,7 +66,7 @@ export default function RootPage() {
 
   useEffect(() => {
     if (!isLoading && user && minLoadingTimePassed) {
-      // Get the user's preferred default route, fallback to /feed/all
+      
       const defaultRoute = localStorage.getItem('defaultRoute') || '/feed/all';
       router.push(defaultRoute);
     }
@@ -223,11 +223,11 @@ export default function RootPage() {
     );
   }
 
-  // Show homepage for non-authenticated users
+  
   if (!user) {
     return <Homepage />;
   }
 
-  // This should not be reached due to the useEffect redirect, but just in case
+  
   return null;
 }

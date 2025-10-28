@@ -24,7 +24,7 @@ export function useRealTimeGroups() {
     }
   })
 
-  // WebSocket subscription for real-time group updates
+  
   const { isConnected } = useWebSocketSubscription({
     messageTypes: ['group_update'],
     onMessage: (message) => {
@@ -37,7 +37,7 @@ export function useRealTimeGroups() {
           case 'created':
             if (group) {
               setGroups(prev => [group, ...prev])
-              // Don't show success message here - the component that creates the group handles it
+              
             }
             break
 
@@ -133,7 +133,7 @@ export function useRealTimeGroups() {
       
       setGroups(groupsData)
       lastFetchTime.current = Date.now()
-      setUnreadUpdates(new Map()) // Reset unread updates on manual fetch
+      setUnreadUpdates(new Map()) 
       
     } catch (e: any) {
       const msg = e?.message || 'Failed to load groups'
@@ -148,9 +148,9 @@ export function useRealTimeGroups() {
     try {
       return await optimisticUpdate(
         (currentGroups) => {
-          // Create optimistic group
+          
           const optimisticGroup: GroupResponse = {
-            id: Date.now(), // Temporary ID
+            id: Date.now(), 
             title: payload.title,
             description: payload.description || '',
             privacy: payload.privacy,
@@ -169,7 +169,7 @@ export function useRealTimeGroups() {
         async () => {
           const res = await api.createGroup(payload)
           success('Group created')
-          await fetchGroups() // Refresh to get real data
+          await fetchGroups() 
           return res
         }
       )
@@ -248,11 +248,11 @@ export function useRealTimeGroups() {
     if (groupId) {
       return unreadUpdates.get(groupId) || 0
     }
-    // Return total unread count across all groups
+    
     return Array.from(unreadUpdates.values()).reduce((sum, count) => sum + count, 0)
   }, [unreadUpdates])
 
-  // Initial load
+  
   useEffect(() => {
     if (user) {
       fetchGroups()

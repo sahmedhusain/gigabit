@@ -3,27 +3,8 @@ import { useState, useMemo } from 'react'
 import Image from 'next/image'
 import { X, Search, MessageSquarePlus, MessageCircle } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { ConversationResponse } from '@/lib/api'
+import { Follower, CreateDirectMessageProps } from '@/types/chat'
 import { getUserInitials } from '@/utils/avatarUtils'
-
-interface Follower {
-  id: number
-  email: string
-  first_name: string
-  last_name: string
-  avatar?: string
-  nickname?: string
-}
-
-interface CreateDirectMessageProps {
-  show: boolean
-  onClose: () => void
-  followings: Follower[]
-  conversations: ConversationResponse[] // Add conversations prop
-  onStartChat: (followerId: number) => void
-  isLoading: boolean
-  getUserStatus: (userId: number) => string
-}
 
 export default function CreateDirectMessage({
   show,
@@ -57,13 +38,13 @@ export default function CreateDirectMessage({
         return matchesSearch && !hasExistingConversation
       })
     }
-    // Sort: online first, then alphabetically by name or nickname
+    
     return filtered.sort((a, b) => {
       const aOnline = getUserStatus(a.id) === 'online';
       const bOnline = getUserStatus(b.id) === 'online';
       if (aOnline && !bOnline) return -1;
       if (!aOnline && bOnline) return 1;
-      // Both online or both not online: sort alphabetically
+      
       const aName = (a.nickname || `${a.first_name} ${a.last_name}`).toLowerCase();
       const bName = (b.nickname || `${b.first_name} ${b.last_name}`).toLowerCase();
       return aName.localeCompare(bName);

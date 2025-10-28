@@ -1,12 +1,12 @@
 -- Mock data for groups table
 INSERT INTO groups (name, description, creator_id, privacy, avatar, created_at, updated_at) VALUES
-('Tech Enthusiasts', 'A community for technology lovers to discuss the latest trends, share knowledge, and collaborate on projects', 1, 'public', '/group-avatars/tech.png', '2024-11-26 10:00:00', '2024-11-26 10:00:00'),
-('Design & Creativity', 'Creative minds unite! Share your design work, get feedback, and learn from fellow designers', 2, 'public', '/group-avatars/design.png', '2024-12-06 10:00:00', '2024-12-06 10:00:00'),
-('Fitness & Wellness', 'Stay motivated and healthy together. Share workout routines, nutrition tips, and wellness advice', 3, 'public', '/group-avatars/fitness.png', '2024-12-17 10:00:00', '2024-12-17 10:00:00'),
-('Book Club', 'Monthly book discussions, reading recommendations, and literary conversations', 4, 'public', '/group-avatars/books.png', '2024-12-27 10:00:00', '2024-12-27 10:00:00'),
-('Gaming Community', 'Connect with fellow gamers, share strategies, and organize gaming sessions', 5, 'public', '/group-avatars/gaming.png', '2025-02-06 10:00:00', '2025-02-06 10:00:00'),
-('Photography Lovers', 'Share your best shots, learn photography techniques, and get constructive feedback', 6, 'public', '/group-avatars/photo.png', '2025-02-14 10:00:00', '2025-02-14 10:00:00'),
-('Entrepreneurship Hub', 'Network with aspiring entrepreneurs, share business ideas, and learn from successful ventures', 7, 'public', '/group-avatars/business.png', '2025-02-24 10:00:00', '2025-02-24 10:00:00'),
-('Music & Arts', 'For musicians, artists, and anyone passionate about creative expression', 8, 'public', '/group-avatars/music.png', '2025-04-06 10:00:00', '2025-04-06 10:00:00'),
-('Travel Explorers', 'Share travel stories, tips, and discover new destinations together', 9, 'public', '/group-avatars/travel.png', '2025-04-16 10:00:00', '2025-04-16 10:00:00'),
-('Cooking & Recipes', 'Food lovers unite! Share recipes, cooking tips, and culinary adventures', 10, 'public', '/group-avatars/cooking.png', '2025-04-26 10:00:00', '2025-04-26 10:00:00');
+('Tech Enthusiasts', 'A community for technology lovers to discuss the latest trends, share knowledge, and collaborate on projects', 1, 'public', 'https://images.unsplash.com/photo-1550751827-4bd374c3f58b?auto=format&fit=crop&w=1170&q=80', '2024-11-26 10:00:00', '2024-11-26 10:00:00'),
+('Design & Creativity', 'Creative minds unite! Share your design work, get feedback, and learn from fellow designers', 2, 'public', 'https://images.unsplash.com/photo-1572044162444-704131427d5a?auto=format&fit=crop&w=1170&q=80', '2024-12-06 10:00:00', '2024-12-06 10:00:00'),
+('Fitness & Wellness', 'Stay motivated and healthy together. Share workout routines, nutrition tips, and wellness advice', 3, 'public', 'https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?auto=format&fit=crop&w=1220&q=80', '2024-12-17 10:00:00', '2024-12-17 10:00:00'),
+('Book Club', 'Monthly book discussions, reading recommendations, and literary conversations', 4, 'public', NULL, '2024-12-27 10:00:00', '2024-12-27 10:00:00'),
+('Gaming Community', 'Connect with fellow gamers, share strategies, and organize gaming sessions', 5, 'public', 'https://images.unsplash.com/photo-1580327344181-c1163234e5a0?auto=format&fit=crop&w=1170&q=80', '2025-02-06 10:00:00', '2025-02-06 10:00:00'),
+('Photography Lovers', 'Share your best shots, learn photography techniques, and get constructive feedback', 6, 'public', 'https://images.unsplash.com/photo-1516035069371-29a1b244cc32?auto=format&fit=crop&w=1064&q=80', '2025-02-14 10:00:00', '2025-02-14 10:00:00'),
+('Entrepreneurship Hub', 'Network with aspiring entrepreneurs, share business ideas, and learn from successful ventures', 7, 'public', 'https://images.unsplash.com/photo-1556761175-b413da4baf72?auto=format&fit=crop&w=1374&q=80', '2025-02-24 10:00:00', '2025-02-24 10:00:00'),
+('Music & Arts', 'For musicians, artists, and anyone passionate about creative expression', 8, 'public', NULL, '2025-04-06 10:00:00', '2025-04-06 10:00:00'),
+('Travel Explorers', 'Share travel stories, tips, and discover new destinations together', 9, 'public', 'https://images.unsplash.com/photo-1503220317375-aaad61436b1b?auto=format&fit=crop&w=1170&q=80', '2025-04-16 10:00:00', '2025-04-16 10:00:00'),
+('Cooking & Recipes', 'Food lovers unite! Share recipes, cooking tips, and culinary adventures', 10, 'public', 'https://images.unsplash.com/photo-1490645935967-10de6ba17021?auto=format&fit=crop&w=1153&q=80', '2025-04-26 10:00:00', '2025-04-26 10:00:00');

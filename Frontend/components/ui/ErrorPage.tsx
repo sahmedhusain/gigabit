@@ -3,15 +3,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, Home, RefreshCw, LogIn } from 'lucide-react';
-
-interface ErrorPageProps {
-  errorCode: number;
-  title?: string;
-  message?: string;
-  showBackButton?: boolean;
-  showHomeButton?: boolean;
-  onRetry?: () => void;
-}
+import { ErrorPageProps } from '@/types/ui';
 
 const ERROR_DETAILS = {
   400: {

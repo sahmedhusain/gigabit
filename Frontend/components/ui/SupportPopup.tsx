@@ -1,11 +1,7 @@
 'use client'
 import { X, HelpCircle, Mail, MessageCircle, Phone, Clock } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
-
-interface SupportPopupProps {
-  isOpen: boolean
-  onClose: () => void
-}
+import { SupportPopupProps } from '@/types/ui'
 
 export default function SupportPopup({ isOpen, onClose }: SupportPopupProps) {
   if (!isOpen) return null

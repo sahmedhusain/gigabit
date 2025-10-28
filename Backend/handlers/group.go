@@ -16,6 +16,7 @@ import (
 type GroupHandler struct {
 	groupService        *services.GroupService
 	notificationService *services.NotificationService
+	likeService         *services.LikeService
 	hub                 *websocket.Hub
 }
 
@@ -23,6 +24,7 @@ func NewGroupHandler(db *sql.DB, hub *websocket.Hub) *GroupHandler {
 	return &GroupHandler{
 		groupService:        services.NewGroupService(db),
 		notificationService: services.NewNotificationService(db, hub),
+		likeService:         services.NewLikeService(db, hub),
 		hub:                 hub,
 	}
 }
@@ -1198,6 +1200,192 @@ func (h *GroupHandler) DeleteGroupMessage(w http.ResponseWriter, r *http.Request
 	}
 
 	writeJSON(w, http.StatusOK, map[string]interface{}{"message": "Message deleted successfully"})
+}
+
+// LikeGroupPost handles liking a group post
+func (h *GroupHandler) LikeGroupPost(w http.ResponseWriter, r *http.Request, groupIDStr, postIDStr string) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
+
+	groupID, err := strconv.ParseUint(groupIDStr, 10, 32)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "Invalid group ID")
+		return
+	}
+
+	postID, err := strconv.ParseUint(postIDStr, 10, 32)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "Invalid post ID")
+		return
+	}
+
+	userID, ok := r.Context().Value("user_id").(uint)
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "User not authenticated")
+		return
+	}
+
+	// Check if user is a member of the group
+	role, err := h.groupService.GetUserRole(uint(groupID), userID)
+	if err != nil {
+		writeError(w, http.StatusForbidden, "User is not a member of this group")
+		return
+	}
+
+	if role == "" {
+		writeError(w, http.StatusForbidden, "User is not a member of this group")
+		return
+	}
+
+	if err := h.likeService.LikeGroupPost(uint(postID), userID); err != nil {
+		writeError(w, http.StatusInternalServerError, "Failed to like post")
+		return
+	}
+
+	// Send notification to post owner
+	postOwnerID, err := h.groupService.GetGroupPostOwner(uint(postID))
+	if err == nil {
+		h.notificationService.NotifyGroupPostLiked(userID, postOwnerID, uint(postID), uint(groupID))
+	}
+
+	writeJSON(w, http.StatusOK, map[string]string{"message": "Post liked successfully"})
+}
+
+// UnlikeGroupPost handles unliking a group post
+func (h *GroupHandler) UnlikeGroupPost(w http.ResponseWriter, r *http.Request, groupIDStr, postIDStr string) {
+	if r.Method != http.MethodDelete {
+		writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
+
+	groupID, err := strconv.ParseUint(groupIDStr, 10, 32)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "Invalid group ID")
+		return
+	}
+
+	postID, err := strconv.ParseUint(postIDStr, 10, 32)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "Invalid post ID")
+		return
+	}
+
+	userID, ok := r.Context().Value("user_id").(uint)
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "User not authenticated")
+		return
+	}
+
+	// Check if user is a member of the group
+	role, err := h.groupService.GetUserRole(uint(groupID), userID)
+	if err != nil {
+		writeError(w, http.StatusForbidden, "User is not a member of this group")
+		return
+	}
+
+	if role == "" {
+		writeError(w, http.StatusForbidden, "User is not a member of this group")
+		return
+	}
+
+	if err := h.likeService.UnlikeGroupPost(uint(postID), userID); err != nil {
+		writeError(w, http.StatusInternalServerError, "Failed to unlike post")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]string{"message": "Post unliked successfully"})
+}
+
+// DislikeGroupPost handles disliking a group post
+func (h *GroupHandler) DislikeGroupPost(w http.ResponseWriter, r *http.Request, groupIDStr, postIDStr string) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
+
+	groupID, err := strconv.ParseUint(groupIDStr, 10, 32)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "Invalid group ID")
+		return
+	}
+
+	postID, err := strconv.ParseUint(postIDStr, 10, 32)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "Invalid post ID")
+		return
+	}
+
+	userID, ok := r.Context().Value("user_id").(uint)
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "User not authenticated")
+		return
+	}
+
+	// Check if user is a member of the group
+	role, err := h.groupService.GetUserRole(uint(groupID), userID)
+	if err != nil {
+		writeError(w, http.StatusForbidden, "User is not a member of this group")
+		return
+	}
+
+	if role == "" {
+		writeError(w, http.StatusForbidden, "User is not a member of this group")
+		return
+	}
+
+	if err := h.likeService.DislikeGroupPost(uint(postID), userID); err != nil {
+		writeError(w, http.StatusInternalServerError, "Failed to dislike post")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]string{"message": "Post disliked successfully"})
+}
+
+// UndislikeGroupPost handles undisliking a group post
+func (h *GroupHandler) UndislikeGroupPost(w http.ResponseWriter, r *http.Request, groupIDStr, postIDStr string) {
+	if r.Method != http.MethodDelete {
+		writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
+
+	groupID, err := strconv.ParseUint(groupIDStr, 10, 32)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "Invalid group ID")
+		return
+	}
+
+	postID, err := strconv.ParseUint(postIDStr, 10, 32)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "Invalid post ID")
+		return
+	}
+
+	userID, ok := r.Context().Value("user_id").(uint)
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "User not authenticated")
+		return
+	}
+
+	// Check if user is a member of the group
+	role, err := h.groupService.GetUserRole(uint(groupID), userID)
+	if err != nil {
+		writeError(w, http.StatusForbidden, "User is not a member of this group")
+		return
+	}
+
+	if role == "" {
+		writeError(w, http.StatusForbidden, "User is not a member of this group")
+		return
+	}
+
+	if err := h.likeService.UndislikeGroupPost(uint(postID), userID); err != nil {
+		writeError(w, http.StatusInternalServerError, "Failed to undislike post")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]string{"message": "Post undisliked successfully"})
 }
 
 func (h *GroupHandler) GetInvitableUsers(w http.ResponseWriter, r *http.Request, groupIDStr string) {

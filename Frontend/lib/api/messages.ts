@@ -3,7 +3,7 @@ import { ConversationResponse, MessageItem, ConversationSearchResult, ChatItem }
 
 declare module './client' {
   interface ApiClient {
-    // Messages endpoints
+    
     getConversations(): Promise<{ conversations: ConversationResponse[] }>;
     getChats(): Promise<{ chats: ChatItem[] }>;
     sendMessage(data: { receiver_id?: number; group_id?: number; content: string; message_type: 'private' | 'group'; image_url?: string }): Promise<{ message: string; data: MessageItem; conversation_id: number }>;

@@ -1,14 +1,11 @@
 'use client'
 import { useState } from 'react'
 import { Search, X } from 'lucide-react'
-
-interface SearchPageProps {
-  onClose: () => void
-}
+import { SearchPageProps } from '@/types/search'
 
 export default function SearchPage({ onClose }: SearchPageProps) {
   const [searchQuery, setSearchQuery] = useState('')
-  const [searchType, setSearchType] = useState('posts') // posts, users, groups
+  const [searchType, setSearchType] = useState('posts') 
 
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex justify-center items-start pt-20">

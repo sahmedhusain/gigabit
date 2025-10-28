@@ -337,19 +337,35 @@ func (s *NotificationService) NotifyJoinRequest(requesterID, creatorID, groupID 
 		return err
 	}
 
-	notification := &models.Notification{
-		UserID:       creatorID,
-		ActorID:      requesterID,
-		Type:         models.NotificationJoinRequest,
-		EntityType:   "group",
-		EntityID:     groupID,
-		Title:        "Join Request",
-		Message:      requester.FirstName + " " + requester.LastName + " wants to join \"" + group.Title + "\"",
-		RedirectURL:  "/discover/?tab=requests",
-		RedirectType: "discover",
+	// Get all admin IDs (creator + admin members)
+	adminIDs, err := s.getGroupAdminIDs(groupID)
+	if err != nil || len(adminIDs) == 0 {
+		// Fallback to just notifying the creator if we can't get admin list
+		adminIDs = []uint{creatorID}
 	}
 
-	return s.CreateNotification(notification)
+	// Send notification to all admins
+	var lastError error
+	for _, adminID := range adminIDs {
+		notification := &models.Notification{
+			UserID:       adminID,
+			ActorID:      requesterID,
+			Type:         models.NotificationJoinRequest,
+			EntityType:   "group",
+			EntityID:     groupID,
+			Title:        "Join Request",
+			Message:      requester.FirstName + " " + requester.LastName + " wants to join \"" + group.Title + "\"",
+			RedirectURL:  "/discover/?tab=requests",
+			RedirectType: "discover",
+		}
+
+		if err := s.CreateNotification(notification); err != nil {
+			lastError = err
+			continue
+		}
+	}
+
+	return lastError
 }
 
 func (s *NotificationService) NotifyJoinAccepted(requesterID, creatorID, groupID uint) error {
@@ -1281,6 +1297,38 @@ ORDER BY gm.created_at ASC
 	}
 
 	return members, nil
+}
+
+func (s *NotificationService) getGroupAdminIDs(groupID uint) ([]uint, error) {
+	// Get the creator ID
+	var creatorID uint
+	err := s.db.QueryRow("SELECT creator_id FROM groups WHERE id = ?", groupID).Scan(&creatorID)
+	if err != nil {
+		return nil, err
+	}
+
+	adminIDs := []uint{creatorID}
+
+	// Get all admin members
+	query := `
+		SELECT user_id FROM group_members 
+		WHERE group_id = ? AND role = 'admin' AND status = 'member' AND user_id != ?
+	`
+	rows, err := s.db.Query(query, groupID, creatorID)
+	if err != nil {
+		return adminIDs, nil // Return at least the creator
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var adminID uint
+		if err := rows.Scan(&adminID); err != nil {
+			continue
+		}
+		adminIDs = append(adminIDs, adminID)
+	}
+
+	return adminIDs, nil
 }
 
 func (s *NotificationService) notifyPrivatePostShare(sharerID, receiverID, postID uint, sharer models.UserResponse) error {

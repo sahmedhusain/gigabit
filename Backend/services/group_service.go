@@ -1040,14 +1040,22 @@ SELECT gm.id, gm.group_id, gm.created_at, gm.user_id, gm.requestor_id,
 	   ru.first_name, ru.last_name, ru.avatar, ru.nickname
 FROM group_members gm
 JOIN groups g ON gm.group_id = g.id
--- Determine if the current user is admin/creator
-JOIN group_members admin_gm ON admin_gm.group_id = g.id AND admin_gm.user_id = ? AND admin_gm.status = 'member' AND admin_gm.role = 'admin'
 JOIN users cu ON g.creator_id = cu.id
 JOIN users ru ON gm.user_id = ru.id
 WHERE gm.status = 'requested' AND gm.requestor_id IS NOT NULL
+  AND (
+    g.creator_id = ? 
+    OR EXISTS (
+      SELECT 1 FROM group_members admin_gm 
+      WHERE admin_gm.group_id = g.id 
+        AND admin_gm.user_id = ? 
+        AND admin_gm.status = 'member' 
+        AND admin_gm.role = 'admin'
+    )
+  )
 ORDER BY gm.created_at DESC`
 
-	rows2, err := s.db.Query(joinReqQuery, userID)
+	rows2, err := s.db.Query(joinReqQuery, userID, userID)
 	if err != nil {
 		return invitations, nil
 	}
@@ -1459,6 +1467,38 @@ ORDER BY gm.created_at DESC
 
 func (s *GroupService) GetReceivedJoinRequests(groupID uint, userID uint) ([]models.GroupMemberResponse, error) {
 	return s.GetPendingRequests(groupID, userID)
+}
+
+func (s *GroupService) GetGroupAdminIDs(groupID uint) ([]uint, error) {
+	// Get the creator ID
+	var creatorID uint
+	err := s.db.QueryRow("SELECT creator_id FROM groups WHERE id = ?", groupID).Scan(&creatorID)
+	if err != nil {
+		return nil, err
+	}
+
+	adminIDs := []uint{creatorID}
+
+	// Get all admin members
+	query := `
+		SELECT user_id FROM group_members 
+		WHERE group_id = ? AND role = 'admin' AND status = 'member' AND user_id != ?
+	`
+	rows, err := s.db.Query(query, groupID, creatorID)
+	if err != nil {
+		return adminIDs, nil // Return at least the creator
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var adminID uint
+		if err := rows.Scan(&adminID); err != nil {
+			continue
+		}
+		adminIDs = append(adminIDs, adminID)
+	}
+
+	return adminIDs, nil
 }
 
 func (s *GroupService) DeleteGroupMessage(messageID uint, userID uint, groupID uint) error {

@@ -44,7 +44,7 @@ export interface MessageItem {
 }
 
 export interface ConversationResponse {
-  id: number;
+  id: string | number;  // Changed to support prefixed IDs like "private_1" or numeric IDs for backward compatibility
   type: 'private' | 'group';
   participant?: User;
   group?: GroupResponse;

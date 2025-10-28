@@ -103,7 +103,7 @@ type TypingIndicator struct {
 }
 
 type ConversationResponse struct {
-	ID          uint            `json:"id"`
+	ID          string          `json:"id"`   // Changed to string to support prefixed IDs like "private_1", "group_1"
 	Type        string          `json:"type"` // "private" or "group"
 	Participant *UserResponse   `json:"participant,omitempty"`
 	Group       *GroupResponse  `json:"group,omitempty"`

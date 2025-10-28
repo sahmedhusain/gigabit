@@ -14,6 +14,7 @@ import {
   NetworkError,
   ConversationResponse
 } from '@/lib/api'
+import { parseConversationId, findChatByConversationId, getConversationNumericId } from '@/utils/chatUtils'
 
 
 import AppLayout from '@/components/layout/AppLayout'
@@ -121,7 +122,10 @@ function ChatsFilterPage() {
         const participant = conv['participant'] as Record<string, unknown> | undefined
         const group = conv['group'] as Record<string, unknown> | undefined
         const last_message = conv['last_message'] as Record<string, unknown> | undefined
-        const id = Number(conv['id'] ?? 0)
+        const rawId = conv['id']
+        // Parse the conversation ID properly (handles "private_123" or "group_456")
+        const parsedId = parseConversationId(rawId as string | number)
+        const id = parsedId.numericId
         const participantId = participant?.['id'] ? Number(participant['id']) : undefined
 
         const participantName = type === 'private'
@@ -300,16 +304,17 @@ function ChatsFilterPage() {
     if (chatId) {
       const id = parseInt(chatId)
       if (!isNaN(id)) {
-        
-        const chat = chats.find(c => c.id === id)
-        setOpenChatWindow({
-          conversationId: id,
-          type: chat?.isGroup ? 'group' : 'private',
-          name: chat?.name || 'Chat',
-          participantId: chat?.participantId,
-          groupId: chat?.isGroup ? chat.groupId : undefined,
-          highlightMessageId: highlightMessageParam ? parseInt(highlightMessageParam) : undefined
-        })
+        // Find private chat by conversation ID
+        const chat = findChatByConversationId(chats, id, 'private')
+        if (chat) {
+          setOpenChatWindow({
+            conversationId: id,
+            type: 'private',
+            name: chat.name || 'Chat',
+            participantId: chat.participantId,
+            highlightMessageId: highlightMessageParam ? parseInt(highlightMessageParam) : undefined
+          })
+        }
         return
       }
     }
@@ -318,7 +323,7 @@ function ChatsFilterPage() {
     if (groupId) {
       const id = parseInt(groupId)
       if (!isNaN(id)) {
-        
+        // Find group chat by group ID (not conversation ID)
         const chat = chats.find(c => c.isGroup && c.groupId === id)
         if (chat) {
           setOpenChatWindow({
@@ -388,9 +393,10 @@ function ChatsFilterPage() {
       )
 
       if (existingConversation) {
-        
+        // Parse the conversation ID to get the numeric part
+        const parsedId = parseConversationId(existingConversation.id)
         setOpenChatWindow({
-          conversationId: existingConversation.id,
+          conversationId: parsedId.numericId,
           type: 'private',
           name: userName,
           participantId: userId

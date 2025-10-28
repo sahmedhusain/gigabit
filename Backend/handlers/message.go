@@ -328,7 +328,7 @@ func (h *MessageHandler) GetConversations(w http.ResponseWriter, r *http.Request
 	conversations := make([]models.ConversationResponse, 0, len(chats))
 	for _, chat := range chats {
 		conversation := models.ConversationResponse{
-			ID:          chat.ConversationID,
+			ID:          chat.ID, // Use the prefixed ID ("private_1", "group_1") instead of numeric ConversationID
 			Type:        chat.Type,
 			UnreadCount: chat.UnreadCount,
 			UpdatedAt:   chat.LastMessageTime.Format(time.RFC3339),

@@ -293,3 +293,71 @@ export const formatLastOnlineTime = (lastStatusChange: string | number | undefin
 
   return `last seen ${timeString}`
 };
+
+/**
+ * Parse a conversation ID which may be prefixed (e.g., "private_123", "group_456")
+ * Returns the numeric ID and the type
+ */
+export const parseConversationId = (id: string | number): { numericId: number; type: 'private' | 'group' | null } => {
+  if (typeof id === 'number') {
+    return { numericId: id, type: null };
+  }
+  
+  const str = String(id);
+  
+  // Check if it's prefixed with "private_" or "group_"
+  if (str.startsWith('private_')) {
+    const numericId = parseInt(str.replace('private_', ''));
+    return { numericId: isNaN(numericId) ? 0 : numericId, type: 'private' };
+  }
+  
+  if (str.startsWith('group_')) {
+    const numericId = parseInt(str.replace('group_', ''));
+    return { numericId: isNaN(numericId) ? 0 : numericId, type: 'group' };
+  }
+  
+  // If no prefix, try to parse as number
+  const numericId = parseInt(str.replace(/\D/g, ''));
+  return { numericId: isNaN(numericId) ? 0 : numericId, type: null };
+};
+
+/**
+ * Find a chat by conversation ID, properly handling prefixed IDs
+ * This handles the case where backend returns "private_1", "group_1" but
+ * we might be searching with just numeric IDs
+ */
+export const findChatByConversationId = (
+  chats: (ChatItem | UnifiedChatItem)[],
+  conversationId: string | number,
+  type?: 'private' | 'group'
+): ChatItem | UnifiedChatItem | undefined => {
+  const parsed = parseConversationId(conversationId);
+  
+  return chats.find(chat => {
+    const chatParsed = parseConversationId(chat.id);
+    
+    // Match by numeric ID and type if available
+    const idsMatch = chatParsed.numericId === parsed.numericId;
+    
+    // If type is specified or can be inferred, check it
+    if (type) {
+      return idsMatch && chat.type === type;
+    }
+    
+    if (parsed.type) {
+      return idsMatch && chat.type === parsed.type;
+    }
+    
+    // If no type specified, just match by numeric ID (could be ambiguous!)
+    return idsMatch;
+  });
+};
+
+/**
+ * Get the numeric conversation ID from a chat object
+ * Handles both prefixed string IDs and numeric IDs
+ */
+export const getConversationNumericId = (chat: ChatItem | UnifiedChatItem): number => {
+  const parsed = parseConversationId(chat.id);
+  return parsed.numericId;
+};

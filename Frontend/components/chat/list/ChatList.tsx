@@ -1,6 +1,6 @@
 import { motion, AnimatePresence, LayoutGroup } from 'framer-motion'
 import { ChatItem } from '@/types/chat'
-import { UnifiedChatItem } from '@/utils/chatUtils'
+import { UnifiedChatItem, getConversationNumericId } from '@/utils/chatUtils'
 import { User } from '@/lib/api'
 import ChatItemComponent from '@/components/chat/ChatItem'
 import { mutate } from 'swr'
@@ -79,7 +79,8 @@ export default function ChatList({
       >
         <AnimatePresence mode="popLayout">
           {chats.map((chat) => {
-            const chatIdNum = chat.id ? (typeof chat.id === 'string' ? parseInt(String(chat.id).replace(/\D/g, '')) : chat.id) : 0;
+            // Use the utility function to properly extract numeric conversation ID
+            const chatIdNum = getConversationNumericId(chat);
             const avatar = chat.avatar && typeof chat.avatar === 'string' ? chat.avatar : undefined;
 
             
@@ -94,12 +95,8 @@ export default function ChatList({
                 const updated = Array.isArray(current) ? current : current.conversations
                 if (!Array.isArray(updated)) return current
                 const next = updated.map((c: ChatItem) => {
-                  if (typeof c?.id === 'number') {
-                    return c.id === chatIdNum ? { ...c, unread_count: 0 } : c;
-                  } else if (typeof c?.id === 'string') {
-                    return parseInt(String(c.id).replace(/\D/g, '')) === chatIdNum ? { ...c, unread_count: 0 } : c;
-                  }
-                  return c;
+                  const cIdNum = getConversationNumericId(c as any);
+                  return cIdNum === chatIdNum ? { ...c, unread_count: 0 } : c;
                 })
                 // Preserve original shape if needed
                 return Array.isArray(current) ? next : { ...current, conversations: next }

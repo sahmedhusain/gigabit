@@ -31,7 +31,6 @@ func (h *NotificationHandler) GetNotifications(w http.ResponseWriter, r *http.Re
 	}
 	log.Printf("GetNotifications - entry user=%d remote=%s query=%s", userID, r.RemoteAddr, r.URL.RawQuery)
 
-	// Get pagination parameters
 	limitStr := r.URL.Query().Get("limit")
 	if limitStr == "" {
 		limitStr = "20"
@@ -197,7 +196,6 @@ func (h *NotificationHandler) GetNotificationSettings(w http.ResponseWriter, r *
 
 	settings, err := h.notificationService.GetNotificationSettings(userID)
 	if err != nil {
-		// If no settings exist, return default settings
 		defaultSettings := &models.NotificationSettings{
 			UserID:             userID,
 			SoundEnabled:       true,

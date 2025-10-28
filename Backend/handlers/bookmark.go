@@ -96,7 +96,6 @@ func (h *BookmarkHandler) GetUserBookmarks(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	// Get pagination parameters
 	limitStr := r.URL.Query().Get("limit")
 	if limitStr == "" {
 		limitStr = "20"

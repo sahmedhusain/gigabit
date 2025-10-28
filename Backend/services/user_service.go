@@ -30,7 +30,6 @@ func (s *UserService) CreateUser(user *models.User) error {
 
 	now := time.Now()
 
-	// Set default status if not provided
 	if user.Status == "" {
 		user.Status = "online"
 	}
@@ -38,8 +37,6 @@ func (s *UserService) CreateUser(user *models.User) error {
 		user.LastStatusChange = now
 	}
 	user.IsDeleted = false
-
-	// Set default privacy settings if not provided
 	if user.BirthdayPrivacy == "" {
 		user.BirthdayPrivacy = "everyone"
 	}

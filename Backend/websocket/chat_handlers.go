@@ -9,7 +9,6 @@ func (h *Hub) handlePrivateMessage(message Message) {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
 
-	// Send to receiver
 	if targetClient, exists := h.clients[message.To]; exists {
 		select {
 		case targetClient.Send <- message:
@@ -22,8 +21,6 @@ func (h *Hub) handlePrivateMessage(message Message) {
 			}(targetClient)
 		}
 	}
-
-	// Send to sender (to replace optimistic message with real ID)
 	if senderClient, exists := h.clients[message.From]; exists {
 		select {
 		case senderClient.Send <- message:
@@ -289,11 +286,9 @@ func (h *Hub) handleMessageDeleted(message Message) {
 			}
 		}
 	} else if message.To > 0 {
-		// Private message deletion - send to both sender and receiver
 		h.mu.RLock()
 		defer h.mu.RUnlock()
 
-		// Send to receiver
 		if targetClient, exists := h.clients[message.To]; exists {
 			select {
 			case targetClient.Send <- message:

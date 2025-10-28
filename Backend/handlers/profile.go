@@ -23,28 +23,24 @@ func NewProfileHandler(db *sql.DB) *ProfileHandler {
 }
 
 func (h *ProfileHandler) GetProfile(w http.ResponseWriter, r *http.Request, userIDStr string) {
-	// covert string to int
 	userID, err := strconv.Atoi(userIDStr)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, "Invalid user ID")
 		return
 	}
 
-	// get the requesting user id from context for privacy check
 	requestingUserID, exists := r.Context().Value("user_id").(uint)
 	if !exists {
 		writeError(w, http.StatusUnauthorized, "User not authorized")
 		return
 	}
 
-	// get the user profile
 	user, err := h.userService.GetUserByID(uint(userID))
 	if err != nil {
 		writeError(w, http.StatusNotFound, "User not found")
 		return
 	}
 
-	// Check if user is deleted
 	if user.IsDeleted {
 		writeJSON(w, http.StatusOK, map[string]interface{}{
 			"id":         user.ID,
@@ -56,7 +52,6 @@ func (h *ProfileHandler) GetProfile(w http.ResponseWriter, r *http.Request, user
 		return
 	}
 
-	// check if the requesting user can view this profile (private account)
 	canView, err := h.userService.CanViewProfile(requestingUserID, uint(userID))
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "Failed to check profile privacy")
@@ -95,7 +90,6 @@ func (h *ProfileHandler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Update fields if provided
 	if req.FirstName != "" {
 		user.FirstName = req.FirstName
 	}
@@ -133,7 +127,6 @@ func (h *ProfileHandler) UpdateProfileImage(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	// Get uploaded filename from request body
 	var req struct {
 		Filename string `json:"filename"`
 	}
@@ -153,7 +146,6 @@ func (h *ProfileHandler) UpdateProfileImage(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	// Update avatar
 	user.Avatar = &req.Filename
 
 	if err := h.userService.UpdateUser(user); err != nil {
@@ -179,7 +171,6 @@ func (h *ProfileHandler) TogglePrivacy(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Parse the request body to get the desired privacy setting
 	var request struct {
 		IsPrivate *bool `json:"is_private,omitempty"`
 	}
@@ -195,11 +186,9 @@ func (h *ProfileHandler) TogglePrivacy(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// If is_private is provided in request, use that value, otherwise toggle
 	if request.IsPrivate != nil {
 		user.IsPrivate = *request.IsPrivate
 	} else {
-		// Toggle privacy setting (backward compatibility)
 		user.IsPrivate = !user.IsPrivate
 	}
 
@@ -227,7 +216,6 @@ func (h *ProfileHandler) SearchUsers(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get current user ID for filtering
 	currentUserID := r.Context().Value("user_id")
 	if currentUserID == nil {
 		writeError(w, http.StatusUnauthorized, "User not authenticated")
@@ -240,7 +228,6 @@ func (h *ProfileHandler) SearchUsers(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Convert to response format
 	var userResponses []models.UserResponse
 	for _, user := range users {
 		userResponses = append(userResponses, user.ToResponse())
@@ -252,28 +239,24 @@ func (h *ProfileHandler) SearchUsers(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// GetPublicStats returns follower/following counts for any user (public info)
 func (h *ProfileHandler) GetPublicStats(w http.ResponseWriter, r *http.Request, userIDStr string) {
 	if r.Method != http.MethodGet {
 		writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
 		return
 	}
 
-	// Convert string to int
 	userID, err := strconv.Atoi(userIDStr)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, "Invalid user ID")
 		return
 	}
 
-	// Check if user exists
 	user, err := h.userService.GetUserByID(uint(userID))
 	if err != nil {
 		writeError(w, http.StatusNotFound, "User not found")
 		return
 	}
 
-	// Check if user is deleted
 	if user.IsDeleted {
 		writeJSON(w, http.StatusOK, map[string]interface{}{
 			"user_id":         user.ID,
@@ -285,14 +268,12 @@ func (h *ProfileHandler) GetPublicStats(w http.ResponseWriter, r *http.Request, 
 		return
 	}
 
-	// Get follower counts (this is public information)
 	followers, following, err := h.followService.GetFollowCounts(uint(userID))
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "Failed to get follow counts")
 		return
 	}
 
-	// Return basic user info with public stats
 	response := map[string]interface{}{
 		"user_id":         user.ID,
 		"display_name":    user.FirstName + " " + user.LastName,
@@ -303,7 +284,6 @@ func (h *ProfileHandler) GetPublicStats(w http.ResponseWriter, r *http.Request, 
 	writeJSON(w, http.StatusOK, response)
 }
 
-// CheckEmailUniqueness checks if an email is available for registration or update
 func (h *ProfileHandler) CheckEmailUniqueness(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
@@ -326,7 +306,6 @@ func (h *ProfileHandler) CheckEmailUniqueness(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	// Check if the existing user is deleted - if so, email is available
 	if existingUser.IsDeleted {
 		writeJSON(w, http.StatusOK, map[string]interface{}{
 			"available": true,
@@ -334,12 +313,10 @@ func (h *ProfileHandler) CheckEmailUniqueness(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	// Email exists and user is not deleted, check if it's the current user's email
 	userID := r.Context().Value("user_id")
 	if userID != nil {
 		currentUser, err := h.userService.GetUserByID(userID.(uint))
 		if err == nil && currentUser.Email == email {
-			// It's the current user's email, so it's available for them
 			writeJSON(w, http.StatusOK, map[string]interface{}{
 				"available": true,
 			})
@@ -347,14 +324,12 @@ func (h *ProfileHandler) CheckEmailUniqueness(w http.ResponseWriter, r *http.Req
 		}
 	}
 
-	// Email is taken by someone else
 	writeJSON(w, http.StatusOK, map[string]interface{}{
 		"available": false,
 		"message":   "User with this email already exists",
 	})
 }
 
-// CheckNicknameUniqueness checks if a nickname is available for registration or update
 func (h *ProfileHandler) CheckNicknameUniqueness(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
@@ -377,7 +352,6 @@ func (h *ProfileHandler) CheckNicknameUniqueness(w http.ResponseWriter, r *http.
 		return
 	}
 
-	// Check if the existing user is deleted - if so, nickname is available
 	if existingUser.IsDeleted {
 		writeJSON(w, http.StatusOK, map[string]interface{}{
 			"available": true,
@@ -385,12 +359,10 @@ func (h *ProfileHandler) CheckNicknameUniqueness(w http.ResponseWriter, r *http.
 		return
 	}
 
-	// Nickname exists and user is not deleted, check if it's the current user's nickname (only if authenticated)
 	userID := r.Context().Value("user_id")
 	if userID != nil {
 		currentUser, err := h.userService.GetUserByID(userID.(uint))
 		if err == nil && currentUser.Nickname != nil && *currentUser.Nickname == nickname {
-			// It's the current user's nickname, so it's available for them
 			writeJSON(w, http.StatusOK, map[string]interface{}{
 				"available": true,
 			})
@@ -398,7 +370,6 @@ func (h *ProfileHandler) CheckNicknameUniqueness(w http.ResponseWriter, r *http.
 		}
 	}
 
-	// Nickname is taken by someone else
 	writeJSON(w, http.StatusOK, map[string]interface{}{
 		"available": false,
 		"message":   "User with this nickname already exists",

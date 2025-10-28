@@ -8,10 +8,11 @@ import (
 	"log"
 	"net/http"
 	"regexp"
+	"time"
+
 	"social/models"
 	"social/services"
 	"social/utils"
-	"time"
 )
 
 type AuthHandler struct {
@@ -40,13 +41,10 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Debug log
 	log.Printf("Received registration request - Avatar length: %d", len(req.Avatar))
 	if req.Avatar != "" {
 		log.Printf("Avatar starts with: %s", req.Avatar[:min(50, len(req.Avatar))])
 	}
-
-	// Basic validation
 	if len(req.FirstName) < 3 {
 		writeError(w, http.StatusBadRequest, "First name must be at least 3 characters long")
 		return
@@ -67,14 +65,12 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Validate email format
 	emailRegex := regexp.MustCompile(`^[a-zA-Z0-9!#$%&'*+/=?^_` + "`" + `{|}~]+(\.[a-zA-Z0-9!#$%&'*+/=?^_` + "`" + `{|}~]+)*@[a-zA-Z0-9-]+(\.[a-zA-Z0-9-]+)*\.[a-zA-Z]{2,}$`)
 	if !emailRegex.MatchString(req.Email) {
 		writeError(w, http.StatusBadRequest, "Please enter a valid email address")
 		return
 	}
 
-	// Check if email already exists
 	existingUser, err := h.userService.GetUserByEmail(req.Email)
 	if err == nil && existingUser != nil && !existingUser.IsDeleted {
 		writeError(w, http.StatusConflict, "User with this email already exists")
@@ -87,7 +83,6 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Hash password
 	hashedPassword, err := utils.HashPassword(req.Password)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "Failed to hash password")
@@ -105,7 +100,6 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Generate nickname from email if not provided
 	nickname := req.Nickname
 	if nickname == "" {
 		generatedNickname, err := h.userService.GenerateUniqueNickname(req.Email)
@@ -115,28 +109,23 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		}
 		nickname = generatedNickname
 	} else {
-		// Validate user-provided nickname length
 		if len(nickname) > 16 {
 			writeError(w, http.StatusBadRequest, "Nickname is too long")
 			return
 		}
 
-		// Validate nickname characters
 		err = validateNickname(nickname)
 		if err != nil {
 			writeError(w, http.StatusBadRequest, err.Error())
 			return
 		}
 
-		// Check if nickname already exists (only if user provided one)
 		existingUser, err = h.userService.GetUserByNickname(nickname)
 		if err == nil && existingUser != nil && !existingUser.IsDeleted {
 			writeError(w, http.StatusConflict, "User with this nickname already exists")
 			return
 		}
 	}
-
-	// Clean up old deleted accounts with the same email or nickname before creating new user
 	cleanupQuery := "DELETE FROM users WHERE is_deleted = true AND (email = ?"
 	cleanupArgs := []interface{}{req.Email}
 	if nickname != "" {
@@ -149,7 +138,6 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		log.Printf("Failed to clean up old deleted accounts: %v", err)
 	}
 
-	// Create user
 	user := &models.User{
 		Email:       req.Email,
 		Password:    hashedPassword,
@@ -158,7 +146,6 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		DateOfBirth: req.DateOfBirth,
 	}
 
-	// Handle optional fields
 	if nickname != "" {
 		user.Nickname = &nickname
 	}
@@ -179,8 +166,6 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to create user: %v", err))
 		return
 	}
-
-	// Clean up old deleted accounts with the same email or nickname (in case any were created during registration)
 	query := "DELETE FROM users WHERE is_deleted = true AND (email = ?"
 	args := []interface{}{req.Email}
 	if nickname != "" {
@@ -190,22 +175,19 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 	query += ")"
 	_, err = h.db.Exec(query, args...)
 	if err != nil {
-		// Log error but don't fail registration
 		log.Printf("Failed to clean up old deleted accounts: %v", err)
 	}
 
-	// Generate secure random token
 	token, err := utils.GenerateSecureToken()
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "Failed to generate token")
 		return
 	}
 
-	// Create session with token
 	session := &models.Session{
 		UserID:    user.ID,
 		Token:     token,
-		ExpiresAt: time.Now().Add(60 * time.Minute), // 1 hour session timeout
+		ExpiresAt: time.Now().Add(60 * time.Minute),
 	}
 
 	if err := h.sessionService.CreateSession(session); err != nil {
@@ -239,34 +221,29 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Find user by email
 	user, err := h.userService.GetUserByEmail(req.Email)
 	if err != nil {
 		writeError(w, http.StatusUnauthorized, "Wrong email or password")
 		return
 	}
 
-	// Check password
 	if !utils.CheckPassword(req.Password, user.Password) {
 		writeError(w, http.StatusUnauthorized, "Wrong email or password")
 		return
 	}
 
-	// Invalidate existing sessions for this user
 	h.sessionService.DeleteUserSessions(user.ID)
 
-	// Generate secure random token
 	token, err := utils.GenerateSecureToken()
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "Failed to generate token")
 		return
 	}
 
-	// Create new session with token
 	session := &models.Session{
 		UserID:    user.ID,
 		Token:     token,
-		ExpiresAt: time.Now().Add(60 * time.Minute), // 1 hour session timeout
+		ExpiresAt: time.Now().Add(60 * time.Minute),
 	}
 
 	if err := h.sessionService.CreateSession(session); err != nil {
@@ -326,7 +303,7 @@ func validatePassword(password string) error {
 
 func validateNickname(nickname string) error {
 	if nickname == "" {
-		return nil // nickname is optional
+		return nil 
 	}
 
 	// Allow only English letters (a-z, A-Z), numbers (0-9), underscore (_), hyphen (-), and dot (.)
@@ -386,32 +363,6 @@ func joinWithCommas(messages []string) string {
 	return result
 }
 
-func (h *AuthHandler) GetMe(w http.ResponseWriter, r *http.Request) {
-	log.Println("GetMe handler invoked")
-	if r.Method != http.MethodGet {
-		writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
-		return
-	}
-
-	userID := r.Context().Value("user_id")
-	if userID == nil {
-		log.Println("GetMe: user_id not found in context")
-		writeError(w, http.StatusUnauthorized, "User not authenticated")
-		return
-	}
-
-	log.Printf("GetMe: userID from context: %v", userID)
-
-	user, err := h.userService.GetUserByID(userID.(uint))
-	if err != nil {
-		log.Printf("GetMe: user not found for ID %v: %v", userID, err)
-		writeError(w, http.StatusNotFound, "User not found")
-		return
-	}
-
-	writeJSON(w, http.StatusOK, user.ToResponse())
-}
-
 func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
@@ -424,7 +375,6 @@ func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Delete the session
 	if err := h.sessionService.DeleteSession(sessionID.(uint)); err != nil {
 		writeError(w, http.StatusInternalServerError, "Failed to logout")
 		return
@@ -457,38 +407,31 @@ func (h *AuthHandler) ChangePassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Check current password
 	if !utils.CheckPassword(req.CurrentPassword, user.Password) {
 		writeError(w, http.StatusUnauthorized, "Current password is incorrect")
 		return
 	}
 
-	// Validate new password
 	err = validatePassword(req.NewPassword)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
-	// Hash new password
 	hashedPassword, err := utils.HashPassword(req.NewPassword)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "Failed to hash password")
 		return
 	}
 
-	// Update password
 	user.Password = hashedPassword
 	if err := h.userService.UpdateUser(user); err != nil {
 		writeError(w, http.StatusInternalServerError, "Failed to update password")
 		return
 	}
-
-	// Invalidate all sessions except current
 	sessionID := r.Context().Value("session_id")
 	if sessionID != nil {
 		h.sessionService.DeleteUserSessions(userID.(uint))
-		// Recreate the current session
 		token, err := utils.GenerateSecureToken()
 		if err != nil {
 			writeError(w, http.StatusInternalServerError, "Failed to generate token")
@@ -503,7 +446,6 @@ func (h *AuthHandler) ChangePassword(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusInternalServerError, "Failed to create session")
 			return
 		}
-		// Note: Frontend will need to update token
 		writeJSON(w, http.StatusOK, map[string]interface{}{"message": "Password changed successfully", "new_token": token})
 	} else {
 		h.sessionService.DeleteUserSessions(userID.(uint))

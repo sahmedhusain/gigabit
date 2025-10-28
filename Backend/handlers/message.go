@@ -49,7 +49,6 @@ func (h *MessageHandler) SendMessage(w http.ResponseWriter, r *http.Request) {
 		MessageType: req.MessageType,
 	}
 
-	// If ImageURL is provided, use it as content (images are stored as URLs in content field)
 	if req.ImageURL != "" {
 		message.Content = req.ImageURL
 	}
@@ -83,18 +82,15 @@ func (h *MessageHandler) SendMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get sender information for WebSocket broadcast
 	var senderFirstName, senderLastName, senderAvatar string
 	senderQuery := `SELECT first_name, last_name, avatar FROM users WHERE id = ?`
 	db := h.messageService.GetDB()
 	err = db.QueryRow(senderQuery, userID).Scan(&senderFirstName, &senderLastName, &senderAvatar)
 	if err != nil {
-		// Log error but don't fail the message send
 		senderFirstName = "Unknown"
 		senderLastName = "User"
 	}
 
-	// Send real-time message via websocket
 	wsMessage := websocket.Message{
 		Type:      websocket.MessageTypePrivateMessage,
 		From:      userID,
@@ -121,7 +117,6 @@ func (h *MessageHandler) SendMessage(w http.ResponseWriter, r *http.Request) {
 		},
 	}
 
-	// Send additional image_shared WebSocket message for images
 	var imageWsMessage *websocket.Message
 	if strings.HasPrefix(message.Content, "http") {
 		imageWsMessage = &websocket.Message{
@@ -148,21 +143,16 @@ func (h *MessageHandler) SendMessage(w http.ResponseWriter, r *http.Request) {
 		wsMessage.To = req.ReceiverID
 		h.hub.BroadcastMessage(wsMessage)
 
-		// Send image_shared message if it's an image
 		if imageWsMessage != nil {
 			imageWsMessage.To = req.ReceiverID
 			h.hub.BroadcastMessage(*imageWsMessage)
 		}
 
-		// Send appropriate notification based on message type
 		if strings.HasPrefix(message.Content, "http") {
-			// Send image sharing notification for images
 			go h.notificationService.NotifyImageShared(userID, 0, false, 0, req.ReceiverID)
 		} else if strings.HasPrefix(message.Content, "Shared a post:") {
-			// Send post sharing notification for shares
 			go h.notificationService.NotifyPostShared(userID, 0, false, 0, req.ReceiverID)
 		} else {
-			// Send notification for text messages
 			go h.notificationService.NotifyPrivateMessage(userID, req.ReceiverID, message.ID)
 		}
 	} else if req.MessageType == "group" {
@@ -170,16 +160,13 @@ func (h *MessageHandler) SendMessage(w http.ResponseWriter, r *http.Request) {
 		wsMessage.GroupID = req.GroupID
 		h.hub.BroadcastMessage(wsMessage)
 
-		// Send image_shared message if it's an image
 		if imageWsMessage != nil {
 			imageWsMessage.Type = websocket.MessageTypeGroupMessage
 			imageWsMessage.GroupID = req.GroupID
 			h.hub.BroadcastMessage(*imageWsMessage)
 		}
 
-		// Send notifications for group messages
 		if strings.HasPrefix(message.Content, "http") {
-			// For images, send to each member individually
 			memberIDs, err := h.notificationService.GetGroupMemberIDs(req.GroupID, userID)
 			if err == nil {
 				for _, memberID := range memberIDs {
@@ -187,7 +174,6 @@ func (h *MessageHandler) SendMessage(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 		} else if strings.HasPrefix(message.Content, "Shared a post:") {
-			// For shares, send to each member individually
 			memberIDs, err := h.notificationService.GetGroupMemberIDs(req.GroupID, userID)
 			if err == nil {
 				for _, memberID := range memberIDs {
@@ -195,7 +181,6 @@ func (h *MessageHandler) SendMessage(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 		} else {
-			// For regular text messages, use the proper group message notification
 			go h.notificationService.NotifyGroupMessage(userID, req.GroupID, message.ID)
 		}
 	}
@@ -220,7 +205,6 @@ func (h *MessageHandler) GetPrivateMessages(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	// Get pagination parameters
 	limitStr := r.URL.Query().Get("limit")
 	if limitStr == "" {
 		limitStr = "50"
@@ -250,7 +234,6 @@ func (h *MessageHandler) GetPrivateMessages(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	// Mark unread messages as read (only messages where current user is the receiver)
 	var unreadMessageIDs []uint
 	for _, msg := range messages {
 		if !msg.IsRead && msg.SenderID != currentUserID {
@@ -282,7 +265,6 @@ func (h *MessageHandler) GetGroupMessages(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	// Get pagination parameters
 	limitStr := r.URL.Query().Get("limit")
 	if limitStr == "" {
 		limitStr = "50"
@@ -312,7 +294,6 @@ func (h *MessageHandler) GetGroupMessages(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	// Mark messages as read for this user
 	var messageIDs []uint
 	for _, msg := range messages {
 		if !msg.IsRead && msg.SenderID != userID {
@@ -344,7 +325,6 @@ func (h *MessageHandler) GetConversations(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	// Convert UnifiedChatItem to ConversationResponse format
 	conversations := make([]models.ConversationResponse, 0, len(chats))
 	for _, chat := range chats {
 		conversation := models.ConversationResponse{
@@ -360,11 +340,9 @@ func (h *MessageHandler) GetConversations(w http.ResponseWriter, r *http.Request
 				CreatedAt: chat.LastMessageTime.Format(time.RFC3339),
 			}
 
-			// Set message type if available
 			if chat.LastMessageType != nil {
 				messageSummary.MessageType = *chat.LastMessageType
 			} else {
-				// Fallback: determine from content
 				if strings.HasPrefix(*chat.LastMessage, "http") {
 					messageSummary.MessageType = "image"
 				} else if strings.HasPrefix(*chat.LastMessage, "Shared a post:") {
@@ -374,12 +352,10 @@ func (h *MessageHandler) GetConversations(w http.ResponseWriter, r *http.Request
 				}
 			}
 
-			// Add sender information if available
 			if chat.LastMessageSender != nil {
 				messageSummary.SenderID = chat.LastMessageSender.ID
 				messageSummary.Sender = chat.LastMessageSender
 			} else if chat.Participant != nil {
-				// For private chats, the participant is the sender (if not current user)
 				messageSummary.SenderID = chat.Participant.ID
 				messageSummary.Sender = chat.Participant
 			}
@@ -415,7 +391,6 @@ func (h *MessageHandler) GetConversationMessages(w http.ResponseWriter, r *http.
 		return
 	}
 
-	// Get pagination parameters
 	limitStr := r.URL.Query().Get("limit")
 	if limitStr == "" {
 		limitStr = "10"
@@ -445,7 +420,6 @@ func (h *MessageHandler) GetConversationMessages(w http.ResponseWriter, r *http.
 		return
 	}
 
-	// Mark unread messages as read (only messages where current user is the receiver)
 	var unreadMessageIDs []uint
 	for _, msg := range messages {
 		if !msg.IsRead && msg.SenderID != currentUserID {
@@ -479,7 +453,6 @@ func (h *MessageHandler) SendTypingIndicator(w http.ResponseWriter, r *http.Requ
 
 	req.UserID = userID
 
-	// Send typing indicator via websocket
 	wsMessage := websocket.Message{
 		Type:      websocket.MessageTypeTyping,
 		From:      userID,
@@ -487,15 +460,12 @@ func (h *MessageHandler) SendTypingIndicator(w http.ResponseWriter, r *http.Requ
 		Data:      req,
 	}
 
-	// Parse conversation ID to determine if it's private or group
 	if len(req.ConversationID) > 8 && req.ConversationID[:8] == "private_" {
-		// Private conversation
 		targetUserIDStr := req.ConversationID[8:]
 		if targetUserID, err := strconv.ParseUint(targetUserIDStr, 10, 32); err == nil {
 			wsMessage.To = uint(targetUserID)
 		}
 	} else if len(req.ConversationID) > 6 && req.ConversationID[:6] == "group_" {
-		// Group conversation
 		groupIDStr := req.ConversationID[6:]
 		if groupID, err := strconv.ParseUint(groupIDStr, 10, 32); err == nil {
 			wsMessage.Type = websocket.MessageTypeGroupMessage
@@ -589,7 +559,6 @@ func (h *MessageHandler) DeleteMessage(w http.ResponseWriter, r *http.Request) {
 
 	log.Printf("✅ [DeleteMessage] Message %d deleted successfully", messageID)
 
-	// Determine message type for WebSocket broadcast
 	var messageType string
 	checkQuery := `
 		SELECT 'private' as type FROM private_messages WHERE id = ?
@@ -606,7 +575,6 @@ func (h *MessageHandler) DeleteMessage(w http.ResponseWriter, r *http.Request) {
 		log.Printf("📋 [DeleteMessage] Message %d type determined: %s", messageID, messageType)
 	}
 
-	// Broadcast message deletion via WebSocket
 	wsMessage := websocket.Message{
 		Type:      websocket.MessageTypeMessageDeleted,
 		From:      userID,
@@ -619,7 +587,6 @@ func (h *MessageHandler) DeleteMessage(w http.ResponseWriter, r *http.Request) {
 
 	log.Printf("📡 [DeleteMessage] Broadcasting message deletion: type=%s, id=%d, message_type=%s", wsMessage.Type, messageID, messageType)
 
-	// Determine if it's private or group message and broadcast accordingly
 	var conversationType string
 	var receiverID, groupID uint
 	conversationCheckQuery := `
@@ -657,7 +624,6 @@ func (h *MessageHandler) DeleteMessage(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// Helper function to parse conversation ID from chat ID
 func (h *MessageHandler) parseConversationID(chatID string) uint {
 	if strings.HasPrefix(chatID, "private_") {
 		if id, err := strconv.ParseUint(chatID[8:], 10, 32); err == nil {
@@ -671,7 +637,6 @@ func (h *MessageHandler) parseConversationID(chatID string) uint {
 	return 0
 }
 
-// Conversation-level read/unread handlers
 func (h *MessageHandler) MarkConversationAsRead(w http.ResponseWriter, r *http.Request) {
 	userID, ok := r.Context().Value("user_id").(uint)
 	if !ok {
@@ -681,7 +646,7 @@ func (h *MessageHandler) MarkConversationAsRead(w http.ResponseWriter, r *http.R
 
 	var req struct {
 		ConversationID   uint   `json:"conversation_id"`
-		ConversationType string `json:"conversation_type"` // "private" or "group"
+		ConversationType string `json:"conversation_type"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -719,7 +684,7 @@ func (h *MessageHandler) MarkConversationAsUnread(w http.ResponseWriter, r *http
 
 	var req struct {
 		ConversationID   uint   `json:"conversation_id"`
-		ConversationType string `json:"conversation_type"` // "private" or "group"
+		ConversationType string `json:"conversation_type"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -764,7 +729,6 @@ func (h *MessageHandler) SearchMessages(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	// Get pagination parameters
 	limitStr := r.URL.Query().Get("limit")
 	if limitStr == "" {
 		limitStr = "20"

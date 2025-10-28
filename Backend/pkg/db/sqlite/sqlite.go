@@ -24,7 +24,6 @@ func NewDB(dataSourceName string) (*DB, error) {
 		return nil, fmt.Errorf("failed to open database: %w", err)
 	}
 
-	// Test the connection
 	if err := db.Ping(); err != nil {
 		return nil, fmt.Errorf("failed to ping database: %w", err)
 	}
@@ -41,7 +40,6 @@ func NewDB(dataSourceName string) (*DB, error) {
 
 	database := &DB{db}
 
-	// Apply migrations
 	if err := database.migrate(); err != nil {
 		return nil, fmt.Errorf("failed to apply migrations: %w", err)
 	}
@@ -56,13 +54,11 @@ func (db *DB) migrate() error {
 		return fmt.Errorf("failed to create migrate driver: %w", err)
 	}
 
-	// Get current working directory
 	wd, err := os.Getwd()
 	if err != nil {
 		return fmt.Errorf("failed to get working directory: %w", err)
 	}
 
-	// Construct migration path
 	migrationPath := filepath.Join(wd, "pkg", "db", "migrations", "sqlite")
 	sourceURL := fmt.Sprintf("file://%s", migrationPath)
 
@@ -71,14 +67,13 @@ func (db *DB) migrate() error {
 		return fmt.Errorf("failed to create migrate instance: %w", err)
 	}
 
-	// Apply all up migrations
 	if err := m.Up(); err != nil && err != migrate.ErrNoChange {
 		return fmt.Errorf("failed to apply migrations: %w", err)
 	}
 
 	log.Println("Database migrations applied successfully")
 	return nil
-} // Close closes the database connection
+}
 func (db *DB) Close() error {
 	return db.DB.Close()
 }

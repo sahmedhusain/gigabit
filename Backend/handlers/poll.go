@@ -23,7 +23,6 @@ func NewPollHandler(db *sql.DB, hub *websocket.Hub) *PollHandler {
 	}
 }
 
-// CreatePoll handles POST /api/polls
 func (h *PollHandler) CreatePoll(w http.ResponseWriter, r *http.Request, userID uint) {
 	var req models.CreatePollRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -31,7 +30,6 @@ func (h *PollHandler) CreatePoll(w http.ResponseWriter, r *http.Request, userID 
 		return
 	}
 
-	// Validate
 	if strings.TrimSpace(req.Title) == "" {
 		http.Error(w, "Poll title is required", http.StatusBadRequest)
 		return
@@ -55,7 +53,6 @@ func (h *PollHandler) CreatePoll(w http.ResponseWriter, r *http.Request, userID 
 		return
 	}
 
-	// Send notification to group members (same as events)
 	h.notificationService.NotifyGroupPollCreated(userID, *req.GroupID, poll.ID)
 
 	w.Header().Set("Content-Type", "application/json")
@@ -63,9 +60,7 @@ func (h *PollHandler) CreatePoll(w http.ResponseWriter, r *http.Request, userID 
 	json.NewEncoder(w).Encode(poll)
 }
 
-// GetPoll handles GET /api/polls/{id}
 func (h *PollHandler) GetPoll(w http.ResponseWriter, r *http.Request, userID uint) {
-	// Extract poll ID from URL
 	pathParts := strings.Split(r.URL.Path, "/")
 	if len(pathParts) < 4 {
 		http.Error(w, "Invalid poll ID", http.StatusBadRequest)
@@ -96,9 +91,7 @@ func (h *PollHandler) GetPoll(w http.ResponseWriter, r *http.Request, userID uin
 	json.NewEncoder(w).Encode(poll)
 }
 
-// GetGroupPolls handles GET /api/groups/{id}/polls
 func (h *PollHandler) GetGroupPolls(w http.ResponseWriter, r *http.Request, userID uint) {
-	// Extract group ID from URL
 	pathParts := strings.Split(r.URL.Path, "/")
 	if len(pathParts) < 4 {
 		http.Error(w, "Invalid group ID", http.StatusBadRequest)
@@ -111,7 +104,6 @@ func (h *PollHandler) GetGroupPolls(w http.ResponseWriter, r *http.Request, user
 		return
 	}
 
-	// Get limit and offset from query params
 	limit := 20
 	offset := 0
 
@@ -139,9 +131,7 @@ func (h *PollHandler) GetGroupPolls(w http.ResponseWriter, r *http.Request, user
 	json.NewEncoder(w).Encode(polls)
 }
 
-// VotePoll handles POST /api/polls/{id}/vote
 func (h *PollHandler) VotePoll(w http.ResponseWriter, r *http.Request, userID uint) {
-	// Extract poll ID from URL
 	pathParts := strings.Split(r.URL.Path, "/")
 	if len(pathParts) < 4 {
 		http.Error(w, "Invalid poll ID", http.StatusBadRequest)
@@ -185,7 +175,6 @@ func (h *PollHandler) VotePoll(w http.ResponseWriter, r *http.Request, userID ui
 		return
 	}
 
-	// Return updated poll
 	poll, err := h.pollService.GetPollByID(uint(pollID), userID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -196,9 +185,7 @@ func (h *PollHandler) VotePoll(w http.ResponseWriter, r *http.Request, userID ui
 	json.NewEncoder(w).Encode(poll)
 }
 
-// UnvotePoll handles DELETE /api/polls/{id}/vote
 func (h *PollHandler) UnvotePoll(w http.ResponseWriter, r *http.Request, userID uint) {
-	// Extract poll ID from URL
 	pathParts := strings.Split(r.URL.Path, "/")
 	if len(pathParts) < 4 {
 		http.Error(w, "Invalid poll ID", http.StatusBadRequest)
@@ -225,7 +212,6 @@ func (h *PollHandler) UnvotePoll(w http.ResponseWriter, r *http.Request, userID 
 		return
 	}
 
-	// Return updated poll
 	poll, err := h.pollService.GetPollByID(uint(pollID), userID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -236,9 +222,7 @@ func (h *PollHandler) UnvotePoll(w http.ResponseWriter, r *http.Request, userID 
 	json.NewEncoder(w).Encode(poll)
 }
 
-// DeletePoll handles DELETE /api/polls/{id}
 func (h *PollHandler) DeletePoll(w http.ResponseWriter, r *http.Request, userID uint) {
-	// Extract poll ID from URL
 	pathParts := strings.Split(r.URL.Path, "/")
 	if len(pathParts) < 4 {
 		http.Error(w, "Invalid poll ID", http.StatusBadRequest)
@@ -275,9 +259,7 @@ func (h *PollHandler) DeletePoll(w http.ResponseWriter, r *http.Request, userID 
 	json.NewEncoder(w).Encode(map[string]string{"message": "Poll deleted successfully"})
 }
 
-// ExpirePoll handles PUT /api/polls/{id}/expire
 func (h *PollHandler) ExpirePoll(w http.ResponseWriter, r *http.Request, userID uint) {
-	// Extract poll ID from URL
 	pathParts := strings.Split(r.URL.Path, "/")
 	if len(pathParts) < 4 {
 		http.Error(w, "Invalid poll ID", http.StatusBadRequest)
@@ -316,7 +298,6 @@ func (h *PollHandler) ExpirePoll(w http.ResponseWriter, r *http.Request, userID 
 		return
 	}
 
-	// Return updated poll
 	poll, err := h.pollService.GetPollByID(uint(pollID), userID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)

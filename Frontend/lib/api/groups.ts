@@ -57,7 +57,7 @@ ApiClient.prototype.getAllGroups = async function(limit: number = 20, offset: nu
 };
 
 ApiClient.prototype.getGroup = async function(groupId: number): Promise<GroupResponse> {
-  return this.request<GroupResponse>(`/api/chats?group=${groupId}`, {
+  return this.request<GroupResponse>(`/api/groups/${groupId}`, {
     method: 'GET',
   });
 };

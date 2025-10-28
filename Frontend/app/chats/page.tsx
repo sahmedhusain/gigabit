@@ -93,22 +93,27 @@ function ChatsPage() {
     const params = new URLSearchParams()
     
     params.set('filter', chatSubTab)
-    if (openChatWindow && openChatWindow.conversationId) {
+    if (openChatWindow) {
       if (openChatWindow.type === 'group') {
-        params.set('group', (openChatWindow.groupId || openChatWindow.conversationId).toString())
+        if (openChatWindow.groupId) {
+          params.set('group', openChatWindow.groupId.toString())
+        }
       } else {
-        params.set('chat', openChatWindow.conversationId.toString())
+        // For private chats: use chat ID if conversation exists, otherwise use user param
+        if (openChatWindow.conversationId && openChatWindow.conversationId > 0) {
+          params.set('chat', openChatWindow.conversationId.toString())
+        } else if (openChatWindow.participantId) {
+          // New conversation - use user param
+          params.set('user', openChatWindow.participantId.toString())
+        }
       }
     }
     if (openChatWindow?.highlightMessageId || highlightMessageParam) {
       params.set('message', (openChatWindow?.highlightMessageId || highlightMessageParam)!.toString())
     }
     
-    if (userParam) {
-      params.set('user', userParam)
-    }
     router.replace(`/chats/all?${params}`)
-  }, [chatSubTab, openChatWindow, router, userParam, highlightMessageParam])
+  }, [chatSubTab, openChatWindow, router, highlightMessageParam])
 
   const formatTimeAgo = (dateString: string) => {
     const date = new Date(dateString)
@@ -171,12 +176,14 @@ function ChatsPage() {
     } finally {
       setIsLoadingChats(false)
     }
-  }, [user?.id, getUserStatus, error])
+  }, [user?.id, getUserStatus])  // Removed 'error' from dependencies
 
   const fetchGroups = useCallback(async () => {
+    if (!user?.id) return
+    
     try {
       setIsLoadingGroups(true)
-      const data = await api.getUserGroups(user?.id || 0)
+      const data = await api.getUserGroups(user.id)
       const groupsArr = data.groups || []
       setGroups(groupsArr.map((group) => ({
         id: group.id,
@@ -197,7 +204,7 @@ function ChatsPage() {
     } finally {
       setIsLoadingGroups(false)
     }
-  }, [user?.id, error])
+  }, [user?.id])  // Removed 'error' from dependencies
 
   const fetchFollowers = useCallback(async () => {
     if (!user) return
@@ -219,13 +226,15 @@ function ChatsPage() {
   }, [user])
 
   
+  // Fetch data once when user is available
   useEffect(() => {
     if (user) {
       fetchConversations()
       fetchGroups()
       fetchFollowers()
     }
-  }, [user, fetchConversations, fetchFollowers, fetchGroups])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id])  // Only refetch when user changes
 
   
   useEffect(() => {
@@ -245,7 +254,7 @@ function ChatsPage() {
         }
       } else if (groupParam) {
         
-        chatToOpen = chats.find(c => c.groupId === parseInt(groupParam) || c.id === parseInt(groupParam))
+        chatToOpen = chats.find(c => c.groupId === parseInt(groupParam))
         if (chatToOpen) {
           setOpenChatWindow({
             conversationId: chatToOpen.id,
@@ -254,10 +263,44 @@ function ChatsPage() {
             groupId: chatToOpen.groupId,
             highlightMessageId: highlightMessageParam ? parseInt(highlightMessageParam) : undefined
           })
+        } else {
+          console.warn(`Group with ID ${groupParam} not found in chats list - user may not be a member`)
+        }
+      } else if (userParam) {
+        // Handle user parameter for new private conversations
+        const userId = parseInt(userParam)
+        if (!isNaN(userId)) {
+          const existingChat = chats.find(c => c.type === 'private' && c.participantId === userId)
+          if (existingChat) {
+            // Conversation exists, open it
+            setOpenChatWindow({
+              conversationId: existingChat.id,
+              type: 'private',
+              name: existingChat.name,
+              participantId: userId,
+              highlightMessageId: highlightMessageParam ? parseInt(highlightMessageParam) : undefined
+            })
+          } else {
+            // New conversation - try to get user name from followers/following
+            const userInFollowers = followers.find(f => f.id === userId)
+            const userInFollowing = following.find(f => f.id === userId)
+            const foundUser = userInFollowers || userInFollowing
+            
+            if (foundUser) {
+              const userName = `${foundUser.first_name} ${foundUser.last_name}`.trim() || foundUser.nickname || foundUser.email
+              setOpenChatWindow({
+                conversationId: 0,
+                type: 'private',
+                name: userName,
+                participantId: userId,
+                highlightMessageId: highlightMessageParam ? parseInt(highlightMessageParam) : undefined
+              })
+            }
+          }
         }
       }
     }
-  }, [chats, chatId, groupParam, highlightMessageParam, openChatWindow])
+  }, [chats, chatId, groupParam, userParam, highlightMessageParam, openChatWindow, followers, following])
 
   
   useEffect(() => {
@@ -397,9 +440,14 @@ function ChatsPage() {
       <CreateGroup
         show={showCreateGroup}
         onClose={() => setShowCreateGroup(false)}
-        onGroupCreated={() => {
-          fetchGroups()
+        onGroupCreated={async () => {
           setShowCreateGroup(false)
+          success('Group created!')
+          // Refetch both conversations and groups to include the new group
+          await Promise.all([
+            fetchConversations(),
+            fetchGroups()
+          ])
         }}
       />
 
@@ -415,9 +463,18 @@ function ChatsPage() {
                   conversationType={openChatWindow.type}
                   participantName={openChatWindow.name}
                   participantId={openChatWindow.participantId}
-                  groupId={openChatWindow.type === 'group' ? (openChatWindow.groupId || openChatWindow.conversationId) : undefined}
+                  groupId={openChatWindow.type === 'group' ? openChatWindow.groupId : undefined}
                   highlightMessageId={openChatWindow.highlightMessageId}
                   initialTab={openChatWindow.initialTab}
+                  onConversationResolved={(newConversationId) => {
+                    // Update the conversation ID when it's resolved from 0 to actual ID
+                    setOpenChatWindow(prev => prev ? {
+                      ...prev,
+                      conversationId: newConversationId
+                    } : null)
+                    // Refresh conversations to get the new conversation
+                    fetchConversations()
+                  }}
                   onClose={() => setOpenChatWindow(null)}
                 />
               ) : (

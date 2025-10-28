@@ -27,13 +27,19 @@ export default function MessageList({
   const messagesContainerRef = useRef<HTMLDivElement>(null)
   const [shouldAutoScroll, setShouldAutoScroll] = useState(true)
   const [isNearBottom, setIsNearBottom] = useState(true)
+  const prevMessagesLengthRef = useRef<number>(0)
 
   
   useEffect(() => {
-    if (shouldAutoScroll && messagesEndRef.current) {
+    // Only auto-scroll if user is near bottom and new messages were added
+    const hasNewMessages = messages.length > prevMessagesLengthRef.current
+    
+    if (shouldAutoScroll && isNearBottom && hasNewMessages && messagesEndRef.current) {
       messagesEndRef.current.scrollIntoView({ behavior: 'smooth' })
     }
-  }, [messages, shouldAutoScroll])
+    
+    prevMessagesLengthRef.current = messages.length
+  }, [messages, shouldAutoScroll, isNearBottom])
 
   
   const checkScrollPosition = () => {
@@ -73,24 +79,25 @@ export default function MessageList({
   }
 
   
-  const shouldShowAvatar = (currentMessage: Message, previousMessage: Message | null, isGroupChat: boolean): boolean => {
-    if (!isGroupChat) return false
-    if (!previousMessage) return true
-
-    const timeDiff = parseDate(currentMessage.created_at).getTime() - parseDate(previousMessage.created_at).getTime()
-    const isDifferentSender = currentMessage.sender.id !== previousMessage.sender.id
-    const isLongTimeGap = timeDiff > 5 * 60 * 1000 
-
-    return isDifferentSender || isLongTimeGap
+  const shouldShowAvatar = (currentMessage: Message, previousMessage: Message | null, isGroupChat: boolean, isCurrentUser: boolean): boolean => {
+    // Never show avatar for current user's messages
+    if (isCurrentUser) return false
+    
+    // Show avatar for all received messages in group chats
+    if (isGroupChat) return true
+    
+    return false
   }
 
   
-  const shouldShowSenderName = (currentMessage: Message, previousMessage: Message | null, isGroupChat: boolean): boolean => {
-    if (!isGroupChat) return false
-    if (!previousMessage) return true
-
-    const isDifferentSender = currentMessage.sender.id !== previousMessage.sender.id
-    return isDifferentSender
+  const shouldShowSenderName = (currentMessage: Message, previousMessage: Message | null, isGroupChat: boolean, isCurrentUser: boolean): boolean => {
+    // Never show sender name for current user's messages
+    if (isCurrentUser) return false
+    
+    // Show sender name for all received messages in group chats
+    if (isGroupChat) return true
+    
+    return false
   }
 
   
@@ -133,7 +140,7 @@ export default function MessageList({
       {/* Messages Container */}
       <div
         ref={messagesContainerRef}
-        className="flex-1 overflow-y-auto px-6 py-4 space-y-1 scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent hover:scrollbar-thumb-white/30"
+        className="flex-1 overflow-y-auto px-6 py-4 space-y-4 scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent hover:scrollbar-thumb-white/30"
         style={{ maxHeight: 'calc(100vh - 200px)' }}
       >
         <AnimatePresence mode="popLayout">
@@ -147,8 +154,8 @@ export default function MessageList({
                 key={message.id}
                 message={message}
                 isCurrentUser={isCurrentUser}
-                showAvatar={shouldShowAvatar(message, previousMessage, isGroupChat)}
-                showSenderName={shouldShowSenderName(message, previousMessage, isGroupChat)}
+                showAvatar={shouldShowAvatar(message, previousMessage, isGroupChat, isCurrentUser)}
+                showSenderName={shouldShowSenderName(message, previousMessage, isGroupChat, isCurrentUser)}
                 showDateSeparator={shouldShowDateSeparator(message, previousMessage)}
                 isFirstUnreadMessage={isFirstUnreadMessage(message, index)}
                 unreadCount={unreadCount}

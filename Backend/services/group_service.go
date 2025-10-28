@@ -608,9 +608,14 @@ func (s *GroupService) LeaveGroup(groupID, userID uint) error {
 }
 
 func (s *GroupService) GetGroupMembers(groupID, currentUserID uint) ([]models.GroupMemberResponse, error) {
-	isMember, err := s.IsUserMember(groupID, currentUserID)
-	if err != nil || !isMember {
-		return nil, sql.ErrNoRows
+	// Allow the creator to view members even without a members row
+	var creatorID uint
+	_ = s.db.QueryRow("SELECT creator_id FROM groups WHERE id = ?", groupID).Scan(&creatorID)
+	if creatorID != currentUserID {
+		isMember, err := s.IsUserMember(groupID, currentUserID)
+		if err != nil || !isMember {
+			return nil, sql.ErrNoRows
+		}
 	}
 
 	query := `
@@ -713,6 +718,11 @@ func (s *GroupService) GetUserMembershipStatus(groupID, userID uint) (string, er
 	var status string
 	err := s.db.QueryRow(query, groupID, userID).Scan(&status)
 	if err == sql.ErrNoRows {
+		// Treat the group creator as a member even if they don't have a row in group_members
+		var creatorID uint
+		if err2 := s.db.QueryRow("SELECT creator_id FROM groups WHERE id = ?", groupID).Scan(&creatorID); err2 == nil && creatorID == userID {
+			return "member", nil
+		}
 		return "none", nil
 	}
 	if err != nil {
@@ -723,6 +733,12 @@ func (s *GroupService) GetUserMembershipStatus(groupID, userID uint) (string, er
 }
 
 func (s *GroupService) IsUserMember(groupID, userID uint) (bool, error) {
+	// Creator is always considered a member
+	var creatorID uint
+	if err := s.db.QueryRow("SELECT creator_id FROM groups WHERE id = ?", groupID).Scan(&creatorID); err == nil && creatorID == userID {
+		return true, nil
+	}
+
 	status, err := s.GetUserMembershipStatus(groupID, userID)
 	if err != nil {
 		return false, err
@@ -735,19 +751,23 @@ func (s *GroupService) GetUserRole(groupID, userID uint) (string, error) {
 	if err := s.db.QueryRow("SELECT creator_id FROM groups WHERE id = ?", groupID).Scan(&creatorID); err != nil {
 		return "", err
 	}
+
+	// Check the role in group_members table first
+	query := `SELECT role FROM group_members WHERE group_id = ? AND user_id = ? AND status = 'member'`
+	var role string
+	err := s.db.QueryRow(query, groupID, userID).Scan(&role)
+	if err != nil && err != sql.ErrNoRows {
+		return "", err
+	}
+
+	// If user is the creator, return "creator" regardless of their role in group_members
 	if creatorID == userID {
 		return "creator", nil
 	}
 
-	query := `SELECT role FROM group_members WHERE group_id = ? AND user_id = ? AND status = 'member'`
-
-	var role string
-	err := s.db.QueryRow(query, groupID, userID).Scan(&role)
+	// If not creator and no role found, return error
 	if err == sql.ErrNoRows {
 		return "", sql.ErrNoRows
-	}
-	if err != nil {
-		return "", err
 	}
 
 	return role, nil
@@ -842,6 +862,16 @@ WHERE gp.id = ?
 }
 
 func (s *GroupService) GetGroupPosts(groupID, currentUserID uint, limit, offset int) ([]models.GroupPostResponse, error) {
+	// Ensure user has access: creators are treated as members
+	var creatorID uint
+	_ = s.db.QueryRow("SELECT creator_id FROM groups WHERE id = ?", groupID).Scan(&creatorID)
+	if creatorID != currentUserID {
+		isMember, err := s.IsUserMember(groupID, currentUserID)
+		if err != nil || !isMember {
+			return nil, sql.ErrNoRows
+		}
+	}
+
 	query := `
 SELECT gp.id, gp.group_id, gp.user_id, gp.content, gp.image_url, gp.created_at, gp.updated_at,
        u.first_name, u.last_name, u.avatar, u.nickname, u.status,
@@ -903,22 +933,19 @@ LIMIT ? OFFSET ?
 }
 
 func (s *GroupService) DeleteGroupPost(postID, groupID, userID uint) error {
-	checkQuery := `
-SELECT gp.user_id, gm.role
-FROM group_posts gp
-JOIN group_members gm ON gp.group_id = gm.group_id
-WHERE gp.id = ? AND gp.group_id = ? AND gm.user_id = ? AND gm.status = 'member'
-`
-
+	// First check if post exists and get the post owner
 	var postOwnerID uint
-	var userRole string
-	err := s.db.QueryRow(checkQuery, postID, groupID, userID).Scan(&postOwnerID, &userRole)
+	err := s.db.QueryRow("SELECT user_id FROM group_posts WHERE id = ? AND group_id = ?", postID, groupID).Scan(&postOwnerID)
 	if err != nil {
 		return err
 	}
 
-	if postOwnerID != userID && userRole != "admin" && userRole != "creator" {
-		return sql.ErrNoRows
+	// If user is not the post owner, check if they're an admin or creator
+	if postOwnerID != userID {
+		isAdmin, err := s.IsUserAdminOrCreator(groupID, userID)
+		if err != nil || !isAdmin {
+			return sql.ErrNoRows
+		}
 	}
 
 	_, err = s.db.Exec("DELETE FROM comments WHERE post_id = ?", postID)
@@ -1153,6 +1180,8 @@ func (s *GroupService) DemoteAdmin(groupID, requesterID, targetUserID uint) erro
 }
 
 func (s *GroupService) CountAdmins(groupID uint) (int, error) {
+	// This counts all users with admin role in group_members, including the creator
+	// The creator is also stored in group_members with role='admin'
 	query := `SELECT COUNT(*) FROM group_members WHERE group_id = ? AND role = 'admin' AND status = 'member'`
 
 	var count int

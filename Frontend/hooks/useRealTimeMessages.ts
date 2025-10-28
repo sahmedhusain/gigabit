@@ -48,6 +48,9 @@ export function useRealTimeMessages() {
           createdAt = parsedDate.toISOString();
         }
 
+        // Extract sender information from data.sender if available
+        const senderData = (message as any).data?.sender || {}
+        
         const newMessage: Message = {
           id: (message as any).data?.id || Date.now(), // Use real ID if available
           conversation_id: conversationId,
@@ -58,9 +61,9 @@ export function useRealTimeMessages() {
           is_read: false,
           sender: {
             id: message.from || 0,
-            first_name: (message as any).sender_name || 'Unknown',
-            last_name: '',
-            avatar: (message as any).sender_avatar || ''
+            first_name: senderData.first_name || 'Unknown',
+            last_name: senderData.last_name || '',
+            avatar: senderData.avatar || ''
           },
           shared_post: (message as any).data?.shared_post
         }
@@ -188,7 +191,7 @@ export function useRealTimeMessages() {
     }
   }, [])
 
-  const fetchConversationMessages = useCallback(async (conversationId: number, conversationType: 'private' | 'group', participantId?: number, limit: number = 20, offset: number = 0, append: boolean = false) => {
+  const fetchConversationMessages = useCallback(async (conversationId: number, conversationType: 'private' | 'group', participantId?: number, limit: number = 20, offset: number = 0, append: boolean = false, groupId?: number) => {
     try {
       setIsLoading(true)
       setError(null)
@@ -197,17 +200,21 @@ export function useRealTimeMessages() {
       let response: { messages: any[]; count: number; limit: number; offset: number }
 
       
-      if (conversationType === 'group' && participantId === undefined) {
+      if (conversationType === 'group') {
         
         
         try {
-          response = await api.getGroupMessages(conversationId, limit, offset)
+          // For groups, use groupId if provided, otherwise fallback to conversationId
+          // This handles both new groups (using groupId) and existing conversations
+          const idToUse = groupId || conversationId
+          response = await api.getGroupMessages(idToUse, limit, offset)
         } catch (groupError: any) {
           console.warn('Failed to fetch group messages, user may not have access:', groupError.message)
           
           response = { messages: [], count: 0, limit, offset }
         }
       } else {
+        // For private conversations, always use getConversationMessages
         try {
           response = await api.getConversationMessages(conversationId, limit, offset)
         } catch (convError: any) {
@@ -285,7 +292,7 @@ export function useRealTimeMessages() {
     }
   }, [])
 
-  const loadMoreMessages = useCallback(async (conversationId: number, conversationType: 'private' | 'group', participantId?: number) => {
+  const loadMoreMessages = useCallback(async (conversationId: number, conversationType: 'private' | 'group', participantId?: number, groupId?: number) => {
     const currentMessages = messages.get(conversationId) || []
     if (currentMessages.length === 0 || isLoadingMore.get(conversationId)) {
       return
@@ -298,11 +305,11 @@ export function useRealTimeMessages() {
         return updated
       })
 
-      await fetchConversationMessages(conversationId, conversationType, participantId, 10, currentMessages.length, true)
+      await fetchConversationMessages(conversationId, conversationType, participantId, 10, currentMessages.length, true, groupId)
     } catch (err) {
       console.error('Failed to load more messages:', err)
     }
-  }, [fetchConversationMessages])
+  }, [fetchConversationMessages, messages, isLoadingMore])
 
   const registerConversationIdCallback = useCallback((placeholderId: number, callback: (newId: number) => void) => {
     conversationIdCallbacks.current.set(placeholderId, callback)
@@ -365,22 +372,31 @@ export function useRealTimeMessages() {
       if (groupId) {
         apiData.group_id = groupId
       } else {
-        
         let finalRecipientId = recipientId
-        
         
         if (!finalRecipientId) {
           const conversationMessages = messages.get(conversationId) || []
-          
           const otherParticipant = conversationMessages.find(msg => msg.sender_id !== user.id)
           if (otherParticipant) {
             finalRecipientId = otherParticipant.sender_id
           }
         }
+
+        if (!finalRecipientId) {
+          const conv = conversations.find(c => c.id === conversationId && c.type === 'private')
+          if (conv && conv.participant && typeof conv.participant.id === 'number') {
+            finalRecipientId = conv.participant.id
+          }
+        }
+
+        if (!finalRecipientId && conversationId > 1000000) {
+          console.error('Cannot determine receiver ID for placeholder conversation:', conversationId)
+        }
         
         if (finalRecipientId) {
           apiData.receiver_id = finalRecipientId
         } else {
+          console.error('Failed to determine receiver ID. conversationId:', conversationId, 'recipientId:', recipientId, 'messages:', messages.get(conversationId), 'conversations:', conversations)
           throw new Error('Receiver ID required for private messages')
         }
       }
@@ -388,6 +404,11 @@ export function useRealTimeMessages() {
       try {
         const apiResponse = await api.sendMessage(apiData)
         
+        // Always refresh conversations to ensure they're up to date
+        // This is especially important for new groups or first messages
+        setTimeout(() => {
+          fetchConversations()
+        }, 100)
         
         if (apiResponse.conversation_id && apiResponse.conversation_id !== conversationId) {
           
@@ -423,11 +444,6 @@ export function useRealTimeMessages() {
             }
             return updated
           })
-
-          
-          setTimeout(() => {
-            fetchConversations()
-          }, 100)
         }
       } catch (apiError) {
         console.error('Failed to persist message to backend:', apiError)
@@ -448,7 +464,7 @@ export function useRealTimeMessages() {
       })
       throw err
     }
-  }, [user, isConnected, fetchConversations])
+  }, [user, isConnected, messages, conversations, fetchConversations])
 
   const markAsRead = useCallback(async (conversationId: number) => {
     try {

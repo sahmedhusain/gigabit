@@ -28,7 +28,7 @@ export default function MessageItem({
   const validCreatedAt = isNaN(parsedDate.getTime()) || parsedDate.getTime() === 0 ? new Date().toISOString() : createdAt
 
   return (
-    <div key={message.id} className="space-y-3">
+    <div key={message.id} className="space-y-4">
       {}
       {showDateSeparator && (
         <motion.div
@@ -117,7 +117,7 @@ export default function MessageItem({
             {/* Sender name for group chats */}
             {showSenderName && (
               <motion.span
-                className="text-xs text-white/60 mb-2 px-3 font-medium"
+                className="text-xs text-white/70 mb-2 px-3 font-semibold"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ delay: 0.2 }}

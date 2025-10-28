@@ -27,6 +27,27 @@ func NewUserHandler(db *sql.DB, hub *websocket.Hub) *UserHandler {
 	}
 }
 
+func (h *UserHandler) GetMe(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
+
+	userID, exists := middleware.GetUserID(r)
+	if !exists {
+		writeError(w, http.StatusUnauthorized, "User not authenticated")
+		return
+	}
+
+	user, err := h.userService.GetUserByID(userID)
+	if err != nil {
+		writeError(w, http.StatusNotFound, "User not found")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, user.ToResponse())
+}
+
 func (h *UserHandler) GetProfile(w http.ResponseWriter, r *http.Request, userIDParam string) {
 	if r.Method != http.MethodGet {
 		writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
@@ -39,9 +60,51 @@ func (h *UserHandler) GetProfile(w http.ResponseWriter, r *http.Request, userIDP
 		return
 	}
 
+	requestingUserID, exists := r.Context().Value("user_id").(uint)
+	if !exists {
+		writeError(w, http.StatusUnauthorized, "User not authorized")
+		return
+	}
+
 	user, err := h.userService.GetUserByID(uint(userID))
 	if err != nil {
 		writeError(w, http.StatusNotFound, "User not found")
+		return
+	}
+
+	if user.IsDeleted {
+		writeJSON(w, http.StatusOK, map[string]interface{}{
+			"id":         user.ID,
+			"is_deleted": true,
+			"message":    "This account has been deleted",
+			"created_at": user.CreatedAt,
+			"updated_at": user.UpdatedAt,
+		})
+		return
+	}
+
+	// Check if requesting user can view this profile
+	canView, err := h.userService.CanViewProfile(requestingUserID, uint(userID))
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "Failed to check profile privacy")
+		return
+	}
+
+	// If cannot view private profile, return limited public information
+	if !canView {
+		// Return limited profile with privacy flag
+		limitedProfile := map[string]interface{}{
+			"id":         user.ID,
+			"first_name": user.FirstName,
+			"last_name":  user.LastName,
+			"nickname":   user.Nickname,
+			"avatar":     user.Avatar,
+			"is_private": user.IsPrivate,
+			"created_at": user.CreatedAt,
+			"can_view":   false,
+			"message":    "This profile is private",
+		}
+		writeJSON(w, http.StatusOK, limitedProfile)
 		return
 	}
 

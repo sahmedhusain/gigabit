@@ -58,8 +58,34 @@ func (h *ProfileHandler) GetProfile(w http.ResponseWriter, r *http.Request, user
 		return
 	}
 
+	// If cannot view private profile, return limited public information
 	if !canView {
-		writeError(w, http.StatusForbidden, "Cannot view this profile")
+		// Get follow status to show if there's a pending request
+		followStatus := "not_following"
+		followRelation, _ := h.followService.GetFollowRelation(requestingUserID, uint(userID))
+		if followRelation != nil {
+			switch followRelation.Status {
+			case "accepted":
+				followStatus = "following"
+			case "pending":
+				followStatus = "pending"
+			}
+		}
+
+		// Return limited profile with privacy flag
+		limitedProfile := map[string]interface{}{
+			"id":            user.ID,
+			"first_name":    user.FirstName,
+			"last_name":     user.LastName,
+			"nickname":      user.Nickname,
+			"avatar":        user.Avatar,
+			"is_private":    user.IsPrivate,
+			"created_at":    user.CreatedAt,
+			"can_view":      false,
+			"follow_status": followStatus,
+			"message":       "This profile is private",
+		}
+		writeJSON(w, http.StatusOK, limitedProfile)
 		return
 	}
 

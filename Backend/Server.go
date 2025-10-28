@@ -117,6 +117,7 @@ func (s *Server) setupRoutes() {
 	s.router.HandleFunc("/api/login", s.handleRoute(authHandler.Login, false))
 	s.router.HandleFunc("/api/images/", s.handleRoute(uploadHandler.ServeImage, false))
 
+	s.router.HandleFunc("/api/me", s.handleRoute(userHandler.GetMe, true))
 	s.router.HandleFunc("/api/logout", s.handleRoute(authHandler.Logout, true))
 	s.router.HandleFunc("/api/change-password", s.handleRoute(authHandler.ChangePassword, true))
 	s.router.HandleFunc("/api/profile/", s.handleProfileRoute(profileHandler))

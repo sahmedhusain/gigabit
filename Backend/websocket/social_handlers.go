@@ -360,9 +360,10 @@ func (h *Hub) handleFollow(message Message) {
 		To:     followerID,
 		Action: "follow_success",
 		Data: map[string]interface{}{
-			"user_id":   targetUserID,
-			"user_name": firstName + " " + lastName,
-			"status":    "following",
+			"user_id":        targetUserID,
+			"user_name":      firstName + " " + lastName,
+			"status":         "following",
+			"is_followed_by": false, // Add this field for consistency
 		},
 		Timestamp: time.Now().Unix(),
 	})
@@ -431,9 +432,10 @@ func (h *Hub) handleUnfollow(message Message) {
 		To:     followerID,
 		Action: "unfollow_success",
 		Data: map[string]interface{}{
-			"user_id":   targetUserID,
-			"user_name": firstName + " " + lastName,
-			"status":    "not_following",
+			"user_id":        targetUserID,
+			"user_name":      firstName + " " + lastName,
+			"status":         "not_following",
+			"is_followed_by": false, // Add this field for consistency
 		},
 		Timestamp: time.Now().Unix(),
 	})
@@ -526,8 +528,10 @@ func (h *Hub) handleFollowRequest(message Message) {
 
 	// Send success response to follower
 	responseMessage := "Follow request sent"
+	responseStatus := status
 	if status == "accepted" {
 		responseMessage = "Now following user"
+		responseStatus = "following" // Frontend expects "following" not "accepted"
 	}
 
 	h.SendToUser(followerID, Message{
@@ -538,7 +542,7 @@ func (h *Hub) handleFollowRequest(message Message) {
 		Data: map[string]interface{}{
 			"user_id":   targetUserID,
 			"user_name": firstName + " " + lastName,
-			"status":    status,
+			"status":    responseStatus,
 			"message":   responseMessage,
 		},
 		Timestamp: time.Now().Unix(),
@@ -603,9 +607,10 @@ func (h *Hub) handleCancelFollowRequest(message Message) {
 		To:     followerID,
 		Action: "follow_request_cancelled",
 		Data: map[string]interface{}{
-			"user_id":   targetUserID,
-			"user_name": firstName + " " + lastName,
-			"status":    "not_following",
+			"user_id":        targetUserID,
+			"user_name":      firstName + " " + lastName,
+			"status":         "not_following",
+			"is_followed_by": false, // Add this field for consistency
 		},
 		Timestamp: time.Now().Unix(),
 	})

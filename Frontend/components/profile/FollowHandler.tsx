@@ -1,5 +1,5 @@
 'use client'
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { UserPlus, UserMinus, X } from 'lucide-react'
 import { useWebSocket } from '@/context/WebSocketContext'
 import { WebSocketMessage } from '@/types/contexts'
@@ -20,6 +20,7 @@ export default function FollowHandler({
   const { success, error, warning } = useToast()
   const [isLoading, setIsLoading] = useState(false)
   const [localStatus, setLocalStatus] = useState<FollowStatus>(currentFollowStatus)
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null)
 
   useEffect(() => {
     setLocalStatus(currentFollowStatus)
@@ -28,6 +29,12 @@ export default function FollowHandler({
   const handleFollowUpdateMessage = useCallback((message: WebSocketMessage) => {
     const data = message.data
     if (!data) return
+
+    // Clear timeout since we got a response
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current)
+      timeoutRef.current = null
+    }
 
     setIsLoading(false)
 
@@ -88,7 +95,11 @@ export default function FollowHandler({
       if (message.type === 'follow_update' && message.data?.user_id === targetUser.id) {
         handleFollowUpdateMessage(message)
       } else if (message.type === 'error' && isLoading) {
-        
+        // Clear timeout on error
+        if (timeoutRef.current) {
+          clearTimeout(timeoutRef.current)
+          timeoutRef.current = null
+        }
         setIsLoading(false)
         error(message.content || 'An error occurred')
       }
@@ -96,6 +107,15 @@ export default function FollowHandler({
 
     return removeListener
   }, [addMessageListener, targetUser.id, isLoading, error, handleFollowUpdateMessage])
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current)
+      }
+    }
+  }, [])
 
   const handleFollowAction = useCallback(async () => {
     if (!isConnected || disabled || isLoading) {
@@ -150,13 +170,15 @@ export default function FollowHandler({
 
       sendMessage(message)
 
-      
-      setTimeout(() => {
-        if (isLoading) {
-          setIsLoading(false)
-          error('Request timed out. Please try again.')
-        }
-      }, 10000) 
+      // Set timeout to handle cases where WebSocket response never comes
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current)
+      }
+      timeoutRef.current = setTimeout(() => {
+        setIsLoading(false)
+        error('Request timed out. Please check your connection and try again.')
+        timeoutRef.current = null
+      }, 10000) // 10 second timeout 
 
     } catch (err) {
       setIsLoading(false)

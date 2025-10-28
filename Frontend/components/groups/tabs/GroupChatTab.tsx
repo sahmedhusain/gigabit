@@ -29,6 +29,7 @@ const GroupChatTab: React.FC<GroupChatTabProps> = ({
   const { user } = useAuth()
   const [userRole, setUserRole] = useState<{ role: string; is_admin_or_creator: boolean } | null>(null)
   const [groupPermissions, setGroupPermissions] = useState<{ send_messages: 'all_members' | 'admins_only' } | null>(null)
+  const [isNotMember, setIsNotMember] = useState(false)
 
   
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -69,10 +70,11 @@ const GroupChatTab: React.FC<GroupChatTabProps> = ({
 
   
   useEffect(() => {
-    if (effectiveConversationId) {
-      fetchConversationMessages(effectiveConversationId, 'group', undefined, 20, 0, false)
+    if (effectiveConversationId && groupId) {
+      // Pass groupId to ensure messages are fetched with the correct ID
+      fetchConversationMessages(effectiveConversationId, 'group', undefined, 20, 0, false, groupId)
     }
-  }, [effectiveConversationId, fetchConversationMessages])
+  }, [effectiveConversationId, groupId, fetchConversationMessages])
 
   
   useEffect(() => {
@@ -110,7 +112,7 @@ const GroupChatTab: React.FC<GroupChatTabProps> = ({
         const canLoadMore = hasMoreMessages.get(effectiveConversationId) && !isLoadingMore.get(effectiveConversationId)
         if (attempts < 5 && canLoadMore) {
           highlightLoadAttemptsRef.current = attempts + 1
-          loadMoreMessages(effectiveConversationId, 'group', undefined)
+          loadMoreMessages(effectiveConversationId, 'group', undefined, groupId)
         }
       }
     }, 100)
@@ -138,7 +140,8 @@ const GroupChatTab: React.FC<GroupChatTabProps> = ({
       const currentScrollTop = messagesContainerRef.current?.scrollTop || 0
       setIsLoadingHistorical(true)
 
-      await loadMoreMessages(effectiveConversationId, 'group', undefined)
+      // Pass groupId to ensure messages are fetched with the correct ID
+      await loadMoreMessages(effectiveConversationId, 'group', undefined, groupId)
 
       setTimeout(() => {
         if (messagesContainerRef.current) {
@@ -147,7 +150,7 @@ const GroupChatTab: React.FC<GroupChatTabProps> = ({
         setIsLoadingHistorical(false)
       }, 50)
     }
-  }, [effectiveConversationId, hasMoreMessages, isLoadingMore, loadMoreMessages])
+  }, [effectiveConversationId, hasMoreMessages, isLoadingMore, loadMoreMessages, groupId])
 
 
 
@@ -177,12 +180,17 @@ const GroupChatTab: React.FC<GroupChatTabProps> = ({
     }
   }, [messages, effectiveConversationId, user])
 
+  // Track previous messages count to detect new messages
+  const prevMessagesCountRef = useRef<number>(0)
   
   const handleMessagesChange = React.useCallback(() => {
     if (isLoadingHistorical) return
 
+    const currentMessages = Array.from(messages.get(effectiveConversationId) || [])
+    const currentCount = currentMessages.length
     
-    if (isInitialLoad && Array.from(messages.get(effectiveConversationId) || []).length > 0) {
+    
+    if (isInitialLoad && currentCount > 0) {
       const unreadInfo = getUnreadMessagesInfo()
       
       if (unreadInfo.hasUnread && unreadInfo.firstUnreadMessage) {
@@ -195,16 +203,28 @@ const GroupChatTab: React.FC<GroupChatTabProps> = ({
         }, 100)
       } else {
         
-        scrollToBottom()
+        setTimeout(() => scrollToBottom(), 100)
       }
       
       setIsInitialLoad(false)
+      prevMessagesCountRef.current = currentCount
       return
     }
 
+    // Check if new message was added
+    if (currentCount > prevMessagesCountRef.current && currentCount > 0) {
+      const lastMessage = currentMessages[currentMessages.length - 1]
+      
+      // If the last message is from the current user, force scroll to bottom
+      if (lastMessage && lastMessage.sender_id === user?.id) {
+        setTimeout(() => {
+          scrollToBottom()
+        }, 100)
+      }
+    }
     
-    
-  }, [isLoadingHistorical, isInitialLoad, messages, effectiveConversationId, scrollToBottom, getUnreadMessagesInfo])
+    prevMessagesCountRef.current = currentCount
+  }, [isLoadingHistorical, isInitialLoad, messages, effectiveConversationId, scrollToBottom, getUnreadMessagesInfo, user?.id])
 
   useEffect(() => {
     handleMessagesChange()
@@ -213,21 +233,51 @@ const GroupChatTab: React.FC<GroupChatTabProps> = ({
   
   useEffect(() => {
     const loadUserRoleAndPermissions = async () => {
-      if (!groupId || !user) return
+      if (!groupId || !user) {
+        console.log('[GroupChatTab] Missing groupId or user', { groupId, userId: user?.id })
+        return
+      }
+      
+      console.log('[GroupChatTab] Loading role for group', groupId, 'user', user.id)
       
       try {
         const roleData = await api.getUserRole(groupId)
+        console.log('[GroupChatTab] Role data received:', roleData)
         setUserRole(roleData)
+        setIsNotMember(false)
         
         
         const groupData = await api.getGroup(groupId)
+        console.log('[GroupChatTab] Group permissions:', {
+          send_messages: groupData.send_messages,
+          create_posts: groupData.create_posts,
+          create_events: groupData.create_events,
+          create_polls: groupData.create_polls
+        })
         setGroupPermissions({
           send_messages: groupData.send_messages
         })
-      } catch (err) {
-        console.error('Failed to load user role and permissions for group:', err)
-        setUserRole(null)
-        setGroupPermissions(null)
+      } catch (err: any) {
+        console.error('[GroupChatTab] Error loading role:', {
+          status: err?.status,
+          name: err?.name,
+          message: err?.message,
+          fullError: err
+        })
+        // Check for 403 Forbidden - user is not a member of this group
+        if (err?.status === 403 || (err?.name === 'NetworkError' && err?.message?.includes('forbidden'))) {
+          console.log('User is not a member of group', groupId)
+          setIsNotMember(true)
+          setUserRole(null)
+          setGroupPermissions(null)
+        } else {
+          // Log other errors for debugging
+          console.error('Failed to load user role and permissions for group:', err?.message || err)
+          // Still set to not member to prevent sending messages if permissions can't be loaded
+          setIsNotMember(false)
+          setUserRole(null)
+          setGroupPermissions(null)
+        }
       }
     }
     
@@ -237,17 +287,21 @@ const GroupChatTab: React.FC<GroupChatTabProps> = ({
   const handleSendMessage = async () => {
     if (!newMessage.trim() || !isConnected) return
 
+    const messageContent = newMessage.trim()
+    setNewMessage('') // Clear input immediately for better UX
+    
     try {
       await sendRealTimeMessage(
         effectiveConversationId,
-        newMessage.trim(),
+        messageContent,
         'text',
         undefined,
         groupId || effectiveConversationId
       )
-      setNewMessage('')
     } catch (error) {
       console.error('Error sending message:', error)
+      // Restore message on error
+      setNewMessage(messageContent)
     }
   }
 
@@ -402,8 +456,46 @@ const GroupChatTab: React.FC<GroupChatTabProps> = ({
   }
 
   const canSendMessages = () => {
-    if (!groupPermissions) return false
-    return userRole?.is_admin_or_creator || groupPermissions.send_messages === 'all_members'
+    const result = {
+      isNotMember,
+      hasPermissions: !!groupPermissions,
+      isAdminOrCreator: userRole?.is_admin_or_creator,
+      sendMessagesPermission: groupPermissions?.send_messages,
+      canSend: false
+    }
+    
+    if (isNotMember) {
+      console.log('[GroupChatTab] Cannot send - not a member:', result)
+      return false
+    }
+    if (!groupPermissions) {
+      console.log('[GroupChatTab] Cannot send - no permissions loaded:', result)
+      return false
+    }
+    
+    result.canSend = userRole?.is_admin_or_creator || groupPermissions.send_messages === 'all_members'
+    console.log('[GroupChatTab] Can send messages:', result)
+    return result.canSend
+  }
+
+  const getMessageInputStatus = () => {
+    if (isNotMember) {
+      console.log('[GroupChatTab] Status: not_member')
+      return 'not_member'
+    }
+    if (!groupPermissions) {
+      console.log('[GroupChatTab] Status: loading (no permissions)')
+      return 'loading'
+    }
+    if (userRole?.is_admin_or_creator || groupPermissions.send_messages === 'all_members') {
+      console.log('[GroupChatTab] Status: can_send', { 
+        isAdmin: userRole?.is_admin_or_creator,
+        sendMessages: groupPermissions.send_messages 
+      })
+      return 'can_send'
+    }
+    console.log('[GroupChatTab] Status: admin_only')
+    return 'admin_only'
   }
 
 
@@ -429,22 +521,32 @@ const GroupChatTab: React.FC<GroupChatTabProps> = ({
       />
 
       {/* Message Input */}
-      <MessageInput
-        newMessage={newMessage}
-        setNewMessage={setNewMessage}
-        onSendMessage={handleSendMessage}
-        onTyping={handleTyping}
-        onImageSelect={(file: File) => {
-          
-          const fakeEvent = {
-            target: { files: [file] }
-          } as unknown as React.ChangeEvent<HTMLInputElement>
-          handleImageSelect(fakeEvent)
-        }}
-        isUploadingImage={isUploadingImage}
-        canSendMessages={canSendMessages()}
-        isConnected={isConnected}
-      />
+      {isNotMember ? (
+        <div className="p-4 flex-shrink-0 relative">
+          <div className="flex items-center justify-center relative z-10">
+            <div className="text-white/60 text-sm bg-red-500/10 border border-red-500/30 rounded-lg px-4 py-2">
+              You are not a member of this group
+            </div>
+          </div>
+        </div>
+      ) : (
+        <MessageInput
+          newMessage={newMessage}
+          setNewMessage={setNewMessage}
+          onSendMessage={handleSendMessage}
+          onTyping={handleTyping}
+          onImageSelect={(file: File) => {
+            
+            const fakeEvent = {
+              target: { files: [file] }
+            } as unknown as React.ChangeEvent<HTMLInputElement>
+            handleImageSelect(fakeEvent)
+          }}
+          isUploadingImage={isUploadingImage}
+          canSendMessages={canSendMessages()}
+          isConnected={isConnected}
+        />
+      )}
 
       {/* Message Menu */}
       <MessageMenu

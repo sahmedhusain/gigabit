@@ -101,6 +101,11 @@ export class ApiClient {
           throw new ValidationError(errorData.error || 'Validation failed', errorData.field);
         }
 
+        if (response.status === 403) {
+          const error = new NetworkError(errorData.error || 'Access forbidden', response.status, errorData.code);
+          throw error;
+        }
+
         if (response.status === 409) {
           throw new Error(errorData.error || 'Conflict');
         }
@@ -125,7 +130,18 @@ export class ApiClient {
         const text = await response.text();
         return text as unknown as T;
       }
-    } catch {
+    } catch (err) {
+      if (err instanceof NetworkError || err instanceof AuthenticationError || err instanceof ValidationError) {
+        throw err;
+      }
+      
+      if (err && typeof err === 'object' && 'status' in err) {
+        throw err;
+      }
+      
+      if (err && typeof err === 'object' && 'name' in err && err.name === 'NetworkError') {
+        throw err;
+      }
       
       throw new NetworkError('Network connection failed. Please check your internet connection.');
     }

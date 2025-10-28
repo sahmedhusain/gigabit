@@ -341,6 +341,7 @@ func (s *ChatService) getGroupChats(userID uint) ([]models.UnifiedChatItem, erro
 				Role:         role,
 			},
 			ConversationID: convIDValue,
+			GroupID:        &groupID, // FIX: Set the actual group ID for frontend
 		}
 		chats = append(chats, chat)
 	}

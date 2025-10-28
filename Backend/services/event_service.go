@@ -670,18 +670,29 @@ func (s *EventService) getEventGroupID(eventID uint) (uint, error) {
 }
 
 func (s *EventService) getUserRoleInGroup(groupID, userID uint) (string, error) {
-	query := `
-		SELECT role FROM group_members 
-		WHERE group_id = ? AND user_id = ? AND status = 'member'
-	`
+	// Check if user is the creator of the group
+	var creatorID uint
+	if err := s.db.QueryRow("SELECT creator_id FROM groups WHERE id = ?", groupID).Scan(&creatorID); err != nil {
+		return "", err
+	}
 
+	// Check the role in group_members table
+	query := `SELECT role FROM group_members WHERE group_id = ? AND user_id = ? AND status = 'member'`
 	var role string
 	err := s.db.QueryRow(query, groupID, userID).Scan(&role)
+	if err != nil && err != sql.ErrNoRows {
+		return "", err
+	}
+
+	// If user is the creator, return "creator" for permission checks
+	// Note: Creator is stored with role='admin' in group_members, but we return "creator"
+	if creatorID == userID {
+		return "creator", nil
+	}
+
+	// If not creator and no role found, return error
 	if err == sql.ErrNoRows {
 		return "", sql.ErrNoRows
-	}
-	if err != nil {
-		return "", err
 	}
 
 	return role, nil

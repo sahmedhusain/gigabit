@@ -109,11 +109,11 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
     
     
     const needsResolution = conversationType === 'private'
-      ? !conversations.find(c => c.id === conversationId && c.type === 'private')
+      ? (conversationId === 0 || !conversations.find(c => c.id === conversationId && c.type === 'private'))
       : !!(conversationType === 'group' && groupId && conversationId === groupId)
 
     
-    if (needsResolution) {
+    if (needsResolution && conversationId !== undefined) {
       registerConversationIdCallback(conversationId, (newId: number) => {
         setEffectiveConversationId(newId)
         onConversationResolved?.(newId)
@@ -122,7 +122,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
 
     
     return () => {
-      if (needsResolution) {
+      if (needsResolution && conversationId !== undefined) {
         unregisterConversationIdCallback(conversationId)
       }
     }
@@ -153,10 +153,12 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
 
   
   useEffect(() => {
-    if (effectiveConversationId && conversationType) {
-      fetchConversationMessages(effectiveConversationId, conversationType, participantId, 20, 0, false)
+    if (effectiveConversationId && effectiveConversationId > 0 && conversationType) {
+      // For group chats, pass groupId to ensure correct message fetching
+      const groupIdToPass = conversationType === 'group' ? groupId : undefined
+      fetchConversationMessages(effectiveConversationId, conversationType, participantId, 20, 0, false, groupIdToPass)
     }
-  }, [effectiveConversationId, conversationType, participantId, fetchConversationMessages])
+  }, [effectiveConversationId, conversationType, participantId, groupId, fetchConversationMessages])
 
   
   
@@ -197,11 +199,12 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
         const canLoadMore = hasMoreMessages.get(effectiveConversationId) && !isLoadingMore.get(effectiveConversationId)
         if (attempts < 5 && canLoadMore) {
           highlightLoadAttemptsRef.current = attempts + 1
-          loadMoreMessages(effectiveConversationId, conversationType, participantId)
+          // For group chats, pass groupId to ensure correct message fetching
+          loadMoreMessages(effectiveConversationId, conversationType, participantId, groupId)
         }
       }
     }, 100)
-  }, [messages, effectiveConversationId, highlightMessageId, hasMoreMessages, isLoadingMore, loadMoreMessages, conversationType, participantId])
+  }, [messages, effectiveConversationId, highlightMessageId, hasMoreMessages, isLoadingMore, loadMoreMessages, conversationType, participantId, groupId])
 
   
   useEffect(() => {
@@ -306,8 +309,11 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
         try {
           const members = await api.getGroupMembers(groupId)
           setGroupMembers(members.members)
-        } catch (error) {
-          console.error('Failed to fetch group members:', error)
+        } catch (error: any) {
+          // Silently ignore 403 errors (user not a member) - this is expected behavior
+          if (error?.status !== 403 && !(error?.name === 'NetworkError' && error?.message?.includes('forbidden'))) {
+            console.error('Failed to fetch group members:', error?.message || error)
+          }
         }
       }
       fetchGroupMembers()
@@ -362,8 +368,11 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
             const requestsResponse = await api.getReceivedJoinRequests(groupId)
             setPendingRequestsCount(requestsResponse.count || 0)
           }
-        } catch (error) {
-          console.error('Failed to fetch tab counts:', error)
+        } catch (error: any) {
+          // Silently ignore 403 errors (user not a member) - this is expected behavior
+          if (error?.status !== 403 && !(error?.name === 'NetworkError' && error?.message?.includes('forbidden'))) {
+            console.error('Failed to fetch tab counts:', error?.message || error)
+          }
         }
       }
       fetchTabCounts()
@@ -385,7 +394,9 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
       const currentScrollTop = messagesContainerRef.current?.scrollTop || 0
       setIsLoadingHistorical(true)
 
-      await loadMoreMessages(conversationId, conversationType, participantId)
+      // For group chats, pass groupId to ensure correct message fetching
+      const groupIdToPass = conversationType === 'group' ? groupId : undefined
+      await loadMoreMessages(conversationId, conversationType, participantId, groupIdToPass)
 
       
       setTimeout(() => {
@@ -395,7 +406,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
         setIsLoadingHistorical(false)
       }, 50)
     }
-  }, [conversationId, conversationType, participantId, hasMoreMessages, isLoadingMore, loadMoreMessages])
+  }, [conversationId, conversationType, participantId, groupId, hasMoreMessages, isLoadingMore, loadMoreMessages])
 
   
   const handleScroll = React.useCallback(() => {
@@ -428,6 +439,8 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
     }
   }, [messages, effectiveConversationId, user])
 
+  // Track previous messages count to detect new messages
+  const prevMessagesCountRef = useRef<number>(0)
   
   const handleMessagesChange = React.useCallback(() => {
     if (isLoadingHistorical) {
@@ -436,8 +449,11 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
       return
     }
 
+    const currentMessages = Array.from(messages.get(effectiveConversationId) || [])
+    const currentCount = currentMessages.length
     
-    if (isInitialLoad && Array.from(messages.get(effectiveConversationId) || []).length > 0) {
+    
+    if (isInitialLoad && currentCount > 0) {
       const unreadInfo = getUnreadMessagesInfo()
 
       if (unreadInfo.hasUnread && unreadInfo.firstUnreadMessage) {
@@ -450,20 +466,32 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
         }, 100)
       } else {
         
-        scrollToBottom()
+        setTimeout(() => scrollToBottom(), 100)
       }
 
       setIsInitialLoad(false)
+      prevMessagesCountRef.current = currentCount
       return
     }
 
+    // Check if new message was added
+    if (currentCount > prevMessagesCountRef.current && currentCount > 0) {
+      const lastMessage = currentMessages[currentMessages.length - 1]
+      
+      // If the last message is from the current user, force scroll to bottom
+      if (lastMessage && lastMessage.sender_id === user?.id) {
+        setTimeout(() => {
+          scrollToBottom()
+        }, 100)
+      }
+    }
     
-    
-  }, [isLoadingHistorical, isInitialLoad, messages, effectiveConversationId, scrollToBottom, getUnreadMessagesInfo])
+    prevMessagesCountRef.current = currentCount
+  }, [isLoadingHistorical, isInitialLoad, messages, effectiveConversationId, scrollToBottom, getUnreadMessagesInfo, user?.id])
 
   useEffect(() => {
     handleMessagesChange()
-  }, [handleMessagesChange, user])
+  }, [handleMessagesChange])
 
   const handleLeaveGroup = async (groupIdToLeave: number) => {
     try {
@@ -489,12 +517,48 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
     if (!newMessage.trim() || !isConnected) return
 
     try {
+      // Determine the correct recipient/group ID
+      let actualRecipientId: number | undefined = undefined
+      let actualGroupId: number | undefined = undefined
+
+      if (conversationType === 'private') {
+        // For private chats, ensure we have participantId
+        actualRecipientId = participantId
+        
+        // If participantId is missing, try to get it from participantData
+        if (!actualRecipientId && participantData) {
+          actualRecipientId = participantData.id
+        }
+
+        // If still missing, try to derive from conversations
+        if (!actualRecipientId) {
+          const conv = conversations.find(c => c.id === effectiveConversationId && c.type === 'private')
+          if (conv && conv.participant) {
+            actualRecipientId = conv.participant.id
+          }
+        }
+
+        if (!actualRecipientId) {
+          console.error('Cannot send private message: recipient ID not found', { 
+            participantId, 
+            participantData, 
+            effectiveConversationId,
+            conversationType 
+          })
+          showErrorToast('Cannot send message: recipient not found')
+          return
+        }
+      } else if (conversationType === 'group') {
+        // For group chats, use groupId or fallback to effectiveConversationId
+        actualGroupId = groupId || effectiveConversationId
+      }
+
       await sendRealTimeMessage(
         effectiveConversationId,
         newMessage.trim(),
         'text',
-        conversationType === 'private' ? participantId : undefined,
-        conversationType === 'group' ? groupId || effectiveConversationId : undefined
+        actualRecipientId,
+        actualGroupId
       )
 
       setNewMessage('')
@@ -532,13 +596,39 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
     try {
       const result = await uploadImage(file)
 
-      
+      // Determine the correct recipient/group ID (same logic as handleSendMessage)
+      let actualRecipientId: number | undefined = undefined
+      let actualGroupId: number | undefined = undefined
+
+      if (conversationType === 'private') {
+        actualRecipientId = participantId
+        
+        if (!actualRecipientId && participantData) {
+          actualRecipientId = participantData.id
+        }
+
+        if (!actualRecipientId) {
+          const conv = conversations.find(c => c.id === effectiveConversationId && c.type === 'private')
+          if (conv && conv.participant) {
+            actualRecipientId = conv.participant.id
+          }
+        }
+
+        if (!actualRecipientId) {
+          console.error('Cannot send image: recipient ID not found')
+          showErrorToast('Cannot send image: recipient not found')
+          return
+        }
+      } else if (conversationType === 'group') {
+        actualGroupId = groupId || effectiveConversationId
+      }
+
       await sendRealTimeMessage(
         effectiveConversationId,
         result.url, 
         'image', 
-        conversationType === 'private' ? participantId : undefined,
-        conversationType === 'group' ? groupId || effectiveConversationId : undefined
+        actualRecipientId,
+        actualGroupId
       )
 
       

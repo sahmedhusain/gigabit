@@ -299,6 +299,7 @@ func (s *MessageService) GetPrivateMessages(userID1, userID2 uint, limit, offset
 }
 
 func (s *MessageService) GetGroupMessages(groupID, userID uint, limit, offset int) ([]models.MessageResponse, error) {
+	// Treat creator as member for access
 	isMember, err := s.isUserGroupMember(groupID, userID)
 	if err != nil || !isMember {
 		return nil, sql.ErrNoRows
@@ -308,42 +309,82 @@ func (s *MessageService) GetGroupMessages(groupID, userID uint, limit, offset in
 	if err != nil {
 		return nil, err
 	}
+	// Determine if user is the group creator to relax membership join requirements
+	var creatorID uint
+	_ = s.db.QueryRow("SELECT creator_id FROM groups WHERE id = ?", groupID).Scan(&creatorID)
+	isCreator := creatorID == userID
 
-	query := `
-	SELECT m.id, m.sender_id, m.content, m.is_read, m.created_at, m.is_deleted,
-	   u.first_name, u.last_name, u.avatar, u.nickname, u.is_deleted as sender_deleted,
-	   g.name,
-	   COALESCE(s.id, 0) as share_id,
-	   COALESCE(p.id, 0) as post_id,
-	   COALESCE(p.user_id, 0) as post_user_id,
-	   COALESCE(p.content, '') as post_content,
-	   COALESCE(p.image_url, '') as post_image_url,
-	   COALESCE(p.privacy, '') as post_privacy,
-	   COALESCE(p.created_at, '') as post_created_at,
-	   COALESCE(pu.first_name, '') as post_user_first_name,
-	   COALESCE(pu.last_name, '') as post_user_last_name,
-	   COALESCE(pu.avatar, '') as post_user_avatar,
-	   COALESCE(pu.nickname, '') as post_user_nickname,
-	   COALESCE(like_stats.like_count, 0) as like_count,
-	   COALESCE(comment_stats.comment_count, 0) as comment_count,
-	   COALESCE(share_stats.share_count, 0) as share_count
-	FROM group_messages m
-	JOIN users u ON m.sender_id = u.id
-	JOIN groups g ON g.id = ?
-	JOIN group_members gm ON g.id = gm.group_id AND gm.user_id = ? AND gm.status = 'member'
-	LEFT JOIN shares s ON m.id = s.message_id
-	LEFT JOIN posts p ON s.post_id = p.id
-	LEFT JOIN users pu ON p.user_id = pu.id
-	LEFT JOIN (SELECT post_id, COUNT(*) as like_count FROM likes GROUP BY post_id) like_stats ON p.id = like_stats.post_id
-	LEFT JOIN (SELECT post_id, COUNT(*) as comment_count FROM comments GROUP BY post_id) comment_stats ON p.id = comment_stats.post_id
-	LEFT JOIN (SELECT post_id, COUNT(*) as share_count FROM shares WHERE message_id IS NOT NULL GROUP BY post_id) share_stats ON p.id = share_stats.post_id
-	WHERE m.conversation_id = ?
-	AND m.created_at >= gm.created_at
-	ORDER BY m.created_at DESC
-	LIMIT ? OFFSET ?
-	`
-
-	rows, err := s.db.Query(query, groupID, userID, conversationID, limit, offset)
+	var rows *sql.Rows
+	if isCreator {
+		// Creator: no need to join group_members or filter by join time
+		query := `
+        SELECT m.id, m.sender_id, m.content, m.is_read, m.created_at, m.is_deleted,
+           u.first_name, u.last_name, u.avatar, u.nickname, u.is_deleted as sender_deleted,
+           g.name,
+           COALESCE(s.id, 0) as share_id,
+           COALESCE(p.id, 0) as post_id,
+           COALESCE(p.user_id, 0) as post_user_id,
+           COALESCE(p.content, '') as post_content,
+           COALESCE(p.image_url, '') as post_image_url,
+           COALESCE(p.privacy, '') as post_privacy,
+           COALESCE(p.created_at, '') as post_created_at,
+           COALESCE(pu.first_name, '') as post_user_first_name,
+           COALESCE(pu.last_name, '') as post_user_last_name,
+           COALESCE(pu.avatar, '') as post_user_avatar,
+           COALESCE(pu.nickname, '') as post_user_nickname,
+           COALESCE(like_stats.like_count, 0) as like_count,
+           COALESCE(comment_stats.comment_count, 0) as comment_count,
+           COALESCE(share_stats.share_count, 0) as share_count
+        FROM group_messages m
+        JOIN users u ON m.sender_id = u.id
+        JOIN groups g ON g.id = ?
+        LEFT JOIN shares s ON m.id = s.message_id
+        LEFT JOIN posts p ON s.post_id = p.id
+        LEFT JOIN users pu ON p.user_id = pu.id
+        LEFT JOIN (SELECT post_id, COUNT(*) as like_count FROM likes GROUP BY post_id) like_stats ON p.id = like_stats.post_id
+        LEFT JOIN (SELECT post_id, COUNT(*) as comment_count FROM comments GROUP BY post_id) comment_stats ON p.id = comment_stats.post_id
+        LEFT JOIN (SELECT post_id, COUNT(*) as share_count FROM shares WHERE message_id IS NOT NULL GROUP BY post_id) share_stats ON p.id = share_stats.post_id
+        WHERE m.conversation_id = ?
+        ORDER BY m.created_at DESC
+        LIMIT ? OFFSET ?
+        `
+		rows, err = s.db.Query(query, groupID, conversationID, limit, offset)
+	} else {
+		query := `
+        SELECT m.id, m.sender_id, m.content, m.is_read, m.created_at, m.is_deleted,
+           u.first_name, u.last_name, u.avatar, u.nickname, u.is_deleted as sender_deleted,
+           g.name,
+           COALESCE(s.id, 0) as share_id,
+           COALESCE(p.id, 0) as post_id,
+           COALESCE(p.user_id, 0) as post_user_id,
+           COALESCE(p.content, '') as post_content,
+           COALESCE(p.image_url, '') as post_image_url,
+           COALESCE(p.privacy, '') as post_privacy,
+           COALESCE(p.created_at, '') as post_created_at,
+           COALESCE(pu.first_name, '') as post_user_first_name,
+           COALESCE(pu.last_name, '') as post_user_last_name,
+           COALESCE(pu.avatar, '') as post_user_avatar,
+           COALESCE(pu.nickname, '') as post_user_nickname,
+           COALESCE(like_stats.like_count, 0) as like_count,
+           COALESCE(comment_stats.comment_count, 0) as comment_count,
+           COALESCE(share_stats.share_count, 0) as share_count
+        FROM group_messages m
+        JOIN users u ON m.sender_id = u.id
+        JOIN groups g ON g.id = ?
+        JOIN group_members gm ON g.id = gm.group_id AND gm.user_id = ? AND gm.status = 'member'
+        LEFT JOIN shares s ON m.id = s.message_id
+        LEFT JOIN posts p ON s.post_id = p.id
+        LEFT JOIN users pu ON p.user_id = pu.id
+        LEFT JOIN (SELECT post_id, COUNT(*) as like_count FROM likes GROUP BY post_id) like_stats ON p.id = like_stats.post_id
+        LEFT JOIN (SELECT post_id, COUNT(*) as comment_count FROM comments GROUP BY post_id) comment_stats ON p.id = comment_stats.post_id
+        LEFT JOIN (SELECT post_id, COUNT(*) as share_count FROM shares WHERE message_id IS NOT NULL GROUP BY post_id) share_stats ON p.id = share_stats.post_id
+        WHERE m.conversation_id = ?
+        AND m.created_at >= gm.created_at
+        ORDER BY m.created_at DESC
+        LIMIT ? OFFSET ?
+        `
+		rows, err = s.db.Query(query, groupID, userID, conversationID, limit, offset)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -473,10 +514,16 @@ func (s *MessageService) canUsersMessage(userID1, userID2 uint) (bool, error) {
 }
 
 func (s *MessageService) isUserGroupMember(groupID, userID uint) (bool, error) {
+	// Treat the group creator as a member even if no row exists in group_members
+	var creatorID uint
+	if err := s.db.QueryRow("SELECT creator_id FROM groups WHERE id = ?", groupID).Scan(&creatorID); err == nil && creatorID == userID {
+		return true, nil
+	}
+
 	query := `
-		SELECT COUNT(*) FROM group_members 
-		WHERE group_id = ? AND user_id = ? AND status = 'member'
-	`
+        SELECT COUNT(*) FROM group_members 
+        WHERE group_id = ? AND user_id = ? AND status = 'member'
+    `
 
 	var count int
 	err := s.db.QueryRow(query, groupID, userID).Scan(&count)
@@ -488,18 +535,29 @@ func (s *MessageService) isUserGroupMember(groupID, userID uint) (bool, error) {
 }
 
 func (s *MessageService) getUserRoleInGroup(groupID, userID uint) (string, error) {
-	query := `
-		SELECT role FROM group_members 
-		WHERE group_id = ? AND user_id = ? AND status = 'member'
-	`
+	// Check if user is the creator of the group
+	var creatorID uint
+	if err := s.db.QueryRow("SELECT creator_id FROM groups WHERE id = ?", groupID).Scan(&creatorID); err != nil {
+		return "", err
+	}
 
+	// Check the role in group_members table
+	query := `SELECT role FROM group_members WHERE group_id = ? AND user_id = ? AND status = 'member'`
 	var role string
 	err := s.db.QueryRow(query, groupID, userID).Scan(&role)
+	if err != nil && err != sql.ErrNoRows {
+		return "", err
+	}
+
+	// If user is the creator, return "creator" for permission checks
+	// Note: Creator is stored with role='admin' in group_members, but we return "creator"
+	if creatorID == userID {
+		return "creator", nil
+	}
+
+	// If not creator and no role found, return error
 	if err == sql.ErrNoRows {
 		return "", sql.ErrNoRows
-	}
-	if err != nil {
-		return "", err
 	}
 
 	return role, nil

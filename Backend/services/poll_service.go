@@ -587,29 +587,29 @@ func (s *PollService) getUserVotes(pollID, userID uint) ([]uint, error) {
 }
 
 func (s *PollService) getUserRoleInGroup(groupID, userID uint) (string, error) {
+	// Check if user is the creator of the group
 	var creatorID uint
 	if err := s.db.QueryRow("SELECT creator_id FROM groups WHERE id = ?", groupID).Scan(&creatorID); err != nil {
 		return "", err
 	}
+
+	// Check the role in group_members table
+	query := `SELECT role FROM group_members WHERE group_id = ? AND user_id = ? AND status = 'member'`
+	var role string
+	err := s.db.QueryRow(query, groupID, userID).Scan(&role)
+	if err != nil && err != sql.ErrNoRows {
+		return "", err
+	}
+
+	// If user is the creator, return "creator" for permission checks
+	// Note: Creator is stored with role='admin' in group_members, but we return "creator"
 	if creatorID == userID {
-		query := `SELECT role FROM group_members WHERE group_id = ? AND user_id = ? AND status = 'member'`
-		var role string
-		err := s.db.QueryRow(query, groupID, userID).Scan(&role)
-		if err == nil && role == "member" {
-			return "member", nil
-		}
 		return "creator", nil
 	}
 
-	query := `SELECT role FROM group_members WHERE group_id = ? AND user_id = ? AND status = 'member'`
-
-	var role string
-	err := s.db.QueryRow(query, groupID, userID).Scan(&role)
+	// If not creator and no role found, return error
 	if err == sql.ErrNoRows {
 		return "", sql.ErrNoRows
-	}
-	if err != nil {
-		return "", err
 	}
 
 	return role, nil

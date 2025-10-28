@@ -55,10 +55,17 @@ const GroupEventsTab: React.FC<GroupEventsTabProps> = ({ groupId, groupTitle }) 
         setGroupPermissions({
           create_events: groupData.create_events
         })
-      } catch (err) {
-        console.error('Failed to load user role for group:', err)
-        setIsAdminOrCreator(false)
-        setGroupPermissions(null)
+      } catch (err: any) {
+        // Check for 403 Forbidden - user is not a member of this group
+        if (err?.status === 403 || (err?.name === 'NetworkError' && err?.message?.includes('forbidden'))) {
+          console.log('User is not a member of group', groupId)
+          setIsAdminOrCreator(false)
+          setGroupPermissions(null)
+        } else {
+          // Log other errors for debugging
+          console.error('Failed to load user role for group:', err?.message || err)
+          setGroupPermissions(null)
+        }
       }
     }
     

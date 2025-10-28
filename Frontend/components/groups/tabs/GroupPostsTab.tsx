@@ -48,23 +48,18 @@ const GroupPostsTab: React.FC<GroupPostsTabProps> = ({ groupId, groupTitle }) =>
         
         const response = await api.getGroupPosts(groupId)
         setPosts(response.posts || [])
-      } catch (error) {
-        console.error('Failed to fetch group posts:', error)
-        if (error instanceof Error) {
-          console.error('Error details:', error.message)
+      } catch (error: any) {
+        // Check for 403 Forbidden - user is not a member of this group
+        if (error?.status === 403 || (error?.name === 'NetworkError' && error?.message?.includes('forbidden'))) {
+          console.log('User is not a member of group', groupId)
+          setIsAdminOrCreator(false)
+          setGroupPermissions(null)
+          setPosts([])
+        } else {
+          // Log other errors for debugging
+          console.error('Failed to fetch group posts:', error?.message || error)
+          setPosts([])
         }
-        
-        
-        const errorMessage = error instanceof Error ? error.message : String(error)
-        if (errorMessage.includes('401') || errorMessage.includes('Unauthorized')) {
-          console.error('Authentication error - user may need to log in again')
-        } else if (errorMessage.includes('403') || errorMessage.includes('Forbidden')) {
-          console.error('Permission error - user may not be a member of this group')
-        } else if (errorMessage.includes('500')) {
-          console.error('Server error - there may be an issue with the backend')
-        }
-        
-        setPosts([]) 
       } finally {
         setIsLoading(false)
       }

@@ -159,12 +159,14 @@ function ChatsFilterPage() {
     } finally {
       setIsLoadingChats(false)
     }
-  }, [onlineUsers, error])
+  }, [onlineUsers])  // Removed 'error' from dependencies
 
   const fetchGroups = useCallback(async () => {
+    if (!user?.id) return
+    
     try {
       setIsLoadingGroups(true)
-      const data = await api.getUserGroups(user?.id || 0)
+      const data = await api.getUserGroups(user.id)
       const dataObj = data as unknown as Record<string, unknown> | undefined
       let groupsArrRaw: unknown[] = []
       if (dataObj) {
@@ -195,7 +197,7 @@ function ChatsFilterPage() {
     } finally {
       setIsLoadingGroups(false)
     }
-  }, [user, error])
+  }, [user?.id])  // Removed 'error' from dependencies
 
   const fetchFollowers = useCallback(async () => {
     if (!user) return
@@ -224,14 +226,32 @@ function ChatsFilterPage() {
 
   
   useEffect(() => {
-    if (openChatWindow && openChatWindow.conversationId) {
-      const param = openChatWindow.type === 'group' ? 'group' : 'chat'
-      
-      if (filter === 'all') {
-        router.replace(`/chats/all?${param}=${openChatWindow.conversationId}`)
+    if (openChatWindow) {
+      if (openChatWindow.type === 'group') {
+        const groupIdValue = openChatWindow.groupId
+        if (groupIdValue) {
+          if (filter === 'all') {
+            router.replace(`/chats/all?group=${groupIdValue}`)
+          } else {
+            router.replace(`/chats/${filter}?group=${groupIdValue}`)
+          }
+        }
       } else {
-        
-        router.replace(`/chats/${filter}?${param}=${openChatWindow.conversationId}`)
+        // For private chats: use chat ID if conversation exists, otherwise use user param
+        if (openChatWindow.conversationId && openChatWindow.conversationId > 0) {
+          if (filter === 'all') {
+            router.replace(`/chats/all?chat=${openChatWindow.conversationId}`)
+          } else {
+            router.replace(`/chats/${filter}?chat=${openChatWindow.conversationId}`)
+          }
+        } else if (openChatWindow.participantId) {
+          // New conversation - use user param
+          if (filter === 'all') {
+            router.replace(`/chats/all?user=${openChatWindow.participantId}`)
+          } else {
+            router.replace(`/chats/${filter}?user=${openChatWindow.participantId}`)
+          }
+        }
       }
     } else {
       
@@ -244,13 +264,15 @@ function ChatsFilterPage() {
   }, [openChatWindow, router, filter])
 
   
+  // Fetch data once when user is available
   useEffect(() => {
     if (user) {
       fetchConversations()
       fetchGroups()
       fetchFollowers()
     }
-  }, [user, fetchConversations, fetchFollowers, fetchGroups])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id])  // Only refetch when user changes
 
   
   useEffect(() => {
@@ -271,6 +293,9 @@ function ChatsFilterPage() {
 
   
   useEffect(() => {
+    // Wait for chats to load before processing URL parameters
+    if (chats.length === 0) return
+    
     
     if (chatId) {
       const id = parseInt(chatId)
@@ -295,15 +320,19 @@ function ChatsFilterPage() {
       if (!isNaN(id)) {
         
         const chat = chats.find(c => c.isGroup && c.groupId === id)
-        setOpenChatWindow({
-          conversationId: chat?.id || id, 
-          type: 'group',
-          name: chat?.name || 'Group Chat',
-          groupId: id,
-          initialTab: tabParam || 'chat',
-          highlightMessageId: highlightMessageParam ? parseInt(highlightMessageParam) : undefined,
-          highlightPollId: highlightPollParam ? parseInt(highlightPollParam) : undefined
-        })
+        if (chat) {
+          setOpenChatWindow({
+            conversationId: chat.id,
+            type: 'group',
+            name: chat.name || 'Group Chat',
+            groupId: id,
+            initialTab: tabParam || 'chat',
+            highlightMessageId: highlightMessageParam ? parseInt(highlightMessageParam) : undefined,
+            highlightPollId: highlightPollParam ? parseInt(highlightPollParam) : undefined
+          })
+        } else {
+          console.warn(`Group with ID ${id} not found in chats list - user may not be a member`)
+        }
         return
       }
     }
@@ -313,16 +342,31 @@ function ChatsFilterPage() {
       const participantId = parseInt(userParam)
       if (!isNaN(participantId)) {
         const existing = chats.find(c => !c.isGroup && c.participantId === participantId)
-        setOpenChatWindow({
-          conversationId: existing?.id || 0,
-          type: 'private',
-          name: existing?.name || 'Direct Message',
-          participantId,
-          highlightMessageId: highlightMessageParam ? parseInt(highlightMessageParam) : undefined
-        })
+        if (existing) {
+          setOpenChatWindow({
+            conversationId: existing.id,
+            type: 'private',
+            name: existing.name,
+            participantId,
+            highlightMessageId: highlightMessageParam ? parseInt(highlightMessageParam) : undefined
+          })
+        } else {
+          // New conversation - try to get user name from following
+          const userInFollowing = following.find(f => f.id === participantId)
+          if (userInFollowing) {
+            const userName = `${userInFollowing.first_name} ${userInFollowing.last_name}`.trim() || userInFollowing.nickname || userInFollowing.email
+            setOpenChatWindow({
+              conversationId: 0,
+              type: 'private',
+              name: userName,
+              participantId,
+              highlightMessageId: highlightMessageParam ? parseInt(highlightMessageParam) : undefined
+            })
+          }
+        }
       }
     }
-  }, [chatId, groupId, chats, userParam, highlightMessageParam, highlightPollParam, tabParam])
+  }, [chatId, groupId, chats, userParam, highlightMessageParam, highlightPollParam, tabParam, following])
 
 
 
@@ -353,18 +397,13 @@ function ChatsFilterPage() {
         })
       } else {
         
-        
-        const tempConversationId = `temp_private_${userId}_${Date.now()}`
-
+        // For new conversations, use conversationId = 0 and rely on participantId
         setOpenChatWindow({
-          conversationId: parseInt(tempConversationId.split('_')[2]), 
+          conversationId: 0, 
           type: 'private',
           name: userName,
           participantId: userId
         })
-
-        
-        await fetchConversations()
       }
 
       
@@ -431,10 +470,14 @@ function ChatsFilterPage() {
       <CreateGroup
         show={showCreateGroup}
         onClose={() => setShowCreateGroup(false)}
-        onGroupCreated={() => {
-          fetchGroups()
+        onGroupCreated={async () => {
           setShowCreateGroup(false)
           success('Group created!')
+          // Refetch both conversations and groups to include the new group
+          await Promise.all([
+            fetchConversations(),
+            fetchGroups()
+          ])
         }}
       />
 
@@ -445,10 +488,19 @@ function ChatsFilterPage() {
           chatType={openChatWindow.type} 
           participantName={openChatWindow.name}
           participantId={openChatWindow.participantId}
-          groupId={openChatWindow.type === 'group' ? (openChatWindow.groupId || openChatWindow.conversationId) : undefined}
+          groupId={openChatWindow.type === 'group' ? openChatWindow.groupId : undefined}
           highlightMessageId={openChatWindow.highlightMessageId}
           highlightPollId={openChatWindow.highlightPollId}
           initialTab={openChatWindow.initialTab}
+          onConversationResolved={(newConversationId) => {
+            // Update the conversation ID when it's resolved from 0 to actual ID
+            setOpenChatWindow(prev => prev ? {
+              ...prev,
+              conversationId: newConversationId
+            } : null)
+            // Refresh conversations to get the new conversation
+            fetchConversations()
+          }}
           onClose={() => setOpenChatWindow(null)}
         />
       ) : (
@@ -457,17 +509,19 @@ function ChatsFilterPage() {
           onChatClick={async (chat) => {
             if (chat.type === 'group') {
               try {
+                if (!chat.groupId) {
+                  console.error('Group chat missing groupId:', chat);
+                  return;
+                }
                 
-                const groupId = chat.groupId || chat.conversationId
-                
-                const groupInfo = await api.getGroup(groupId)
+                const groupInfo = await api.getGroup(chat.groupId)
                 
                 setOpenChatWindow({
                   conversationId: chat.conversationId,
                   type: chat.type,
                   name: chat.name,
                   participantId: chat.participantId,
-                  groupId: groupId,
+                  groupId: chat.groupId,
                   isGroupMember: groupInfo.is_member,
                   userRole: groupInfo.role || 'member',
                   initialTab: tabParam || chat.initialTab,
@@ -476,13 +530,17 @@ function ChatsFilterPage() {
                 })
               } catch (err) {
                 console.error('Error fetching group info:', err)
-                
+                // ✅ FIX: Always use groupId, never conversationId for group identification
+                if (!chat.groupId) {
+                  console.error('Group chat missing groupId:', chat);
+                  return;
+                }
                 setOpenChatWindow({
                   conversationId: chat.conversationId,
                   type: chat.type,
                   name: chat.name,
                   participantId: chat.participantId,
-                  groupId: chat.groupId || chat.conversationId,
+                  groupId: chat.groupId,
                   isGroupMember: true,
                   userRole: 'member',
                   initialTab: tabParam || chat.initialTab,

@@ -498,7 +498,7 @@ erDiagram
 
     notification_settings {
         INTEGER id PK
-        INTEGER user_id FK UK
+        INTEGER user_id FK
         BOOLEAN sound_enabled
         VARCHAR sound_theme
         BOOLEAN browser_push_enabled

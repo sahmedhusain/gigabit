@@ -17,9 +17,9 @@
   <img src="Frontend/public/logo.png" alt="GigaBit Logo" width="400" height="225">
 </p>
 
-Hey there! 👋 Welcome to **GigaBit** - a modern, real-time social networking platform that's actually fun to use. Think of it like a supercharged social media app where everything happens instantly, communities thrive, and your privacy is always respected. Whether you're connecting with friends, joining interest-based groups, or just sharing your thoughts with the world, GigaBit makes social networking feel natural and immediate.
+Hey there! 👋 Welcome to **GigaBit** - a real-time social networking platform we built to make online connections feel more natural. It's like social media but without all the noise - instant messaging, community groups, and privacy controls that actually work.
 
-Built with cutting-edge web technologies, GigaBit combines the best of social media with real-time messaging, advanced privacy controls, and rich interactive features. It's designed for people who want meaningful connections without the noise and complexity of traditional social platforms.
+We built this with modern web technologies to create something that feels responsive and alive. Whether you're catching up with friends, joining niche communities, or just sharing what's on your mind, GigaBit keeps things simple and real-time.
 
 ## 📸 Screenshots
 
@@ -57,105 +57,98 @@ _Easy event scheduling with RSVP tracking and automated reminders_
 
 ## ✨ What Makes GigaBit Special
 
-### 🔐 Smart Authentication & Privacy
-**Secure Login That Just Works**
-Getting started with GigaBit is simple - just pick a username, add your email, and you're in. But don't let the simplicity fool you. Behind the scenes, we're using industry-standard JWT authentication with secure password hashing using bcrypt. Your login sessions are managed intelligently, with automatic token refresh so you stay logged in securely without annoying re-authentication prompts.
+### 🔐 Simple But Secure Login
+Getting started is easy - just pick a username and add your email. We use proper JWT tokens and bcrypt password hashing so your account stays secure. Sessions refresh automatically so you don't get logged out at annoying times.
 
-**Privacy Controls You Actually Control**
-Your data is yours, and GigaBit gives you granular control over who sees what. Set your profile visibility (public or private), control who can see your birthday and gender, and manage follow requests if you prefer approval-based following. It's social media with privacy built-in from day one.
+### 🤝 Social Features That Work Like You Expect
+**Following with Approval**
+Public accounts let anyone follow immediately. Private accounts require approval first. When someone wants to follow you, you get a notification and can accept or decline. No unwanted followers.
 
-**Real-time Status Management**
-Let people know when you're available with live status indicators - online, away, busy, or invisible. Your status updates instantly across the platform, so friends know when you're free to chat.
+**Finding People**
+Search by name, email, or nickname to find specific people. We also suggest connections based on mutual friends. It's straightforward - no complicated algorithms.
 
-### 🤝 Social Networking That Feels Natural
-**Follow System with Smart Approval**
-Following works just like you'd expect, but with extra smarts. Public accounts let anyone follow immediately, while private accounts require approval. When someone wants to follow you, you get a notification and can choose to accept or decline. It's social networking that respects personal boundaries.
+**Profile Customization**
+Add a nickname, bio, avatar, and personal details. Control who sees your birthday and gender. Your profile, your rules.
 
-**Intelligent Friend Discovery**
-GigaBit helps you find interesting people through mutual connections and smart suggestions. Search by name, nickname, or email to find specific people, or let our system suggest friends based on who you already know.
+### 📝 Creating & Sharing Content
+**Posting Made Simple**
+Write posts with text and photos. Choose who sees each post - everyone, just your followers, or specific people. We made it flexible so you can share exactly how you want.
 
-**Advanced Profile Customization**
-Your profile is your digital home. Add a catchy nickname, write a bio that tells your story, upload an avatar, and set your personal details. Control exactly who sees what with privacy settings for birthdays, gender, and other personal information.
+**Comments & Discussions**
+Comments can have images too, and you can reply to replies for threaded conversations. Like posts and comments to show you care. It's like having mini-forums on every post.
 
-### 📝 Rich Content Creation
-**Posts with Personality**
-Share your thoughts, moments, and ideas with posts that support text and images. Set privacy levels for each post - share publicly, limit to followers only, or create custom audiences. It's flexible content sharing that adapts to your needs.
+**Polls for Fun & Decisions**
+Make polls with multiple options and set when they expire. Results update live as people vote. Great for quick opinions or group decisions.
 
-**Conversations That Matter**
-Comments aren't just replies - they're full conversations. Nest comments for threaded discussions, add images to your replies, and react with likes. It's forum-style discussion built into every post.
+**Sharing & Saving**
+Share posts to your feed or send them in messages. Bookmark stuff you want to find later. Content moves around the platform naturally.
 
-**Interactive Polls**
-Create polls with multiple choices, set expiration dates, and watch results update in real-time. Perfect for group decisions, opinions, or just having fun with friends.
+### 💬 Chat & Messaging
+**Private Messages**
+Talk one-on-one with anyone. Messages arrive instantly, you see when people are typing, and get read receipts. It feels just like texting but with more features.
 
-**Smart Sharing & Bookmarking**
-Share interesting posts to your feed or directly in private chats. Bookmark posts you want to save for later. Content flows naturally across the platform.
+**Group Conversations**
+Chat with multiple people at once. Perfect for communities or friend groups. Everyone sees messages in real-time, same features as private chats.
 
-### 💬 Messaging That Feels Instant
-**Private Conversations**
-One-on-one messaging with full encryption and real-time delivery. See typing indicators, read receipts, and message timestamps. Conversations feel as immediate as texting.
+**Managing Your Chats**
+Keep your chat history organized. Delete messages if you change your mind, archive old conversations, and scroll through thousands of messages quickly.
 
-**Group Chats**
-Multi-user conversations for communities and friend groups. Everyone sees messages instantly, with the same rich features as private chats.
+### 👥 Groups & Communities
+**Building Communities**
+Make groups for any interest - public ones anyone can join, or private ones that need approval. Each group gets its own space with posts, events, and chat rooms.
 
-**Message Management**
-Archive old conversations, delete messages you regret, and manage your chat history. Pagination keeps things fast even with thousands of messages.
+**Who Can Do What**
+Group creators and admins manage everything. Members have different permissions based on their role. You control who can post, create events, or send messages.
 
-### 👥 Community Groups
-**Groups That Bring People Together**
-Create public or private groups around shared interests. Each group has its own feed, events, and chat. It's like having dedicated communities within your social network.
+**Group-Only Stuff**
+Groups have their own content - posts, polls, and events that only members see. Everyone gets notified when something happens in their groups.
 
-**Smart Permission System**
-Groups have role-based permissions - creators and admins can manage settings, while members have appropriate access. Control who can post, create events, send messages, and more.
+**Getting People In**
+Private groups need admin approval to join. You can invite specific people or let them request to join. Admins decide who gets in.
 
-**Group-Exclusive Content**
-Groups have their own posts, polls, and events. Members get notifications for group activity, keeping communities engaged and active.
+### 📅 Events & Meetups
+**Planning Events**
+Set up events with all the details - what, when, where. Make them for your groups or just for yourself. It's straightforward to get people together.
 
-**Join Requests & Invitations**
-Private groups require approval to join. Send invitations to specific people, or let interested users request to join. Admins review and approve membership.
+**RSVP System**
+People can say if they're coming, not coming, or maybe. You see who's going and get reminded before it starts. No more wondering who will show up.
 
-### 📅 Events & Scheduling
-**Event Creation Made Easy**
-Schedule events with titles, descriptions, dates, and locations. Set them for groups or create personal events.
+**Managing Events**
+Change details if plans change, cancel with a reason, and see responses update live. Everything stays in sync for everyone involved.
 
-**RSVP & Attendance Tracking**
-People can RSVP as "going," "not going," or "maybe." See who's attending and get reminders before events start.
+### 🔔 Staying in the Loop
+**Getting Notified**
+You get alerts for likes, comments, follows, messages, event invites, group stuff, and more. We make sure you don't miss what's important.
 
-**Event Lifecycle Management**
-Edit event details, cancel events with explanations, and track responses. Everything updates in real-time for all participants.
+**Customizing Alerts**
+Pick your sounds, set quiet times, and mute specific chats. Turn on browser notifications for desktop alerts. Make it work how you want.
 
-### 🔔 Notifications That Keep You Connected
-**Comprehensive Notification System**
-Get notified for everything that matters - likes, comments, follows, messages, event invites, group activity, and more. Never miss important updates.
+**Instant Updates**
+Notifications pop up immediately. Check them in your notification center with links to see what's happening.
 
-**Smart Notification Settings**
-Customize your notification experience with sound themes, quiet hours, and conversation muting. Enable browser push notifications for desktop alerts.
+## 🛠️ What We Built It With
 
-**Real-time Updates**
-Notifications appear instantly across the platform. See them in your notification center, with links to relevant content.
+### Backend - The Engine Room
+- **Go 1.23.2** - Fast compiled language that handles our server and real-time features well
+- **SQLite** - Simple, file-based database that works without extra setup
+- **Gorilla WebSocket** - Makes instant messaging and live updates possible
+- **Gorilla Mux** - Routes all our API requests to the right handlers
+- **golang-migrate** - Keeps our database schema updated as we add features
+- **bcrypt** - Securely hashes passwords so they're never stored in plain text
 
-## 🛠️ Tech Stack
+### Frontend - What You See
+- **Next.js 15.5.3** - React framework with smart routing and performance features
+- **React 19.1.0** - Component library that makes the interface responsive and smooth
+- **TypeScript 5** - Catches JavaScript errors before they happen
+- **Tailwind CSS 4** - Utility classes that make styling fast and consistent
+- **Framer Motion 12.23.22** - Adds smooth animations and transitions
+- **SWR** - Smart caching that keeps the app feeling fast
+- **Lucide Icons** - Clean, scalable icons that look good everywhere
 
-### Backend - The Reliable Engine
-- **Go 1.23.2** - A fast, compiled language that's perfect for web servers and real-time applications
-- **SQLite** - A lightweight, serverless database that stores everything in a single file
-- **Gorilla WebSocket** - Enables real-time, bidirectional communication between browser and server
-- **Gorilla Mux** - A powerful HTTP router that handles all our API endpoints
-- **golang-migrate** - Manages database schema changes and migrations
-- **bcrypt** - Industry-standard password hashing for security
-
-### Frontend - The Beautiful Interface
-- **Next.js 15.5.3** - React's most popular framework, with the new App Router for better performance
-- **React 19.1.0** - Component-based UI library with concurrent features
-- **TypeScript 5** - Adds type safety to JavaScript, catching errors before they happen
-- **Tailwind CSS 4** - Utility-first CSS framework for rapid, consistent styling
-- **Framer Motion 12.23.22** - Production-ready animations that make the interface feel alive
-- **SWR** - Smart data fetching with caching and real-time updates
-- **Lucide Icons** - Beautiful, consistent icons that scale perfectly
-
-### DevOps - Making Deployment Easy
-- **Docker** - Containerizes our entire application for consistent deployment
-- **Docker Compose** - Orchestrates multiple containers (frontend, backend, database)
-- **Nginx** - High-performance reverse proxy for production deployments
+### DevOps - Getting It Running
+- **Docker** - Packages everything so it runs the same anywhere
+- **Docker Compose** - Coordinates frontend, backend, and database together
+- **Nginx** - Handles web traffic efficiently in production
 
 ## 🏗️ Architecture & Data Flow
 
@@ -825,50 +818,39 @@ const ws = new WebSocket('ws://localhost:8080/ws', [], {
 - **Post Updates:** New content in feeds
 - **Event Changes:** RSVP updates and reminders
 
-## 🔒 Security Features
+## 🔒 Security & Privacy
 
-- **Password Hashing:** bcrypt with salt
-- **JWT Tokens:** Secure authentication with expiration
-- **Input Validation:** All user input sanitized
-- **SQL Injection Protection:** Parameterized queries
-- **CORS Configuration:** Proper cross-origin policies
-- **Rate Limiting:** API request throttling
-- **Session Management:** Automatic cleanup
+We take security seriously to keep your data safe:
 
-## 🚀 Future Improvements
+- **Strong Passwords:** We use bcrypt to hash passwords so they're never stored in plain text
+- **Secure Login:** JWT tokens handle authentication with automatic expiration
+- **Clean Inputs:** All user data gets validated and sanitized before saving
+- **Safe Database:** Parameterized queries prevent SQL injection attacks
+- **Proper CORS:** Configured to only accept requests from our frontend
+- **Rate Limiting:** Prevents abuse by limiting how many requests you can make
+- **Session Cleanup:** Old sessions get cleaned up automatically
 
-### 🔍 Advanced Features
-- **Advanced Search & Filtering:** Full-text search with filters by date, content type, and user
-- **Content Moderation:** AI-powered content moderation and automated spam detection
-- **Video Support:** Native video upload and streaming capabilities
-- **Stories Feature:** Instagram-style ephemeral content with 24-hour visibility
-- **Live Streaming:** Real-time video broadcasting for events and announcements
+## 🚀 Future Plans
 
-### 📊 Analytics & Insights
-- **User Analytics:** Post engagement metrics, follower growth, and activity insights
-- **Content Analytics:** Performance tracking for posts, optimal posting times, and audience reach
-- **Group Analytics:** Member activity, content engagement, and community health metrics
-- **Real-time Dashboards:** Administrative panels with live system monitoring
+We're always looking to improve GigaBit based on user feedback. Here are some things we're considering:
 
-### 🔧 Technical Enhancements
-- **Microservices Architecture:** Break down monolithic backend into scalable microservices
-- **GraphQL API:** More flexible and efficient data fetching
-- **Redis Caching:** High-performance caching layer for frequently accessed data
-- **CDN Integration:** Global content delivery for faster media loading
-- **Advanced WebRTC:** Peer-to-peer video calling and screen sharing
+### 🔍 Better Search & Discovery
+- **Improved search** with filters for finding posts, people, and groups more easily
+- **Better recommendations** for groups and people to follow
 
-### 🌐 Platform Expansion
-- **Mobile Apps:** Native iOS and Android applications
-- **Progressive Web App:** Installable web app with offline capabilities
-- **API Ecosystem:** Third-party integrations and developer API access
-- **Multi-language Support:** Internationalization and localization
-- **Accessibility:** WCAG 2.1 compliance and screen reader support
+### 📊 Basic Analytics
+- **Simple stats** for groups and posts to see what's working
+- **User activity insights** to help understand engagement
 
-### 🤖 AI & Machine Learning
-- **Smart Recommendations:** AI-powered content and friend suggestions
-- **Automated Tagging:** Image recognition and content categorization
-- **Sentiment Analysis:** Community mood tracking and toxicity detection
-- **Personalized Feeds:** Machine learning algorithms for content ranking
+### 🔧 Technical Improvements
+- **Better image handling** with compression and different sizes
+- **Email notifications** for important updates
+- **Improved mobile experience** with responsive design tweaks
+
+### 🌐 Platform Growth
+- **Progressive Web App** so it works more like a native app
+- **Better accessibility** for screen readers and keyboard navigation
+- **Multiple languages** support for international users
 
 ## ⚠️ Limitations
 
@@ -900,16 +882,24 @@ const ws = new WebSocket('ws://localhost:8080/ws', [], {
 
 ## 🤝 Contributing
 
-We welcome contributions! Here's how to get involved:
+Want to help make GigaBit better? We'd love to have you! Here's how you can get involved:
 
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes with tests
-4. Submit a pull request
+1. **Fork the project** on GitHub
+2. **Create a branch** for your feature (`git checkout -b feature/amazing-idea`)
+3. **Make your changes** and test them out
+4. **Submit a pull request** - we'll review it and get back to you
+
+We're especially interested in:
+- Bug fixes and performance improvements
+- New features that fit our vision
+- Better documentation and examples
+- UI/UX enhancements
+
+Don't worry about making it perfect - we can iterate together!
 
 ## 📄 License
 
-MIT License - see LICENSE.md for details.
+MIT License - see [LICENSE.md](LICENSE.md) for details.
 
 ## 👥 Authors
 

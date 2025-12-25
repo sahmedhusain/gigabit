@@ -4,9 +4,9 @@ import (
 	"database/sql"
 	"encoding/json"
 	"net/http"
-	"social/models"
-	"social/services"
-	"social/websocket"
+	"gigabit/models"
+	"gigabit/services"
+	"gigabit/websocket"
 	"strconv"
 	"strings"
 )

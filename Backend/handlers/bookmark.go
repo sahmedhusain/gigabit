@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"strconv"
 
-	"social/services"
-	"social/websocket"
+	"gigabit/services"
+	"gigabit/websocket"
 )
 
 type BookmarkHandler struct {

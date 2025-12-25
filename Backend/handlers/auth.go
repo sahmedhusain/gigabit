@@ -10,9 +10,9 @@ import (
 	"regexp"
 	"time"
 
-	"social/models"
-	"social/services"
-	"social/utils"
+	"gigabit/models"
+	"gigabit/services"
+	"gigabit/utils"
 )
 
 type AuthHandler struct {

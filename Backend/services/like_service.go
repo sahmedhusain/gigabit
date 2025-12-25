@@ -2,7 +2,7 @@ package services
 
 import (
 	"database/sql"
-	"social/websocket"
+	"gigabit/websocket"
 	"time"
 )
 

@@ -7,10 +7,10 @@ import (
 	"net/http"
 	"strconv"
 
-	"social/models"
-	"social/services"
+	"gigabit/models"
+	"gigabit/services"
 
-	"social/websocket"
+	"gigabit/websocket"
 )
 
 type PostHandler struct {

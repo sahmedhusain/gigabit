@@ -6,11 +6,11 @@ import (
 	"net/http"
 	"strconv"
 
-	"social/middleware"
-	"social/models"
-	"social/services"
-	"social/utils"
-	"social/websocket"
+	"gigabit/middleware"
+	"gigabit/models"
+	"gigabit/services"
+	"gigabit/utils"
+	"gigabit/websocket"
 )
 
 type UserHandler struct {

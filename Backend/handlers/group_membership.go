@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"strconv"
 
-	"social/models"
+	"gigabit/models"
 )
 
 func (h *GroupHandler) InviteUsers(w http.ResponseWriter, r *http.Request, groupIDStr string) {

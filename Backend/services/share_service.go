@@ -3,8 +3,8 @@ package services
 import (
 	"database/sql"
 	"fmt"
-	"social/models"
-	"social/websocket"
+	"gigabit/models"
+	"gigabit/websocket"
 	"time"
 )
 

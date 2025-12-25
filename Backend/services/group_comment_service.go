@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
-	"social/models"
-	"social/websocket"
+	"gigabit/models"
+	"gigabit/websocket"
 )
 
 type GroupCommentService struct {

@@ -6,9 +6,9 @@ import (
 	"net/http"
 	"strconv"
 
-	"social/models"
-	"social/services"
-	"social/websocket"
+	"gigabit/models"
+	"gigabit/services"
+	"gigabit/websocket"
 )
 
 type EventHandler struct {

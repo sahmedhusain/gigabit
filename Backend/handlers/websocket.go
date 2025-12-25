@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"strconv"
 
-	"social/websocket"
+	"gigabit/websocket"
 )
 
 type WebSocketHandler struct {

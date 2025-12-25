@@ -7,9 +7,9 @@ import (
 	"sort"
 	"strings"
 
-	"social/middleware"
-	"social/models"
-	"social/services"
+	"gigabit/middleware"
+	"gigabit/models"
+	"gigabit/services"
 )
 
 type SearchHandler struct {

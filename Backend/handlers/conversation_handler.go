@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"strconv"
 
-	"social/services"
+	"gigabit/services"
 )
 
 type ConversationHandler struct {

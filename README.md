@@ -1,199 +1,249 @@
-# 🌐 Social Network
+# GigaBit 🌐
 
-A full-stack social networking platform built with modern web technologies. This application provides a complete social media experience with real-time features, privacy controls, and rich media support.
+[![Go](https://img.shields.io/badge/Go-1.23.2-00ADD8?style=flat&logo=go)](https://golang.org/)
+[![Docker](https://img.shields.io/badge/Docker-Ready-blue?style=flat&logo=docker)](https://www.docker.com/)
+[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE.md)
+[![SQLite](https://img.shields.io/badge/SQLite-3.0-green)](https://www.sqlite.org/)
+[![WebSocket](https://img.shields.io/badge/WebSocket-Real--Time-blue)](https://developer.mozilla.org/en-US/docs/Web/API/WebSockets_API)
+[![Next.js](https://img.shields.io/badge/Next.js-15.5.3-black)](https://nextjs.org/)
+[![React](https://img.shields.io/badge/React-19.1.0-blue)](https://reactjs.org/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5-blue)](https://www.typescriptlang.org/)
+[![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-4-38B2AC)](https://tailwindcss.com/)
+[![Framer Motion](https://img.shields.io/badge/Framer_Motion-12.23.22-purple)](https://www.framer.com/motion/)
+[![Gorilla Mux](https://img.shields.io/badge/Gorilla_Mux-1.8-red)](https://github.com/gorilla/mux)
+[![Gorilla WebSocket](https://img.shields.io/badge/Gorilla_WebSocket-1.5-red)](https://github.com/gorilla/websocket)
+
+<p align="center">
+  <img src="Frontend/public/logo.png" alt="GigaBit Logo" width="400" height="225">
+</p>
+
+Hey there! 👋 Welcome to **GigaBit** - a modern, real-time social networking platform that's actually fun to use. Think of it like a supercharged social media app where everything happens instantly, communities thrive, and your privacy is always respected. Whether you're connecting with friends, joining interest-based groups, or just sharing your thoughts with the world, GigaBit makes social networking feel natural and immediate.
+
+Built with cutting-edge web technologies, GigaBit combines the best of social media with real-time messaging, advanced privacy controls, and rich interactive features. It's designed for people who want meaningful connections without the noise and complexity of traditional social platforms.
+
+## 📸 Screenshots
+
+### Main Feed & Posts
+![Main Feed](screenshots/main-feed.png)
+_The heart of GigaBit - your personalized feed with posts from people you follow_
+
+### Real-time Chat
+![Chat Interface](screenshots/chat-interface.png)
+_Private messaging that feels instant, with typing indicators and read receipts_
+
+### Group Communities
+![Group Page](screenshots/group-page.png)
+_Dedicated spaces for communities with their own posts, events, and discussions_
+
+### Event Management
+![Event Creation](screenshots/event-creation.png)
+_Easy event scheduling with RSVP tracking and automated reminders_
 
 ## 📋 Table of Contents
 
-- [Features](#-features)
-- [Tech Stack](#-tech-stack)
-- [Architecture](#-architecture)
-- [Database Schema](#-database-schema-erd)
-- [Getting Started](#-getting-started)
-- [Project Structure](#-project-structure)
-- [API Documentation](#-api-documentation)
-- [Real-time Features](#-real-time-features)
-- [Contributing](#-contributing)
-- [License](#-license)
+- [✨ What Makes GigaBit Special](#-what-makes-gigabit-special)
+- [🛠️ Tech Stack](#️-tech-stack)
+- [🏗️ Architecture & Data Flow](#️-architecture--data-flow)
+- [🗄️ Database Schema & Logic](#-database-schema--logic)
+- [🚀 Getting Started](#-getting-started)
+- [📖 How GigaBit Works](#-how-gigabit-works)
+- [🔌 Real-time Features](#-real-time-features)
+- [📁 Project Structure](#-project-structure)
+- [🔒 Security Features](#-security-features)
+- [🤝 Contributing](#-contributing)
+- [📄 License](#-license)
+- [👥 Authors](#-authors)
+- [🙏 Acknowledgments](#-acknowledgments)
 
-## ✨ Features
+## ✨ What Makes GigaBit Special
 
-### 👤 User Management
-- **Secure Authentication:** JWT-based authentication with secure password hashing
-- **User Profiles:** Customizable profiles with avatar, bio, and personal information
-- **Privacy Controls:** Set profile visibility (public/private) and control who can see your information
-- **Status Management:** Online, away, busy, and invisible status options
-- **Session Management:** Secure session handling with automatic token expiration
+### 🔐 Smart Authentication & Privacy
+**Secure Login That Just Works**
+Getting started with GigaBit is simple - just pick a username, add your email, and you're in. But don't let the simplicity fool you. Behind the scenes, we're using industry-standard JWT authentication with secure password hashing using bcrypt. Your login sessions are managed intelligently, with automatic token refresh so you stay logged in securely without annoying re-authentication prompts.
 
-### 🤝 Social Networking
-- **Follow System:** Follow/unfollow users with pending request system for private accounts
-- **Privacy Settings:** Control birthday and gender visibility
-- **Friend Suggestions:** Discover new users based on mutual connections
-- **User Search:** Advanced search functionality to find users by name, nickname, or email
+**Privacy Controls You Actually Control**
+Your data is yours, and GigaBit gives you granular control over who sees what. Set your profile visibility (public or private), control who can see your birthday and gender, and manage follow requests if you prefer approval-based following. It's social media with privacy built-in from day one.
 
-### 📝 Content Creation
-- **Posts:** Create, edit, and delete posts with rich text and images
-- **Privacy Levels:** Set post visibility (public, followers-only, or custom selection)
-- **Comments:** Nested commenting system with support for images
-- **Reactions:** Like/dislike posts and comments
-- **Shares:** Share posts to your feed or via chat
-- **Bookmarks:** Save posts for later viewing
-- **Polls:** Create polls with multiple options and expiration dates
+**Real-time Status Management**
+Let people know when you're available with live status indicators - online, away, busy, or invisible. Your status updates instantly across the platform, so friends know when you're free to chat.
 
-### 💬 Real-time Messaging
-- **Private Conversations:** One-on-one encrypted messaging
-- **Group Chats:** Multi-user group conversations
-- **Message Types:** Text messages and image sharing
-- **Typing Indicators:** See when others are typing
-- **Read Receipts:** Track message read status
-- **Message History:** Load previous messages with pagination
-- **Conversation Management:** Archive and delete conversations
+### 🤝 Social Networking That Feels Natural
+**Follow System with Smart Approval**
+Following works just like you'd expect, but with extra smarts. Public accounts let anyone follow immediately, while private accounts require approval. When someone wants to follow you, you get a notification and can choose to accept or decline. It's social networking that respects personal boundaries.
 
-### 👥 Groups
-- **Group Creation:** Create public or private groups
-- **Member Management:** Admin and member roles with permission controls
-- **Group Posts:** Separate feed for group-specific content
-- **Group Events:** Schedule and manage events within groups
-- **Group Polls:** Create polls exclusively for group members
-- **Join Requests:** Approval system for private groups
-- **Invitations:** Invite users to join groups
+**Intelligent Friend Discovery**
+GigaBit helps you find interesting people through mutual connections and smart suggestions. Search by name, nickname, or email to find specific people, or let our system suggest friends based on who you already know.
 
-### 📅 Events
-- **Event Creation:** Schedule events with date, location, and description
-- **RSVP System:** Going/Not Going responses
-- **Event Management:** Edit or cancel events with notifications
-- **Attendee List:** View who's attending events
-- **Event Reminders:** Get notified before events start
+**Advanced Profile Customization**
+Your profile is your digital home. Add a catchy nickname, write a bio that tells your story, upload an avatar, and set your personal details. Control exactly who sees what with privacy settings for birthdays, gender, and other personal information.
 
-### 🔔 Notifications
-- **Real-time Updates:** Instant notifications for all activities
-- **Notification Types:** Likes, comments, follows, messages, events, and more
-- **Notification Settings:** Customize sound, theme, and quiet hours
-- **Mute Conversations:** Silence notifications from specific chats
-- **Push Notifications:** Browser push notification support
+### 📝 Rich Content Creation
+**Posts with Personality**
+Share your thoughts, moments, and ideas with posts that support text and images. Set privacy levels for each post - share publicly, limit to followers only, or create custom audiences. It's flexible content sharing that adapts to your needs.
 
-### 🎨 User Experience
-- **Responsive Design:** Works seamlessly on desktop, tablet, and mobile
-- **Dark Mode Ready:** Beautiful gradient-based UI with glassmorphism effects
-- **Smooth Animations:** Framer Motion animations throughout
-- **Real-time Updates:** WebSocket integration for instant updates
-- **Optimistic Updates:** Immediate UI feedback for better user experience
-- **Infinite Scroll:** Lazy loading for posts and messages
-- **Image Preview:** Full-screen image viewer with zoom
+**Conversations That Matter**
+Comments aren't just replies - they're full conversations. Nest comments for threaded discussions, add images to your replies, and react with likes. It's forum-style discussion built into every post.
 
-## 🛠 Tech Stack
+**Interactive Polls**
+Create polls with multiple choices, set expiration dates, and watch results update in real-time. Perfect for group decisions, opinions, or just having fun with friends.
 
-### Backend
-- **Go 1.21+** - High-performance backend server
-- **SQLite** - Lightweight, serverless database
-- **Gorilla WebSocket** - Real-time bidirectional communication
-- **Gorilla Mux** - HTTP router and URL matcher
-- **golang-migrate** - Database migration management
-- **bcrypt** - Secure password hashing
+**Smart Sharing & Bookmarking**
+Share interesting posts to your feed or directly in private chats. Bookmark posts you want to save for later. Content flows naturally across the platform.
 
-### Frontend
-- **Next.js 14** - React framework with App Router
-- **React 18** - UI component library
-- **TypeScript** - Type-safe JavaScript
-- **Tailwind CSS** - Utility-first CSS framework
-- **Framer Motion** - Animation library
-- **SWR** - Data fetching and caching
-- **Lucide Icons** - Beautiful icon library
+### 💬 Messaging That Feels Instant
+**Private Conversations**
+One-on-one messaging with full encryption and real-time delivery. See typing indicators, read receipts, and message timestamps. Conversations feel as immediate as texting.
 
-### DevOps
-- **Docker** - Containerization
-- **Docker Compose** - Multi-container orchestration
-- **Nginx** - Reverse proxy (production)
+**Group Chats**
+Multi-user conversations for communities and friend groups. Everyone sees messages instantly, with the same rich features as private chats.
 
-## 🏗 Architecture
+**Message Management**
+Archive old conversations, delete messages you regret, and manage your chat history. Pagination keeps things fast even with thousands of messages.
 
-### Backend Architecture
+### 👥 Community Groups
+**Groups That Bring People Together**
+Create public or private groups around shared interests. Each group has its own feed, events, and chat. It's like having dedicated communities within your social network.
+
+**Smart Permission System**
+Groups have role-based permissions - creators and admins can manage settings, while members have appropriate access. Control who can post, create events, send messages, and more.
+
+**Group-Exclusive Content**
+Groups have their own posts, polls, and events. Members get notifications for group activity, keeping communities engaged and active.
+
+**Join Requests & Invitations**
+Private groups require approval to join. Send invitations to specific people, or let interested users request to join. Admins review and approve membership.
+
+### 📅 Events & Scheduling
+**Event Creation Made Easy**
+Schedule events with titles, descriptions, dates, and locations. Set them for groups or create personal events.
+
+**RSVP & Attendance Tracking**
+People can RSVP as "going," "not going," or "maybe." See who's attending and get reminders before events start.
+
+**Event Lifecycle Management**
+Edit event details, cancel events with explanations, and track responses. Everything updates in real-time for all participants.
+
+### 🔔 Notifications That Keep You Connected
+**Comprehensive Notification System**
+Get notified for everything that matters - likes, comments, follows, messages, event invites, group activity, and more. Never miss important updates.
+
+**Smart Notification Settings**
+Customize your notification experience with sound themes, quiet hours, and conversation muting. Enable browser push notifications for desktop alerts.
+
+**Real-time Updates**
+Notifications appear instantly across the platform. See them in your notification center, with links to relevant content.
+
+## 🛠️ Tech Stack
+
+### Backend - The Reliable Engine
+- **Go 1.23.2** - A fast, compiled language that's perfect for web servers and real-time applications
+- **SQLite** - A lightweight, serverless database that stores everything in a single file
+- **Gorilla WebSocket** - Enables real-time, bidirectional communication between browser and server
+- **Gorilla Mux** - A powerful HTTP router that handles all our API endpoints
+- **golang-migrate** - Manages database schema changes and migrations
+- **bcrypt** - Industry-standard password hashing for security
+
+### Frontend - The Beautiful Interface
+- **Next.js 15.5.3** - React's most popular framework, with the new App Router for better performance
+- **React 19.1.0** - Component-based UI library with concurrent features
+- **TypeScript 5** - Adds type safety to JavaScript, catching errors before they happen
+- **Tailwind CSS 4** - Utility-first CSS framework for rapid, consistent styling
+- **Framer Motion 12.23.22** - Production-ready animations that make the interface feel alive
+- **SWR** - Smart data fetching with caching and real-time updates
+- **Lucide Icons** - Beautiful, consistent icons that scale perfectly
+
+### DevOps - Making Deployment Easy
+- **Docker** - Containerizes our entire application for consistent deployment
+- **Docker Compose** - Orchestrates multiple containers (frontend, backend, database)
+- **Nginx** - High-performance reverse proxy for production deployments
+
+## 🏗️ Architecture & Data Flow
+
+### How Everything Fits Together
+
+Imagine GigaBit as a well-orchestrated conversation between your browser, our servers, and the database:
+
 ```
-Backend/
-├── handlers/       # HTTP request handlers
-├── services/       # Business logic layer
-├── models/         # Data models and structures
-├── middleware/     # Authentication, CORS, logging
-├── websocket/      # WebSocket handlers and hub
-├── utils/          # Helper functions
-└── pkg/
-    └── db/
-        └── migrations/  # Database migrations
-```
-
-### Frontend Architecture
-```
-Frontend/
-├── app/            # Next.js App Router pages
-├── components/     # React components
-│   ├── auth/       # Authentication components
-│   ├── chat/       # Chat interface
-│   ├── groups/     # Group management
-│   ├── posts/      # Post components
-│   └── ui/         # Reusable UI components
-├── context/        # React Context providers
-├── hooks/          # Custom React hooks
-├── lib/            # API client and utilities
-└── types/          # TypeScript type definitions
+Your Browser (Frontend) ↔ Go Backend (API Server) ↔ SQLite Database
+       ↓                           ↓
+   WebSocket Connection    Real-time Updates
 ```
 
-## 🔄 Data Flow
+**The Frontend** (Next.js + React) is what you see and interact with. It handles the user interface, form submissions, and displays data beautifully.
 
-1. **Client Request** → Next.js Frontend
-2. **API Call** → Go Backend (REST API)
-3. **Business Logic** → Service Layer
-4. **Data Access** → SQLite Database
-5. **Response** → JSON to Frontend
-6. **Real-time Updates** → WebSocket Connection
+**The Backend** (Go) is the brains of the operation. It processes requests, enforces business rules, manages real-time connections, and coordinates everything.
 
-## 🗄 Database Schema (ERD)
+**The Database** (SQLite) is our persistent memory. It stores all user data, posts, messages, and relationships safely and efficiently.
 
-The application uses SQLite with a normalized relational database schema. Below is the complete Entity Relationship Diagram:
+**WebSocket Connections** provide the "real-time magic" - instant updates without page refreshes.
+
+### Request Flow Example
+
+When you create a post:
+1. **Frontend** collects your post data and sends it via API call
+2. **Backend** validates the data, checks permissions, and saves to database
+3. **Backend** broadcasts the new post to followers via WebSocket
+4. **Frontend** receives the update and shows the post instantly
+5. **Database** stores everything permanently
+
+### Real-time Flow Example
+
+When someone sends you a message:
+1. **Sender's Frontend** sends message via WebSocket
+2. **Backend** validates sender, saves to database, checks if recipient is online
+3. **Backend** sends message to recipient via WebSocket (if online)
+4. **Recipient's Frontend** receives and displays message instantly
+5. **Backend** stores notification for later if recipient is offline
+
+## 🗄️ Database Schema & Relationships
+
+GigaBit uses SQLite with 25 interconnected tables that create a comprehensive social networking system. Below is the complete Entity Relationship Diagram showing how all tables connect:
 
 ```mermaid
 erDiagram
-    users ||--o{ sessions : "has"
-    users ||--o{ follows : "follows/is_followed"
-    users ||--o{ posts : "creates"
-    users ||--o{ comments : "creates"
-    users ||--o{ likes : "creates"
-    users ||--o{ group_members : "member_of"
-    users ||--o{ groups : "creates"
-    users ||--o{ event_responses : "responds_to"
-    users ||--o{ events : "creates"
-    users ||--o{ private_messages : "sends"
-    users ||--o{ group_messages : "sends"
-    users ||--o{ notifications : "receives"
-    users ||--o{ bookmarks : "creates"
-    users ||--o{ polls : "creates"
-    users ||--o{ poll_votes : "votes"
-    users ||--o{ shares : "shares"
-    users ||--o{ invitations : "invites/invited"
-    users ||--o| notification_settings : "has"
-    users ||--o{ private_conversations : "participant"
-    
-    posts ||--o{ comments : "has"
-    posts ||--o{ likes : "has"
-    posts ||--o{ post_privacy : "has"
-    posts ||--o{ bookmarks : "bookmarked_in"
-    posts ||--o{ shares : "shared"
-    
-    groups ||--o{ group_members : "has"
-    groups ||--o{ group_posts : "contains"
-    groups ||--o{ events : "hosts"
-    groups ||--o{ group_conversations : "has"
-    groups ||--o{ polls : "contains"
-    groups ||--o{ invitations : "for"
-    groups ||--o{ shares : "shared_to"
-    
-    events ||--o{ event_responses : "has"
-    
-    polls ||--o{ poll_options : "has"
-    poll_options ||--o{ poll_votes : "receives"
-    
-    private_conversations ||--o{ private_messages : "contains"
-    group_conversations ||--o{ group_messages : "contains"
-    
-    private_conversations ||--o{ shares : "receives"
+    users ||--o{ sessions : "manages_authentication"
+    users ||--o{ follows : "creates_follow_relationships"
+    users ||--o{ posts : "creates_content"
+    users ||--o{ comments : "writes_discussions"
+    users ||--o{ likes : "gives_reactions"
+    users ||--o{ bookmarks : "saves_content"
+    users ||--o{ group_members : "participates_in_groups"
+    users ||--o{ groups : "creates_communities"
+    users ||--o{ event_responses : "rsvp_to_events"
+    users ||--o{ events : "organizes_activities"
+    users ||--o{ private_messages : "sends_private_messages"
+    users ||--o{ group_messages : "sends_group_messages"
+    users ||--o{ notifications : "receives_activity_alerts"
+    users ||--o{ polls : "creates_interactive_content"
+    users ||--o{ poll_votes : "participates_in_polls"
+    users ||--o{ shares : "distributes_content"
+    users ||--o{ invitations : "sends_group_invites"
+    users ||--o| notification_settings : "configures_alerts"
+    users ||--o{ private_conversations : "engages_in_private_chats"
+
+    posts ||--o{ comments : "sparks_discussions"
+    posts ||--o{ likes : "receives_reactions"
+    posts ||--o{ post_privacy : "controls_visibility"
+    posts ||--o{ bookmarks : "gets_saved"
+    posts ||--o{ shares : "gets_distributed"
+
+    groups ||--o{ group_members : "has_participants"
+    groups ||--o{ group_posts : "contains_discussions"
+    groups ||--o{ events : "hosts_activities"
+    groups ||--o{ group_conversations : "facilitates_communication"
+    groups ||--o{ polls : "runs_interactive_content"
+    groups ||--o{ invitations : "manages_access"
+    groups ||--o{ shares : "receives_shared_content"
+
+    events ||--o{ event_responses : "tracks_participation"
+
+    polls ||--o{ poll_options : "defines_choices"
+    poll_options ||--o{ poll_votes : "collects_responses"
+
+    private_conversations ||--o{ private_messages : "contains_chat_history"
+    group_conversations ||--o{ group_messages : "contains_group_chat_history"
+
+    private_conversations ||--o{ shares : "receives_shared_content"
 
     users {
         INTEGER id PK
@@ -265,7 +315,6 @@ erDiagram
     likes {
         INTEGER id PK
         INTEGER user_id FK
-        INTEGER post_id FK
         TEXT entity_type
         INTEGER entity_id
         TEXT reaction_type
@@ -462,382 +511,414 @@ erDiagram
     }
 ```
 
-### Key Database Features
+### 🔗 Key Database Relationships Explained
 
-- **24 Tables** with normalized relationships
-- **Comprehensive Indexing** for query optimization
-- **Cascade Deletions** to maintain referential integrity
-- **Soft Deletes** for users and messages
-- **Timestamp Tracking** on all entities
-- **Privacy Controls** at multiple levels
-- **Unique Constraints** to prevent duplicates
+**User-Centric Relationships:**
+- **users → sessions**: Each user can have multiple active login sessions for secure authentication
+- **users → follows**: Users create follow relationships with other users (social graph)
+- **users → posts**: Users create content that forms their feed and timeline
+- **users → group_members**: Users participate in multiple communities with different roles
+- **users → notifications**: Users receive activity alerts from the platform
+- **users → private_conversations**: Users engage in one-on-one messaging
+
+**Content Relationships:**
+- **posts → comments**: User-generated content sparks discussions and conversations
+- **posts → likes**: Content receives reactions from the community
+- **posts → post_privacy**: Posts can have custom visibility rules beyond basic privacy settings
+- **posts → bookmarks**: Users save interesting content for later reference
+- **posts → shares**: Content gets distributed across conversations and groups
+
+**Community Relationships:**
+- **groups → group_members**: Communities consist of participants with different permission levels
+- **groups → group_posts**: Each group maintains its own discussion feed
+- **groups → events**: Communities organize activities and gatherings
+- **groups → invitations**: Private groups control access through invitation system
+- **groups → group_conversations**: Communities facilitate group messaging
+
+**Interactive Features:**
+- **events → event_responses**: Activities track participation through RSVP system
+- **polls → poll_options → poll_votes**: Interactive content collects community input
+- **private_conversations → private_messages**: Direct messaging with read receipts
+- **group_conversations → group_messages**: Community discussions with member participation
+
+**System Relationships:**
+- **users → notification_settings**: Each user configures their alert preferences
+- **notifications**: Links users to activities performed by other users (actor_id)
+- **shares**: Connects content distribution across different contexts (posts, conversations, groups)
+
+### 📊 Database Architecture Benefits
+
+- **Normalized Structure**: Eliminates data redundancy while maintaining relationships
+- **Cascading Deletes**: Ensures referential integrity when users/groups are removed
+- **Flexible Permissions**: Role-based access control for groups and content
+- **Scalable Messaging**: Separate conversation tracking for private and group chats
+- **Comprehensive Auditing**: Full timestamp tracking on all entities
+- **Privacy Controls**: Granular visibility settings at multiple levels
+- **Real-time Ready**: Optimized for WebSocket-based live updates
 
 ## 🚀 Getting Started
 
-### Prerequisites
+### Quick Start with Docker (Recommended)
 
-- **Docker** (version 20.10+)
-- **Docker Compose** (version 2.0+)
-
-Or for local development:
-- **Go** (version 1.21+)
-- **Node.js** (version 18+)
-- **npm** or **yarn**
-
-### Installation with Docker (Recommended)
-
-1. **Clone the repository**
+1. **Get the code**
    ```bash
-   git clone https://github.com/yourusername/social-network.git
-   cd social-network
+   git clone https://github.com/sahmedhusain/gigabit.git
+   cd gigabit
    ```
 
-2. **Build the containers**
-   ```bash
-   ./build.sh
-   ```
-   This script will build both the frontend and backend Docker images.
-
-3. **Run the application**
+2. **Launch everything**
    ```bash
    ./run.sh
    ```
-   This will start all services in detached mode.
 
-4. **Access the application**
-   - **Frontend**: http://localhost:3000
-   - **Backend API**: http://localhost:8080
-   - **WebSocket**: ws://localhost:8080/ws
+3. **Open GigaBit**
+   - Frontend: http://localhost:3000
+   - Backend API: http://localhost:8080
 
-5. **View logs** (optional)
-   ```bash
-   docker-compose logs -f
-   ```
+That's it! GigaBit is running with all services properly connected.
 
-6. **Stop the application**
-   ```bash
-   docker-compose down
-   ```
+### Manual Development Setup
 
-### Local Development Setup
-
-#### Backend
-
+**Backend Setup:**
 ```bash
 cd Backend
-
-# Install dependencies
 go mod download
-
-# Run database migrations
-go run main.go migrate
-
-# Start the server
-go run main.go
-
-# Or build and run
-go build -o social-network
-./social-network
+go run main.go migrate  # Setup database
+go run main.go          # Start server
 ```
 
-The backend will start on `http://localhost:8080`
-
-#### Frontend
-
+**Frontend Setup:**
 ```bash
 cd Frontend
-
-# Install dependencies
 npm install
-
-# Start development server
 npm run dev
-
-# Or build for production
-npm run build
-npm start
 ```
 
-The frontend will start on `http://localhost:3000`
+## 📖 How GigaBit Works
 
-### Environment Variables
+### 🔄 Overall Application Flow
 
-Create a `.env` file in the Backend directory:
+```mermaid
+flowchart TD
+    A[User Visits GigaBit] --> B{Registered?}
+    B -->|No| C[Sign Up Process]
+    B -->|Yes| D[Login Process]
 
-```env
-# Server Configuration
-PORT=8080
-FRONTEND_URL=http://localhost:3000
+    C --> C1[Enter Details<br/>Email/Password/Name]
+    C1 --> C2[Validate Input<br/>Check Email Uniqueness]
+    C2 --> C3[Hash Password<br/>Create User Record]
+    C3 --> C4[JWT Token Generated<br/>Session Created]
+    C4 --> E[Main Dashboard]
 
-# Database
-DB_PATH=./social_network.db
+    D --> D1[Enter Credentials<br/>Email/Password]
+    D1 --> D2[Validate Credentials<br/>Check Password Hash]
+    D2 --> D3{JWT Token Created<br/>Session Established}
+    D3 --> E
 
-# JWT Secret
-JWT_SECRET=your-super-secret-jwt-key-change-this-in-production
+    E --> F{Choose Action}
 
-# Upload Configuration
-UPLOAD_DIR=./uploads
-MAX_UPLOAD_SIZE=10485760  # 10MB in bytes
+    F -->|View Feed| G[Browse Posts]
+    F -->|Create Content| H[Post Creation]
+    F -->|Connect| I[Social Features]
+    F -->|Communicate| J[Messaging]
+    F -->|Join Community| K[Groups]
+    F -->|Organize| L[Events]
 
-# CORS
-CORS_ALLOWED_ORIGINS=http://localhost:3000
+    G --> G1[Load Timeline<br/>From Followed Users]
+    G1 --> G2[Display Posts<br/>With Reactions]
+    G2 --> G3[Real-time Updates<br/>Via WebSocket]
+    G3 --> G4[User Interactions<br/>Like/Comment/Share]
+
+    H --> H1[Compose Post<br/>Text + Images]
+    H1 --> H2[Set Privacy<br/>Public/Followers/Custom]
+    H2 --> H3[Submit Post<br/>Save to Database]
+    H3 --> H4[Broadcast to Feed<br/>Notify Followers]
+    H4 --> H5[Real-time Display<br/>In User Timelines]
+
+    I --> I1{Follow Users}
+    I --> I2{Search People}
+    I --> I3{Profile Management}
+
+    I1 --> I1A[Click Follow<br/>On Profile]
+    I1A --> I1B{Account Type?}
+    I1B -->|Public| I1C[Immediate Follow<br/>Status: Accepted]
+    I1B -->|Private| I1D[Send Request<br/>Status: Pending]
+    I1D --> I1E[Wait for Approval<br/>Notification Sent]
+    I1E --> I1F{Approved?}
+    I1F -->|Yes| I1C
+    I1F -->|No| I1G[Request Declined<br/>Optional Retry]
+
+    I2 --> I2A[Search by Name<br/>Email/Nickname]
+    I2A --> I2B[Display Results<br/>With Profiles]
+    I2B --> I2C[View Profiles<br/>Send Messages/Follow]
+
+    I3 --> I3A[Update Profile<br/>Avatar/Bio/Settings]
+    I3A --> I3B[Privacy Controls<br/>Visibility Settings]
+    I3B --> I3C[Save Changes<br/>Update Database]
+
+    J --> J1{Message Type}
+    J1 -->|Private| J2[Select User<br/>Start Conversation]
+    J1 -->|Group| J3[Join Group Chat<br/>Send Group Message]
+
+    J2 --> J2A[Open Chat<br/>Load Message History]
+    J2A --> J2B[Type Message<br/>Send via WebSocket]
+    J2B --> J2C[Real-time Delivery<br/>Read Receipts]
+    J2C --> J2D[Typing Indicators<br/>Online Status]
+
+    J3 --> J3A[Group Chat Interface<br/>Member List]
+    J3A --> J3B[Send Messages<br/>@Mentions Support]
+    J3B --> J3C[All Members Receive<br/>Instantly]
+
+    K --> K1{Browse Groups}
+    K1 -->|Public| K2[View Group<br/>Request to Join]
+    K1 -->|Private| K3[Need Invitation<br/>Or Admin Approval]
+
+    K2 --> K2A[Join Request<br/>Status: Requested]
+    K2A --> K2B{Admin Approves?}
+    K2B -->|Yes| K2C[Become Member<br/>Access Group Content]
+    K2B -->|No| K2D[Request Denied<br/>Cannot Access]
+
+    K3 --> K3A[Receive Invitation<br/>From Group Member]
+    K3A --> K3B{Accept Invite?}
+    K3B -->|Yes| K2C
+    K3B -->|No| K3C[Decline Invitation]
+
+    L --> L1[Create Event<br/>In Group]
+    L1 --> L2[Set Details<br/>Date/Location/Description]
+    L2 --> L3[Invite Members<br/>Send Notifications]
+    L3 --> L4[Members RSVP<br/>Going/Not Going/Maybe]
+    L4 --> L5[Track Attendance<br/>Send Reminders]
+    L5 --> L6[Event Day<br/>Real-time Updates]
+
+    F -->|Get Notified| M[Notification System]
+    M --> M1[Receive Alerts<br/>For All Activities]
+    M1 --> M2[Like/Comment/Follow<br/>Message/Event Updates]
+    M2 --> M3[Real-time Delivery<br/>Via WebSocket]
+    M3 --> M4[Customizable Settings<br/>Sound Themes/Muting]
+
+    E --> N[Real-time Engine]
+    N --> N1[WebSocket Connection<br/>Persistent Link]
+    N1 --> N2[Live Updates<br/>Instant Synchronization]
+    N2 --> N3[Typing Indicators<br/>Status Changes]
+    N3 --> N4[Push Notifications<br/>Background Sync]
+
+    style A fill:#e1f5fe
+    style E fill:#f3e5f5
+    style N fill:#e8f5e8
 ```
 
-Create a `.env.local` file in the Frontend directory:
+### 🔍 Flowchart Legend
 
-```env
-NEXT_PUBLIC_API_URL=http://localhost:8080
-NEXT_PUBLIC_WS_URL=ws://localhost:8080/ws
-```
+- **🔵 Blue Nodes**: User entry points and main navigation
+- **🟣 Purple Nodes**: Core application features and user actions
+- **🟢 Green Nodes**: Real-time system components
+- **Decision Diamonds**: Conditional logic (public/private accounts, approvals, etc.)
+- **Solid Arrows**: Main user flow progression
+- **Dashed Elements**: Background processes and real-time updates
 
-## 📖 API Documentation
+### User Registration & Authentication
 
-### Authentication Endpoints
+**Creating an Account:**
+1. User submits registration form with email, password, name
+2. Backend validates input and checks for existing email
+3. Password is hashed with bcrypt for security
+4. User record is created in database
+5. JWT token is generated for immediate login
 
-| Method | Endpoint | Description | Auth Required |
-|--------|----------|-------------|---------------|
-| POST | `/api/register` | Register new user | No |
-| POST | `/api/login` | Login user | No |
-| POST | `/api/logout` | Logout user | Yes |
-| GET | `/api/check-session` | Validate session | Yes |
+**Login Process:**
+1. User provides email/username and password
+2. Backend finds user by email or username
+3. Password is verified against stored hash
+4. If valid, JWT token is created and stored in session
+5. Token is returned to frontend for authentication
 
-### User Endpoints
+### Group Creation & Management
 
-| Method | Endpoint | Description | Auth Required |
-|--------|----------|-------------|---------------|
-| GET | `/api/users/:id` | Get user profile | Yes |
-| PUT | `/api/users/:id` | Update profile | Yes |
-| GET | `/api/users/:id/followers` | Get followers | Yes |
-| GET | `/api/users/:id/following` | Get following | Yes |
-| PUT | `/api/users/:id/status` | Update status | Yes |
+**Creating a Group:**
+1. User fills group creation form (name, description, privacy settings)
+2. Backend validates permissions and input
+3. Group record is created with creator as first admin
+4. Creator is automatically added to group_members as 'admin'
+5. Success response includes group details
 
-### Post Endpoints
+**Joining Groups:**
+- **Public Groups:** User clicks "Join" → status becomes 'member' immediately
+- **Private Groups:** User requests to join → status becomes 'requested' → admin approval required
 
-| Method | Endpoint | Description | Auth Required |
-|--------|----------|-------------|---------------|
-| GET | `/api/posts` | Get posts feed | Yes |
-| POST | `/api/posts` | Create post | Yes |
-| GET | `/api/posts/:id` | Get post details | Yes |
-| PUT | `/api/posts/:id` | Update post | Yes |
-| DELETE | `/api/posts/:id` | Delete post | Yes |
-| POST | `/api/posts/:id/like` | Like post | Yes |
-| DELETE | `/api/posts/:id/like` | Unlike post | Yes |
+**Admin Functions:**
+- Promote members to admin (max 3 admins per group)
+- Remove members from group
+- Update group settings and permissions
+- Delete group (creator only)
 
-### Group Endpoints
+### Event Management
 
-| Method | Endpoint | Description | Auth Required |
-|--------|----------|-------------|---------------|
-| GET | `/api/groups` | List all groups | Yes |
-| POST | `/api/groups` | Create group | Yes |
-| GET | `/api/groups/:id` | Get group details | Yes |
-| PUT | `/api/groups/:id` | Update group | Yes |
-| POST | `/api/groups/:id/join` | Join group | Yes |
-| POST | `/api/groups/:id/leave` | Leave group | Yes |
-| GET | `/api/groups/:id/members` | Get members | Yes |
+**Creating Events:**
+1. Admin selects "Create Event" in group
+2. Fills event details (title, description, date, location)
+3. Backend validates user is group admin
+4. Event is created and linked to group
+5. Group members get notifications
 
-### Message Endpoints
+**RSVP System:**
+1. Members see event and click response (going/not going/maybe)
+2. Response is recorded in event_responses table
+3. Creator sees updated attendance count
+4. Reminders sent before event date
 
-| Method | Endpoint | Description | Auth Required |
-|--------|----------|-------------|---------------|
-| GET | `/api/conversations` | List conversations | Yes |
-| POST | `/api/messages` | Send message | Yes |
-| GET | `/api/conversations/:id/messages` | Get messages | Yes |
-| DELETE | `/api/messages/:id` | Delete message | Yes |
-| PUT | `/api/messages/read` | Mark as read | Yes |
+### Real-time Messaging
 
-### WebSocket Events
+**Starting a Conversation:**
+1. User clicks "Message" on another user's profile
+2. Backend checks if conversation already exists
+3. If not, creates private_conversations record
+4. Returns conversation ID for messaging
 
-Connect to `ws://localhost:8080/ws` with authentication token.
+**Sending Messages:**
+1. User types message and hits send
+2. Message saved to database with timestamp
+3. WebSocket broadcasts to recipient (if online)
+4. Notification created for offline recipient
 
-#### Client → Server Events
-- `typing_start` - User starts typing
-- `typing_stop` - User stops typing
-- `status_change` - Update online status
+### Follow System
 
-#### Server → Client Events
-- `private_message` - New private message
-- `group_message` - New group message
-- `message_deleted` - Message was deleted
-- `notification` - New notification
-- `user_status_changed` - User status updated
-- `typing` - User is typing
+**Following Public Accounts:**
+1. User clicks "Follow" on profile
+2. Follow record created with status 'accepted'
+3. Follower count updates immediately
+4. Both users get notifications
+
+**Following Private Accounts:**
+1. User clicks "Follow" → status becomes 'pending'
+2. Target user gets follow request notification
+3. Target can accept or decline request
+4. If accepted, status changes to 'accepted'
+
+### Account Deletion
+
+**Soft Delete Process:**
+1. User requests account deletion
+2. All user content remains but becomes anonymous
+3. User record marked as `is_deleted = true`
+4. Profile becomes inaccessible to others
+5. Data preserved for legal/backup purposes
 
 ## 🔌 Real-time Features
 
-The application uses WebSocket connections for real-time updates:
+GigaBit uses WebSocket connections for instant updates:
 
-### WebSocket Connection
+### Connection Establishment
 
-```typescript
-// Frontend connection example
+```javascript
 const ws = new WebSocket('ws://localhost:8080/ws', [], {
-  headers: {
-    'Authorization': `Bearer ${token}`
-  }
+  headers: { 'Authorization': `Bearer ${token}` }
 });
-
-ws.onmessage = (event) => {
-  const message = JSON.parse(event.data);
-  handleMessage(message);
-};
 ```
 
-### Message Types
+### Real-time Events
 
-- **private_message**: Real-time private chat messages
-- **group_message**: Real-time group chat messages
-- **notification**: Instant notifications
-- **typing**: Live typing indicators
-- **status_change**: User online/offline status
-- **post_created**: New post alerts
-- **comment_added**: New comment notifications
-
-## 🏗 Project Structure
-
-```
-social-network-2/
-├── Backend/
-│   ├── handlers/              # HTTP request handlers
-│   │   ├── auth.go           # Authentication
-│   │   ├── user.go           # User management
-│   │   ├── post.go           # Post operations
-│   │   ├── message.go        # Messaging
-│   │   ├── group.go          # Group management
-│   │   ├── event.go          # Event handling
-│   │   └── websocket.go      # WebSocket connections
-│   ├── services/              # Business logic
-│   │   ├── user_service.go
-│   │   ├── post_service.go
-│   │   ├── message_service.go
-│   │   ├── group_service.go
-│   │   └── notification_service.go
-│   ├── models/                # Data models
-│   ├── middleware/            # Middleware (auth, CORS)
-│   ├── websocket/            # WebSocket hub & handlers
-│   ├── utils/                # Helper functions
-│   ├── pkg/db/migrations/    # Database migrations
-│   ├── main.go               # Application entry point
-│   └── Dockerfile
-├── Frontend/
-│   ├── app/                  # Next.js App Router
-│   │   ├── feed/            # Feed page
-│   │   ├── chats/           # Chat interface
-│   │   ├── profile/         # User profiles
-│   │   ├── groups/          # Group pages
-│   │   └── events/          # Event pages
-│   ├── components/          # React components
-│   │   ├── auth/           # Auth components
-│   │   ├── chat/           # Chat UI
-│   │   ├── posts/          # Post components
-│   │   ├── groups/         # Group components
-│   │   └── ui/             # Reusable UI
-│   ├── context/            # React Context
-│   │   ├── AuthContext.tsx
-│   │   ├── WebSocketContext.tsx
-│   │   └── ToastContext.tsx
-│   ├── hooks/              # Custom hooks
-│   │   ├── useFeed.ts
-│   │   ├── useRealTimeMessages.ts
-│   │   └── useNotifications.ts
-│   ├── lib/                # API client
-│   │   └── api/           # API methods
-│   ├── types/             # TypeScript types
-│   └── Dockerfile
-├── docker-compose.yml     # Docker orchestration
-├── build.sh              # Build script
-└── run.sh               # Run script
-```
-
-## 🧪 Testing
-
-### Backend Tests
-
-```bash
-cd Backend
-go test ./...
-
-# Run with coverage
-go test -cover ./...
-
-# Run specific package
-go test ./services/...
-```
-
-### Frontend Tests
-
-```bash
-cd Frontend
-npm test
-
-# Run with coverage
-npm run test:coverage
-
-# E2E tests
-npm run test:e2e
-```
+- **Private Messages:** Instant chat delivery
+- **Group Messages:** Live group conversations
+- **Typing Indicators:** See when others are typing
+- **Status Updates:** Online/offline status changes
+- **Notifications:** Instant activity alerts
+- **Post Updates:** New content in feeds
+- **Event Changes:** RSVP updates and reminders
 
 ## 🔒 Security Features
 
-- **Password Hashing**: bcrypt with salt
-- **JWT Authentication**: Secure token-based auth
-- **Session Management**: Automatic token expiration
-- **CORS Protection**: Configured CORS policies
-- **SQL Injection Prevention**: Prepared statements
-- **XSS Protection**: Input sanitization
-- **Rate Limiting**: API rate limiting (production)
-- **HTTPS Ready**: SSL/TLS support
+- **Password Hashing:** bcrypt with salt
+- **JWT Tokens:** Secure authentication with expiration
+- **Input Validation:** All user input sanitized
+- **SQL Injection Protection:** Parameterized queries
+- **CORS Configuration:** Proper cross-origin policies
+- **Rate Limiting:** API request throttling
+- **Session Management:** Automatic cleanup
 
-## 🚀 Deployment
+## 🚀 Future Improvements
 
-### Production Build
+### 🔍 Advanced Features
+- **Advanced Search & Filtering:** Full-text search with filters by date, content type, and user
+- **Content Moderation:** AI-powered content moderation and automated spam detection
+- **Video Support:** Native video upload and streaming capabilities
+- **Stories Feature:** Instagram-style ephemeral content with 24-hour visibility
+- **Live Streaming:** Real-time video broadcasting for events and announcements
 
-```bash
-# Build Docker images for production
-docker-compose -f docker-compose.prod.yml build
+### 📊 Analytics & Insights
+- **User Analytics:** Post engagement metrics, follower growth, and activity insights
+- **Content Analytics:** Performance tracking for posts, optimal posting times, and audience reach
+- **Group Analytics:** Member activity, content engagement, and community health metrics
+- **Real-time Dashboards:** Administrative panels with live system monitoring
 
-# Run in production mode
-docker-compose -f docker-compose.prod.yml up -d
-```
+### 🔧 Technical Enhancements
+- **Microservices Architecture:** Break down monolithic backend into scalable microservices
+- **GraphQL API:** More flexible and efficient data fetching
+- **Redis Caching:** High-performance caching layer for frequently accessed data
+- **CDN Integration:** Global content delivery for faster media loading
+- **Advanced WebRTC:** Peer-to-peer video calling and screen sharing
 
-### Environment Variables (Production)
+### 🌐 Platform Expansion
+- **Mobile Apps:** Native iOS and Android applications
+- **Progressive Web App:** Installable web app with offline capabilities
+- **API Ecosystem:** Third-party integrations and developer API access
+- **Multi-language Support:** Internationalization and localization
+- **Accessibility:** WCAG 2.1 compliance and screen reader support
 
-Ensure you set these in production:
+### 🤖 AI & Machine Learning
+- **Smart Recommendations:** AI-powered content and friend suggestions
+- **Automated Tagging:** Image recognition and content categorization
+- **Sentiment Analysis:** Community mood tracking and toxicity detection
+- **Personalized Feeds:** Machine learning algorithms for content ranking
 
-- `DB_PATH`: Persistent volume path
-- `CORS_ALLOWED_ORIGINS`: Your production domain
-- `PORT`: Production port (default: 8080)
+## ⚠️ Limitations
+
+### 🗃️ Database Constraints
+- **SQLite Limitations:** Single-writer limitation may cause bottlenecks under high load
+- **No Built-in Replication:** Manual backup and restore processes required
+- **File-based Storage:** Database file size limits and potential corruption risks
+
+### ⚡ Performance Considerations
+- **Memory Usage:** WebSocket connections consume server memory for each active user
+- **Real-time Scaling:** Current architecture may struggle with 10,000+ concurrent users
+
+### 🔐 Security Boundaries
+- **No Multi-factor Authentication:** Currently relies on password-only authentication
+- **Basic Rate Limiting:** Simple request throttling without advanced DDoS protection
+- **Session Management:** JWT tokens don't support forced logout across all devices
+
+### 🎨 User Experience Gaps
+- **Limited Customization:** Basic theming options without extensive personalization
+
+### 📱 Platform Restrictions
+- **Web-Only:** No native mobile applications available
+- **Browser Dependent:** Real-time features require modern browser WebSocket support
+
+### 🔧 Development & Deployment
+- **Monolithic Architecture:** Single codebase may become complex to maintain at scale
+- **Manual Deployment:** Docker-based but lacks automated CI/CD pipelines
+- **Limited Monitoring:** Basic logging without comprehensive system monitoring
 
 ## 🤝 Contributing
 
-Contributions are welcome! Please follow these steps:
+We welcome contributions! Here's how to get involved:
 
-1. **Fork the Project**
-2. **Create your Feature Branch** (`git checkout -b feature/AmazingFeature`)
-3. **Commit your Changes** (`git commit -m 'Add some AmazingFeature'`)
-4. **Push to the Branch** (`git push origin feature/AmazingFeature`)
-5. **Open a Pull Request**
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes with tests
+4. Submit a pull request
 
-### Coding Standards
+## 📄 License
 
-- **Backend**: Follow Go best practices and `gofmt`
-- **Frontend**: Use TypeScript, follow React best practices
-- **Commits**: Use conventional commit messages
-- **Tests**: Add tests for new features
-
-## 📝 License
-
-Distributed under the MIT License. See `LICENSE.md` for more information.
+MIT License - see LICENSE.md for details.
 
 ## 👥 Authors
 
-- **qaljaffe**
-- **sayuksel**
-- **sayehusain**
+- **Salah Yuksel**
+- **Qassim Aljaffer**
+- **Sayed Ahmed Husain** - [sayedahmed97.sad@gmail.com](mailto:sayedahmed97.sad@gmail.com)
 
 ## 🙏 Acknowledgments
 
-- Next.js team for the amazing framework
-- Go community for excellent libraries
-- All contributors who helped build this project
+Built with ❤️ using modern web technologies. Special thanks to the Go and React communities for amazing tools and libraries.
 
-**⭐ If you find this project useful, please give it a star!**
+**⭐ If GigaBit helps you connect, please give it a star!**

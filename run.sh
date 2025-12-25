@@ -214,17 +214,17 @@ docker_compose_status() {
   docker compose -f "$DOCKER_COMPOSE_FILE" ps
   echo ""
   info "Health status:"
-  docker inspect social-network-backend --format='Backend: {{.State.Health.Status}}' 2>/dev/null || echo "Backend: not running"
-  docker inspect social-network-frontend --format='Frontend: {{.State.Health.Status}}' 2>/dev/null || echo "Frontend: not running"
+  docker inspect gigabit-backend --format='Backend: {{.State.Health.Status}}' 2>/dev/null || echo "Backend: not running"
+  docker inspect gigabit-frontend --format='Frontend: {{.State.Health.Status}}' 2>/dev/null || echo "Frontend: not running"
 }
 
 docker_compose_shell() {
   local service="${1:-backend}"
   info "Opening shell in $service container..."
   if [ "$service" = "backend" ]; then
-    docker exec -it social-network-backend /bin/sh
+    docker exec -it gigabit-backend /bin/sh
   elif [ "$service" = "frontend" ]; then
-    docker exec -it social-network-frontend /bin/sh
+    docker exec -it gigabit-frontend /bin/sh
   else
     err "Invalid service. Use 'backend' or 'frontend'"
     exit 1
@@ -239,8 +239,8 @@ docker_compose_clean() {
     docker compose -f "$DOCKER_COMPOSE_FILE" down -v --remove-orphans
     
     info "Removing images..."
-    docker image rm social-network-backend:latest 2>/dev/null || true
-    docker image rm social-network-frontend:latest 2>/dev/null || true
+    docker image rm gigabit-backend:latest 2>/dev/null || true
+    docker image rm gigabit-frontend:latest 2>/dev/null || true
     
     success "Docker cleanup completed"
   else

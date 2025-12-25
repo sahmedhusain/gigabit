@@ -4,7 +4,7 @@ import (
 	"database/sql"
 	"net/http"
 
-	"social/services"
+	"gigabit/services"
 )
 
 type ChatHandler struct {

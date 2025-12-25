@@ -5,8 +5,8 @@ import (
 	"database/sql"
 	"encoding/json"
 	"net/http"
-	"social/services"
-	"social/utils"
+	"gigabit/services"
+	"gigabit/utils"
 	"strings"
 	"time"
 )

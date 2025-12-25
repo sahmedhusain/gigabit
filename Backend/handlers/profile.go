@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"strconv"
 
-	"social/models"
-	"social/services"
+	"gigabit/models"
+	"gigabit/services"
 )
 
 type ProfileHandler struct {

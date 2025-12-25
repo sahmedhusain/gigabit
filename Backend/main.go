@@ -3,8 +3,8 @@ package main
 import (
 	"flag"
 	"log"
-	"social/mockdata"
-	"social/websocket"
+"gigabit/mockdata"
+"gigabit/websocket"
 )
 
 func main() {

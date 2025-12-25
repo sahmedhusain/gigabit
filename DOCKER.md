@@ -1,6 +1,6 @@
 # Docker Setup Guide
 
-This document explains the Docker architecture and usage for the Social Network Application.
+This document explains the Docker architecture and usage for GigaBit.
 
 ## Architecture Overview
 
@@ -28,7 +28,7 @@ The application uses **Docker containers** to run two separate services:
          │
          ▼
    Bridge Network
-  (social-network)
+  (gigabit)
 ```
 
 ### Key Concepts
@@ -41,8 +41,8 @@ The application uses **Docker containers** to run two separate services:
 ## Container Details
 
 ### Backend Container
-- **Name**: `social-network-backend`
-- **Image**: `social-network-backend:latest`
+- **Name**: `gigabit-backend`
+- **Image**: `gigabit-backend:latest`
 - **Port**: 8080
 - **Technology**: Go 1.23 + Gin framework
 - **Volumes**:
@@ -50,8 +50,8 @@ The application uses **Docker containers** to run two separate services:
   - `backend_uploads`: User uploaded files
 
 ### Frontend Container
-- **Name**: `social-network-frontend`
-- **Image**: `social-network-frontend:latest`
+- **Name**: `gigabit-frontend`
+- **Image**: `gigabit-frontend:latest`
 - **Port**: 3000
 - **Technology**: Next.js 14 + React
 - **Depends on**: Backend (waits for backend to be healthy)
@@ -138,16 +138,16 @@ docker compose restart backend
 docker compose restart frontend
 
 # Execute commands in containers
-docker exec -it social-network-backend /bin/sh
-docker exec -it social-network-frontend /bin/sh
+docker exec -it gigabit-backend /bin/sh
+docker exec -it gigabit-frontend /bin/sh
 ```
 
 ### Health Checks
 
 ```bash
 # Check container health
-docker inspect social-network-backend --format='{{.State.Health.Status}}'
-docker inspect social-network-frontend --format='{{.State.Health.Status}}'
+docker inspect gigabit-backend --format='{{.State.Health.Status}}'
+docker inspect gigabit-frontend --format='{{.State.Health.Status}}'
 
 # Test endpoints
 curl http://localhost:8080/health    # Backend health
@@ -161,15 +161,15 @@ curl http://localhost:3000           # Frontend
 docker volume ls
 
 # Inspect volumes
-docker volume inspect social-network-backend-data
-docker volume inspect social-network-backend-uploads
+docker volume inspect gigabit-backend-data
+docker volume inspect gigabit-backend-uploads
 
 # Backup database
-docker run --rm -v social-network-backend-data:/data -v $(pwd):/backup \
+docker run --rm -v gigabit-backend-data:/data -v $(pwd):/backup \
   alpine tar czf /backup/backup-$(date +%Y%m%d).tar.gz -C /data .
 
 # Restore database
-docker run --rm -v social-network-backend-data:/data -v $(pwd):/backup \
+docker run --rm -v gigabit-backend-data:/data -v $(pwd):/backup \
   alpine tar xzf /backup/backup-20241028.tar.gz -C /data
 ```
 
@@ -214,10 +214,10 @@ docker compose up -d
 
 ```bash
 # Check health status
-docker inspect social-network-backend --format='{{json .State.Health}}'
+docker inspect gigabit-backend --format='{{json .State.Health}}'
 
 # View recent logs
-docker logs --tail 50 social-network-backend
+docker logs --tail 50 gigabit-backend
 
 # Restart container
 docker compose restart backend
@@ -298,7 +298,7 @@ To force fresh build:
 docker stats
 
 # View specific container
-docker stats social-network-backend
+docker stats gigabit-backend
 ```
 
 ### Logs
@@ -335,4 +335,3 @@ docker compose up -d
 - [Docker Documentation](https://docs.docker.com/)
 - [Docker Compose Documentation](https://docs.docker.com/compose/)
 - [Multi-stage Builds](https://docs.docker.com/build/building/multi-stage/)
-

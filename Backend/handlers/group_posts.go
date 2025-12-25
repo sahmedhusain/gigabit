@@ -7,9 +7,9 @@ import (
 	"strconv"
 	"time"
 
-	"social/models"
-	"social/services"
-	"social/websocket"
+	"gigabit/models"
+	"gigabit/services"
+	"gigabit/websocket"
 )
 
 // CreateGroupPost creates a new post in a group

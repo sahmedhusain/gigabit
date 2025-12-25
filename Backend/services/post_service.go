@@ -2,8 +2,8 @@ package services
 
 import (
 	"database/sql"
-	"social/models"
-	"social/websocket"
+	"gigabit/models"
+	"gigabit/websocket"
 	"time"
 )
 

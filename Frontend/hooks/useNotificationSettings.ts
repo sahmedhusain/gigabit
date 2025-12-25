@@ -82,7 +82,7 @@ export function useNotificationSettings() {
         const notification = new Notification(title, {
           body,
           icon: icon || '/favicon.ico',
-          tag: 'social-network-notification',
+          tag: 'gigabit-notification',
           requireInteraction: false,
           silent: true
         })

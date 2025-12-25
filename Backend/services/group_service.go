@@ -9,7 +9,7 @@ import (
 
 	sqlite3 "github.com/mattn/go-sqlite3"
 
-	"social/models"
+	"gigabit/models"
 )
 
 type GroupService struct {

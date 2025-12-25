@@ -91,8 +91,8 @@ main() {
     if [ "$CLEAN_BUILD" = true ]; then
         warn "Clean build requested - removing existing containers and volumes..."
         docker compose down -v --remove-orphans 2>/dev/null || true
-        docker image rm social-network-backend:latest 2>/dev/null || true
-        docker image rm social-network-frontend:latest 2>/dev/null || true
+        docker image rm gigabit-backend:latest 2>/dev/null || true
+        docker image rm gigabit-frontend:latest 2>/dev/null || true
         success "Cleanup completed"
         echo ""
     fi
@@ -130,8 +130,8 @@ main() {
     INTERVAL=5
 
     while [ $WAITED -lt $MAX_WAIT ]; do
-        BACKEND_HEALTHY=$(docker inspect social-network-backend --format='{{.State.Health.Status}}' 2>/dev/null || echo "starting")
-        FRONTEND_HEALTHY=$(docker inspect social-network-frontend --format='{{.State.Health.Status}}' 2>/dev/null || echo "starting")
+        BACKEND_HEALTHY=$(docker inspect gigabit-backend --format='{{.State.Health.Status}}' 2>/dev/null || echo "starting")
+        FRONTEND_HEALTHY=$(docker inspect gigabit-frontend --format='{{.State.Health.Status}}' 2>/dev/null || echo "starting")
         
         if [ "$BACKEND_HEALTHY" = "healthy" ] && [ "$FRONTEND_HEALTHY" = "healthy" ]; then
             break
@@ -145,8 +145,8 @@ main() {
     echo ""
 
     # Check final health status
-    BACKEND_HEALTHY=$(docker inspect social-network-backend --format='{{.State.Health.Status}}' 2>/dev/null || echo "unknown")
-    FRONTEND_HEALTHY=$(docker inspect social-network-frontend --format='{{.State.Health.Status}}' 2>/dev/null || echo "unknown")
+    BACKEND_HEALTHY=$(docker inspect gigabit-backend --format='{{.State.Health.Status}}' 2>/dev/null || echo "unknown")
+    FRONTEND_HEALTHY=$(docker inspect gigabit-frontend --format='{{.State.Health.Status}}' 2>/dev/null || echo "unknown")
 
     echo "🏥 Health Check Results:"
     echo "========================"

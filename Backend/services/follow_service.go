@@ -2,7 +2,7 @@ package services
 
 import (
 	"database/sql"
-	"social/models"
+	"gigabit/models"
 	"time"
 )
 

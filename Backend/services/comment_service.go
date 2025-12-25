@@ -4,8 +4,8 @@ import (
 	"database/sql"
 	"time"
 
-	"social/models"
-	"social/websocket"
+	"gigabit/models"
+	"gigabit/websocket"
 )
 
 type CommentService struct {

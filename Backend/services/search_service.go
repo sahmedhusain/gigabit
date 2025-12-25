@@ -6,7 +6,7 @@ import (
 	"sort"
 	"strings"
 
-	"social/models"
+	"gigabit/models"
 )
 
 type SearchService struct {

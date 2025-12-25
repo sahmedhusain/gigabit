@@ -7,9 +7,9 @@ import (
 	"strconv"
 	"strings"
 
-	"social/models"
-	"social/services"
-	"social/websocket"
+	"gigabit/models"
+	"gigabit/services"
+	"gigabit/websocket"
 )
 
 type GroupHandler struct {

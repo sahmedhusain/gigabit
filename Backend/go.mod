@@ -1,4 +1,4 @@
-module social
+module gigabit
 
 go 1.23.2
 

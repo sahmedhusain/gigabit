@@ -10,11 +10,11 @@ import (
 	"strings"
 	"time"
 
-	"social/handlers"
-	"social/middleware"
-	customsqlite "social/pkg/db/sqlite"
-	"social/services"
-	"social/websocket"
+"gigabit/handlers"
+"gigabit/middleware"
+customsqlite "gigabit/pkg/db/sqlite"
+"gigabit/services"
+"gigabit/websocket"
 )
 
 type contextKey string

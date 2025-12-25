@@ -2,7 +2,7 @@ package main
 
 import (
 	"log"
-	customsqlite "social/pkg/db/sqlite"
+	customsqlite "gigabit/pkg/db/sqlite"
 )
 
 var DB *customsqlite.DB

@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"social/services"
+	"gigabit/services"
 )
 
 type StatusHandler struct {

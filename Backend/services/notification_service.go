@@ -4,8 +4,8 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"social/models"
-	"social/websocket"
+	"gigabit/models"
+	"gigabit/websocket"
 	"strings"
 	"time"
 )

@@ -1,7 +1,9 @@
-# GigaBit 🌐⚡
+# GigaBit 🌐
 
 <p align="center">
-  <img src="https://capsule-render.vercel.app/api?type=waving&height=170&text=GigaBit&fontAlignY=35&desc=Real-time%20Social%20Network%20%7C%20Go%20Backend%20%2B%20Next.js%20Frontend&descAlignY=55&animation=twinkling" alt="GigaBit Banner" />
+  <img src="https://capsule-render.vercel.app/api?type=waving&color=0:10B981,100:0EA5E9&height=190&text=%20&fontAlign=50&fontAlignY=32&fontColor=0F172A&desc=Real-time%20Social%20Network%20%7C%20Go%20Backend%20%2B%20Next.js%20Frontend&descAlign=50&descAlignY=42&animation=twinkling" alt="GigaBit Banner" />
+  <br />
+  <img src="Frontend/public/logo.png" alt="GigaBit Logo Banner" width="340" />
 </p>
 
 <p align="center">
@@ -18,7 +20,7 @@
 </p>
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/solar.png" width="100%" alt="Animated Divider" />
+  <img src="https://capsule-render.vercel.app/api?type=rect&color=0:0EA5E9,100:111827&height=4&section=footer" width="100%" alt="Divider" />
 </p>
 
 [![Go](https://img.shields.io/badge/Go-1.23.2-00ADD8?style=flat&logo=go)](https://golang.org/)
@@ -39,10 +41,6 @@
 [![Auth](https://img.shields.io/badge/Auth-JWT-orange)](#-security--privacy)
 
 <p align="center">
-  <img src="Frontend/public/logo.png" alt="GigaBit Logo" width="400" height="225">
-</p>
-
-<p align="center">
   <img src="https://raw.githubusercontent.com/devicons/devicon/master/icons/go/go-original.svg" width="34"/>
   <img src="https://raw.githubusercontent.com/devicons/devicon/master/icons/nextjs/nextjs-original.svg" width="34"/>
   <img src="https://raw.githubusercontent.com/devicons/devicon/master/icons/react/react-original.svg" width="34"/>
@@ -52,18 +50,12 @@
   <img src="https://raw.githubusercontent.com/devicons/devicon/master/icons/docker/docker-original.svg" width="34"/>
 </p>
 
-<p align="center">
-  <img src="https://svg-banners.vercel.app/api?type=glitch&text1=Real-time%20updates&text2=Messaging%20%7C%20Groups%20%7C%20Events%20%7C%20Privacy%20controls&width=980&height=90" alt="GigaBit Highlights Banner"/>
-</p>
-
 ---
 
 GigaBit is a flagship, end-to-end social network blueprint. It blends a Go + WebSocket backend with a modern Next.js/React/Tailwind frontend and a relational data model that powers the full social surface area: feed, messaging, polls, events, groups, privacy controls, notifications, and real-time delivery.
 
-> Think of it as a product-quality case study: every interaction is wired, every edge is handled, and this README doubles as the story, playbook, and runbook.
-
 <p align="center">
-  <img src="https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/fresh.png" width="100%" alt="Animated Divider" />
+  <img src="https://capsule-render.vercel.app/api?type=rect&color=0:0EA5E9,100:111827&height=4&section=footer" width="100%" alt="Divider" />
 </p>
 
 ## ⭐ Key Highlights
@@ -87,7 +79,7 @@ Broadcast loop (notifications, chat, live feed)
 ```
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/dots.png" width="100%" alt="Animated Divider" />
+  <img src="https://capsule-render.vercel.app/api?type=rect&color=0:0EA5E9,100:111827&height=4&section=footer" width="100%" alt="Divider" />
 </p>
 
 ## 📸 Screenshots
@@ -119,7 +111,7 @@ A quick tour of live surfaces captured from the current build (no extra uploads 
 </div>
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/mermaid.png" width="100%" alt="Animated Divider" />
+  <img src="https://capsule-render.vercel.app/api?type=rect&color=0:0EA5E9,100:111827&height=4&section=footer" width="100%" alt="Divider" />
 </p>
 
 ## 📋 Table of Contents
@@ -336,18 +328,10 @@ See your likes, comments, and posts together to recap your footprint across the 
 Stay oriented with quick links for follows, invites, and your calendar.
 
 <div align="center">
-  <img src="screenshots/sidebar-following.jpeg" alt="Sidebar Following" />
-  <p><em>Managing who you follow and follower requests</em></p>
-</div>
-
-<div align="center">
-  <img src="screenshots/sidebar-invitations.jpeg" alt="Sidebar Invitations" />
-  <p><em>Group invitations and pending requests</em></p>
-</div>
-
-<div align="center">
-  <img src="screenshots/sidebar-calender.jpeg" alt="Sidebar Calendar" />
-  <p><em>Event calendar and upcoming activities</em></p>
+  <img src="screenshots/sidebar-calender.jpeg" alt="Sidebar Calendar" width="32%" />
+  <img src="screenshots/sidebar-following.jpeg" alt="Sidebar Following" width="32%" />
+  <img src="screenshots/sidebar-invitations.jpeg" alt="Sidebar Invitations" width="32%" />
+  <p><em>Event calendar and upcoming activities · Managing who you follow and follower requests · Group invitations and pending requests</em></p>
 </div>
 
 ## 🛠️ Tech Stack

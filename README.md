@@ -1,4 +1,25 @@
-# GigaBit 🌐
+# GigaBit 🌐⚡
+
+<p align="center">
+  <img src="https://capsule-render.vercel.app/api?type=waving&height=170&text=GigaBit&fontAlignY=35&desc=Real-time%20Social%20Network%20%7C%20Go%20Backend%20%2B%20Next.js%20Frontend&descAlignY=55&animation=twinkling" alt="GigaBit Banner" />
+</p>
+
+<p align="center">
+  <a href="#-screenshots">Screenshots</a> •
+  <a href="#-what-makes-gigabit-special">Highlights</a> •
+  <a href="#-architecture--data-flow">Architecture</a> •
+  <a href="#-database-schema--logic">Database</a> •
+  <a href="#-getting-started">Get Started</a> •
+  <a href="#-security--privacy">Security</a>
+</p>
+
+<p align="center">
+  <img src="https://readme-typing-svg.demolab.com?font=Fira+Code&pause=900&center=true&vCenter=true&width=980&lines=Built+as+a+hero+project+covering+the+full+social+stack;Real-time+chat%2C+posts%2C+polls%2C+events%2C+privacy%2C+notifications;Go+%2B+WebSockets+%2B+Next.js+15+%7C+React+19+%7C+Tailwind+4" alt="Typing SVG" />
+</p>
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/solar.png" width="100%" alt="Animated Divider" />
+</p>
 
 [![Go](https://img.shields.io/badge/Go-1.23.2-00ADD8?style=flat&logo=go)](https://golang.org/)
 [![Docker](https://img.shields.io/badge/Docker-Ready-blue?style=flat&logo=docker)](https://www.docker.com/)
@@ -13,15 +34,65 @@
 [![Gorilla Mux](https://img.shields.io/badge/Gorilla_Mux-1.8-red)](https://github.com/gorilla/mux)
 [![Gorilla WebSocket](https://img.shields.io/badge/Gorilla_WebSocket-1.5-red)](https://github.com/gorilla/websocket)
 
+[![Full Stack](https://img.shields.io/badge/Project-Full--Stack%20Social%20Network-blueviolet)](#-key-highlights)
+[![Realtime](https://img.shields.io/badge/Realtime-WebSocket-0A66C2)](#-real-time-features)
+[![Auth](https://img.shields.io/badge/Auth-JWT-orange)](#-security--privacy)
+
 <p align="center">
   <img src="Frontend/public/logo.png" alt="GigaBit Logo" width="400" height="225">
 </p>
 
-Hey there! 👋 Welcome to **GigaBit** - a real-time social networking platform we built to make online connections feel more natural. It's like social media but without all the noise - instant messaging, community groups, and privacy controls that actually work.
+<p align="center">
+  <img src="https://raw.githubusercontent.com/devicons/devicon/master/icons/go/go-original.svg" width="34"/>
+  <img src="https://raw.githubusercontent.com/devicons/devicon/master/icons/nextjs/nextjs-original.svg" width="34"/>
+  <img src="https://raw.githubusercontent.com/devicons/devicon/master/icons/react/react-original.svg" width="34"/>
+  <img src="https://raw.githubusercontent.com/devicons/devicon/master/icons/typescript/typescript-original.svg" width="34"/>
+  <img src="https://raw.githubusercontent.com/devicons/devicon/master/icons/tailwindcss/tailwindcss-original.svg" width="34"/>
+  <img src="https://raw.githubusercontent.com/devicons/devicon/master/icons/sqlite/sqlite-original.svg" width="34"/>
+  <img src="https://raw.githubusercontent.com/devicons/devicon/master/icons/docker/docker-original.svg" width="34"/>
+</p>
 
-We built this with modern web technologies to create something that feels responsive and alive. Whether you're catching up with friends, joining niche communities, or just sharing what's on your mind, GigaBit keeps things simple and real-time.
+<p align="center">
+  <img src="https://svg-banners.vercel.app/api?type=glitch&text1=Real-time%20updates&text2=Messaging%20%7C%20Groups%20%7C%20Events%20%7C%20Privacy%20controls&width=980&height=90" alt="GigaBit Highlights Banner"/>
+</p>
+
+---
+
+GigaBit is a flagship, end-to-end social network blueprint. It blends a Go + WebSocket backend with a modern Next.js/React/Tailwind frontend and a relational data model that powers the full social surface area: feed, messaging, polls, events, groups, privacy controls, notifications, and real-time delivery.
+
+> Think of it as a product-quality case study: every interaction is wired, every edge is handled, and this README doubles as the story, playbook, and runbook.
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/fresh.png" width="100%" alt="Animated Divider" />
+</p>
+
+## ⭐ Key Highlights
+
+- **Privacy-first social graph:** private/public profiles, follow approvals, per-post privacy lists, and profile visibility controls.
+- **Full content loop:** posts with media, threaded comments, reactions, bookmarks, shares, polls, and a feed tuned for real conversations.
+- **Community OS:** groups with roles, invitations, gated membership, group-only posts/polls/events, and admin dashboards.
+- **Real-time nervous system:** WebSocket hub powering chat, typing indicators, live notifications, status changes, and feed updates.
+- **Production-ready posture:** Go + SQLite core, Next.js 15/React 19/Tailwind 4 frontend, Dockerized with Nginx-ready routing.
+
+### 🧩 At a Glance
+
+```text
+Next.js 15 + React 19 + TypeScript UI
+    ↕ REST (auth, feed, groups, events)
+Go services (Mux handlers, WebSocket hub)
+    ↕
+SQLite (25-table relational schema)
+    ↕
+Broadcast loop (notifications, chat, live feed)
+```
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/dots.png" width="100%" alt="Animated Divider" />
+</p>
 
 ## 📸 Screenshots
+
+A quick tour of live surfaces captured from the current build (no extra uploads needed).
 
 ### Main Feed
 <div align="center">
@@ -47,30 +118,39 @@ We built this with modern web technologies to create something that feels respon
   <p><em>Organize and track events with RSVP functionality</em></p>
 </div>
 
+<p align="center">
+  <img src="https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/mermaid.png" width="100%" alt="Animated Divider" />
+</p>
+
 ## 📋 Table of Contents
 
+Jump to any section below — the platform covers a full social network surface area.
+
 - [✨ What Makes GigaBit Special](#-what-makes-gigabit-special)
-- [🛠️ Tech Stack](#️-tech-stack)
-- [🏗️ Architecture & Data Flow](#️-architecture--data-flow)
+- [🛠️ Tech Stack](#-tech-stack)
+- [🏗️ Architecture & Data Flow](#-architecture--data-flow)
 - [🗄️ Database Schema & Logic](#-database-schema--logic)
 - [🚀 Getting Started](#-getting-started)
 - [📖 How GigaBit Works](#-how-gigabit-works)
 - [🔌 Real-time Features](#-real-time-features)
 - [📁 Project Structure](#-project-structure)
-- [🔒 Security Features](#-security-features)
+- [🔒 Security & Privacy](#-security--privacy)
 - [🤝 Contributing](#-contributing)
 - [📄 License](#-license)
 - [👥 Authors](#-authors)
 - [🙏 Acknowledgments](#-acknowledgments)
 
+<details open>
+<summary><strong>✨ What Makes GigaBit Special (expand/collapse)</strong></summary>
+
 ## ✨ What Makes GigaBit Special
 
 ### 🔐 Simple But Secure Login
-Getting started is easy - just pick a username and add your email. We use proper JWT tokens and bcrypt password hashing so your account stays secure. Sessions refresh automatically so you don't get logged out at annoying times.
+Onboard with an email, username, and password. Credentials are hashed with bcrypt, JWT sessions refresh cleanly, and you stay signed in without stale tokens.
 
 ### 🤝 Social Features That Work Like You Expect
 **Following with Approval**
-Public accounts let anyone follow immediately. Private accounts require approval first. When someone wants to follow you, you get a notification and can accept or decline. No unwanted followers.
+Public accounts are instant follows; private accounts queue a request and surface a notification so you can approve or decline. No surprise followers.
 
 <div align="center">
   <img src="screenshots/follow-request-private.jpeg" alt="Follow Request" />
@@ -78,7 +158,7 @@ Public accounts let anyone follow immediately. Private accounts require approval
 </div>
 
 **Finding People**
-Search by name, email, or nickname to find specific people. We also suggest connections based on mutual friends. It's straightforward - no complicated algorithms.
+Search by name, email, or nickname, and get mutual-connection hints. Profiles open quickly so you can follow or message right away.
 
 <div align="center">
   <img src="screenshots/discover-page.jpeg" alt="Discover Page" />
@@ -91,7 +171,7 @@ Search by name, email, or nickname to find specific people. We also suggest conn
 </div>
 
 **Profile Customization**
-Add a nickname, bio, avatar, and personal details. Control who sees your birthday and gender. Your profile, your rules.
+Add nickname, bio, avatar, and personal details with privacy flags for birthday and gender. Own your profile without oversharing.
 
 <div align="center">
   <img src="screenshots/profile-page.jpeg" alt="Profile Page" />
@@ -105,7 +185,7 @@ Add a nickname, bio, avatar, and personal details. Control who sees your birthda
 
 ### 📝 Creating & Sharing Content
 **Posting Made Simple**
-Write posts with text and photos. Choose who sees each post - everyone, just your followers, or specific people. We made it flexible so you can share exactly how you want.
+Write posts with text and photos, pick public/followers/custom audiences, and hit publish. Privacy is part of the composer, not an afterthought.
 
 <div align="center">
   <img src="screenshots/create-post.jpeg" alt="Create Post" />
@@ -113,7 +193,7 @@ Write posts with text and photos. Choose who sees each post - everyone, just you
 </div>
 
 **Comments & Discussions**
-Comments can have images too, and you can reply to replies for threaded conversations. Like posts and comments to show you care. It's like having mini-forums on every post.
+Threaded comments (with images) and reactions keep conversations tidy. Replies nest cleanly so long discussions stay readable.
 
 <div align="center">
   <img src="screenshots/posts-and-comments.jpeg" alt="Posts and Comments" />
@@ -121,10 +201,10 @@ Comments can have images too, and you can reply to replies for threaded conversa
 </div>
 
 **Polls for Fun & Decisions**
-Make polls with multiple options and set when they expire. Results update live as people vote. Great for quick opinions or group decisions.
+Create polls with multiple options and expiry times. Results update live as votes land.
 
 **Sharing & Saving**
-Share posts to your feed or send them in messages. Bookmark stuff you want to find later. Content moves around the platform naturally.
+Share to feed or chat, and bookmark anything worth revisiting. Posts carry their privacy rules along the way.
 
 <div align="center">
   <img src="screenshots/post-privacy.jpeg" alt="Post Privacy" />
@@ -133,10 +213,10 @@ Share posts to your feed or send them in messages. Bookmark stuff you want to fi
 
 ### 💬 Chat & Messaging
 **Private Messages**
-Talk one-on-one with anyone. Messages arrive instantly, you see when people are typing, and get read receipts. It feels just like texting but with more features.
+One-to-one conversations with instant delivery, typing indicators, and read receipts so you know what landed.
 
 **Group Conversations**
-Chat with multiple people at once. Perfect for communities or friend groups. Everyone sees messages in real-time, same features as private chats.
+Chat in groups with the same real-time fidelity and member-aware context.
 
 <div align="center">
   <img src="screenshots/group-chat.jpeg" alt="Group Chat" />
@@ -144,7 +224,7 @@ Chat with multiple people at once. Perfect for communities or friend groups. Eve
 </div>
 
 **Managing Your Chats**
-Keep your chat history organized. Delete messages if you change your mind, archive old conversations, and scroll through thousands of messages quickly.
+Archive, delete, and scroll long histories without losing performance.
 
 <div align="center">
   <img src="screenshots/chats-page.jpeg" alt="Chats Page" />
@@ -153,7 +233,7 @@ Keep your chat history organized. Delete messages if you change your mind, archi
 
 ### 👥 Groups & Communities
 **Building Communities**
-Make groups for any interest - public ones anyone can join, or private ones that need approval. Each group gets its own space with posts, events, and chat rooms.
+Spin up public or private groups with avatars, descriptions, and clear membership rules.
 
 <div align="center">
   <img src="screenshots/create-group.jpeg" alt="Create Group" />
@@ -161,7 +241,7 @@ Make groups for any interest - public ones anyone can join, or private ones that
 </div>
 
 **Who Can Do What**
-Group creators and admins manage everything. Members have different permissions based on their role. You control who can post, create events, or send messages.
+Creators and admins control roles, permissions, and moderation. Members get scoped capabilities that match their role.
 
 <div align="center">
   <img src="screenshots/group-admin1.jpeg" alt="Group Admin Panel" />
@@ -174,7 +254,7 @@ Group creators and admins manage everything. Members have different permissions 
 </div>
 
 **Group-Only Stuff**
-Groups have their own content - posts, polls, and events that only members see. Everyone gets notified when something happens in their groups.
+Group feeds, polls, and events stay inside the walls. Members get notified when something happens.
 
 <div align="center">
   <img src="screenshots/group-polls.jpeg" alt="Group Polls" />
@@ -182,7 +262,7 @@ Groups have their own content - posts, polls, and events that only members see. 
 </div>
 
 **Getting People In**
-Private groups need admin approval to join. You can invite specific people or let them request to join. Admins decide who gets in.
+Invites, join requests, and admin approvals keep private spaces curated.
 
 <div align="center">
   <img src="screenshots/group-admin2.jpeg" alt="Group Admin Tools" />
@@ -201,7 +281,7 @@ Private groups need admin approval to join. You can invite specific people or le
 
 ### 📅 Events & Meetups
 **Planning Events**
-Set up events with all the details - what, when, where. Make them for your groups or just for yourself. It's straightforward to get people together.
+Schedule events with titles, descriptions, locations, and dates for groups or personal use.
 
 <div align="center">
   <img src="screenshots/create-event.jpeg" alt="Create Event" />
@@ -209,17 +289,17 @@ Set up events with all the details - what, when, where. Make them for your group
 </div>
 
 **RSVP System**
-People can say if they're coming, not coming, or maybe. You see who's going and get reminded before it starts. No more wondering who will show up.
+Track going/not going/maybe with live updates and reminders.
 
 **Managing Events**
-Change details if plans change, cancel with a reason, and see responses update live. Everything stays in sync for everyone involved.
+Edit details, cancel with reasons, and keep everyone in sync.
 
 ### 🔔 Staying in the Loop
 **Getting Notified**
-You get alerts for likes, comments, follows, messages, event invites, group stuff, and more. We make sure you don't miss what's important.
+Likes, comments, follows, messages, invites, and group actions all surface as notifications so nothing slips.
 
 **Customizing Alerts**
-Pick your sounds, set quiet times, and mute specific chats. Turn on browser notifications for desktop alerts. Make it work how you want.
+Pick sounds, mute chats, set quiet hours, and toggle browser push. Your notifications, your way.
 
 <div align="center">
   <img src="screenshots/settings-pages.jpeg" alt="Settings Pages" />
@@ -232,17 +312,20 @@ Pick your sounds, set quiet times, and mute specific chats. Turn on browser noti
 </div>
 
 **Instant Updates**
-Notifications pop up immediately. Check them in your notification center with links to see what's happening.
+Notifications arrive via WebSocket in real time with deep links to the relevant action.
 
 <div align="center">
   <img src="screenshots/notifications-page.jpeg" alt="Notifications Page" />
   <p><em>Notification center showing all activity alerts and updates</em></p>
 </div>
 
+</details>
+
+---
 ## 📊 Activity & Engagement
 
 ### Your Activity Overview
-Track your interactions across the platform - see your likes, comments, and posts all in one place.
+See your likes, comments, and posts together to recap your footprint across the network.
 
 <div align="center">
   <img src="screenshots/your-activity-likes.jpeg" alt="Your Activity Likes" />
@@ -250,7 +333,7 @@ Track your interactions across the platform - see your likes, comments, and post
 </div>
 
 ### Sidebar Navigation
-Quick access to all your important sections through the sidebar.
+Stay oriented with quick links for follows, invites, and your calendar.
 
 <div align="center">
   <img src="screenshots/sidebar-following.jpeg" alt="Sidebar Following" />
@@ -267,35 +350,38 @@ Quick access to all your important sections through the sidebar.
   <p><em>Event calendar and upcoming activities</em></p>
 </div>
 
-## 🛠️ What We Built It With
+## 🛠️ Tech Stack
+
+What powers GigaBit end-to-end, from real-time backplane to the UI polish.
 
 ### Backend - The Engine Room
-- **Go 1.23.2** - Fast compiled language that handles our server and real-time features well
-- **SQLite** - Simple, file-based database that works without extra setup
-- **Gorilla WebSocket** - Makes instant messaging and live updates possible
-- **Gorilla Mux** - Routes all our API requests to the right handlers
-- **golang-migrate** - Keeps our database schema updated as we add features
-- **bcrypt** - Securely hashes passwords so they're never stored in plain text
+- **Go 1.23.2** - Fast, typed, and perfect for WebSocket-heavy workloads.
+- **SQLite** - Lightweight, zero-ops relational store that travels with the repo.
+- **Gorilla WebSocket** - Handles bidirectional, low-latency messaging.
+- **Gorilla Mux** - Predictable routing for REST endpoints.
+- **golang-migrate** - Managed schema evolution without manual SQL drift.
+- **bcrypt** - Industry-standard password hashing.
 
 ### Frontend - What You See
-- **Next.js 15.5.3** - React framework with smart routing and performance features
-- **React 19.1.0** - Component library that makes the interface responsive and smooth
-- **TypeScript 5** - Catches JavaScript errors before they happen
-- **Tailwind CSS 4** - Utility classes that make styling fast and consistent
-- **Framer Motion 12.23.22** - Adds smooth animations and transitions
-- **SWR** - Smart caching that keeps the app feeling fast
-- **Lucide Icons** - Clean, scalable icons that look good everywhere
+- **Next.js 15.5.3** - Hybrid rendering, file routing, and performance by default.
+- **React 19.1.0** - Interactive UI foundation.
+- **TypeScript 5** - Safer component contracts and API calls.
+- **Tailwind CSS 4** - Utility styling for a consistent system look.
+- **Framer Motion 12.23.22** - Smooth transitions and motion flourishes.
+- **SWR** - Smart caching and revalidation for fast data refreshes.
+- **Lucide Icons** - Clean, scalable icons.
 
 ### DevOps - Getting It Running
-- **Docker** - Packages everything so it runs the same anywhere
-- **Docker Compose** - Coordinates frontend, backend, and database together
-- **Nginx** - Handles web traffic efficiently in production
+- **Docker** - Same environment everywhere.
+- **Docker Compose** - Orchestrates frontend, backend, and database together.
+- **Nginx** - Production-ready reverse proxy option.
 
+---
 ## 🏗️ Architecture & Data Flow
 
-### How Everything Fits Together
+Think of GigaBit as a conversation between the browser, the Go services, and the database, with a WebSocket rail for live signals.
 
-Imagine GigaBit as a well-orchestrated conversation between your browser, our servers, and the database:
+### How Everything Fits Together
 
 ```
 Your Browser (Frontend) ↔ Go Backend (API Server) ↔ SQLite Database
@@ -303,35 +389,36 @@ Your Browser (Frontend) ↔ Go Backend (API Server) ↔ SQLite Database
    WebSocket Connection    Real-time Updates
 ```
 
-**The Frontend** (Next.js + React) is what you see and interact with. It handles the user interface, form submissions, and displays data beautifully.
+**The Frontend** (Next.js + React) handles UI, form flows, and beautifully renders data.
 
-**The Backend** (Go) is the brains of the operation. It processes requests, enforces business rules, manages real-time connections, and coordinates everything.
+**The Backend** (Go) enforces rules, validates input, orchestrates WebSocket sessions, and keeps state consistent.
 
-**The Database** (SQLite) is our persistent memory. It stores all user data, posts, messages, and relationships safely and efficiently.
+**The Database** (SQLite) stores users, posts, chats, events, and relationships with referential integrity.
 
-**WebSocket Connections** provide the "real-time magic" - instant updates without page refreshes.
+**WebSocket Connections** keep timelines, chats, and notifications moving without page refreshes.
 
 ### Request Flow Example
 
 When you create a post:
-1. **Frontend** collects your post data and sends it via API call
-2. **Backend** validates the data, checks permissions, and saves to database
-3. **Backend** broadcasts the new post to followers via WebSocket
-4. **Frontend** receives the update and shows the post instantly
-5. **Database** stores everything permanently
+1. Frontend collects the data and sends it via API call.
+2. Backend validates, checks permissions, and writes to the database.
+3. Backend broadcasts the new post to followers via WebSocket.
+4. Frontend receives the update and renders instantly.
+5. Database keeps the source of truth.
 
 ### Real-time Flow Example
 
 When someone sends you a message:
-1. **Sender's Frontend** sends message via WebSocket
-2. **Backend** validates sender, saves to database, checks if recipient is online
-3. **Backend** sends message to recipient via WebSocket (if online)
-4. **Recipient's Frontend** receives and displays message instantly
-5. **Backend** stores notification for later if recipient is offline
+1. Sender's frontend pushes the message over WebSocket.
+2. Backend validates the sender, saves to database, and checks recipient presence.
+3. Backend sends the message to the recipient via WebSocket (if online).
+4. Recipient's frontend displays it instantly.
+5. Backend stores notification for later if the recipient is offline.
 
-## 🗄️ Database Schema & Relationships
+---
+## 🗄️ Database Schema & Logic
 
-GigaBit uses SQLite with 25 interconnected tables that create a comprehensive social networking system. Below is the complete Entity Relationship Diagram showing how all tables connect:
+SQLite with 25 interconnected tables forms the relational spine. Here is the full Entity Relationship Diagram:
 
 ```mermaid
 erDiagram
@@ -647,50 +734,27 @@ erDiagram
 
 ### 🔗 Key Database Relationships Explained
 
-**User-Centric Relationships:**
-- **users → sessions**: Each user can have multiple active login sessions for secure authentication
-- **users → follows**: Users create follow relationships with other users (social graph)
-- **users → posts**: Users create content that forms their feed and timeline
-- **users → group_members**: Users participate in multiple communities with different roles
-- **users → notifications**: Users receive activity alerts from the platform
-- **users → private_conversations**: Users engage in one-on-one messaging
-
-**Content Relationships:**
-- **posts → comments**: User-generated content sparks discussions and conversations
-- **posts → likes**: Content receives reactions from the community
-- **posts → post_privacy**: Posts can have custom visibility rules beyond basic privacy settings
-- **posts → bookmarks**: Users save interesting content for later reference
-- **posts → shares**: Content gets distributed across conversations and groups
-
-**Community Relationships:**
-- **groups → group_members**: Communities consist of participants with different permission levels
-- **groups → group_posts**: Each group maintains its own discussion feed
-- **groups → events**: Communities organize activities and gatherings
-- **groups → invitations**: Private groups control access through invitation system
-- **groups → group_conversations**: Communities facilitate group messaging
-
-**Interactive Features:**
-- **events → event_responses**: Activities track participation through RSVP system
-- **polls → poll_options → poll_votes**: Interactive content collects community input
-- **private_conversations → private_messages**: Direct messaging with read receipts
-- **group_conversations → group_messages**: Community discussions with member participation
-
-**System Relationships:**
-- **users → notification_settings**: Each user configures their alert preferences
-- **notifications**: Links users to activities performed by other users (actor_id)
-- **shares**: Connects content distribution across different contexts (posts, conversations, groups)
+- **users → sessions** keeps authentication state tied to actual users.
+- **users → follows → posts** builds the social graph and drives personalized feeds.
+- **posts → comments/likes/bookmarks/shares** layer interactions and distribution on every piece of content.
+- **groups → members/posts/events/conversations** anchor community spaces with clear permissions.
+- **polls → options → votes** provide lightweight decision-making in feeds and groups.
+- **conversations → messages** separate private and group chat rails while keeping histories lean.
+- **users → notification_settings/notifications** personalize how and when alerts get delivered.
 
 ### 📊 Database Architecture Benefits
 
-- **Normalized Structure**: Eliminates data redundancy while maintaining relationships
-- **Cascading Deletes**: Ensures referential integrity when users/groups are removed
-- **Flexible Permissions**: Role-based access control for groups and content
-- **Scalable Messaging**: Separate conversation tracking for private and group chats
-- **Comprehensive Auditing**: Full timestamp tracking on all entities
-- **Privacy Controls**: Granular visibility settings at multiple levels
-- **Real-time Ready**: Optimized for WebSocket-based live updates
+- **Normalized & consistent** to avoid duplication and keep joins predictable.
+- **Cascading deletes** to protect referential integrity when users or groups disappear.
+- **Role-aware design** so permissions stay explicit in group contexts.
+- **Real-time ready** with message and notification tables tuned for WebSocket fan-out.
+- **Privacy baked in** through dedicated post_privacy and profile visibility fields.
+- **Auditable** with timestamps across all entities.
 
+---
 ## 🚀 Getting Started
+
+> Quick start: `./run.sh` (Docker Compose) spins up everything. Open the **Frontend** at `http://localhost:3000` and the **Backend API** at `http://localhost:8080`.
 
 ### Quick Start with Docker (Recommended)
 
@@ -709,8 +773,6 @@ erDiagram
    - Frontend: http://localhost:3000
    - Backend API: http://localhost:8080
 
-That's it! GigaBit is running with all services properly connected.
-
 ### Manual Development Setup
 
 **Backend Setup:**
@@ -728,6 +790,7 @@ npm install
 npm run dev
 ```
 
+---
 ## 📖 How GigaBit Works
 
 ### 🔄 Overall Application Flow
@@ -937,9 +1000,10 @@ flowchart TD
 4. Profile becomes inaccessible to others
 5. Data preserved for legal/backup purposes
 
+---
 ## 🔌 Real-time Features
 
-GigaBit uses WebSocket connections for instant updates:
+GigaBit uses WebSocket connections for instant updates across messaging, notifications, status, and feed changes.
 
 ### Connection Establishment
 
@@ -959,21 +1023,31 @@ const ws = new WebSocket('ws://localhost:8080/ws', [], {
 - **Post Updates:** New content in feeds
 - **Event Changes:** RSVP updates and reminders
 
+---
+## 📁 Project Structure
+
+```bash
+Frontend/   # Next.js + React + Tailwind frontend
+Backend/    # Go backend with REST + WebSocket
+screenshots # App captures used throughout this README
+run.sh      # Docker Compose bootstrap for local dev
+```
+
+---
 ## 🔒 Security & Privacy
 
-We take security seriously to keep your data safe:
+- **Strong Passwords:** Passwords are bcrypt-hashed, never stored in plain text.
+- **JWT Auth:** Short-lived tokens handle authentication with expiration.
+- **Input Hygiene:** Validation and sanitization on every user-facing field.
+- **Safe Database:** Parameterized queries to avoid SQL injection.
+- **CORS Discipline:** Only accepts requests from the intended frontend origin.
+- **Rate Limits:** Request throttling to discourage abuse.
+- **Session Cleanup:** Expired sessions get pruned automatically.
 
-- **Strong Passwords:** We use bcrypt to hash passwords so they're never stored in plain text
-- **Secure Login:** JWT tokens handle authentication with automatic expiration
-- **Clean Inputs:** All user data gets validated and sanitized before saving
-- **Safe Database:** Parameterized queries prevent SQL injection attacks
-- **Proper CORS:** Configured to only accept requests from our frontend
-- **Rate Limiting:** Prevents abuse by limiting how many requests you can make
-- **Session Cleanup:** Old sessions get cleaned up automatically
-
+---
 ## 🚀 Future Plans
 
-We're always looking to improve GigaBit based on user feedback. Here are some things we're considering:
+Ideas on deck based on feedback and where we want the product to go next:
 
 ### 🔍 Better Search & Discovery
 - **Improved search** with filters for finding posts, people, and groups more easily
@@ -993,6 +1067,7 @@ We're always looking to improve GigaBit based on user feedback. Here are some th
 - **Better accessibility** for screen readers and keyboard navigation
 - **Multiple languages** support for international users
 
+---
 ## ⚠️ Limitations
 
 ### 🗃️ Database Constraints
@@ -1026,35 +1101,37 @@ We're always looking to improve GigaBit based on user feedback. Here are some th
 - **Manual Deployment:** Docker-based but lacks automated CI/CD pipelines
 - **Limited Monitoring:** Basic logging without comprehensive system monitoring
 
+---
 ## 🤝 Contributing
 
-Want to help make GigaBit better? We'd love to have you! Here's how you can get involved:
+Want to push GigaBit further? Here's the flow:
 
 1. **Fork the project** on GitHub
 2. **Create a branch** for your feature (`git checkout -b feature/amazing-idea`)
-3. **Make your changes** and test them out
-4. **Submit a pull request** - we'll review it and get back to you
+3. **Make your changes** and test them
+4. **Submit a pull request** — we'll review together
 
 We're especially interested in:
 - Bug fixes and performance improvements
-- New features that fit our vision
+- New features that fit the product story
 - Better documentation and examples
 - UI/UX enhancements
 
-Don't worry about making it perfect - we can iterate together!
-
+---
 ## 📄 License
 
 MIT License - see [LICENSE.md](LICENSE.md) for details.
 
+---
 ## 👥 Authors
 
 - **Salah Yuksel**
 - **Qassim Aljaffer**
 - **Sayed Ahmed Husain** - [sayedahmed97.sad@gmail.com](mailto:sayedahmed97.sad@gmail.com)
 
+---
 ## 🙏 Acknowledgments
 
-Built with ❤️ using modern web technologies. Special thanks to the Go and React communities for amazing tools and libraries.
+Built with ❤️ using modern web technologies. Huge thanks to the Go, React, and open-source communities for the tools and libraries that power this build.
 
 **⭐ If GigaBit helps you connect, please give it a star!**

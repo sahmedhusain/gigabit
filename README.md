@@ -23,21 +23,29 @@ We built this with modern web technologies to create something that feels respon
 
 ## 📸 Screenshots
 
-### Main Feed & Posts
-![Main Feed](screenshots/main-feed.png)
-_The heart of GigaBit - your personalized feed with posts from people you follow_
+### Main Feed
+<div align="center">
+  <img src="screenshots/home-feed.jpeg" alt="Home Feed" />
+  <p><em>Your personalized feed showing posts from people you follow</em></p>
+</div>
 
 ### Real-time Chat
-![Chat Interface](screenshots/chat-interface.png)
-_Private messaging that feels instant, with typing indicators and read receipts_
+<div align="center">
+  <img src="screenshots/private-chat.jpeg" alt="Private Chat" />
+  <p><em>Private messaging with instant delivery and read receipts</em></p>
+</div>
 
 ### Group Communities
-![Group Page](screenshots/group-page.png)
-_Dedicated spaces for communities with their own posts, events, and discussions_
+<div align="center">
+  <img src="screenshots/group-posts.jpeg" alt="Group Posts" />
+  <p><em>Dedicated spaces for communities with their own discussions</em></p>
+</div>
 
 ### Event Management
-![Event Creation](screenshots/event-creation.png)
-_Easy event scheduling with RSVP tracking and automated reminders_
+<div align="center">
+  <img src="screenshots/events-page.jpeg" alt="Events Page" />
+  <p><em>Organize and track events with RSVP functionality</em></p>
+</div>
 
 ## 📋 Table of Contents
 
@@ -64,24 +72,64 @@ Getting started is easy - just pick a username and add your email. We use proper
 **Following with Approval**
 Public accounts let anyone follow immediately. Private accounts require approval first. When someone wants to follow you, you get a notification and can accept or decline. No unwanted followers.
 
+<div align="center">
+  <img src="screenshots/follow-request-private.jpeg" alt="Follow Request" />
+  <p><em>Managing follow requests on private accounts</em></p>
+</div>
+
 **Finding People**
 Search by name, email, or nickname to find specific people. We also suggest connections based on mutual friends. It's straightforward - no complicated algorithms.
 
+<div align="center">
+  <img src="screenshots/discover-page.jpeg" alt="Discover Page" />
+  <p><em>Discovering new people and communities to follow</em></p>
+</div>
+
+<div align="center">
+  <img src="screenshots/other-user-profile.jpeg" alt="Other User Profile" />
+  <p><em>Viewing other users' profiles and their activity</em></p>
+</div>
+
 **Profile Customization**
 Add a nickname, bio, avatar, and personal details. Control who sees your birthday and gender. Your profile, your rules.
+
+<div align="center">
+  <img src="screenshots/profile-page.jpeg" alt="Profile Page" />
+  <p><em>Customizing your profile with personal information and settings</em></p>
+</div>
+
+<div align="center">
+  <img src="screenshots/private-profile.jpeg" alt="Private Profile" />
+  <p><em>Profile view with privacy controls for personal information</em></p>
+</div>
 
 ### 📝 Creating & Sharing Content
 **Posting Made Simple**
 Write posts with text and photos. Choose who sees each post - everyone, just your followers, or specific people. We made it flexible so you can share exactly how you want.
 
+<div align="center">
+  <img src="screenshots/create-post.jpeg" alt="Create Post" />
+  <p><em>Creating posts with text, images, and privacy controls</em></p>
+</div>
+
 **Comments & Discussions**
 Comments can have images too, and you can reply to replies for threaded conversations. Like posts and comments to show you care. It's like having mini-forums on every post.
+
+<div align="center">
+  <img src="screenshots/posts-and-comments.jpeg" alt="Posts and Comments" />
+  <p><em>Post details with threaded comments and reactions</em></p>
+</div>
 
 **Polls for Fun & Decisions**
 Make polls with multiple options and set when they expire. Results update live as people vote. Great for quick opinions or group decisions.
 
 **Sharing & Saving**
 Share posts to your feed or send them in messages. Bookmark stuff you want to find later. Content moves around the platform naturally.
+
+<div align="center">
+  <img src="screenshots/post-privacy.jpeg" alt="Post Privacy" />
+  <p><em>Setting privacy levels for individual posts</em></p>
+</div>
 
 ### 💬 Chat & Messaging
 **Private Messages**
@@ -90,25 +138,75 @@ Talk one-on-one with anyone. Messages arrive instantly, you see when people are 
 **Group Conversations**
 Chat with multiple people at once. Perfect for communities or friend groups. Everyone sees messages in real-time, same features as private chats.
 
+<div align="center">
+  <img src="screenshots/group-chat.jpeg" alt="Group Chat" />
+  <p><em>Group conversations with multiple participants</em></p>
+</div>
+
 **Managing Your Chats**
 Keep your chat history organized. Delete messages if you change your mind, archive old conversations, and scroll through thousands of messages quickly.
+
+<div align="center">
+  <img src="screenshots/chats-page.jpeg" alt="Chats Page" />
+  <p><em>Overview of all your conversations and chat management</em></p>
+</div>
 
 ### 👥 Groups & Communities
 **Building Communities**
 Make groups for any interest - public ones anyone can join, or private ones that need approval. Each group gets its own space with posts, events, and chat rooms.
 
+<div align="center">
+  <img src="screenshots/create-group.jpeg" alt="Create Group" />
+  <p><em>Setting up a new group with privacy and permission settings</em></p>
+</div>
+
 **Who Can Do What**
 Group creators and admins manage everything. Members have different permissions based on their role. You control who can post, create events, or send messages.
+
+<div align="center">
+  <img src="screenshots/group-admin1.jpeg" alt="Group Admin Panel" />
+  <p><em>Managing group members and permissions as an admin</em></p>
+</div>
+
+<div align="center">
+  <img src="screenshots/group-info.jpeg" alt="Group Information" />
+  <p><em>Group details and member management interface</em></p>
+</div>
 
 **Group-Only Stuff**
 Groups have their own content - posts, polls, and events that only members see. Everyone gets notified when something happens in their groups.
 
+<div align="center">
+  <img src="screenshots/group-polls.jpeg" alt="Group Polls" />
+  <p><em>Group polls for member voting and discussions</em></p>
+</div>
+
 **Getting People In**
 Private groups need admin approval to join. You can invite specific people or let them request to join. Admins decide who gets in.
+
+<div align="center">
+  <img src="screenshots/group-admin2.jpeg" alt="Group Admin Tools" />
+  <p><em>Advanced admin controls for group management</em></p>
+</div>
+
+<div align="center">
+  <img src="screenshots/group-admin3.jpeg" alt="Group Admin Settings" />
+  <p><em>Group settings and member management options</em></p>
+</div>
+
+<div align="center">
+  <img src="screenshots/group-delete.jpeg" alt="Group Delete" />
+  <p><em>Group deletion and management options</em></p>
+</div>
 
 ### 📅 Events & Meetups
 **Planning Events**
 Set up events with all the details - what, when, where. Make them for your groups or just for yourself. It's straightforward to get people together.
+
+<div align="center">
+  <img src="screenshots/create-event.jpeg" alt="Create Event" />
+  <p><em>Scheduling events with date, location, and description</em></p>
+</div>
 
 **RSVP System**
 People can say if they're coming, not coming, or maybe. You see who's going and get reminded before it starts. No more wondering who will show up.
@@ -123,8 +221,51 @@ You get alerts for likes, comments, follows, messages, event invites, group stuf
 **Customizing Alerts**
 Pick your sounds, set quiet times, and mute specific chats. Turn on browser notifications for desktop alerts. Make it work how you want.
 
+<div align="center">
+  <img src="screenshots/settings-pages.jpeg" alt="Settings Pages" />
+  <p><em>Customizing notification preferences and account settings</em></p>
+</div>
+
+<div align="center">
+  <img src="screenshots/sidebar-quick-settings.jpeg" alt="Sidebar Quick Settings" />
+  <p><em>Quick access to settings and preferences</em></p>
+</div>
+
 **Instant Updates**
 Notifications pop up immediately. Check them in your notification center with links to see what's happening.
+
+<div align="center">
+  <img src="screenshots/notifications-page.jpeg" alt="Notifications Page" />
+  <p><em>Notification center showing all activity alerts and updates</em></p>
+</div>
+
+## 📊 Activity & Engagement
+
+### Your Activity Overview
+Track your interactions across the platform - see your likes, comments, and posts all in one place.
+
+<div align="center">
+  <img src="screenshots/your-activity-likes.jpeg" alt="Your Activity Likes" />
+  <p><em>Viewing your liked posts and activity history</em></p>
+</div>
+
+### Sidebar Navigation
+Quick access to all your important sections through the sidebar.
+
+<div align="center">
+  <img src="screenshots/sidebar-following.jpeg" alt="Sidebar Following" />
+  <p><em>Managing who you follow and follower requests</em></p>
+</div>
+
+<div align="center">
+  <img src="screenshots/sidebar-invitations.jpeg" alt="Sidebar Invitations" />
+  <p><em>Group invitations and pending requests</em></p>
+</div>
+
+<div align="center">
+  <img src="screenshots/sidebar-calender.jpeg" alt="Sidebar Calendar" />
+  <p><em>Event calendar and upcoming activities</em></p>
+</div>
 
 ## 🛠️ What We Built It With
 
@@ -874,6 +1015,11 @@ We're always looking to improve GigaBit based on user feedback. Here are some th
 ### 📱 Platform Restrictions
 - **Web-Only:** No native mobile applications available
 - **Browser Dependent:** Real-time features require modern browser WebSocket support
+
+<div align="center">
+  <img src="screenshots/mobile-resposive.jpeg" alt="Mobile Responsive" />
+  <p><em>GigaBit works great on mobile browsers with responsive design, but no native mobile app available</em></p>
+</div>
 
 ### 🔧 Development & Deployment
 - **Monolithic Architecture:** Single codebase may become complex to maintain at scale
